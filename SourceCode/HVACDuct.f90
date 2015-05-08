@@ -197,13 +197,13 @@ SUBROUTINE GetDuctInput
   LOGICAL                        :: IsBlank              ! Flag for blank name
 
   cCurrentModuleObject='Duct'
-  NumDucts = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumDucts = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(Duct(NumDucts))
   ALLOCATE(CheckEquipName(NumDucts))
   CheckEquipName=.true.
 
   DO DuctNum=1,NumDucts
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),DuctNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,DuctNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.FALSE.
@@ -445,7 +445,7 @@ END SUBROUTINE ReportDuct
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

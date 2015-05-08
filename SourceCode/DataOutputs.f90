@@ -31,67 +31,70 @@ IMPLICIT NONE ! Enforce explicit typing of all variables
 PUBLIC ! Data Only modules are Public
 
           ! MODULE PARAMETER DEFINITIONS:
-INTEGER, PARAMETER :: NumMonthlyReports=59
+INTEGER, PARAMETER :: NumMonthlyReports=62
 CHARACTER(len=*), PARAMETER, DIMENSION(NumMonthlyReports) :: MonthlyNamedReports=  &
-    (/'ZONECOOLINGSUMMARYMONTHLY                               ',   &
-      'ZONEHEATINGSUMMARYMONTHLY                               ',   &
-      'ZONEELECTRICSUMMARYMONTHLY                              ',   &
-      'SPACEGAINSMONTHLY                                       ',   &
-      'PEAKSPACEGAINSMONTHLY                                   ',   &
-      'SPACEGAINCOMPONENTSATCOOLINGPEAKMONTHLY                 ',   &
-      'ENERGYCONSUMPTIONELECTRICITYNATURALGASMONTHLY           ',   &
-      'ENERGYCONSUMPTIONELECTRICITYGENERATEDPROPANEMONTHLY     ',   &
-      'ENERGYCONSUMPTIONDIESELFUELOILMONTHLY                   ',   &
-      'ENERGY CONSUMPTION  - DISTRICT HEATING & COOLING MONTHLY',   &
-      'ENERGYCONSUMPTIONCOALGASOLINEMONTHLY                    ',   &
-      'ENDUSEENERGYCONSUMPTIONELECTRICITYMONTHLY               ',   &
-      'ENDUSEENERGYCONSUMPTIONNATURALGASMONTHLY                ',   &
-      'ENDUSEENERGYCONSUMPTIONDIESELMONTHLY                    ',   &
-      'ENDUSEENERGYCONSUMPTIONFUELOILMONTHLY                   ',   &
-      'ENDUSEENERGYCONSUMPTIONCOALMONTHLY                      ',   &
-      'ENDUSEENERGYCONSUMPTIONPROPANEMONTHLY                   ',   &
-      'ENDUSEENERGYCONSUMPTIONGASOLINEMONTHLY                  ',   &
-      'PEAKENERGYENDUSEELECTRICITYPART1MONTHLY                 ',   &
-      'PEAKENERGYENDUSEELECTRICITYPART2MONTHLY                 ',   &
-      'ELECTRICCOMPONENTSOFPEAKDEMANDMONTHLY                   ',   &
-      'PEAKENERGYENDUSENATURALGASMONTHLY                       ',   &
-      'PEAKENERGYENDUSEDIESELMONTHLY                           ',   &
-      'PEAKENERGYENDUSEFUELOILMONTHLY                          ',   &
-      'PEAKENERGYENDUSECOALMONTHLY                             ',   &
-      'PEAKENERGYENDUSEPROPANEMONTHLY                          ',   &
-      'PEAKENERGYENDUSEGASOLINEMONTHLY                         ',   &
-      'SETPOINTSNOTMETWITHTEMPERATURESMONTHLY                  ',   &
-      'COMFORTREPORTSIMPLE55MONTHLY                            ',   &
-      'UNGLAZEDTRANSPIREDSOLARCOLLECTORSUMMARYMONTHLY          ',   &
-      'OCCUPANTCOMFORTDATASUMMARYMONTHLY                       ',   &
-      'CHILLERREPORTMONTHLY                                    ',   &
-      'TOWERREPORTMONTHLY                                      ',   &
-      'BOILERREPORTMONTHLY                                     ',   &
-      'DXREPORTMONTHLY                                         ',   &
-      'WINDOWREPORTMONTHLY                                     ',   &
-      'WINDOWENERGYREPORTMONTHLY                               ',   &
-      'WINDOWZONESUMMARYMONTHLY                                ',   &
-      'WINDOWENERGYZONESUMMARYMONTHLY                          ',   &
-      'AVERAGEOUTDOORCONDITIONSMONTHLY                         ',   &
-      'OUTDOORCONDITIONSMAXIMUMDRYBULBMONTHLY                  ',   &
-      'OUTDOORCONDITIONSMINIMUMDRYBULBMONTHLY                  ',   &
-      'OUTDOORCONDITIONSMAXIMUMWETBULBMONTHLY                  ',   &
-      'OUTDOORCONDITIONSMAXIMUMDEWPOINTMONTHLY                 ',   &
-      'OUTDOORGROUNDCONDITIONSMONTHLY                          ',   &
-      'WINDOWACREPORTMONTHLY                                   ',   &
-      'WATERHEATERREPORTMONTHLY                                ',   &
-      'GENERATORREPORTMONTHLY                                  ',   &
-      'DAYLIGHTINGREPORTMONTHLY                                ',   &
-      'COILREPORTMONTHLY                                       ',   &
-      'PLANTLOOPDEMANDREPORTMONTHLY                            ',   &
-      'FANREPORTMONTHLY                                        ',   &
-      'PUMPREPORTMONTHLY                                       ',   &
-      'CONDLOOPDEMANDREPORTMONTHLY                             ',   &
-      'ZONETEMPERATUREOSCILLATIONREPORTMONTHLY                 ',   &
-      'AIRLOOPSYSTEMENERGYANDWATERUSEMONTHLY                   ',   &
-      'AIRLOOPSYSTEMCOMPONENTLOADSMONTHLY                      ',   &
-      'AIRLOOPSYSTEMCOMPONENTENERGYUSEMONTHLY                  ',   &
-      'MECHANICALVENTILATIONLOADSMONTHLY                       '/)
+    (/'ZONECOOLINGSUMMARYMONTHLY                          ',   &
+      'ZONEHEATINGSUMMARYMONTHLY                          ',   &
+      'ZONEELECTRICSUMMARYMONTHLY                         ',   &
+      'SPACEGAINSMONTHLY                                  ',   &
+      'PEAKSPACEGAINSMONTHLY                              ',   &
+      'SPACEGAINCOMPONENTSATCOOLINGPEAKMONTHLY            ',   &
+      'ENERGYCONSUMPTIONELECTRICITYNATURALGASMONTHLY      ',   &
+      'ENERGYCONSUMPTIONELECTRICITYGENERATEDPROPANEMONTHLY',   &
+      'ENERGYCONSUMPTIONDIESELFUELOILMONTHLY              ',   &
+      'ENERGYCONSUMPTIONDISTRICTHEATINGCOOLINGMONTHLY     ',   &
+      'ENERGYCONSUMPTIONCOALGASOLINEMONTHLY               ',   &
+      'ENERGYCONSUMPTIONOTHERFUELSMONTHLY                 ',   &
+      'ENDUSEENERGYCONSUMPTIONELECTRICITYMONTHLY          ',   &
+      'ENDUSEENERGYCONSUMPTIONNATURALGASMONTHLY           ',   &
+      'ENDUSEENERGYCONSUMPTIONDIESELMONTHLY               ',   &
+      'ENDUSEENERGYCONSUMPTIONFUELOILMONTHLY              ',   &
+      'ENDUSEENERGYCONSUMPTIONCOALMONTHLY                 ',   &
+      'ENDUSEENERGYCONSUMPTIONPROPANEMONTHLY              ',   &
+      'ENDUSEENERGYCONSUMPTIONGASOLINEMONTHLY             ',   &
+      'ENDUSEENERGYCONSUMPTIONOTHERFUELSMONTHLY           ',   &
+      'PEAKENERGYENDUSEELECTRICITYPART1MONTHLY            ',   &
+      'PEAKENERGYENDUSEELECTRICITYPART2MONTHLY            ',   &
+      'ELECTRICCOMPONENTSOFPEAKDEMANDMONTHLY              ',   &
+      'PEAKENERGYENDUSENATURALGASMONTHLY                  ',   &
+      'PEAKENERGYENDUSEDIESELMONTHLY                      ',   &
+      'PEAKENERGYENDUSEFUELOILMONTHLY                     ',   &
+      'PEAKENERGYENDUSECOALMONTHLY                        ',   &
+      'PEAKENERGYENDUSEPROPANEMONTHLY                     ',   &
+      'PEAKENERGYENDUSEGASOLINEMONTHLY                    ',   &
+      'PEAKENERGYENDUSEOTHERFUELSMONTHLY                  ',   &
+      'SETPOINTSNOTMETWITHTEMPERATURESMONTHLY             ',   &
+      'COMFORTREPORTSIMPLE55MONTHLY                       ',   &
+      'UNGLAZEDTRANSPIREDSOLARCOLLECTORSUMMARYMONTHLY     ',   &
+      'OCCUPANTCOMFORTDATASUMMARYMONTHLY                  ',   &
+      'CHILLERREPORTMONTHLY                               ',   &
+      'TOWERREPORTMONTHLY                                 ',   &
+      'BOILERREPORTMONTHLY                                ',   &
+      'DXREPORTMONTHLY                                    ',   &
+      'WINDOWREPORTMONTHLY                                ',   &
+      'WINDOWENERGYREPORTMONTHLY                          ',   &
+      'WINDOWZONESUMMARYMONTHLY                           ',   &
+      'WINDOWENERGYZONESUMMARYMONTHLY                     ',   &
+      'AVERAGEOUTDOORCONDITIONSMONTHLY                    ',   &
+      'OUTDOORCONDITIONSMAXIMUMDRYBULBMONTHLY             ',   &
+      'OUTDOORCONDITIONSMINIMUMDRYBULBMONTHLY             ',   &
+      'OUTDOORCONDITIONSMAXIMUMWETBULBMONTHLY             ',   &
+      'OUTDOORCONDITIONSMAXIMUMDEWPOINTMONTHLY            ',   &
+      'OUTDOORGROUNDCONDITIONSMONTHLY                     ',   &
+      'WINDOWACREPORTMONTHLY                              ',   &
+      'WATERHEATERREPORTMONTHLY                           ',   &
+      'GENERATORREPORTMONTHLY                             ',   &
+      'DAYLIGHTINGREPORTMONTHLY                           ',   &
+      'COILREPORTMONTHLY                                  ',   &
+      'PLANTLOOPDEMANDREPORTMONTHLY                       ',   &
+      'FANREPORTMONTHLY                                   ',   &
+      'PUMPREPORTMONTHLY                                  ',   &
+      'CONDLOOPDEMANDREPORTMONTHLY                        ',   &
+      'ZONETEMPERATUREOSCILLATIONREPORTMONTHLY            ',   &
+      'AIRLOOPSYSTEMENERGYANDWATERUSEMONTHLY              ',   &
+      'AIRLOOPSYSTEMCOMPONENTLOADSMONTHLY                 ',   &
+      'AIRLOOPSYSTEMCOMPONENTENERGYUSEMONTHLY             ',   &
+      'MECHANICALVENTILATIONLOADSMONTHLY                  '/)
 
 
           ! DERIVED TYPE DEFINITIONS:
@@ -355,7 +358,7 @@ END FUNCTION DOMakeUPPERCase
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

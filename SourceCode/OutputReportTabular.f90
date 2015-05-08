@@ -54,6 +54,7 @@ USE DataGlobals,  ONLY : MaxNameLength, BigNumber, ZoneTSReporting, HVACTSReport
                          OutputFileDebug
 USE DataInterfaces
 USE DataGlobalConstants
+USE OutputReportPredefined
 
 IMPLICIT NONE
 
@@ -82,6 +83,7 @@ INTEGER, parameter  ::  tableStyleComma               = 1
 INTEGER, parameter  ::  tableStyleTab                 = 2
 INTEGER, parameter  ::  tableStyleFixed               = 3
 INTEGER, parameter  ::  tableStyleHTML                = 4
+INTEGER, parameter  ::  tableStyleXML                 = 5
 
 INTEGER, PUBLIC, parameter  ::  unitsStyleNone             = 0 !no change to any units
 INTEGER, PUBLIC, parameter  ::  unitsStyleJtoKWH           = 1
@@ -97,8 +99,8 @@ INTEGER, parameter  ::  stepTypeHVAC               = HVACTSReporting
 
 ! BEPS Report Related Variables
 ! From Report:Table:Predefined - BEPS
-INTEGER, parameter  ::  numResourceTypes = 12
-INTEGER, parameter  ::  numSourceTypes   =  10
+INTEGER, parameter  ::  numResourceTypes = 14
+INTEGER, parameter  ::  numSourceTypes   =  12
 
 CHARACTER(LEN=*), parameter :: validChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_:.'
 
@@ -158,8 +160,9 @@ TYPE NamedMonthlyType
   CHARACTER(len=MaxNameLength)    :: title     =' '       ! report title
   LOGICAL                         :: show      =.FALSE.   ! if report should be shown
 END TYPE
-INTEGER, PARAMETER    :: numNamedMonthly = 59
+INTEGER, PARAMETER    :: numNamedMonthly = 62
 TYPE (NamedMonthlyType), DIMENSION(:),ALLOCATABLE :: namedMonthly  !for predefined monthly report titles
+! These reports are detailed/named in routine InitializePredefinedMonthlyTitles
 
 TYPE MonthlyInputType
   CHARACTER(len=MaxNameLength * 2)   :: name     =' ' ! identifier
@@ -174,21 +177,14 @@ TYPE MonthlyFieldSetInputType
   CHARACTER(len=MaxNameLength)   :: variMeter = ''    ! the name of the variable or meter
   CHARACTER(len=MaxNameLength)   :: colHead   = ''    ! the column header to use instead of the variable name (only for predefined)
   INTEGER                        :: aggregate = 0     ! the type of aggregation for the variable (see aggType parameters)
-
-!#ifdef ITM_KEYCACHE
-  ! Noel Comment: May not be the best place to add these.
-  ! This is where we could store values and use them later in IMTabular
-  ! May need to change NamesOfKeys and IndexesForKeyVar to be allocatable if we can't
-  ! decide on a max value for the key count.
-  CHARACTER(len=MaxNameLength)   :: varUnits = ''     ! Units sting, may be blank  ! noel
-  CHARACTER(len=MaxNameLength)   :: variMeterUpper = ''    ! the name of the variable or meter uppercased ! noel
-  INTEGER                        :: typeOfVar = 0     ! 0=not found, 1=integer, 2=real, 3=meter !noel
+  CHARACTER(len=MaxNameLength)   :: varUnits = ''     ! Units sting, may be blank
+  CHARACTER(len=MaxNameLength)   :: variMeterUpper = ''    ! the name of the variable or meter uppercased
+  INTEGER                        :: typeOfVar = 0     ! 0=not found, 1=integer, 2=real, 3=meter
   INTEGER                        :: keyCount=0        ! noel
-  INTEGER                        :: varAvgSum=1       ! Variable  is Averaged=1 or Summed=2 noel
-  INTEGER                        :: varStepType=1     ! Variable time step is Zone=1 or HVAC=2 noel
+  INTEGER                        :: varAvgSum=1       ! Variable  is Averaged=1 or Summed=2
+  INTEGER                        :: varStepType=1     ! Variable time step is Zone=1 or HVAC=2
   CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: NamesOfKeys  ! keyNames !noel
   INTEGER, ALLOCATABLE, DIMENSION(:)          :: IndexesForKeyVar ! keyVarIndexes !noel
-!#endif
 END TYPE
 
 TYPE MonthlyTablesType
@@ -254,8 +250,8 @@ INTEGER :: UnitConvSize
 
 LOGICAL, PUBLIC   ::    WriteTabularFiles=.false.
 
-! Allow up to four output files to be created
-INTEGER, PARAMETER :: maxNumStyles = 4
+! Allow up to five output files to be created
+INTEGER, PARAMETER :: maxNumStyles = 5
 
 ! From Report:Table:Style
 INTEGER,PUBLIC                          :: unitsStyle        = 0   ! see list of parameters
@@ -275,6 +271,7 @@ LOGICAL   ::    displaySurfaceShadowing = .false.
 LOGICAL   ::    displayDemandEndUse = .false.
 LOGICAL   ::    displayAdaptiveComfort = .false.
 LOGICAL   ::    displaySourceEnergyEndUseSummary = .false.
+LOGICAL   ::    displayZoneComponentLoadSummary = .false.
 
 ! BEPS Report Related Variables
 ! From Report:Table:Predefined - BEPS
@@ -364,6 +361,8 @@ REAL(r64)                                       :: sourceFactorCoal             
 REAL(r64)                                       :: sourceFactorFuelOil1           =0.0
 REAL(r64)                                       :: sourceFactorFuelOil2           =0.0
 REAL(r64)                                       :: sourceFactorPropane            =0.0
+REAL(r64)                                       :: sourceFactorOtherFuel1         =0.0
+REAL(r64)                                       :: sourceFactorOtherFuel2         =0.0
 
 INTEGER,DIMENSION(8)        :: td
 !(1)   Current year
@@ -380,11 +379,80 @@ INTEGER,DIMENSION(8)        :: td
 CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:)  :: DesignDayName
 INTEGER                                                 :: DesignDayCount=0
 
+
+!arrays related to pulse and load component reporting
+REAL(r64), DIMENSION(:,:),ALLOCATABLE,PUBLIC   :: radiantPulseUsed
+INTEGER, DIMENSION(:,:),ALLOCATABLE,PUBLIC   :: radiantPulseTimestep
+REAL(r64), DIMENSION(:,:),ALLOCATABLE,PUBLIC   :: radiantPulseReceived
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC   :: loadConvectedNormal
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC   :: loadConvectedWithPulse
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC   :: netSurfRadSeq
+REAL(r64), DIMENSION(:,:),ALLOCATABLE,PUBLIC   :: decayCurveCool
+REAL(r64), DIMENSION(:,:),ALLOCATABLE,PUBLIC   :: decayCurveHeat
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC   :: ITABSFseq  !used for determining the radiant fraction on each surface
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC   :: TMULTseq   !used for determining the radiant fraction on each surface
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: peopleInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: peopleLatentSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: peopleRadSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE         :: peopleDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: lightInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: lightRetAirSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: lightLWRadSeq        ! long wave thermal radiation
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: lightSWRadSeq        ! short wave visible radiation
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE         :: lightDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: equipInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: equipLatentSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: equipRadSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE         :: equipDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: refrigInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: refrigRetAirSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: refrigLatentSeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: waterUseInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: waterUseLatentSeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: hvacLossInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: hvacLossRadSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE         :: hvacLossDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: powerGenInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: powerGenRadSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE         :: powerGenDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: infilInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: infilLatentSeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: zoneVentInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: zoneVentLatentSeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: interZoneMixInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: interZoneMixLatentSeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: feneCondInstantSeq
+!REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: feneSolarInstantSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: feneSolarRadSeq
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: feneSolarDelaySeq
+
+REAL(r64), DIMENSION(:,:,:),ALLOCATABLE,PUBLIC  :: surfDelaySeq
+
 INTEGER,PUBLIC :: maxUniqueKeyCount=0
+
+! for the XML report must keep track fo the active sub-table name and report set by other routines
+CHARACTER(len=MaxNameLength) :: activeSubTableName
+CHARACTER(len=MaxNameLength) :: activeReportName
+CHARACTER(len=MaxNameLength) :: prevReportName = ''
 
 
 ! SUBROUTINE SPECIFICATIONS FOR MODULE PrimaryPlantLoops
  PUBLIC       UpdateTabularReports
+ PUBLIC       isCompLoadRepReq
+ PUBLIC       AllocateLoadComponentArrays
+ PUBLIC       DeallocateLoadComponentArrays
+ PUBLIC       ComputeLoadComponentDecayCurve
  PRIVATE      GetInputTabularMonthly
  PRIVATE      GetInputTabularTimeBins
  PRIVATE      GetInputTabularStyle
@@ -395,6 +463,8 @@ INTEGER,PUBLIC :: maxUniqueKeyCount=0
  PRIVATE      GatherBEPSResultsForTimestep
  PRIVATE      GatherHeatGainReport
  PRIVATE      GatherSourceEnergyEndUseResultsForTimestep
+ PUBLIC       GatherComponentLoadsHVAC
+ PUBLIC       GatherComponentLoadsSurface
  PUBLIC       WriteTabularReports
  PRIVATE      WriteMonthlyTables
  PRIVATE      WriteTimeBinTables
@@ -411,6 +481,7 @@ INTEGER,PUBLIC :: maxUniqueKeyCount=0
  PUBLIC       writeSubtitle
  PUBLIC       WriteTable
  PRIVATE      WriteTableOfContents
+ PRIVATE      WriteZoneLoadComponentTable
  PUBLIC      DetermineBuildingFloorArea
  PUBLIC       RealToStr
  PUBLIC       IntToStr
@@ -482,6 +553,7 @@ IF (GetInput) THEN
   CALL InitializeTabularMonthly
   CALL GetInputFuelAndPollutionFactors
   CALL SetupUnitConversions
+  CALL AddTOCZoneLoadComponentTable
   GetInput = .FALSE.
   CALL DATE_AND_TIME(values=td)
 END IF
@@ -1504,20 +1576,36 @@ ELSEIF (NumTabularStyle .EQ. 1) THEN
     numStyles = 1
     TableStyle(1) = tableStyleHTML
     del(1) = CharSpace !space - this is not used much for HTML output
+  ELSEIF (SameString(AlphArray(1),'XML')) THEN
+    numStyles = 1
+    TableStyle(1) = tableStyleXML
+    del(1) = CharSpace !space - this is not used much for XML output
   ELSEIF (SameString(AlphArray(1),'CommaAndHTML')) THEN
     numStyles = 2
     TableStyle(1) = tableStyleComma
     del(1) = CharComma !comma
     TableStyle(2) = tableStyleHTML
     del(2) = CharSpace !space - this is not used much for HTML output
+  ELSEIF (SameString(AlphArray(1),'CommaAndXML')) THEN
+    numStyles = 2
+    TableStyle(1) = tableStyleComma
+    del(1) = CharComma !comma
+    TableStyle(2) = tableStyleXML
+    del(2) = CharSpace !space - this is not used much for XML output
   ELSEIF (SameString(AlphArray(1),'TabAndHTML')) THEN
     numStyles = 2
     TableStyle(1) = tableStyleTab
     del(1) = CharTab  !tab
     TableStyle(2) = tableStyleHTML
     del(2) = CharSpace !space - this is not used much for HTML output
+  ELSEIF (SameString(AlphArray(1),'XMLandHTML')) THEN
+    numStyles = 2
+    TableStyle(1) = tableStyleXML
+    del(1) = CharSpace !space - this is not used much for XML output
+    TableStyle(2) = tableStyleHTML
+    del(2) = CharSpace !space - this is not used much for HTML output
   ELSEIF (SameString(AlphArray(1),'All')) THEN
-    numStyles = 4
+    numStyles = 5
     TableStyle(1) = tableStyleComma
     del(1) = CharComma !comma
     TableStyle(2) = tableStyleTab
@@ -1526,6 +1614,8 @@ ELSEIF (NumTabularStyle .EQ. 1) THEN
     del(3) = CharSpace ! space
     TableStyle(4) = tableStyleHTML
     del(4) = CharSpace !space - this is not used much for HTML output
+    TableStyle(5) = tableStyleXML
+    del(5) = CharSpace !space - this is not used much for XML output
   ELSE
     CALL ShowWarningError(CurrentModuleObject//': Invalid '//TRIM(cAlphaFieldNames(1))//'="'//  &
        TRIM(AlphArray(1))//'". Commas will be used.')
@@ -1553,6 +1643,7 @@ ELSEIF (NumTabularStyle .EQ. 1) THEN
     ENDIF
   ELSE
     unitsStyle = unitsStyleNone
+    AlphArray(2)='None'
   END IF
 ELSEIF (NumTabularStyle .GT. 1) THEN
   CALL ShowWarningError(CurrentModuleObject//': Only one instance of this object is allowed. Commas will be used.')
@@ -1560,15 +1651,16 @@ ELSEIF (NumTabularStyle .GT. 1) THEN
   del = CharComma !comma
   AlphArray(1)='COMMA'
   unitsStyle = unitsStyleNone
+  AlphArray(2)='None'
 ENDIF
 
 IF (WriteTabularFiles) THEN
-  Write(OutputFileInits,fmta) '! <Tabular Report>,Style'
+  Write(OutputFileInits,fmta) '! <Tabular Report>,Style,Unit Conversion'
   IF (AlphArray(1) /= 'HTML') THEN
     CALL ConvertCaseToLower(AlphArray(1),AlphArray(2))
     AlphArray(1)(2:)=AlphArray(2)(2:)
   ENDIF
-  WRITE(OutputFileInits,"('Tabular Report,',A)") TRIM(AlphArray(1))
+  WRITE(OutputFileInits,"('Tabular Report,',A,',',A)") TRIM(AlphArray(1)),TRIM(AlphArray(2))
 ENDIF
 
 END SUBROUTINE GetInputTabularStyle
@@ -1705,6 +1797,10 @@ IF (NumTabularPredefined .EQ. 1) THEN
       displaySourceEnergyEndUseSummary = .TRUE.
       WriteTabularFiles=.true.
       nameFound=.true.
+    ELSEIF (SameString(AlphArray(iReport),'ZoneComponentLoadSummary')) then
+      displayZoneComponentLoadSummary = .TRUE.
+      WriteTabularFiles=.true.
+      nameFound=.true.
     ELSEIF (SameString(AlphArray(iReport),'EnergyMeters')) then
       WriteTabularFiles=.true.
       nameFound=.true.
@@ -1722,6 +1818,22 @@ IF (NumTabularPredefined .EQ. 1) THEN
       DO jReport = 1, numReportName
         reportName(jReport)%show = .TRUE.
       END DO
+    ELSEIF (SameString(AlphArray(iReport),'AllSummaryAndSizingPeriod')) then
+      WriteTabularFiles=.true.
+      displayTabularBEPS = .TRUE.
+      displayTabularVeriSum = .TRUE.
+      displayTabularCompCosts = .TRUE.
+      displaySurfaceShadowing = .TRUE.
+      displayComponentSizing = .TRUE.
+      displayDemandEndUse = .true.
+      displayAdaptiveComfort = .TRUE.
+      displaySourceEnergyEndUseSummary = .TRUE.
+      nameFound=.true.
+      DO jReport = 1, numReportName
+        reportName(jReport)%show = .TRUE.
+      END DO
+      !the sizing period reports
+      displayZoneComponentLoadSummary = .TRUE.
     ELSEIF (SameString(AlphArray(iReport),'AllMonthly')) then
       WriteTabularFiles=.true.
       DO jReport = 1, numNamedMonthly
@@ -1745,6 +1857,25 @@ IF (NumTabularPredefined .EQ. 1) THEN
       DO jReport = 1, numNamedMonthly
         namedMonthly(jReport)%show = .TRUE.
       END DO
+    ELSEIF (SameString(AlphArray(iReport),'AllSummaryMonthlyAndSizingPeriod')) then
+      WriteTabularFiles=.true.
+      displayTabularBEPS = .TRUE.
+      displayTabularVeriSum = .TRUE.
+      displayTabularCompCosts = .TRUE.
+      displaySurfaceShadowing = .TRUE.
+      displayComponentSizing = .TRUE.
+      displayDemandEndUse = .true.
+      displayAdaptiveComfort = .TRUE.
+      displaySourceEnergyEndUseSummary = .TRUE.
+      nameFound=.true.
+      DO jReport = 1, numReportName
+        reportName(jReport)%show = .TRUE.
+      END DO
+      DO jReport = 1, numNamedMonthly
+        namedMonthly(jReport)%show = .TRUE.
+      END DO
+      !the sizing period reports
+      displayZoneComponentLoadSummary = .TRUE.
     ENDIF
     !check the reports that are predefined and are created by outputreportpredefined.f90
     DO jReport = 1, numReportName
@@ -1798,6 +1929,8 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   resourceTypeNames(10) = 'FuelOil#1'
   resourceTypeNames(11) = 'FuelOil#2'
   resourceTypeNames(12) = 'Propane'
+  resourceTypeNames(13) = 'OtherFuel1'
+  resourceTypeNames(14) = 'OtherFuel2'
 
   sourceTypeNames(1)='Electric'
   sourceTypeNames(2)='NaturalGas'
@@ -1809,6 +1942,8 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
   sourceTypeNames(8)='Propane'
   sourceTypeNames(9)='PurchasedElectric'
   sourceTypeNames(10)='SoldElectric'
+  sourceTypeNames(11)='OtherFuel1'
+  sourceTypeNames(12)='OtherFuel2'
 
   ! initialize the end use names
   endUseNames(endUseHeating) = 'Heating'
@@ -1924,6 +2059,81 @@ IF (displayTabularBEPS .OR. displayDemandEndUse .OR. displaySourceEnergyEndUseSu
 END IF
 END SUBROUTINE GetInputTabularPredefined
 
+LOGICAL FUNCTION isCompLoadRepReq()
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   November 2003
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Determine if the ZoneComponentLoadSummary or
+          !   ZoneComponentLoadDetail reports are requested.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Uses get input structure similar to other objects
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+CHARACTER(len=*), PARAMETER :: CurrentModuleObject='Output:Table:SummaryReports'
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER                     :: NumTabularPredefined
+INTEGER                     :: NumParams
+INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
+INTEGER                     :: NumNums    ! Number of elements in the numeric array
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:)  :: AlphArray
+REAL(r64),ALLOCATABLE,                         DIMENSION(:)  :: NumArray
+INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
+INTEGER                     :: iReport
+LOGICAL :: isFound
+
+isFound = .FALSE.
+NumTabularPredefined = GetNumObjectsFound(CurrentModuleObject)
+IF (NumTabularPredefined .EQ. 1) THEN
+  ! find out how many fields since the object is extensible
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
+  ! allocate the temporary arrays for the call to get the filed
+  ALLOCATE(AlphArray(NumAlphas))
+  AlphArray = ''
+  ! don't really need the NumArray since not expecting any numbers but the call requires it
+  ALLOCATE(NumArray(NumNums))
+  NumArray = 0
+  ! get the object
+  CALL GetObjectItem(CurrentModuleObject,1,AlphArray,NumAlphas, &
+                    NumArray,NumNums,IOSTAT)
+  ! loop through the fields looking for matching report titles
+  DO iReport = 1, NumAlphas
+    IF (SameString(AlphArray(iReport),'ZoneComponentLoadSummary')) then
+      isFound = .TRUE.
+    END IF
+    IF (SameString(AlphArray(iReport),'AllSummaryAndSizingPeriod')) then
+      isFound = .TRUE.
+    END IF
+    IF (SameString(AlphArray(iReport),'AllSummaryMonthlyAndSizingPeriod')) then
+      isFound = .TRUE.
+    END IF
+  END DO
+END IF
+isCompLoadRepReq = isFound !return true if either report was found
+END FUNCTION
+
+
 SUBROUTINE InitializePredefinedMonthlyTitles
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Jason Glazer
@@ -1941,6 +2151,9 @@ SUBROUTINE InitializePredefinedMonthlyTitles
           ! na
 
           ! USE STATEMENTS:
+USE DataOutputs
+USE General, ONLY: RoundSigDigits
+
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1956,6 +2169,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: xcount
+
 ALLOCATE(namedMonthly(numNamedMonthly))
 namedMonthly(1)%title = 'ZoneCoolingSummaryMonthly'
 namedMonthly(2)%title = 'ZoneHeatingSummaryMonthly'
@@ -1968,54 +2183,74 @@ namedMonthly(8)%title = 'EnergyConsumptionElectricityGeneratedPropaneMonthly'
 namedMonthly(9)%title = 'EnergyConsumptionDieselFuelOilMonthly'
 namedMonthly(10)%title = 'EnergyConsumptionDistrictHeatingCoolingMonthly'
 namedMonthly(11)%title = 'EnergyConsumptionCoalGasolineMonthly'
-namedMonthly(12)%title = 'EndUseEnergyConsumptionElectricityMonthly'
-namedMonthly(13)%title = 'EndUseEnergyConsumptionNaturalGasMonthly'
-namedMonthly(14)%title = 'EndUseEnergyConsumptionDieselMonthly'
-namedMonthly(15)%title = 'EndUseEnergyConsumptionFuelOilMonthly'
-namedMonthly(16)%title = 'EndUseEnergyConsumptionCoalMonthly'
-namedMonthly(17)%title = 'EndUseEnergyConsumptionPropaneMonthly'
-namedMonthly(18)%title = 'EndUseEnergyConsumptionGasolineMonthly'
-namedMonthly(19)%title = 'PeakEnergyEndUseElectricityPart1Monthly'
-namedMonthly(20)%title = 'PeakEnergyEndUseElectricityPart2Monthly'
-namedMonthly(21)%title = 'ElectricComponentsOfPeakDemandMonthly'
-namedMonthly(22)%title = 'PeakEnergyEndUseNaturalGasMonthly'
-namedMonthly(23)%title = 'PeakEnergyEndUseDieselMonthly'
-namedMonthly(24)%title = 'PeakEnergyEndUseFuelOilMonthly'
-namedMonthly(25)%title = 'PeakEnergyEndUseCoalMonthly'
-namedMonthly(26)%title = 'PeakEnergyEndUsePropaneMonthly'
-namedMonthly(27)%title = 'PeakEnergyEndUseGasolineMonthly'
-namedMonthly(28)%title = 'SetpointsNotMetWithTemperaturesMonthly'
-namedMonthly(29)%title = 'ComfortReportSimple55Monthly'
-namedMonthly(30)%title = 'UnglazedTranspiredSolarCollectorSummaryMonthly'
-namedMonthly(31)%title = 'OccupantComfortDataSummaryMonthly'
-namedMonthly(32)%title = 'ChillerReportMonthly'
-namedMonthly(33)%title = 'TowerReportMonthly'
-namedMonthly(34)%title = 'BoilerReportMonthly'
-namedMonthly(35)%title = 'DXReportMonthly'
-namedMonthly(36)%title = 'WindowReportMonthly'
-namedMonthly(37)%title = 'WindowEnergyReportMonthly'
-namedMonthly(38)%title = 'WindowZoneSummaryMonthly'
-namedMonthly(39)%title = 'WindowEnergyZoneSummaryMonthly'
-namedMonthly(40)%title = 'AverageOutdoorConditionsMonthly'
-namedMonthly(41)%title = 'OutdoorConditionsMaximumDryBulbMonthly'
-namedMonthly(42)%title = 'OutdoorConditionsMinimumDryBulbMonthly'
-namedMonthly(43)%title = 'OutdoorConditionsMaximumWetBulbMonthly'
-namedMonthly(44)%title = 'OutdoorConditionsMaximumDewPointMonthly'
-namedMonthly(45)%title = 'OutdoorGroundConditionsMonthly'
-namedMonthly(46)%title = 'WindowACReportMonthly'
-namedMonthly(47)%title = 'WaterHeaterReportMonthly'
-namedMonthly(48)%title = 'GeneratorReportMonthly'
-namedMonthly(49)%title = 'DaylightingReportMonthly'
-namedMonthly(50)%title = 'CoilReportMonthly'
-namedMonthly(51)%title = 'PlantLoopDemandReportMonthly'
-namedMonthly(52)%title = 'FanReportMonthly'
-namedMonthly(53)%title = 'PumpReportMonthly'
-namedMonthly(54)%title = 'CondLoopDemandReportMonthly'
-namedMonthly(55)%title = 'ZoneTemperatureOscillationReportMonthly'
-namedMonthly(56)%title = 'AirLoopSystemEnergyAndWaterUseMonthly'
-namedMonthly(57)%title = 'AirLoopSystemComponentLoadsMonthly'
-namedMonthly(58)%title = 'AirLoopSystemComponentEnergyUseMonthly'
-namedMonthly(59)%title = 'MechanicalVentilationLoadsMonthly'
+namedMonthly(12)%title = 'EnergyConsumptionOtherFuelsMonthly'
+namedMonthly(13)%title = 'EndUseEnergyConsumptionElectricityMonthly'
+namedMonthly(14)%title = 'EndUseEnergyConsumptionNaturalGasMonthly'
+namedMonthly(15)%title = 'EndUseEnergyConsumptionDieselMonthly'
+namedMonthly(16)%title = 'EndUseEnergyConsumptionFuelOilMonthly'
+namedMonthly(17)%title = 'EndUseEnergyConsumptionCoalMonthly'
+namedMonthly(18)%title = 'EndUseEnergyConsumptionPropaneMonthly'
+namedMonthly(19)%title = 'EndUseEnergyConsumptionGasolineMonthly'
+namedMonthly(20)%title = 'EndUseEnergyConsumptionOtherFuelsMonthly'
+namedMonthly(21)%title = 'PeakEnergyEndUseElectricityPart1Monthly'
+namedMonthly(22)%title = 'PeakEnergyEndUseElectricityPart2Monthly'
+namedMonthly(23)%title = 'ElectricComponentsOfPeakDemandMonthly'
+namedMonthly(24)%title = 'PeakEnergyEndUseNaturalGasMonthly'
+namedMonthly(25)%title = 'PeakEnergyEndUseDieselMonthly'
+namedMonthly(26)%title = 'PeakEnergyEndUseFuelOilMonthly'
+namedMonthly(27)%title = 'PeakEnergyEndUseCoalMonthly'
+namedMonthly(28)%title = 'PeakEnergyEndUsePropaneMonthly'
+namedMonthly(29)%title = 'PeakEnergyEndUseGasolineMonthly'
+namedMonthly(30)%title = 'PeakEnergyEndUseOtherFuelsMonthly'
+namedMonthly(31)%title = 'SetpointsNotMetWithTemperaturesMonthly'
+namedMonthly(32)%title = 'ComfortReportSimple55Monthly'
+namedMonthly(33)%title = 'UnglazedTranspiredSolarCollectorSummaryMonthly'
+namedMonthly(34)%title = 'OccupantComfortDataSummaryMonthly'
+namedMonthly(35)%title = 'ChillerReportMonthly'
+namedMonthly(36)%title = 'TowerReportMonthly'
+namedMonthly(37)%title = 'BoilerReportMonthly'
+namedMonthly(38)%title = 'DXReportMonthly'
+namedMonthly(39)%title = 'WindowReportMonthly'
+namedMonthly(40)%title = 'WindowEnergyReportMonthly'
+namedMonthly(41)%title = 'WindowZoneSummaryMonthly'
+namedMonthly(42)%title = 'WindowEnergyZoneSummaryMonthly'
+namedMonthly(43)%title = 'AverageOutdoorConditionsMonthly'
+namedMonthly(44)%title = 'OutdoorConditionsMaximumDryBulbMonthly'
+namedMonthly(45)%title = 'OutdoorConditionsMinimumDryBulbMonthly'
+namedMonthly(46)%title = 'OutdoorConditionsMaximumWetBulbMonthly'
+namedMonthly(47)%title = 'OutdoorConditionsMaximumDewPointMonthly'
+namedMonthly(48)%title = 'OutdoorGroundConditionsMonthly'
+namedMonthly(49)%title = 'WindowACReportMonthly'
+namedMonthly(50)%title = 'WaterHeaterReportMonthly'
+namedMonthly(51)%title = 'GeneratorReportMonthly'
+namedMonthly(52)%title = 'DaylightingReportMonthly'
+namedMonthly(53)%title = 'CoilReportMonthly'
+namedMonthly(54)%title = 'PlantLoopDemandReportMonthly'
+namedMonthly(55)%title = 'FanReportMonthly'
+namedMonthly(56)%title = 'PumpReportMonthly'
+namedMonthly(57)%title = 'CondLoopDemandReportMonthly'
+namedMonthly(58)%title = 'ZoneTemperatureOscillationReportMonthly'
+namedMonthly(59)%title = 'AirLoopSystemEnergyAndWaterUseMonthly'
+namedMonthly(60)%title = 'AirLoopSystemComponentLoadsMonthly'
+namedMonthly(61)%title = 'AirLoopSystemComponentEnergyUseMonthly'
+namedMonthly(62)%title = 'MechanicalVentilationLoadsMonthly'
+
+IF (numNamedMonthly /= NumMonthlyReports) THEN
+  CALL ShowFatalError('InitializePredefinedMonthlyTitles: Number of Monthly Reports in OutputReportTabular=['//  &
+    trim(RoundSigDigits(numNamedMonthly))//'] does not match number in DataOutputs=['//  &
+    trim(RoundSigDigits(NumMonthlyReports))//'].')
+ELSE
+  DO xcount=1,NumNamedMonthly
+    IF (.not. SameString(MonthlyNamedReports(xcount),namedMonthly(xcount)%title)) THEN
+      CALL ShowSevereError('InitializePredefinedMonthlyTitles: Monthly Report Titles in OutputReportTabular do not match'//  &
+         ' titles in DataOutput.')
+      CALL ShowContinueError('first mismatch at ORT ['//trim(RoundSigDigits(NumNamedMonthly))//'] ="'//  &
+         trim(namedMonthly(xcount)%Title)//'".')
+      CALL ShowContinueError('same location in DO ="'//trim(MonthlyNamedReports(xcount))//'".')
+      CALL ShowFatalError('Preceding condition causes termination.')
+    ENDIF
+  ENDDO
+ENDIF
 END SUBROUTINE InitializePredefinedMonthlyTitles
 
 SUBROUTINE CreatePredefinedMonthlyReports
@@ -2059,64 +2294,64 @@ INTEGER :: curReport
 
 IF (NamedMonthly(1)%show) THEN
   curReport = AddMonthlyReport('ZoneCoolingSummaryMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Air System Sensible Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Air System Sensible Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Zone Total Internal Latent Gain Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(2)%show) THEN
   curReport = AddMonthlyReport('ZoneHeatingSummaryMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Heating Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Heating Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Air System Sensible Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Air System Sensible Heating Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(3)%show) THEN
   curReport = AddMonthlyReport('ZoneElectricSummaryMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Electric Consumption','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Electric Consumption','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Electric Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Electric Energy','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(4)%show) THEN
   curReport = AddMonthlyReport('SpaceGainsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss Energy','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(5)%show) THEN
   curReport = AddMonthlyReport('PeakSpaceGainsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heating Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain Energy','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss Energy','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(6)%show) THEN
   curReport = AddMonthlyReport('SpaceGainComponentsAtCoolingPeakMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone/Sys Sensible Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Air System Sensible Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone People Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Lights Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Electric Equipment Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Gas Equipment Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Hot Water Equipment Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Steam Equipment Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Other Equipment Total Heating Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Gain Energy','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Infiltration Sensible Heat Loss Energy','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(7)%show) THEN
   curReport = AddMonthlyReport('EnergyConsumptionElectricityNaturalGasMonthly',2)
@@ -2150,12 +2385,19 @@ IF (NamedMonthly(10)%show) THEN
 END IF
 IF (NamedMonthly(11)%show) THEN
   curReport = AddMonthlyReport('EnergyConsumptionCoalGasolineMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'COAL:Facility','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'COAL:Facility','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'GASOLINE:Facility','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'GASOLINE:Facility','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Coal:Facility','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Coal:Facility','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Gasoline:Facility','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Gasoline:Facility','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(12)%show) THEN
+  curReport = AddMonthlyReport('EnergyConsumptionOtherFuelsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'OtherFuel1:Facility','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'OtherFuel1:Facility','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'OtherFuel2:Facility','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'OtherFuel2:Facility','',aggTypeMaximum)
+END IF
+IF (NamedMonthly(13)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionElectricityMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'InteriorLights:Electricity','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorLights:Electricity','',aggTypeSumOrAvg)
@@ -2171,7 +2413,7 @@ IF (NamedMonthly(12)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Electricity','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Electricity','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(13)%show) THEN
+IF (NamedMonthly(14)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionNaturalGasMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'InteriorEquipment:Gas','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Gas','',aggTypeSumOrAvg)
@@ -2180,7 +2422,7 @@ IF (NamedMonthly(13)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Gas','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Gas','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(14)%show) THEN
+IF (NamedMonthly(15)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionDieselMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Diesel','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Diesel','',aggTypeSumOrAvg)
@@ -2188,7 +2430,7 @@ IF (NamedMonthly(14)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Diesel','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Diesel','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(15)%show) THEN
+IF (NamedMonthly(16)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionFuelOilMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:FuelOil#1','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:FuelOil#1','',aggTypeSumOrAvg)
@@ -2201,13 +2443,13 @@ IF (NamedMonthly(15)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:FuelOil#2','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:FuelOil#2','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(16)%show) THEN
+IF (NamedMonthly(17)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionCoalMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Coal','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Heating:Coal','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Coal','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(17)%show) THEN
+IF (NamedMonthly(18)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionPropaneMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Propane','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Propane','',aggTypeSumOrAvg)
@@ -2215,7 +2457,7 @@ IF (NamedMonthly(17)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Propane','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Propane','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(18)%show) THEN
+IF (NamedMonthly(19)%show) THEN
   curReport = AddMonthlyReport('EndUseEnergyConsumptionGasolineMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Gasoline','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Gasoline','',aggTypeSumOrAvg)
@@ -2223,7 +2465,20 @@ IF (NamedMonthly(18)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Gasoline','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Gasoline','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(19)%show) THEN
+IF (NamedMonthly(20)%show) THEN
+  curReport = AddMonthlyReport('EndUseEnergyConsumptionOtherFuelsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:OtherFuel1','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling:OtherFuel1','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating:OtherFuel1','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:OtherFuel1','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:OtherFuel1','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:OtherFuel2','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling:OtherFuel2','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating:OtherFuel2','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:OtherFuel2','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:OtherFuel2','',aggTypeSumOrAvg)
+END IF
+IF (NamedMonthly(21)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseElectricityPart1Monthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'InteriorLights:Electricity','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorLights:Electricity','',aggTypeMaximum)
@@ -2233,7 +2488,7 @@ IF (NamedMonthly(19)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Pumps:Electricity','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Heating:Electricity','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(20)%show) THEN
+IF (NamedMonthly(22)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseElectricityPart2Monthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Electricity','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'HeatRejection:Electricity','',aggTypeMaximum)
@@ -2242,7 +2497,7 @@ IF (NamedMonthly(20)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Electricity','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Electricity','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(21)%show) THEN
+IF (NamedMonthly(23)%show) THEN
   curReport = AddMonthlyReport('ElectricComponentsOfPeakDemandMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'Electricity:Facility','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'InteriorLights:Electricity','',aggTypeValueWhenMaxMin)
@@ -2255,7 +2510,7 @@ IF (NamedMonthly(21)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Electricity','',aggTypeValueWhenMaxMin)
   CALL AddMonthlyFieldSetInput(curReport,'HeatRejection:Electricity','',aggTypeValueWhenMaxMin)
 END IF
-IF (NamedMonthly(22)%show) THEN
+IF (NamedMonthly(24)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseNaturalGasMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'InteriorEquipment:Gas','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Gas','',aggTypeMaximum)
@@ -2264,7 +2519,7 @@ IF (NamedMonthly(22)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Gas','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Gas','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(23)%show) THEN
+IF (NamedMonthly(25)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseDieselMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Diesel','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Diesel','',aggTypeMaximum)
@@ -2272,7 +2527,7 @@ IF (NamedMonthly(23)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Diesel','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Diesel','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(24)%show) THEN
+IF (NamedMonthly(26)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseFuelOilMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:FuelOil#1','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:FuelOil#1','',aggTypeMaximum)
@@ -2285,13 +2540,13 @@ IF (NamedMonthly(24)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:FuelOil#2','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:FuelOil#2','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(25)%show) THEN
+IF (NamedMonthly(27)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseCoalMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Coal','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Heating:Coal','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Coal','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(26)%show) THEN
+IF (NamedMonthly(28)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUsePropaneMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Propane','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Propane','',aggTypeMaximum)
@@ -2299,7 +2554,7 @@ IF (NamedMonthly(26)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Propane','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Propane','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(27)%show) THEN
+IF (NamedMonthly(29)%show) THEN
   curReport = AddMonthlyReport('PeakEnergyEndUseGasolineMonthly',2)
   CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:Gasoline','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cooling:Gasoline','',aggTypeMaximum)
@@ -2307,333 +2562,355 @@ IF (NamedMonthly(27)%show) THEN
   CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:Gasoline','',aggTypeMaximum)
   CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:Gasoline','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(28)%show) THEN
-  curReport = AddMonthlyReport('SetpointsNotMetWithTemperaturesMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Heating Setpoint Not Met','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Heating Setpoint Not Met While Occupied','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Cooling Setpoint Not Met','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Cooling Setpoint Not Met While Occupied','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-END IF
-IF (NamedMonthly(29)%show) THEN
-  curReport = AddMonthlyReport('ComfortReportSimple55Monthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Not Comfortable Summer Clothes','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Not Comfortable Winter Clothes','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Not Comfortable Summer Or Winter Clothes','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
-END IF
 IF (NamedMonthly(30)%show) THEN
-  curReport = AddMonthlyReport('UnglazedTranspiredSolarCollectorSummaryMonthly',5)
-  CALL AddMonthlyFieldSetInput(curReport,'UTSC Overall Efficiency','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'UTSC Overall Efficiency','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'UTSC Average Suction Face Velocity','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'UTSC Sensible Heating Rate','',aggTypeSumOrAverageHoursShown)
+  curReport = AddMonthlyReport('PeakEnergyEndUseOtherFuelsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:OtherFuel1','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling:OtherFuel1','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating:OtherFuel1','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:OtherFuel1','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:OtherFuel1','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'ExteriorEquipment:OtherFuel2','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling:OtherFuel2','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating:OtherFuel2','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'WaterSystems:OtherFuel2','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cogeneration:OtherFuel2','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(31)%show) THEN
-  curReport = AddMonthlyReport('OccupantComfortDataSummaryMonthly',5)
-  CALL AddMonthlyFieldSetInput(curReport,'People Number Of Occupants','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'People Air Temperatures','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'People Air Relative Humidity','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'FANGERPMV','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'FANGERPPD','',aggTypeSumOrAverageHoursShown)
+  curReport = AddMonthlyReport('SetpointsNotMetWithTemperaturesMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Heating Setpoint Not Met Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Heating Setpoint Not Met While Occupied Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Cooling Setpoint Not Met Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Cooling Setpoint Not Met While Occupied Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
 END IF
 IF (NamedMonthly(32)%show) THEN
+  curReport = AddMonthlyReport('ComfortReportSimple55Monthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Thermal Comfort ASHRAE 55 Simple Model Summer Clothes Not Comfortable Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Thermal Comfort ASHRAE 55 Simple Model Winter Clothes Not Comfortable Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Thermal Comfort ASHRAE 55 Simple Model Summer or Winter Clothes Not Comfortable Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mean Air Temperature','',aggTypeSumOrAverageHoursShown)
+END IF
+IF (NamedMonthly(33)%show) THEN
+  curReport = AddMonthlyReport('UnglazedTranspiredSolarCollectorSummaryMonthly',5)
+  CALL AddMonthlyFieldSetInput(curReport,'Solar Collector System Efficiency','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Solar Collector System Efficiency','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Solar Collector Outside Face Suction Velocity','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Solar Collector Sensible Heating Rate','',aggTypeSumOrAverageHoursShown)
+END IF
+IF (NamedMonthly(34)%show) THEN
+  curReport = AddMonthlyReport('OccupantComfortDataSummaryMonthly',5)
+  CALL AddMonthlyFieldSetInput(curReport,'People Occupant Count','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'People Air Temperature','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'People Air Relative Humidity','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Thermal Comfort Fanger Model PMV','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Thermal Comfort Fanger Model PPD','',aggTypeSumOrAverageHoursShown)
+END IF
+IF (NamedMonthly(35)%show) THEN
   curReport = AddMonthlyReport('ChillerReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Consumption','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Power','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Consumption','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Chiller Evap Heat Trans','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Chiller Cond Heat Trans','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Electric Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Evaporator Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Chiller Condenser Heat Transfer Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller COP','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Chiller COP','',aggTypeMaximum)
 END IF
-IF (NamedMonthly(33)%show) THEN
-  curReport = AddMonthlyReport('TowerReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Fan Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Fan Electric Consumption','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Fan Electric Power','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Heat Transfer','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Water Inlet Temp','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Water Outlet Temp','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Tower Water Mass Flow Rate','',aggTypeSumOrAvg)
-END IF
-IF (NamedMonthly(34)%show) THEN
-  curReport = AddMonthlyReport('BoilerReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Output Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Gas Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Output Energy','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Output Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Gas Consumption Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Water Inlet Temp','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Water Outlet Temp','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Water Mass Flow Rate','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Boiler Parasitic Electric Consumption Rate','',aggTypeSumOrAvg)
-END IF
-IF (NamedMonthly(35)%show) THEN
-  curReport = AddMonthlyReport('DXReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Total Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Total Cooling Energy','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Sensible Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Latent Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Crankcase Heater Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Runtime Fraction','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Runtime Fraction','',aggTypeMinimum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Total Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Sensible Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Coil Latent Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Electric Power','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'DX Cooling Coil Crankcase Heater Power','',aggTypeMaximum)
-END IF
 IF (NamedMonthly(36)%show) THEN
-  curReport = AddMonthlyReport('WindowReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Beam Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Diffuse Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Heat Loss','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Inside Glass Condensation Flag','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Fraction of Time Shading Device Is On','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Storm Window On/Off Flag','',aggTypeHoursNonZero)
+  curReport = AddMonthlyReport('TowerReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Fan Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Fan Electric Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Fan Electric Power','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Heat Transfer Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Inlet Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Outlet Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Tower Mass Flow Rate','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(37)%show) THEN
-  curReport = AddMonthlyReport('WindowEnergyReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Solar Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Beam Solar Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Transmitted Diffuse Solar Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Heat Gain Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window Heat Loss Energy','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('BoilerReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Gas Consumption','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Heating Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Gas Consumption Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Inlet Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Outlet Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Mass Flow Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Boiler Ancillary Electric Power','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(38)%show) THEN
-  curReport = AddMonthlyReport('WindowZoneSummaryMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Heat Gain','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Heat Loss','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Transmitted Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Beam Solar from Exterior Windows','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Diff Solar from Exterior Windows','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Diff Solar from Interior Windows','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Beam Solar from Interior Windows','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('DXReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Total Cooling Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Sensible Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Latent Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Crankcase Heater Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Runtime Fraction','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Runtime Fraction','',aggTypeMinimum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Total Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Sensible Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Latent Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Electric Power','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Crankcase Heater Electric Power','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(39)%show) THEN
-  curReport = AddMonthlyReport('WindowEnergyZoneSummaryMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Heat Gain Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Heat Loss Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Transmitted Solar Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Beam Solar from Exterior Windows Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Diff Solar from Exterior Windows Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Diff Solar from Interior Windows Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Beam Solar from Interior Windows Energy','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('WindowReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Beam Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Diffuse Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Heat Gain Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Heat Loss Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Inside Face Glazing Condensation Status','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Shading Device Is On Time Fraction','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Storm Window On Off Status','',aggTypeHoursNonZero)
 END IF
 IF (NamedMonthly(40)%show) THEN
-  curReport = AddMonthlyReport('AverageOutdoorConditionsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dew Point','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Wind Speed','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Sky Temperature','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Diffuse Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Direct Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Raining','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('WindowEnergyReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Beam Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Transmitted Diffuse Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Heat Gain Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Surface Window Heat Loss Energy','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(41)%show) THEN
-  curReport = AddMonthlyReport('OutdoorConditionsMaximumDryBulbMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dew Point','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Wind Speed','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Sky Temperature','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Diffuse Solar','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Direct Solar','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('WindowZoneSummaryMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Heat Gain Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Heat Loss Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Transmitted Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Exterior Windows Total Transmitted Beam Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Exterior Windows Total Transmitted Diffuse Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Interior Windows Total Transmitted Diffuse Solar Radiation Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Interior Windows Total Transmitted Beam Solar Radiation Rate','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(42)%show) THEN
-  curReport = AddMonthlyReport('OutdoorConditionsMinimumDryBulbMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeMinimum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dew Point','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Wind Speed','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Sky Temperature','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Diffuse Solar','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Direct Solar','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('WindowEnergyZoneSummaryMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Heat Gain Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Heat Loss Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Windows Total Transmitted Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Exterior Windows Total Transmitted Beam Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Exterior Windows Total Transmitted Diffuse Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Interior Windows Total Transmitted Diffuse Solar Radiation Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Interior Windows Total Transmitted Beam Solar Radiation Energy','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(43)%show) THEN
-  curReport = AddMonthlyReport('OutdoorConditionsMaximumWetBulbMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dew Point','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Wind Speed','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Sky Temperature','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Diffuse Solar','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Direct Solar','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('AverageOutdoorConditionsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Dewpoint Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Wind Speed','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Sky Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Diffuse Solar Radiation Rate per Area','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Direct Solar Radiation Rate per Area','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Rain Status','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(44)%show) THEN
-  curReport = AddMonthlyReport('OutdoorConditionsMaximumDewPointMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dew Point','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Dry Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Outdoor Wet Bulb','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Wind Speed','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Sky Temperature','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Diffuse Solar','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Direct Solar','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('OutdoorConditionsMaximumDryBulbMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Dewpoint Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Wind Speed','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Sky Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Diffuse Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Direct Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(45)%show) THEN
-  curReport = AddMonthlyReport('OutdoorGroundConditionsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Ground Temperature','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Surface Ground Temperature','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Deep Ground Temperature','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Water Mains Temperature','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Ground Reflected Solar','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Snow On Ground','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('OutdoorConditionsMinimumDryBulbMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeMinimum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Dewpoint Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Wind Speed','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Sky Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Diffuse Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Direct Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(46)%show) THEN
-  curReport = AddMonthlyReport('WindowACReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Total Zone Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Total Zone Cooling Energy','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Sensible Zone Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Latent Zone Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Total Zone Cooling Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Sensible Zone Cooling Rate','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Latent Zone Cooling Rate','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Window AC Electric Power','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('OutdoorConditionsMaximumWetBulbMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Dewpoint Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Wind Speed','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Sky Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Diffuse Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Direct Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(47)%show) THEN
+  curReport = AddMonthlyReport('OutdoorConditionsMaximumDewPointMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Dewpoint Temperature','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Drybulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Outdoor Air Wetbulb Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Wind Speed','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Sky Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Diffuse Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Direct Solar Radiation Rate per Area','',aggTypeValueWhenMaxMin)
+END IF
+IF (NamedMonthly(48)%show) THEN
+  curReport = AddMonthlyReport('OutdoorGroundConditionsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Ground Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Surface Ground Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Deep Ground Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Mains Water Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Ground Reflected Solar Radiation Rate per Area','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Snow on Ground Status','',aggTypeSumOrAvg)
+END IF
+IF (NamedMonthly(49)%show) THEN
+  curReport = AddMonthlyReport('WindowACReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Total Cooling Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Sensible Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Latent Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Total Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Sensible Cooling Rate','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Latent Cooling Rate','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Window Air Conditioner Electric Power','',aggTypeValueWhenMaxMin)
+END IF
+IF (NamedMonthly(50)%show) THEN
   curReport = AddMonthlyReport('WaterHeaterReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Total Demand Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Use Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Total Demand Heat Transfer Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Use Side Heat Transfer Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Burner Heating Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Gas Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Total Demand Energy','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Total Demand Heat Transfer Energy','',aggTypeHoursNonZero)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Loss Demand Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Loss Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Water Heater Heat Loss Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Tank Temperature','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Heat Recovery Supply Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Water Heater Source Energy','',aggTypeSumOrAvg)
 END IF
-IF (NamedMonthly(48)%show) THEN
+IF (NamedMonthly(51)%show) THEN
   curReport = AddMonthlyReport('GeneratorReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Generator Electric Energy Produced','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Generator Produced Electric Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Generator Diesel Consumption','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Generator Gas Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Generator Electric Energy Produced','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Generator Produced Electric Energy','',aggTypeHoursNonZero)
   CALL AddMonthlyFieldSetInput(curReport,'Generator Total Heat Recovery','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Generator Jacket Heat Recovery','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Generator Jacket Heat Recovery Energy','',aggTypeSumOrAvg)
   CALL AddMonthlyFieldSetInput(curReport,'Generator Lube Heat Recovery','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Generator Exhaust Heat Recovery','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Generator Exhaust Stack Temp','',aggTypeSumOrAvg)
-END IF
-IF (NamedMonthly(49)%show) THEN
-  curReport = AddMonthlyReport('DaylightingReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Exterior Beam Normal Illuminance','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Ltg Power Multiplier from Daylighting','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Ltg Power Multiplier from Daylighting','',aggTypeMinimumDuringHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Daylight Illum at Ref Point 1','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Glare Index at Ref Point 1','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Glare Index Setpoint at Ref Point 1','', aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Daylight Illuminance Setpoint at Ref Point 1','', aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Daylight Illum at Ref Point 2','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Glare Index at Ref Point 2','',aggTypeSumOrAverageHoursShown)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Glare Index Setpoint at Ref Point 2','', aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Exceeding Daylight Illuminance Setpoint at Ref Point 2','', aggTypeSumOrAvg)
-END IF
-IF (NamedMonthly(50)%show) THEN
-  curReport = AddMonthlyReport('CoilReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Total Water Heating Coil Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Total Water Heating Coil Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Total Water Cooling Coil Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Sensible Water Cooling Coil Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Total Water Cooling Coil Rate','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Sensible Water Cooling Coil Rate','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Area Wet Fraction','',aggTypeSumOrAvg)
-END IF
-IF (NamedMonthly(51)%show) THEN
-  curReport = AddMonthlyReport('PlantLoopDemandReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Plant Loop Cooling Demand','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Plant Loop Cooling Demand','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Plant Loop Heating Demand','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Plant Loop Heating Demand','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Generator Exhaust Heat Recovery Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Generator Exhaust Air Temperature','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(52)%show) THEN
-  curReport = AddMonthlyReport('FanReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Fan Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Fan Delta Temp','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Fan Electric Power','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Fan Delta Temp','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('DaylightingReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Site Exterior Beam Normal Illuminance','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Lighting Power Multiplier','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Lighting Power Multiplier','',aggTypeMinimumDuringHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 1 Illuminance','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 1 Glare Index','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 1 Glare Index Setpoint Exceeded Time','', aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Daylighting Reference Point 1 Daylight Illuminance Setpoint Exceeded Time','', aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 2 Illuminance','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 2 Glare Index','',aggTypeSumOrAverageHoursShown)
+  CALL AddMonthlyFieldSetInput(curReport,'Daylighting Reference Point 2 Glare Index Setpoint Exceeded Time','', aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Daylighting Reference Point 2 Daylight Illuminance Setpoint Exceeded Time','', aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(53)%show) THEN
-  curReport = AddMonthlyReport('PumpReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Heat To Fluid Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Electric Power','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Shaft Power','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Heat To Fluid','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Outlet Temp','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Pump Mass Flow Rate','',aggTypeValueWhenMaxMin)
+  curReport = AddMonthlyReport('CoilReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating Coil Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Heating Coil Heating Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Sensible Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Total Cooling Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Sensible Cooling Rate','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Cooling Coil Wetted Area Fraction','',aggTypeSumOrAvg)
 END IF
 IF (NamedMonthly(54)%show) THEN
-  curReport = AddMonthlyReport('CondLoopDemandReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Cooling Demand','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Cooling Demand','',aggTypeMaximum)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Inlet Temp','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Outlet Temp','',aggTypeValueWhenMaxMin)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Heating Demand','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Cond Loop Heating Demand','',aggTypeMaximum)
+  curReport = AddMonthlyReport('PlantLoopDemandReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Cooling Demand Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Cooling Demand Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Heating Demand Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Heating Demand Rate','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(55)%show) THEN
-  curReport = AddMonthlyReport('ZoneTemperatureOscillationReportMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Time Zone Temperature Oscillating','',aggTypeHoursNonZero)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone People Number Of Occupants','',aggTypeSumOrAverageHoursShown)
+  curReport = AddMonthlyReport('FanReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Fan Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Fan Rise in Air Temperature','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Fan Electric Power','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Fan Rise in Air Temperature','',aggTypeValueWhenMaxMin)
 END IF
 IF (NamedMonthly(56)%show) THEN
-  curReport = AddMonthlyReport('AirLoopSystemEnergyAndWaterUseMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Hot Water Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Steam Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Chilled Water Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Gas Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Water Consumption','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('PumpReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Fluid Heat Gain Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Electric Power','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Shaft Power','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Fluid Heat Gain Rate','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Outlet Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Pump Mass Flow Rate','',aggTypeValueWhenMaxMin)
 END IF
-
 IF (NamedMonthly(57)%show) THEN
-  curReport = AddMonthlyReport('AirLoopSystemComponentLoadsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Fan Heating Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Cooling Coil Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Heating Coil Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Heat Exchanger Heating Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Heat Exchanger Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Humidifier Heating Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Evap Cooler Cooling Energy','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Total Desiccant Dehumidifier Cooling Energy','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('CondLoopDemandReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Cooling Demand Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Cooling Demand Rate','',aggTypeMaximum)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Inlet Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Outlet Temperature','',aggTypeValueWhenMaxMin)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Heating Demand Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Plant Supply Side Heating Demand Rate','',aggTypeMaximum)
 END IF
 IF (NamedMonthly(58)%show) THEN
-  curReport = AddMonthlyReport('AirLoopSystemComponentEnergyUseMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Fan Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Heating Coil Hot Water Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Cooling Coil Chilled Water Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop DX Heating Coil Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop DX Cooling Coil Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Heating Coil Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Heating Coil Gas Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Heating Coil Steam Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Humidifier Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Evap Cooler Electric Consumption','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Air Loop Desiccant Dehumidifier Electric Consumption','',aggTypeSumOrAvg)
+  curReport = AddMonthlyReport('ZoneTemperatureOscillationReportMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Oscillating Temperatures Time','',aggTypeHoursNonZero)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone People Occupant Count','',aggTypeSumOrAverageHoursShown)
 END IF
 IF (NamedMonthly(59)%show) THEN
+  curReport = AddMonthlyReport('AirLoopSystemEnergyAndWaterUseMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Hot Water Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Steam Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Chilled Water Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Gas Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Water Volume','',aggTypeSumOrAvg)
+END IF
+
+IF (NamedMonthly(60)%show) THEN
+  curReport = AddMonthlyReport('AirLoopSystemComponentLoadsMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Fan Air Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Cooling Coil Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heating Coil Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heat Exchanger Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heat Exchanger Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Humidifier Total Heating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Evaporative Cooler Total Cooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Desiccant Dehumidifier Total Cooling Energy','',aggTypeSumOrAvg)
+END IF
+IF (NamedMonthly(61)%show) THEN
+  curReport = AddMonthlyReport('AirLoopSystemComponentEnergyUseMonthly',2)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Fan Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heating Coil Hot Water Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Cooling Coil Chilled Water Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System DX Heating Coil Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System DX Cooling Coil Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heating Coil Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heating Coil Gas Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Heating Coil Steam Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Humidifier Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Evaporative Cooler Electric Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Air System Desiccant Dehumidifier Electric Energy','',aggTypeSumOrAvg)
+END IF
+IF (NamedMonthly(62)%show) THEN
   curReport = AddMonthlyReport('MechanicalVentilationLoadsMonthly',2)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation No Load Heat Removal','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Cooling Load Increase','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mech Ventilation Cooling Load Increase: OverHeating','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Cooling Load Decrease','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation No Load Heat Addition','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Heating Load Increase','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mech Ventilation Heating Load Increase: OverCooling','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Heating Load Decrease','',aggTypeSumOrAvg)
-  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Air Change Rate','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation No Load Heat Removal Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Cooling Load Increase Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Mechanical Ventilation Cooling Load Increase Due to Overheating Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Cooling Load Decrease Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation No Load Heat Addition Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Heating Load Increase Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,  &
+     'Zone Mechanical Ventilation Heating Load Increase Due to Overcooling Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Heating Load Decrease Energy','',aggTypeSumOrAvg)
+  CALL AddMonthlyFieldSetInput(curReport,'Zone Mechanical Ventilation Air Changes per Hour','',aggTypeSumOrAvg)
 END IF
 END SUBROUTINE CreatePredefinedMonthlyReports
 
@@ -2689,6 +2966,8 @@ sourceFactorCoal             = 1.05d0
 sourceFactorFuelOil1         = 1.05d0
 sourceFactorFuelOil2         = 1.05d0
 sourceFactorPropane          = 1.05d0
+sourceFactorOtherFuel1       = 1.0d0
+sourceFactorOtherFuel2       = 1.0d0
 ! the following should be kept consistent with the assumptions in the pollution calculation routines
 efficiencyDistrictCooling   = 3.0d0
 efficiencyDistrictHeating   = 0.3d0
@@ -2841,6 +3120,32 @@ efficiencyDistrictHeating   = 0.3d0
       ffSchedIndex(5) = ffScheduleIndex
     ENDIF
 
+    CALL GetFuelFactorInfo('OtherFuel1',fuelFactorUsed,curSourceFactor,fFScheduleUsed,ffScheduleIndex)
+    IF (fuelFactorUsed) THEN
+      sourceFactorOtherFuel1 = curSourceFactor
+      fuelfactorsused(11)=.true.  ! should be source number
+      ffUsed(13)=.true.
+    ENDIF
+    SourceFactors(13) = curSourceFactor
+    IF (fFScheduleUsed) THEN
+      fuelFactorSchedulesUsed=.true.
+      ffSchedUsed(13) = .TRUE.
+      ffSchedIndex(13) = ffScheduleIndex
+    ENDIF
+
+    CALL GetFuelFactorInfo('OtherFuel2',fuelFactorUsed,curSourceFactor,fFScheduleUsed,ffScheduleIndex)
+    IF (fuelFactorUsed) THEN
+      sourceFactorOtherFuel2 = curSourceFactor
+      fuelfactorsused(12)=.true.  ! should be source number
+      ffUsed(14)=.true.
+    ENDIF
+    SourceFactors(14) = curSourceFactor
+    IF (fFScheduleUsed) THEN
+      fuelFactorSchedulesUsed=.true.
+      ffSchedUsed(14) = .TRUE.
+      ffSchedIndex(14) = ffScheduleIndex
+    ENDIF
+
     CALL GetEnvironmentalImpactFactorInfo(efficiencyDistrictHeating,efficiencyDistrictCooling,sourceFactorSteam)
 
 END SUBROUTINE GetInputFuelAndPollutionFactors
@@ -2975,6 +3280,27 @@ IF (WriteTabularFiles) THEN
       ENDIF
       WRITE(curFH,TimeStampFmt1) "<p>Simulation Timestamp: <b>", td(1),'-', td(2),'-',td(3)
       WRITE(curFH,TimeStampFmt2) '  ',td(5),':', td(6),':',td(7),'</b></p>'
+    ELSEIF (tableStyle(iStyle) .eq. tableStyleXML) THEN
+      CALL DisplayString('Writing tabular output file results using XML format.')
+      OPEN(curFH,FILE='eplustbl.xml',action='WRITE',iostat=write_stat)
+      IF (write_stat /= 0) THEN
+       CALL ShowFatalError('OpenOutputTabularFile: Could not open file "eplustbl.xml" for output (write).')
+      ENDIF
+      WRITE(curFH,fmta) '<?xml version="1.0"?>'
+      WRITE(curFH,fmta) '<EnergyPlusTabularReports>'
+      WRITE(curFH,fmta) '  <BuildingName>' // TRIM(BuildingName) // '</BuildingName>'
+      WRITE(curFH,fmta) '  <EnvironmentName>' // TRIM(EnvironmentName) // '</EnvironmentName>'
+      WRITE(curFH,fmta) '  <WeatherFileLocationTitle>' //TRIM(WeatherFileLocationTitle) // '</WeatherFileLocationTitle>'
+      WRITE(curFH,fmta) '  <ProgramVersion>'// TRIM(VerString) // '</ProgramVersion>'
+      WRITE(curFH,fmta) '  <SimulationTimestamp>'
+      WRITE(curFH,fmta) '    <Date>'
+      WRITE(curFH,TimeStampFmt1) '      ', td(1),'-', td(2),'-',td(3)
+      WRITE(curFH,fmta) '    </Date>'
+      WRITE(curFH,fmta) '    <Time>'
+      WRITE(curFH,TimeStampFmt2) '      ',td(5),':', td(6),':',td(7),' '
+      WRITE(curFH,fmta) '    </Time>'
+      WRITE(curFH,fmta) '  </SimulationTimestamp>'
+      WRITE(curFH,fmta) ' '
     ELSE
       CALL DisplayString('Writing tabular output file results using text format.')
       OPEN(curFH,File='eplustbl.txt', Action='write',iostat=write_stat)
@@ -3040,6 +3366,11 @@ IF (WriteTabularFiles) THEN
     IF (tableStyle(iStyle) .eq. tableStyleHTML) THEN
       WRITE(TabularOutputFile(iStyle),fmta) '</body>'
       WRITE(TabularOutputFile(iStyle),fmta) '</html>'
+    ELSEIF (tableStyle(iStyle) .eq. tableStyleXML) THEN
+      IF (LEN_TRIM(prevReportName) .NE. 0) THEN
+        WRITE(TabularOutputFile(iStyle),fmta) '</' // TRIM(prevReportName) //'>'  !close the last element if it was used.
+      END IF
+      WRITE(TabularOutputFile(iStyle),fmta) '</EnergyPlusTabularReports>'
     END IF
     CLOSE(TabularOutputFile(iStyle))
   END DO
@@ -3103,19 +3434,19 @@ DO iStyle = 1, numStyles
     WRITE(curFH,fmta) '<p><b>Table of Contents</b></p>'
     WRITE(curFH,fmta) '<a href="#top">Top</a>'
     IF (displayTabularBEPS) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('AnnualBuildingUtilityPerformanceSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Annual Building Utility Performance Summary', &
                           'Entire Facility')) // '">Annual Building Utility Performance Summary</a>'
     ENDIF
     IF (displayTabularVeriSum) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('InputVerificationandResultsSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Input Verification and Results Summary', &
                           'Entire Facility')) // '">Input Verification and Results Summary</a>'
     ENDIF
     IF (displayDemandEndUse) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('DemandEndUseComponentsSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Demand End Use Components Summary', &
                           'Entire Facility')) // '">Demand End Use Components Summary</a>'
     ENDIF
     IF (displaySourceEnergyEndUseSummary) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('SourceEnergyEndUseComponentsSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Source Energy End Use Components Summary', &
                           'Entire Facility')) // '">Source Energy End Use Components Summary</a>'
     ENDIF
     IF (DoCostEstimate) THEN
@@ -3123,11 +3454,11 @@ DO iStyle = 1, numStyles
                           'Entire Facility')) // '">Construction Cost Estimate Summary</a>'
     ENDIF
     IF (displayComponentSizing) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('ComponentSizingSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Component Sizing Summary', &
                           'Entire Facility')) // '">Component Sizing Summary</a>'
     END IF
     IF (displaySurfaceShadowing) THEN
-      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('SurfaceShadowingSummary', &
+      WRITE(curFH,fmta) '<br><a href="#' // TRIM(MakeAnchorName('Surface Shadowing Summary', &
                           'Entire Facility')) // '">Surface Shadowing Summary</a>'
     END IF
     DO kReport = 1, numReportName
@@ -3874,6 +4205,8 @@ SUBROUTINE GatherSourceEnergyEndUseResultsForTimestep(IndexTypeKey)
           !          sourceTypeNames(8)='Propane'
           !          sourceTypeNames(9)='PurchasedElectric'
           !          sourceTypeNames(10)='SoldElectric'
+          !          sourceTypeNames(11)='OtherFuel1'
+          !          sourceTypeNames(12)='OtherFuel2'
 
           ! REFERENCES:
           ! na
@@ -4086,66 +4419,67 @@ SUBROUTINE GatherHeatGainReport(IndexTypeKey)
 ! The routine generates an annual table with the following columns which correspond to
 ! the output variables and data structures shown:
 !
-! Column                               Output Variable                                Internal Data Structure       Timestep    Rate/Energy
-! ------                               ---------------                                -----------------------       --------    -----------
-! HVAC Input Sensible Air Heating      Zone Air Balance System Air Transfer Rate      ZnAirRpt()%SumMCpDTsystem     HVAC        Rate
-!                                      Zone Air Balance System Convective Gains Rate  ZnAirRpt()%SumNonAirSystem    HVAC        Rate
+! Column                               Output Variable                                Internal Data Structure      Timestep Type
+! ------                               ---------------                                -----------------------      -------- -----
+! HVAC Input Sensible Air Heating      Zone Air Heat Balance System Air Transfer Rate ZnAirRpt()%SumMCpDTsystem    HVAC     Rate
+!                                   Zone Air Heat Balance System Convective Heat Gain Rate ZnAirRpt()%SumNonAirSystem HVAC   Rate
 !
-! HVAC Input Sensible Air Cooling      Zone Air Balance System Air Transfer Rate      ZnAirRpt()%SumMCpDTsystem     HVAC        Rate
-!                                      Zone Air Balance System Convective Gains Rate  ZnAirRpt()%SumNonAirSystem    HVAC        Rate
+! HVAC Input Sensible Air Cooling      Zone Air Heat Balance System Air Transfer Rate ZnAirRpt()%SumMCpDTsystem    HVAC     Rate
+!                                    Zone Air Heat Balance System Convective Heat Gain Rate ZnAirRpt()%SumNonAirSystem HVAC  Rate
 !
-! HVAC Input Heated Surface Heating    Electric Low Temp Radiant Heating Energy       ElecRadSys()%HeatEnergy       HVAC        Energy
-!                                      Ventilated Slab Radiant Heating Energy         VentSlab()%RadHeatingEnergy   HVAC        Energy
-!                                      Hydronic Low Temp Radiant Heating Energy       HydrRadSys()%HeatEnergy       HVAC        Energy
-!                                      Constant Flow Low Temp Radiant Heating Energy  CFloRadSys()%HeatEnergy       HVAC        Energy
+! HVAC Input Heated Surface Heating    Electric Low Temp Radiant Heating Energy       ElecRadSys()%HeatEnergy      HVAC     Energy
+!                                      Zone Ventilated Slab Radiant Heating Energy    VentSlab()%RadHeatingEnergy  HVAC     Energy
+!                                      Hydronic Low Temp Radiant Heating Energy       HydrRadSys()%HeatEnergy      HVAC     Energy
+!                                      Constant Flow Low Temp Radiant Heating Energy  CFloRadSys()%HeatEnergy      HVAC     Energy
 !
-! HVAC Input Cooled Surface Cooling    Ventilated Slab Radiant Cooling Energy         -VentSlab()%RadCoolingEnergy   HVAC        Energy
-!                                      Hydronic Low Temp Radiant Cooling Energy       -HydrRadSys()%CoolEnergy       HVAC        Energy
-!                                      Constant Flow Low Temp Radiant Cooling Energy  -CFloRadSys()%CoolEnergy       HVAC        Energy
+! HVAC Input Cooled Surface Cooling    Zone Ventilated Slab Radiant Cooling Energy    -VentSlab()%RadCoolingEnergy HVAC     Energy
+!                                      Hydronic Low Temp Radiant Cooling Energy       -HydrRadSys()%CoolEnergy     HVAC     Energy
+!                                      Constant Flow Low Temp Radiant Cooling Energy  -CFloRadSys()%CoolEnergy     HVAC     Energy
 !
-! People Sensible Heat Addition        Zone People Sensible Heat Gain                 ZnRpt()%PeopleSenGain         Zone        Energy
+! People Sensible Heat Addition        Zone People Sensible Heating Energy            ZnRpt()%PeopleSenGain        Zone     Energy
 !
-! Lights Sensible Heat Addition        Zone Lights Total Heat Gain                    ZnRpt()%LtsTotGain            Zone        Energy
+! Lights Sensible Heat Addition        Zone Lights Total Heating Energy               ZnRpt()%LtsTotGain           Zone     Energy
 !
-! Equipment Sensible Heat Addition     Zone Electric Equipment Radiant Heat Gain      ZnRpt()%ElecRadGain           Zone        Energy
-!                                      Zone Gas Equipment Radiant Heat Gain           ZnRpt()%GasRadGain            Zone        Energy
-!                                      Zone Steam Equipment Radiant Heat Gain         ZnRpt()%SteamRadGain          Zone        Energy
-!                                      Zone Hot Water Equipment Radiant Heat Gain     ZnRpt()%HWRadGain             Zone        Energy
-!                                      Zone Other Equipment Radiant Heat Gain         ZnRpt()%OtherRadGain          Zone        Energy
-!                                      Zone Electric Equipment Convective Heat Gain   ZnRpt()%ElecConGain           Zone        Energy
-!                                      Zone Gas Equipment Convective Heat Gain        ZnRpt()%GasConGain            Zone        Energy
-!                                      Zone Steam Equipment Convective Heat Gain      ZnRpt()%SteamConGain          Zone        Energy
-!                                      Zone Hot Water Equipment Convective Heat Gain  ZnRpt()%HWConGain             Zone        Energy
-!                                      Zone Other Equipment Convective Heat Gain      ZnRpt()%OtherConGain          Zone        Energy
+! Equipment Sensible Heat Addition     Zone Electric Equipment Radiant Heating Energy ZnRpt()%ElecRadGain          Zone     Energy
+!                                      Zone Gas Equipment Radiant Heating Energy      ZnRpt()%GasRadGain           Zone     Energy
+!                                      Zone Steam Equipment Radiant Heating Energy    ZnRpt()%SteamRadGain         Zone     Energy
+!                                      Zone Hot Water Equipment Radiant Heating Energy ZnRpt()%HWRadGain           Zone     Energy
+!                                      Zone Other Equipment Radiant Heating Energy    ZnRpt()%OtherRadGain         Zone     Energy
+!                                   Zone Electric Equipment Convective Heating Energy ZnRpt()%ElecConGain          Zone     Energy
+!                                      Zone Gas Equipment Convective Heating Energy   ZnRpt()%GasConGain           Zone     Energy
+!                                      Zone Steam Equipment Convective Heating Energy ZnRpt()%SteamConGain         Zone     Energy
+!                                    Zone Hot Water Equipment Convective Heating Energy ZnRpt()%HWConGain          Zone     Energy
+!                                      Zone Other Equipment Convective Heating Energy ZnRpt()%OtherConGain         Zone     Energy
 !
-! Window Heat Addition                 Zone Window Heat Gain Energy                   ZoneWinHeatGainRepEnergy()    Zone        Energy
+! Window Heat Addition                 Zone Windows Total Heat Gain Energy            ZoneWinHeatGainRepEnergy()   Zone     Energy
 !
-! Interzone Air Transfer Heat Addition Zone Air Balance Interzone Air Transfer Rate   ZnAirRpt()%SumMCpDTzones      HVAC        Rate
+! Interzone Air Transfer Heat Addition Zone Air Heat Balance Interzone Air Transfer Rate  ZnAirRpt()%SumMCpDTzones HVAC     Rate
 !
-! Infiltration Heat Addition           Zone Air Balance Outdoor Air Transfer Rate     ZnAirRpt()%SumMCpDtInfil      HVAC        Rate
+! Infiltration Heat Addition           Zone Air Heat Balance Outdoor Air Transfer Rate ZnAirRpt()%SumMCpDtInfil     HVAC     Rate
 !
-! Equipment Sensible Heat Removal      Zone Electric Equipment Radiant Heat Gain      ZnRpt()%ElecRadGain           Zone        Energy
-!                                      Zone Gas Equipment Radiant Heat Gain           ZnRpt()%GasRadGain            Zone        Energy
-!                                      Zone Steam Equipment Radiant Heat Gain         ZnRpt()%SteamRadGain          Zone        Energy
-!                                      Zone Hot Water Equipment Radiant Heat Gain     ZnRpt()%HWRadGain             Zone        Energy
-!                                      Zone Other Equipment Radiant Heat Gain         ZnRpt()%OtherRadGain          Zone        Energy
-!                                      Zone Electric Equipment Convective Heat Gain   ZnRpt()%ElecConGain           Zone        Energy
-!                                      Zone Gas Equipment Convective Heat Gain        ZnRpt()%GasConGain            Zone        Energy
-!                                      Zone Steam Equipment Convective Heat Gain      ZnRpt()%SteamConGain          Zone        Energy
-!                                      Zone Hot Water Equipment Convective Heat Gain  ZnRpt()%HWConGain             Zone        Energy
-!                                      Zone Other Equipment Convective Heat Gain      ZnRpt()%OtherConGain          Zone        Energy
+! Equipment Sensible Heat Removal      Zone Electric Equipment Radiant Heating Energy ZnRpt()%ElecRadGain          Zone     Energy
+!                                      Zone Gas Equipment Radiant Heating Energy      ZnRpt()%GasRadGain           Zone     Energy
+!                                      Zone Steam Equipment Radiant Heating Energy    ZnRpt()%SteamRadGain         Zone     Energy
+!                                      Zone Hot Water Equipment Radiant Heating Energy ZnRpt()%HWRadGain           Zone     Energy
+!                                      Zone Other Equipment Radiant Heating Energy    ZnRpt()%OtherRadGain         Zone     Energy
+!                                   Zone Electric Equipment Convective Heating Energy ZnRpt()%ElecConGain          Zone     Energy
+!                                      Zone Gas Equipment Convective Heating Energy   ZnRpt()%GasConGain           Zone     Energy
+!                                      Zone Steam Equipment Convective Heating Energy ZnRpt()%SteamConGain         Zone     Energy
+!                                     Zone Hot Water Equipment Convective Heating Energy ZnRpt()%HWConGain         Zone     Energy
+!                                      Zone Other Equipment Convective Heating Energy ZnRpt()%OtherConGain         Zone     Energy
 !
-! Window Heat Removal                  Zone Window Heat Loss Energy                   -ZoneWinHeatLossRepEnergy()   Zone        Energy
+! Window Heat Removal                  Zone Windows Total Heat Loss Energy            -ZoneWinHeatLossRepEnergy()  Zone     Energy
 !
-! Interzone Air Transfer Heat Removal  Zone Air Balance Interzone Air Transfer Rate   ZnAirRpt()%SumMCpDTzones      HVAC        Rate
+! Interzone Air Transfer Heat Removal  Zone Air Heat Balance Interzone Air Transfer Rate ZnAirRpt()%SumMCpDTzones  HVAC     Rate
 !
-! Infiltration Heat Removal            Zone Air Balance Outdoor Air Transfer Rate     ZnAirRpt()%SumMCpDtInfil      HVAC        Rate
+! Infiltration Heat Removal            Zone Air Heat Balance Outdoor Air Transfer Rate ZnAirRpt()%SumMCpDtInfil     HVAC     Rate
 !
 ! The following two columns are derived based on the values of the other columns and need to be computed on every HVAC timestep.
 !   Opaque Surface Conduction and Other Heat Addition
 !   Opaque Surface Conduction and Other Heat Removal
 !
-! For variables that are updated on a zone timestep basis, the values are used on the HVAC timestep but are ratioed by the timestep lengths.
+! For variables that are updated on a zone timestep basis, the values are used on the HVAC timestep but are ratioed by the
+! timestep lengths.
 !
 ! The peak reports follow a similar example.
 
@@ -4716,6 +5050,9 @@ SUBROUTINE     WriteTabularReports
           !   report is added it can be added to the list here.
 IMPLICIT NONE
 
+  INTEGER EchoInputFile  ! found unit number for 'eplusout.audit'
+INTEGER, EXTERNAL :: FindUnitNumber
+
 CALL FillWeatherPredefinedEntries
 CALL FillRemainingPredefinedEntries
 IF (WriteTabularFiles) THEN
@@ -4730,11 +5067,30 @@ IF (WriteTabularFiles) THEN
   CALL WriteSurfaceShadowing
   CALL WriteCompCostTable
   CALL WriteAdaptiveComfortTable
+  CALL WriteZoneLoadComponentTable
   IF (DoWeathSim) THEN
     CALL WriteMonthlyTables
     CALL WriteTimeBinTables
   END IF
 ENDIF
+  EchoInputFile=FindUnitNumber('eplusout.audit')
+  Write(EchoInputFile,*) 'MonthlyInputCount=',MonthlyInputCount
+  Write(EchoInputFile,*) 'sizeMonthlyInput=',sizeMonthlyInput
+  Write(EchoInputFile,*) 'MonthlyFieldSetInputCount=',MonthlyFieldSetInputCount
+  Write(EchoInputFile,*) 'sizeMonthlyFieldSetInput=',sizeMonthlyFieldSetInput
+  Write(EchoInputFile,*) 'MonthlyTablesCount=',MonthlyTablesCount
+  Write(EchoInputFile,*) 'MonthlyColumnsCount=',MonthlyColumnsCount
+  Write(EchoInputFile,*) 'sizeReportName=',sizeReportName
+  Write(EchoInputFile,*) 'numReportName=',numReportName
+  Write(EchoInputFile,*) 'sizeSubTable=',sizeSubTable
+  Write(EchoInputFile,*) 'numSubTable=',numSubTable
+  Write(EchoInputFile,*) 'sizeColumnTag=',sizeColumnTag
+  Write(EchoInputFile,*) 'numColumnTag=',numColumnTag
+  Write(EchoInputFile,*) 'sizeTableEntry=',sizeTableEntry
+  Write(EchoInputFile,*) 'numTableEntry=',numTableEntry
+  Write(EchoInputFile,*) 'sizeCompSizeTableEntry=',sizeCompSizeTableEntry
+  Write(EchoInputFile,*) 'numCompSizeTableEntry=',numCompSizeTableEntry
+
 RETURN
 END SUBROUTINE WriteTabularReports
 
@@ -4925,6 +5281,7 @@ IF (fileExists) THEN
         eposlt=INDEX(lineIn,'}')
         IF (sposlt > 0 .and. eposlt > 0) THEN
           CALL PreDefTableEntry(pdchWthrVal, 'Latitude', lineIn(sposlt:eposlt))
+          ! redefine so next scan can go with {}
           lineIn(sposlt:sposlt)='['
           lineIn(eposlt:eposlt)=']'
         ELSE
@@ -4934,6 +5291,7 @@ IF (fileExists) THEN
         eposlg=INDEX(lineIn,'}')
         IF (sposlg > 0 .and. eposlg > 0) THEN
           CALL PreDefTableEntry(pdchWthrVal, 'Longitude', lineIn(sposlg:eposlg))
+          ! redefine so next scan can go with {}
           lineIn(sposlg:sposlg)='['
           lineIn(eposlg:eposlg)=']'
         ELSE
@@ -4943,6 +5301,7 @@ IF (fileExists) THEN
         epostz=INDEX(lineIn,'}')
         IF (spostz > 0 .and. epostz > 0) THEN
           CALL PreDefTableEntry(pdchWthrVal, 'Time Zone', lineIn(spostz:epostz))
+          ! redefine so next scan can go with {}
           lineIn(spostz:spostz)='['
           lineIn(epostz:epostz)=']'
         ELSE
@@ -4950,13 +5309,17 @@ IF (fileExists) THEN
         ENDIF
       CASE (ElevationLine) ! Elevation --     5m above sea level
         lnPtr=index(lineIn(13:),'m')
-        curNameWithSIUnits = 'Elevation (m) '//lineIn(13+lnPtr+1:)
-        IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(13:13+lnPtr-2))),1)))
-        ELSE
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameWithSIUnits), lineIn(13:13+lnPtr-2))
+        if (lnPtr > 0) then
+          curNameWithSIUnits = 'Elevation (m) '//lineIn(13+lnPtr+1:)
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(13:13+lnPtr-2))),1)))
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameWithSIUnits), lineIn(13:13+lnPtr-2))
+          ENDIF
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Elevatopm', 'not found')
         ENDIF
       CASE (StdPressureLine) ! Standard Pressure at Elevation -- 101265Pa
         CALL PreDefTableEntry(pdchWthrVal, 'Standard Pressure at Elevation', lineIn(35:))
@@ -5110,68 +5473,100 @@ IF (fileExists) THEN
         storeASHRAECDD=lineIn(3:6)
       CASE (maxDryBulbLine) !   - Maximum Dry Bulb temperature of  35.6°C on Jul  9
         sposlt=INDEX(lineIn,'of')
-        eposlt=INDEX(lineIn,degChar)
+        eposlt=INDEX(lineIn,'C')
         sposlt=sposlt+2
-        eposlt=eposlt-1
-        IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Maximum Dry Bulb Temperature (C)'
-          CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
-        ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt))
-        ENDIF
+        eposlt=eposlt-2
+        if (sposlt > 0 .and. eposlt > 0) then
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Maximum Dry Bulb Temperature (C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt)//degchar)
+          ENDIF
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Temperature','not found')
+        endif
         sposlt=INDEX(lineIn,'on')
         sposlt=sposlt+2
-        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Occurs on', lineIn(sposlt:))
+        if (sposlt > 0) then
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Occurs on', lineIn(sposlt:))
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dry Bulb Occurs on', 'not found')
+        endif
       CASE (minDryBulbLine) !   - Minimum Dry Bulb temperature of -22.8°C on Jan  7
         sposlt=INDEX(lineIn,'of')
-        eposlt=INDEX(lineIn,degChar)
+        eposlt=INDEX(lineIn,'C')
         sposlt=sposlt+2
-        eposlt=eposlt-1
-        IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Minimum Dry Bulb Temperature (C)'
-          CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
-        ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt))
-        ENDIF
+        eposlt=eposlt-2
+        if (sposlt > 0 .and. eposlt > 0) then
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Minimum Dry Bulb Temperature (C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Temperature (C)', lineIn(sposlt:eposlt)//degchar)
+          ENDIF
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Temperature','not found')
+        endif
         sposlt=INDEX(lineIn,'on')
         sposlt=sposlt+2
-        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Occurs on', lineIn(sposlt:))
+        if (sposlt > 0) then
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Occurs on', lineIn(sposlt:))
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dry Bulb Occurs on', 'not found')
+        endif
       CASE (maxDewPointLine) !   - Maximum Dew Point temperature of  25.6°C on Aug  4
         sposlt=INDEX(lineIn,'of')
-        eposlt=INDEX(lineIn,degChar)
+        eposlt=INDEX(lineIn,'C')
         sposlt=sposlt+2
-        eposlt=eposlt-1
-        IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Maximum Dew Point Temperature (C)'
-          CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
-        ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Temperature (C)', lineIn(sposlt:eposlt))
-        ENDIF
+        eposlt=eposlt-2
+        if (sposlt > 0 .and. eposlt > 0) then
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Maximum Dew Point Temperature (C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Temperature (C)', lineIn(sposlt:eposlt)//degchar)
+          ENDIF
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Temperature','not found')
+        endif
         sposlt=INDEX(lineIn,'on')
         sposlt=sposlt+2
-        CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Occurs on', lineIn(sposlt:))
+        if (sposlt > 0) then
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Occurs on', lineIn(sposlt:))
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Maximum Dew Point Occurs on', 'not found')
+        endif
       CASE (minDewPointLine) !   - Minimum Dew Point temperature of -28.9°C on Dec 31
         sposlt=INDEX(lineIn,'of')
-        eposlt=INDEX(lineIn,degChar)
+        eposlt=INDEX(lineIn,'C')
         sposlt=sposlt+2
-        eposlt=eposlt-1
-        IF (unitsStyle .EQ. unitsStyleInchPound) THEN
-          curNameWithSIUnits = 'Minimum Dew Point Temperature (C)'
-          CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
-          CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
-             trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
-        ELSE
-          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Temperature (C)', lineIn(sposlt:eposlt))
-        ENDIF
+        eposlt=eposlt-2
+        if (sposlt > 0 .and. eposlt > 0) then
+          IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+            curNameWithSIUnits = 'Minimum Dew Point Temperature (C)'
+            CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
+            CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
+               trim(RealToStr(ConvertIP(indexUnitConv,StrToReal(lineIn(sposlt:eposlt))),1))//degchar)
+          ELSE
+            CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Temperature (C)', lineIn(sposlt:eposlt)//degchar)
+          ENDIF
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Temperature','not found')
+        endif
         sposlt=INDEX(lineIn,'on')
         sposlt=sposlt+2
-        CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Occurs on', lineIn(sposlt:))
+        if (sposlt > 0) then
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Occurs on', lineIn(sposlt:))
+        else
+          CALL PreDefTableEntry(pdchWthrVal, 'Minimum Dew Point Occurs on', 'not found')
+        endif
       CASE (wthHDDLine) !  - 1745 (wthr file) annual heating degree-days (10°C baseline)
         IF (storeASHRAEHDD /= ' ') THEN
           IF (unitsStyle .EQ. unitsStyleInchPound) THEN
@@ -5194,8 +5589,11 @@ IF (fileExists) THEN
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
              trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
+          CALL PreDefTableEntry(pdchLeedGenData, 'Heating Degree Days',   &
+             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
         ELSE
           CALL PreDefTableEntry(pdchWthrVal, 'Weather File Heating Degree-Days (base 10°C)', lineIn(3:6))
+          CALL PreDefTableEntry(pdchLeedGenData, 'Heating Degree Days', lineIn(3:6))
         ENDIF
       CASE (wthCDDLine) !  -  464 (wthr file) annual cooling degree-days (18°C baseline)
         IF (storeASHRAECDD /= ' ') THEN
@@ -5219,8 +5617,11 @@ IF (fileExists) THEN
           CALL LookupSItoIP(curNameWithSIUnits, indexUnitConv, curNameAndUnits)
           CALL PreDefTableEntry(pdchWthrVal, trim(curNameAndUnits),   &
              trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
+          CALL PreDefTableEntry(pdchLeedGenData, 'Cooling Degree Days',   &
+             trim(RealToStr(ConvertIPDelta(indexUnitConv,StrToReal(lineIn(3:6))),1)))
         ELSE
           CALL PreDefTableEntry(pdchWthrVal, 'Weather File Cooling Degree-Days (base 18°C)', lineIn(3:6))
+          CALL PreDefTableEntry(pdchLeedGenData, 'Cooling Degree Days',lineIn(3:6))
         ENDIF
       CASE (KoppenLine) ! - Climate type "BSk" (Köppen classification)
         IF (INDEX(lineIn,'not shown') == 0) THEN
@@ -5256,6 +5657,7 @@ IF (fileExists) THEN
           ashZone = lineIn(17:18)
           if (ashZone(2:2) == '"') ashZone(2:2)=' '
           CALL PreDefTableEntry(pdchWthrVal, 'ASHRAE Climate Zone', ashZone)
+          CALL PreDefTableEntry(pdchLeedGenData,'Climate Zone',ashZone)
           IF (ashZone .EQ. '1A') THEN
             CALL PreDefTableEntry(pdchWthrVal, 'ASHRAE Description', 'Very Hot-Humid')
           ELSEIF (ashZone .EQ. '1B') THEN
@@ -5385,7 +5787,7 @@ SUBROUTINE FillRemainingPredefinedEntries
           ! METHODOLOGY EMPLOYED:
           !   na
 
-USE DataHeatBalance,   ONLY: Zone, TotLights, Lights, ZonePreDefRep, ZnAirRpt, BuildingPreDefRep
+USE DataHeatBalance,   ONLY: Zone, TotLights, Lights, ZonePreDefRep, ZnAirRpt, BuildingPreDefRep, People, NumPeopleStatements
 USE ExteriorEnergyUse, ONLY: ExteriorLights, NumExteriorLights, ScheduleOnly, AstroClockOverride
 USE ScheduleManager,   ONLY: ScheduleAverageHoursPerWeek, GetScheduleName
 USE DataEnvironment,   ONLY: RunPeriodStartDayOfWeek,CurrentYearIsLeapYear
@@ -5394,7 +5796,10 @@ USE DataHVACGlobals,   ONLY: NumPrimaryAirSys
 USE DataOutputs,       ONLY: iNumberOfRecords,iNumberOfDefaultedFields,iTotalFieldsWithDefaults,  &
        iNumberOfAutosizedFields,iTotalAutoSizableFields,iNumberOfAutoCalcedFields,iTotalAutoCalculatableFields
 USE ZonePlenum,        ONLY: NumZoneReturnPlenums, NumZoneSupplyPlenums
-USE OutputReportPredefined
+USE DataEnvironment,   ONLY : EnvironmentName, WeatherFileLocationTitle
+USE DataErrorTracking, ONLY: TotalSevereErrors, TotalWarningErrors
+USE General, ONLY: RoundSigDigits
+
 IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -5413,6 +5818,7 @@ IMPLICIT NONE
 INTEGER :: iLight
 INTEGER :: zonePt
 INTEGER :: iZone
+INTEGER :: jPeople
 REAL(r64) :: totalVolume = 0.0
 INTEGER :: numUncondZones = 0
 INTEGER :: numCondZones = 0
@@ -5508,7 +5914,7 @@ DO iZone = 1, NumOfZones
           ZonePreDefRep(iZone)%MechVentVolTotal / (ZonePreDefRep(iZone)%TotTimeOcc * Zone(iZone)%volume &
                       * Zone(iZone)%Multiplier * Zone(iZone)%ListMultiplier),3)
       END IF
-      IF (Zone(iZone)%volume .GT. 0) THEN
+      IF ((Zone(iZone)%volume .GT. 0) .AND. (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0)) THEN
         CALL PreDefTableEntry(pdchOaoMinMechVent, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%MechVentVolMin / Zone(iZone)%volume * Zone(iZone)%Multiplier * Zone(iZone)%ListMultiplier,3)
       END IF
@@ -5517,16 +5923,25 @@ DO iZone = 1, NumOfZones
         CALL PreDefTableEntry(pdchOaoAvgInfil, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%InfilVolTotal / (ZonePreDefRep(iZone)%TotTimeOcc * Zone(iZone)%volume),3)
       END IF
-      IF (Zone(iZone)%volume .GT. 0) THEN
+      IF ((Zone(iZone)%volume .GT. 0) .AND. (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0)) THEN
         CALL PreDefTableEntry(pdchOaoMinInfil, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%InfilVolMin / Zone(iZone)%volume,3)
+      END IF
+      !AFN infiltration
+      IF (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0) THEN
+        CALL PreDefTableEntry(pdchOaoAvgAFNInfil, Zone(iZone)%Name, &
+          ZonePreDefRep(iZone)%AFNInfilVolTotal / (ZonePreDefRep(iZone)%TotTimeOcc * Zone(iZone)%volume),3)
+      END IF
+      IF ((Zone(iZone)%volume .GT. 0) .AND. (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0)) THEN
+        CALL PreDefTableEntry(pdchOaoMinAFNInfil, Zone(iZone)%Name, &
+          ZonePreDefRep(iZone)%AFNInfilVolMin / Zone(iZone)%volume,3)
       END IF
       !simple 'ZoneVentilation'
       IF (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0) THEN
         CALL PreDefTableEntry(pdchOaoAvgSimpVent, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%SimpVentVolTotal / (ZonePreDefRep(iZone)%TotTimeOcc * Zone(iZone)%volume),3)
       END IF
-      IF (Zone(iZone)%volume .GT. 0) THEN
+      IF ((Zone(iZone)%volume .GT. 0) .AND. (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0)) THEN
         CALL PreDefTableEntry(pdchOaoMinSimpVent, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%SimpVentVolMin / Zone(iZone)%volume,3)
       END IF
@@ -5697,6 +6112,22 @@ CALL PreDefTableEntry(pdchSHGSHtWindRem,  'Total Facility', BuildingPreDefRep%SH
 CALL PreDefTableEntry(pdchSHGSHtIzaRem,   'Total Facility', BuildingPreDefRep%SHGSHtIzaRem)
 CALL PreDefTableEntry(pdchSHGSHtInfilRem, 'Total Facility', BuildingPreDefRep%SHGSHtInfilRem)
 CALL PreDefTableEntry(pdchSHGSHtOtherRem, 'Total Facility', BuildingPreDefRep%SHGSHtOtherRem)
+
+! LEED Report
+!
+! 1.1A-General Information
+!CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','-')
+IF (EnvironmentName == WeatherFileLocationTitle) THEN
+  CALL PreDefTableEntry(pdchLeedGenData,'Weather File',TRIM(EnvironmentName))
+ELSE
+  CALL PreDefTableEntry(pdchLeedGenData,'Weather File',TRIM(EnvironmentName)//' ** '//TRIM(WeatherFileLocationTitle))
+ENDIF
+
+!CALL PreDefTableEntry(pdchLeedGenData,'Climate Zone','-')
+!CALL PreDefTableEntry(pdchLeedGenData,'Heating Degree Days','-')
+!CALL PreDefTableEntry(pdchLeedGenData,'Cooling Degree Days','-')
+CALL PreDefTableEntry(pdchLeedGenData,'HDD and CDD data source','Weather File Stat')
+CALL PreDefTableEntry(pdchLeedGenData,'Total gross floor area [m2]','-')
 
 END SUBROUTINE FillRemainingPredefinedEntries
 
@@ -6074,7 +6505,7 @@ DO iInput = 1, MonthlyInputCount
       END SELECT
     END DO !KColumn
     CALL WriteReportHeaders(MonthlyInput(iInput)%name,MonthlyTables(curTable)%keyValue,isAverage)
-    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.TRUE.) !transpose monthly XML tables.
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         MonthlyInput(iInput)%name,&
                                         MonthlyTables(curTable)%keyValue,&
@@ -6290,7 +6721,7 @@ DO iInObj = 1 , OutputTableBinnedCount
     tableBody(39,curIntervalCount+3) = TRIM(RealToStr(tableTotal,2))
     CALL writeTextLine('Values in table are in hours.')
     CALL writeTextLine(' ')
-    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.TRUE.) !transpose XML tables
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         repNameWithUnitsandscheduleName,&
                                         BinObjVarID(repIndex)%namesOfObj,&
@@ -6334,7 +6765,7 @@ DO iInObj = 1 , OutputTableBinnedCount
       tableBodyStat(6,1) = RealToStr(repStDev,2)
     END IF
     CALL writeSubtitle('Statistics')
-    CALL writeTable(tableBodyStat,rowHeadStat,columnHeadStat,columnWidthStat)
+    CALL writeTable(tableBodyStat,rowHeadStat,columnHeadStat,columnWidthStat,.TRUE.) !transpose XML table
     CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                         repNameWithUnitsandscheduleName,&
                                         BinObjVarID(repIndex)%namesOfObj,&
@@ -6373,8 +6804,6 @@ SUBROUTINE WriteBEPSTable
 USE OutputProcessor, ONLY: MaxNumSubcategories, EndUseCategory
 USE DataWater,       ONlY: WaterStorage
 USE ManageElectricPower , ONLY: ElecStorage, NumElecStorageDevices
-USE OutputReportPredefined, ONLY: TotalNotMetHeatingOccupiedForABUPS, &
-    TotalNotMetCoolingOccupiedForABUPS,TotalTimeNotSimpleASH55EitherForABUPS
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
 USE DataHVACGlobals, ONLY: deviationFromSetPtThresholdHtg,deviationFromSetPtThresholdClg
 USE ScheduleManager, ONLY: GetScheduleName
@@ -6398,7 +6827,7 @@ INTEGER, parameter  ::  notesLine             = 83
 
 INTEGER, parameter  ::  colElectricity        = 1
 INTEGER, parameter  ::  colGas                = 2
-INTEGER, parameter  ::  colOtherFuel          = 3
+INTEGER, parameter  ::  colAdditionalFuel     = 3
 INTEGER, parameter  ::  colPurchCool          = 4
 INTEGER, parameter  ::  colPurchHeat          = 5
 INTEGER, parameter  ::  colWater              = 6
@@ -6456,8 +6885,29 @@ REAL(r64)                                      :: convBldgCondFloorArea
 CHARACTER(len=MaxNameLength) :: curNameWithSIUnits
 CHARACTER(len=MaxNameLength) :: curNameAndUnits
 INTEGER :: indexUnitConv
-CHARACTER(len=52)                             :: tableString
+CHARACTER(len=52)                              :: tableString
+REAL(r64)                                      :: processFraction
+REAL(r64)                                      :: processElecCost
+REAL(r64)                                      :: processGasCost
+REAL(r64)                                      :: processOthrCost
 
+REAL(r64),DIMENSION(6)                         :: leedFansParkFromFan
+REAL(r64),DIMENSION(6)                         :: leedFansParkFromExtFuelEquip
+REAL(r64),DIMENSION(6)                         :: leedIntLightProc
+REAL(r64),DIMENSION(6)                         :: leedCook
+REAL(r64),DIMENSION(6)                         :: leedIndProc
+REAL(r64),DIMENSION(6)                         :: leedElevEsc
+CHARACTER(len=MaxNameLength)                   :: subCatName
+REAL(r64)                                      :: nonMisc
+REAL(r64)                                      :: leedSiteIntLite = 0.0
+REAL(r64)                                      :: leedSiteSpHeat = 0.0
+REAL(r64)                                      :: leedSiteSpCool = 0.0
+REAL(r64)                                      :: leedSiteFanInt = 0.0
+REAL(r64)                                      :: leedSiteSrvWatr = 0.0
+REAL(r64)                                      :: leedSiteRecept = 0.0
+REAL(r64)                                      :: leedSiteMisc = 0.0
+REAL(r64)                                      :: leedSiteTotal = 0.0
+REAL(r64)                                      :: unconvert
 
 IF (displayTabularBEPS) THEN
   ! show the headers of the report
@@ -6474,12 +6924,14 @@ IF (displayTabularBEPS) THEN
   DO jEndUse=1,numEndUses
     collapsedEndUse(jEndUse,1) = gatherEndUseBEPS(jEndUse,1)    !electricity
     collapsedEndUse(jEndUse,2) = gatherEndUseBEPS(jEndUse,2)    !natural gas
-    collapsedEndUse(jEndUse,3) = gatherEndUseBEPS(jEndUse,6)  & !other fuel       <- gasoline
+    collapsedEndUse(jEndUse,3) = gatherEndUseBEPS(jEndUse,6)  & !additional fuel  <- gasoline
                                + gatherEndUseBEPS(jEndUse,8)  & !                 <- diesel
                                + gatherEndUseBEPS(jEndUse,9)  & !                 <- coal
                                + gatherEndUseBEPS(jEndUse,10) & !                 <- fuel oil #1
                                + gatherEndUseBEPS(jEndUse,11) & !                 <- fuel oil #2
-                               + gatherEndUseBEPS(jEndUse,12)   !                 <- propane
+                               + gatherEndUseBEPS(jEndUse,12) & !                 <- propane
+                               + gatherEndUseBEPS(jEndUse,13) & !                 <- otherfuel1
+                               + gatherEndUseBEPS(jEndUse,14)   !                 <- otherfuel2
     collapsedEndUse(jEndUse,4) = gatherEndUseBEPS(jEndUse,3)    !district cooling <- purchased cooling
     collapsedEndUse(jEndUse,5) = gatherEndUseBEPS(jEndUse,4)  & !district heating <- purchased heating
                                + gatherEndUseBEPS(jEndUse,5)    !                 <- steam
@@ -6488,12 +6940,14 @@ IF (displayTabularBEPS) THEN
   ! repeat with totals
   collapsedTotal(1) = gatherTotalsBEPS(1)    !electricity
   collapsedTotal(2) = gatherTotalsBEPS(2)    !natural gas
-  collapsedTotal(3) = gatherTotalsBEPS(6)  & !other fuel       <- gasoline
+  collapsedTotal(3) = gatherTotalsBEPS(6)  & !additional fuel  <- gasoline
                     + gatherTotalsBEPS(8)  & !                 <- diesel
                     + gatherTotalsBEPS(9)  & !                 <- coal
                     + gatherTotalsBEPS(10) & !                 <- fuel oil #1
                     + gatherTotalsBEPS(11) & !                 <- fuel oil #2
-                    + gatherTotalsBEPS(12)   !                 <- propane
+                    + gatherTotalsBEPS(12) & !                 <- propane
+                    + gatherTotalsBEPS(13) & !                 <- otherfuel1
+                    + gatherTotalsBEPS(14)   !                 <- otherfuel2
   collapsedTotal(4) = gatherTotalsBEPS(3)    !district cooling <- purchased cooling
   collapsedTotal(5) = gatherTotalsBEPS(4)  & !district heating <- purchased heating
                     + gatherTotalsBEPS(5)    !                 <- steam
@@ -6503,12 +6957,14 @@ IF (displayTabularBEPS) THEN
     DO kEndUseSub = 1, EndUseCategory(jEndUse)%NumSubcategories
       collapsedEndUseSub(1,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(1,jEndUse,kEndUseSub)    !electricity
       collapsedEndUseSub(2,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(2,jEndUse,kEndUseSub)    !natural gas
-      collapsedEndUseSub(3,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(6,jEndUse,kEndUseSub) &  !other fuel       <- gasoline
+      collapsedEndUseSub(3,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(6,jEndUse,kEndUseSub) &  !additional fuel  <- gasoline
                                                + gatherEndUseSubBEPS(8,jEndUse,kEndUseSub) &  !                 <- diesel
                                                + gatherEndUseSubBEPS(9,jEndUse,kEndUseSub) &  !                 <- coal
                                                + gatherEndUseSubBEPS(10,jEndUse,kEndUseSub) & !                 <- fuel oil #1
                                                + gatherEndUseSubBEPS(11,jEndUse,kEndUseSub) & !                 <- fuel oil #2
-                                               + gatherEndUseSubBEPS(12,jEndUse,kEndUseSub)   !                 <- propane
+                                               + gatherEndUseSubBEPS(12,jEndUse,kEndUseSub) & !                 <- propane
+                                               + gatherEndUseSubBEPS(13,jEndUse,kEndUseSub) & !                 <- otherfuel1
+                                               + gatherEndUseSubBEPS(14,jEndUse,kEndUseSub)   !                 <- otherfuel2
       collapsedEndUseSub(4,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(3,jEndUse,kEndUseSub)    !district cooling <- purch cooling
       collapsedEndUseSub(5,jEndUse,kEndUseSub) = gatherEndUseSubBEPS(4,jEndUse,kEndUseSub) &  !district heating <- purch heating
                                                + gatherEndUseSubBEPS(5,jEndUse,kEndUseSub)    !                 <- steam
@@ -6632,7 +7088,10 @@ IF (displayTabularBEPS) THEN
                         + gatherTotalsBEPS(9)  & !coal
                         + gatherTotalsBEPS(10) & !fuel oil #1
                         + gatherTotalsBEPS(11) & !fuel oil #2
-                        + gatherTotalsBEPS(12)   ) / largeConversionFactor !propane
+                        + gatherTotalsBEPS(12) & !propane
+                        + gatherTotalsBEPS(13) & !otherfuel1
+                        + gatherTotalsBEPS(14) & !otherfuel2
+                                              ) / largeConversionFactor
 
   netElecPurchasedSold = gatherElecPurchased  - gatherElecSurplusSold
 
@@ -6647,7 +7106,10 @@ IF (displayTabularBEPS) THEN
                 + gatherTotalsBEPS(9)  & !coal
                 + gatherTotalsBEPS(10) & !fuel oil #1
                 + gatherTotalsBEPS(11) & !fuel oil #2
-                + gatherTotalsBEPS(12)   ) / largeConversionFactor !propane
+                + gatherTotalsBEPS(12) & !propane
+                + gatherTotalsBEPS(13) & !otherfuel1
+                + gatherTotalsBEPS(14) & !otherfuel2
+                                      ) / largeConversionFactor
 
   IF (efficiencyDistrictCooling .EQ. 0)  efficiencyDistrictCooling = 1
   IF (efficiencyDistrictHeating .EQ. 0)  efficiencyDistrictHeating = 1
@@ -6703,6 +7165,19 @@ IF (displayTabularBEPS) THEN
   else
     TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsBEPS(12)*sourceFactorPropane
   endif
+  !otherfuel1
+  if (fuelfactorsused(11)) then
+    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsSource(11)
+  else
+    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsBEPS(13)*sourceFactorOtherFuel1
+  endif
+  !otherfuel2
+  if (fuelfactorsused(12)) then
+    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsSource(12)
+  else
+    TotalSourceEnergyUse=TotalSourceEnergyUse+gatherTotalsBEPS(14)*sourceFactorOtherFuel2
+  endif
+
 
   TotalSourceEnergyUse = (TotalSourceEnergyuse   &
                   + gatherTotalsBEPS(3)*sourceFactorElectric/efficiencyDistrictCooling  & !district cooling
@@ -6762,6 +7237,18 @@ IF (displayTabularBEPS) THEN
   else
     netSourceEnergyUse=netSourceEnergyUse+gatherTotalsBEPS(12)*sourceFactorPropane
   endif
+  ! otherfuel1
+  if (fuelfactorsused(11)) then
+    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsSource(11)
+  else
+    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsBEPS(13)*sourceFactorOtherFuel1
+  endif
+  ! otherfuel2
+  if (fuelfactorsused(12)) then
+    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsSource(12)
+  else
+    netSourceEnergyUse=netSourceEnergyUse+gatherTotalsBEPS(14)*sourceFactorOtherFuel2
+  endif
 
   netSourceEnergyUse = (netSourceEnergyUse   &          ! from other fuels
                   + netSourceElecPurchasedSold        & !net source from electricity
@@ -6815,11 +7302,11 @@ IF (displayTabularBEPS) THEN
   !
   !---- Source and Site Energy Sub-Table
   !
-  ALLOCATE(rowHead(11))
+  ALLOCATE(rowHead(13))
   ALLOCATE(columnHead(1))
   ALLOCATE(columnWidth(1))
   columnWidth = 50 !array assignment
-  ALLOCATE(tableBody(11,1))
+  ALLOCATE(tableBody(13,1))
 
   columnHead(1) = 'Site=>Source Conversion Factor'
 
@@ -6834,6 +7321,8 @@ IF (displayTabularBEPS) THEN
   rowHead(9)  = 'Fuel Oil #1'
   rowHead(10)  = 'Fuel Oil #2'
   rowHead(11)  = 'Propane'
+  rowHead(12)  = 'Other Fuel 1'
+  rowHead(13)  = 'Other Fuel 2'
 
   tableBody = ''
 
@@ -6929,6 +7418,24 @@ IF (displayTabularBEPS) THEN
     tableBody(11,1)  = 'N/A'
   END IF
 
+  IF (.not. ffSchedUsed(13)) THEN
+    tableBody(12,1)  = TRIM(RealToStr(sourceFactorOtherFuel1 ,3))
+  ELSEIF (gatherTotalsBEPS(13) > SmallValue) THEN
+    tableBody(12,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(13)/gatherTotalsBEPS(13),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(13))) //'")'
+  ELSE
+    tableBody(12,1)  = 'N/A'
+  END IF
+
+  IF (.not. ffSchedUsed(14)) THEN
+    tableBody(13,1)  = TRIM(RealToStr(sourceFactorOtherFuel2 ,3))
+  ELSEIF (gatherTotalsBEPS(14) > SmallValue) THEN
+    tableBody(13,1)  = 'Effective Factor = ' // TRIM(RealToStr(gatherTotalsBySourceBEPS(14)/gatherTotalsBEPS(14),3)) // &
+                         ' (calculated using schedule "' // TRIM(GetScheduleName(ffSchedIndex(14))) //'")'
+  ELSE
+    tableBody(13,1)  = 'N/A'
+  END IF
+
   ! heading for the entire sub-table
   CALL writeSubtitle('Site to Source Energy Conversion Factors')
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
@@ -6966,6 +7473,7 @@ IF (displayTabularBEPS) THEN
 
   tableBody = ''
   tableBody(1,1)  = TRIM(RealToStr(convBldgGrossFloorArea,2))
+  CALL PreDefTableEntry(pdchLeedGenData,'Total gross floor area [m2]',TRIM(RealToStr(convBldgGrossFloorArea,2)))
   tableBody(2,1)  = TRIM(RealToStr(convBldgCondFloorArea,2))
   tableBody(3,1)  = TRIM(RealToStr(convBldgGrossFloorArea - convBldgCondFloorArea,2))
 
@@ -7030,21 +7538,21 @@ IF (displayTabularBEPS) THEN
     CASE (unitsStyleJtoKWH)
       columnHead(1) = 'Electricity [kWh]'
       columnHead(2) = 'Natural Gas [kWh]'
-      columnHead(3) = 'Other Fuel [kWh]'
+      columnHead(3) = 'Additional Fuel [kWh]'
       columnHead(4) = 'District Cooling [kWh]'
       columnHead(5) = 'District Heating [kWh]'
       columnHead(6) = 'Water [m3]'
     CASE (unitsStyleInchPound)
       columnHead(1) = 'Electricity [kBtu]'
       columnHead(2) = 'Natural Gas [kBtu]'
-      columnHead(3) = 'Other Fuel [kBtu]'
+      columnHead(3) = 'Additional Fuel [kBtu]'
       columnHead(4) = 'District Cooling [kBtu]'
       columnHead(5) = 'District Heating [kBtu]'
       columnHead(6) = 'Water [gal]'
     CASE DEFAULT
       columnHead(1) = 'Electricity [GJ]'
       columnHead(2) = 'Natural Gas [GJ]'
-      columnHead(3) = 'Other Fuel [GJ]'
+      columnHead(3) = 'Additional Fuel [GJ]'
       columnHead(4) = 'District Cooling [GJ]'
       columnHead(5) = 'District Heating [GJ]'
       columnHead(6) = 'Water [m3]'
@@ -7057,20 +7565,243 @@ IF (displayTabularBEPS) THEN
     END DO
     tableBody(16,iResource) = TRIM(RealToStr(useVal(15,iResource),2))
   END DO
+  !complete the LEED end use table using the same values
+  ! for certain rows in the LEED table the subcategories are necessary so first compute those values
+  leedFansParkFromFan = 0.0
+  leedFansParkFromExtFuelEquip = 0.0
+  leedIntLightProc = 0.0
+  leedCook = 0.0
+  leedIndProc = 0.0
+  leedElevEsc = 0.0
+
+  DO iResource = 1, 5    ! don't bother with water
+    DO jEndUse = 1, NumEndUses
+      IF (EndUseCategory(jEndUse)%NumSubcategories > 0) THEN
+        DO kEndUseSub = 1, EndUseCategory(jEndUse)%NumSubcategories
+          subCatName = EndUseCategory(jEndUse)%SubcategoryName(kEndUseSub)
+          IF (SameString(subCatName,'Fans - Parking Garage')) THEN
+            IF (jEndUse .EQ. 7) THEN  !fans
+              leedFansParkFromFan(iResource) = leedFansParkFromFan(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+            ELSE
+              leedFansParkFromExtFuelEquip(iResource) = leedFansParkFromExtFuelEquip(iResource) &
+                   + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+            END IF
+          ELSEIF (SameString(subCatName,'Interior Lighting - Process')) THEN
+            leedIntLightProc(iResource) = leedIntLightProc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Cooking')) THEN
+            leedCook(iResource) = leedCook(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Industrial Process')) THEN
+            leedIndProc(iResource) = leedIndProc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Elevators and Escalators')) THEN
+            leedElevEsc(iResource) = leedElevEsc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          END IF
+        END DO
+      END IF
+    END DO
+  END DO
+
+  unconvert = largeConversionFactor / 1000000000.d0  !to avoid double converting, the values for the LEED report should be in GJ
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Interior Lighting',unconvert * (useVal(3,colElectricity) &
+                    - leedIntLightProc(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Exterior Lighting',unconvert * useVal(4,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Space Heating',unconvert * useVal(1,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Space Cooling',unconvert * useVal(2,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Pumps',unconvert * useVal(8,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Heat Rejection',unconvert * useVal(9,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Fans-Interior',unconvert * (useVal(7,colElectricity) &
+                     - leedFansParkFromFan(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colElectricity) &
+                     + leedFansParkFromExtFuelEquip(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Service Water Heating',unconvert * useVal(12,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Receptacle Equipment',unconvert * useVal(5,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Interior Lighting (process)',unconvert * leedIntLightProc(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Refrigeration Equipment',unconvert * useVal(13,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Cooking',unconvert * leedCook(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Industrial Process',unconvert * leedIndProc(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Elevators and Escalators',unconvert * leedElevEsc(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElEneUse,'Total Line',unconvert * useVal(15,colElectricity),2)
+  !  Energy Use Intensities
+  IF (buildingGrossFloorArea .GT. 0) THEN
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Interior Lighting',unconvert * 1000 * (useVal(3,colElectricity) &
+                      - leedIntLightProc(colElectricity))/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Space Heating',unconvert * 1000 * useVal(1,colElectricity)/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Space Cooling',unconvert * 1000 * useVal(2,colElectricity)/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Fans-Interior',unconvert * 1000 * (useVal(7,colElectricity) &
+                      - leedFansParkFromFan(colElectricity))/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Service Water Heating',unconvert * 1000 &
+                      * useVal(12,colElectricity)/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Receptacle Equipment',unconvert * 1000 &
+                      * useVal(5,colElectricity)/buildingGrossFloorArea,2)
+    nonMisc = useVal(3,colElectricity) - leedIntLightProc(colElectricity) &
+              + useVal(1,colElectricity) +  useVal(2,colElectricity) &
+              + useVal(7,colElectricity) - leedFansParkFromFan(colElectricity) &
+              + useVal(12,colElectricity) + useVal(5,colElectricity)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Miscellaneous',unconvert * 1000 * (useVal(15,colElectricity) - nonMisc) &
+              / buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiElec,'Subtotal',unconvert * 1000 * useVal(15,colElectricity)/buildingGrossFloorArea,2)
+  END IF
+
+  CALL PreDefTableEntry(pdchLeedEusTotal,'Electricity',unconvert * useVal(15,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedEusProc,'Electricity',unconvert * (useVal(5,colElectricity) + useVal(13,colElectricity)),2)
+  IF (useVal(15,colElectricity) .NE. 0) THEN
+    processFraction = (useVal(5,colElectricity) + useVal(13,colElectricity))/useVal(15,colElectricity)
+    processElecCost = LEEDelecCostTotal * processFraction
+  ELSE
+    processElecCost = 0
+  END IF
+  CALL PreDefTableEntry(pdchLeedEcsProc,'Electricity',processElecCost,2)
+  CALL addFootNoteSubTable(pdstLeedEneCostSum,'Process energy cost based on ratio of process to total energy.')
+
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Interior Lighting',unconvert * (useVal(3,colGas) - leedIntLightProc(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Exterior Lighting',unconvert * useVal(4,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Space Heating',unconvert * useVal(1,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Space Cooling',unconvert * useVal(2,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Pumps',unconvert * useVal(8,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Heat Rejection',unconvert * useVal(9,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Fans-Interior',unconvert * (useVal(7,colGas)- leedFansParkFromFan(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colGas) &
+                    + leedFansParkFromExtFuelEquip(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Service Water Heating',unconvert * useVal(12,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Receptacle Equipment',unconvert * useVal(5,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Interior Lighting (process)',unconvert * leedIntLightProc(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Refrigeration Equipment',unconvert * useVal(13,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Cooking',unconvert * leedCook(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Industrial Process',unconvert * leedIndProc(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Elevators and Escalators',unconvert * leedElevEsc(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasEneUse,'Total Line',unconvert * useVal(15,colGas),2)
+  !  Energy Use Intensities
+  IF (buildingGrossFloorArea .GT. 0) THEN
+    CALL PreDefTableEntry(pdchLeedEuiNatG,'Space Heating',unconvert * 1000 * useVal(1,colGas)/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiNatG,'Service Water Heating',unconvert * 1000 * useVal(12,colGas)/buildingGrossFloorArea,2)
+    nonMisc = useVal(1,colGas) + useVal(12,colGas)
+    CALL PreDefTableEntry(pdchLeedEuiNatG,'Miscellaneous',unconvert * 1000 * (useVal(15,colGas) - nonMisc) &
+           / buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiNatG,'Subtotal',unconvert * 1000 * useVal(15,colGas)/buildingGrossFloorArea,2)
+  END IF
+  CALL PreDefTableEntry(pdchLeedEusTotal,'Natural Gas',unconvert * useVal(15,colGas),2)
+  CALL PreDefTableEntry(pdchLeedEusProc,'Natural Gas',unconvert * (useVal(5,colGas) + useVal(13,colGas)),2)
+  IF (useVal(15,colGas) .NE. 0) THEN
+    processFraction = (useVal(5,colGas) + useVal(13,colGas))/useVal(15,colGas)
+    processGasCost = LEEDgasCostTotal * processFraction
+  ELSE
+    processGasCost = 0
+  END IF
+  CALL PreDefTableEntry(pdchLeedEcsProc,'Natural Gas',processGasCost,2)
+
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Interior Lighting',unconvert *   &
+                                    (useVal(3,colAdditionalFuel) + useVal(3,colPurchCool) &
+                                       + useVal(3,colPurchHeat) - (leedIntLightProc(colAdditionalFuel) &
+                                       + leedIntLightProc(colPurchCool) + leedIntLightProc(colPurchHeat))) ,2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Exterior Lighting',unconvert *   &
+                                    (useVal(4,colAdditionalFuel) + useVal(4,colPurchCool) &
+                                       + useVal(4,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Space Heating',unconvert * (useVal(1,colAdditionalFuel) + useVal(1,colPurchCool) &
+                                       + useVal(1,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Space Cooling',unconvert * (useVal(2,colAdditionalFuel) + useVal(2,colPurchCool) &
+                                       + useVal(2,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Pumps',unconvert * (useVal(8,colAdditionalFuel) + useVal(8,colPurchCool) &
+                                       + useVal(8,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Heat Rejection',unconvert * (useVal(9,colAdditionalFuel) + useVal(9,colPurchCool) &
+                                       + useVal(9,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Fans-Interior',unconvert * (useVal(7,colAdditionalFuel) +  useVal(7,colPurchCool) &
+                                       + useVal(7,colPurchHeat) - (leedFansParkFromFan(colAdditionalFuel) &
+                                       + leedFansParkFromFan(colPurchCool) + leedFansParkFromFan(colPurchHeat))),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colAdditionalFuel) &
+                                       + leedFansParkFromFan(colPurchCool) + leedFansParkFromFan(colPurchHeat) &
+                                       + leedFansParkFromExtFuelEquip(colAdditionalFuel)   &
+                                       + leedFansParkFromExtFuelEquip(colPurchCool) &
+                                       + leedFansParkFromExtFuelEquip(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Service Water Heating',unconvert * (useVal(12,colAdditionalFuel) &
+                                       + useVal(12,colPurchCool) + useVal(12,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Receptacle Equipment',unconvert * (useVal(5,colAdditionalFuel) &
+                                       + useVal(5,colPurchCool) + useVal(5,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Interior Lighting (process)',unconvert * (leedIntLightProc(colAdditionalFuel) &
+                                      + leedIntLightProc(colPurchCool) + leedIntLightProc(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Refrigeration Equipment',unconvert * (useVal(13,colAdditionalFuel) &
+                                      + useVal(13,colPurchCool) + useVal(13,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Cooking',unconvert * (leedCook(colAdditionalFuel) + leedCook(colPurchCool) &
+                                      + leedCook(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Industrial Process',unconvert * (leedIndProc(colAdditionalFuel) &
+                                      + leedIndProc(colPurchCool) + leedIndProc(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Elevators and Escalators',unconvert * (leedElevEsc(colAdditionalFuel) &
+                                      + leedElevEsc(colPurchCool) + leedElevEsc(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthEneUse,'Total Line',unconvert * (useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) &
+                                      + useVal(15,colPurchHeat)),2)
+  !  Energy Use Intensities
+  IF (buildingGrossFloorArea .GT. 0) THEN
+    CALL PreDefTableEntry(pdchLeedEuiOthr,'Miscellaneous',unconvert * 1000 * useVal(15,colAdditionalFuel)/buildingGrossFloorArea,2)
+    CALL PreDefTableEntry(pdchLeedEuiOthr,'Subtotal',unconvert * 1000 * useVal(15,colAdditionalFuel)/buildingGrossFloorArea,2)
+  END IF
+  CALL PreDefTableEntry(pdchLeedEusTotal,'Additional',unconvert * (useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) &
+                                                             + useVal(15,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedEusProc,'Additional',unconvert * (useVal(5,colAdditionalFuel) + useVal(13,colAdditionalFuel) &
+                                                             + useVal(5,colPurchCool) + useVal(13,colPurchCool) &
+                                                             + useVal(5,colPurchHeat) + useVal(13,colPurchHeat)) ,2)
+  IF ((useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat)) .GT. 0.001) THEN
+              processFraction = (useVal(5,colAdditionalFuel) + useVal(13,colAdditionalFuel) &
+                              + useVal(5,colPurchCool) + useVal(13,colPurchCool) &
+                              + useVal(5,colPurchHeat) + useVal(13,colPurchHeat))&
+                              /(useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat))
+  ELSE
+     processFraction = 0.0
+  END IF
+  processOthrCost = LEEDothrCostTotal * processFraction
+  CALL PreDefTableEntry(pdchLeedEcsProc,'Additional',processOthrCost,2)
+  CALL PreDefTableEntry(pdchLeedEcsProc,'Total',processElecCost + processGasCost + processOthrCost,2)
+  ! accumulate for percentage table
+  leedSiteIntLite = 0
+  leedSiteSpHeat = 0
+  leedSiteSpCool = 0
+  leedSiteFanInt = 0
+  leedSiteSrvWatr = 0
+  leedSiteRecept = 0
+  leedSiteTotal  = 0
+  DO iResource = 1, 5    ! don't bother with water
+    leedSiteIntLite = leedSiteIntLite + useVal(3,iResource) - leedIntLightProc(iResource)
+    leedSiteSpHeat = leedSiteSpHeat + useVal(1,iResource)
+    leedSiteSpCool = leedSiteSpCool + useVal(2,iResource)
+    leedSiteFanInt = leedSiteFanInt + useVal(7,iResource) - leedFansParkFromFan(iResource)
+    leedSiteSrvWatr = leedSiteSrvWatr + useVal(12,iResource)
+    leedSiteRecept = leedSiteRecept + useVal(5,iResource)
+    leedSiteTotal  = leedSiteTotal + useVal(15,iResource)
+  END DO
+  IF (leedSiteTotal .NE. 0) THEN
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Interior Lighting',100 * leedSiteIntLite / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Space Heating',100 * leedSiteSpHeat / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Space Cooling',100 * leedSiteSpCool / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Fans-Interior',100 * leedSiteFanInt / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Service Water Heating',100 * leedSiteSrvWatr / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Receptacle Equipment',100 * leedSiteRecept / leedSiteTotal,2)
+    CALL PreDefTableEntry(pdchLeedEupPerc,'Miscellaneous',100 * (leedSiteTotal &
+      - (leedSiteIntLite + leedSiteSpHeat + leedSiteSpCool + leedSiteFanInt + leedSiteSrvWatr + leedSiteRecept)) / leedSiteTotal,2)
+  END IF
+  !totals across energy source
+  CALL PreDefTableEntry(pdchLeedEusTotal,'Total',unconvert * (useVal(15,colAdditionalFuel) + useVal(15,colPurchCool)  &
+                                         + useVal(15,colPurchHeat) + useVal(15,colElectricity) + useVal(15,colGas)),2)
+  CALL PreDefTableEntry(pdchLeedEusProc,'Total',unconvert * (useVal(5,colAdditionalFuel) + useVal(13,colAdditionalFuel) &
+                                                             + useVal(5,colPurchCool) + useVal(13,colPurchCool) &
+                                                             + useVal(5,colPurchHeat) + useVal(13,colPurchHeat) &
+                                                             + useVal(5,colElectricity) + useVal(13,colElectricity) &
+                                                             + useVal(5,colGas) + useVal(13,colGas)),2)
+
   footnote = ''
   SELECT CASE (resourcePrimaryHeating)
     CASE (colElectricity)
       footnote = 'Note: Electricity appears to be the principal heating source based on energy usage. '
+      CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','Electricity')
     CASE (colGas)
       footnote = 'Note: Natural gas appears to be the principal heating source based on energy usage. '
-    CASE (colOtherFuel)
-      footnote = 'Note: Other fuel appears to be the principal heating source based on energy usage. '
+      CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','Natural Gas')
+    CASE (colAdditionalFuel)
+      footnote = 'Note: Additional fuel appears to be the principal heating source based on energy usage. '
+      CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','Additional Fuel')
     CASE (colPurchHeat)
       footnote = 'Note: District heat appears to be the principal heating source based on energy usage. '
+      CALL PreDefTableEntry(pdchLeedGenData,'Principal Heating Source','District Heat')
   END SELECT
   ! heading for the entire sub-table
   CALL writeSubtitle('End Uses')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.FALSE., footnote)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'AnnualBuildingUtilityPerformanceSummary',&
                                       'Entire Facility',&
@@ -7161,21 +7892,21 @@ IF (displayTabularBEPS) THEN
     CASE (unitsStyleJtoKWH)
       columnHead(2) = 'Electricity [kWh]'
       columnHead(3) = 'Natural Gas [kWh]'
-      columnHead(4) = 'Other Fuel [kWh]'
+      columnHead(4) = 'Additional Fuel [kWh]'
       columnHead(5) = 'District Cooling [kWh]'
       columnHead(6) = 'District Heating [kWh]'
       columnHead(7) = 'Water [m3]'
     CASE (unitsStyleInchPound)
       columnHead(2) = 'Electricity [kBtu]'
       columnHead(3) = 'Natural Gas [kBtu]'
-      columnHead(4) = 'Other Fuel [kBtu]'
+      columnHead(4) = 'Additional Fuel [kBtu]'
       columnHead(5) = 'District Cooling [kBtu]'
       columnHead(6) = 'District Heating [kBtu]'
       columnHead(7) = 'Water [gal]'
     CASE DEFAULT
       columnHead(2) = 'Electricity [GJ]'
       columnHead(3) = 'Natural Gas [GJ]'
-      columnHead(4) = 'Other Fuel [GJ]'
+      columnHead(4) = 'Additional Fuel [GJ]'
       columnHead(5) = 'District Cooling [GJ]'
       columnHead(6) = 'District Heating [GJ]'
       columnHead(7) = 'Water [m3]'
@@ -7257,21 +7988,21 @@ IF (displayTabularBEPS) THEN
     CASE (unitsStyleJtoKWH)
       columnHead(1) = 'Electricity Intensity [kWh/m2]'
       columnHead(2) = 'Natural Gas Intensity [kWh/m2]'
-      columnHead(3) = 'Other Fuel Intensity [kWh/m2]'
+      columnHead(3) = 'Additional Fuel Intensity [kWh/m2]'
       columnHead(4) = 'District Cooling Intensity [kWh/m2]'
       columnHead(5) = 'District Heating Intensity [kWh/m2]'
       columnHead(6) = 'Water Intensity [m3/m2]'
     CASE (unitsStyleInchPound)
       columnHead(1) = 'Electricity Intensity [kBtu/ft2]'
       columnHead(2) = 'Natural Gas Intensity [kBtu/ft2]'
-      columnHead(3) = 'Other Fuel Intensity [kBtu/ft2]'
+      columnHead(3) = 'Additional Fuel Intensity [kBtu/ft2]'
       columnHead(4) = 'District Cooling Intensity [kBtu/ft2]'
       columnHead(5) = 'District Heating Intensity [kBtu/ft2]'
       columnHead(6) = 'Water Intensity [gal/ft2]'
     CASE DEFAULT
       columnHead(1) = 'Electricity Intensity [MJ/m2]'
       columnHead(2) = 'Natural Gas Intensity [MJ/m2]'
-      columnHead(3) = 'Other Fuel Intensity [MJ/m2]'
+      columnHead(3) = 'Additional Fuel Intensity [MJ/m2]'
       columnHead(4) = 'District Cooling Intensity [MJ/m2]'
       columnHead(5) = 'District Heating Intensity [MJ/m2]'
       columnHead(6) = 'Water Intensity [m3/m2]'
@@ -7354,10 +8085,14 @@ IF (displayTabularBEPS) THEN
   tableBody = ''
 
   ! show annual values
+  unconvert = largeConversionFactor / 1000000000.d0  !to avoid double converting, the values for the LEED report should be in GJ
+
   tableBody(1,1)  = TRIM(RealToStr(gatherPowerFuelFireGen,2))
   tableBody(2,1)  = TRIM(RealToStr(gatherPowerHTGeothermal,2))
   tableBody(3,1)  = TRIM(RealToStr(gatherPowerPV,2))
+  CALL PreDefTableEntry(pdchLeedRenAnGen,'Photovoltaic',unconvert * gatherPowerPV,2)
   tableBody(4,1)  = TRIM(RealToStr(gatherPowerWind,2))
+  CALL PreDefTableEntry(pdchLeedRenAnGen,'Wind',unconvert * gatherPowerWind,2)
   tableBody(5,1)  = TRIM(RealToStr(OverallNetEnergyFromStorage, 2 ))
   tableBody(6,1)  = TRIM(RealToStr(gatherElecProduced,2))
   tableBody(8,1)  = TRIM(RealToStr(gatherElecPurchased,2))
@@ -7597,8 +8332,8 @@ IF (displayTabularBEPS) THEN
   ENDIF
   columnHead(1)=curNameAndUnits
 
-  rowHead(1)  = 'Tolerance for Time Heating Setpoint Not Met'
-  rowHead(2)  = 'Tolerance for Time Cooling Setpoint Not Met'
+  rowHead(1)  = 'Tolerance for Zone Heating Setpoint Not Met Time'
+  rowHead(2)  = 'Tolerance for Zone Cooling Setpoint Not Met Time'
 
   IF (unitsStyle .NE. unitsStyleInchPound) THEN
     tableBody(1,1)  = TRIM(RealToStr(abs(deviationFromSetPtThresholdHtg),2))
@@ -7629,6 +8364,11 @@ IF (displayTabularBEPS) THEN
 
   tableBody(1,1)  = TRIM(RealToStr(TotalNotMetHeatingOccupiedForABUPS,2))
   tableBody(2,1)  = TRIM(RealToStr(TotalNotMetCoolingOccupiedForABUPS,2))
+  CALL PreDefTableEntry(pdchLeedAmData,'Number of hours heating loads not met', &
+          TRIM(RealToStr(TotalNotMetHeatingOccupiedForABUPS,2)))
+  CALL PreDefTableEntry(pdchLeedAmData,'Number of hours cooling loads not met', &
+          TRIM(RealToStr(TotalNotMetCoolingOccupiedForABUPS,2)))
+  CALL PreDefTableEntry(pdchLeedAmData,'Number of hours not met',TRIM(RealToStr(TotalNotMetOccupiedForABUPS,2)))
   tableBody(3,1)  = TRIM(RealToStr(TotalTimeNotSimpleASH55EitherForABUPS,2))
 
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
@@ -7735,12 +8475,14 @@ IF (displaySourceEnergyEndUseSummary) THEN
   DO jEndUse=1,numEndUses
     collapsedEndUse(jEndUse,1) = gatherEndUseBySourceBEPS(jEndUse,1)    !electricity
     collapsedEndUse(jEndUse,2) = gatherEndUseBySourceBEPS(jEndUse,2)    !natural gas
-    collapsedEndUse(jEndUse,3) = gatherEndUseBySourceBEPS(jEndUse,6)  & !other fuel       <- gasoline
+    collapsedEndUse(jEndUse,3) = gatherEndUseBySourceBEPS(jEndUse,6)  & !Additional fuel  <- gasoline
                                + gatherEndUseBySourceBEPS(jEndUse,8)  & !                 <- diesel
                                + gatherEndUseBySourceBEPS(jEndUse,9)  & !                 <- coal
                                + gatherEndUseBySourceBEPS(jEndUse,10) & !                 <- fuel oil #1
                                + gatherEndUseBySourceBEPS(jEndUse,11) & !                 <- fuel oil #2
-                               + gatherEndUseBySourceBEPS(jEndUse,12)   !                 <- propane
+                               + gatherEndUseBySourceBEPS(jEndUse,12) & !                 <- propane
+                               + gatherEndUseBySourceBEPS(jEndUse,13) & !                 <- otherfuel1
+                               + gatherEndUseBySourceBEPS(jEndUse,14)   !                 <- otherfuel2
     collapsedEndUse(jEndUse,4) = gatherEndUseBySourceBEPS(jEndUse,3)    !district cooling <- purchased cooling
     collapsedEndUse(jEndUse,5) = gatherEndUseBySourceBEPS(jEndUse,4)  & !district heating <- purchased heating
                                + gatherEndUseBySourceBEPS(jEndUse,5)    !                 <- steam
@@ -7749,12 +8491,14 @@ IF (displaySourceEnergyEndUseSummary) THEN
   ! repeat with totals
   collapsedTotal(1) = gatherTotalsBySourceBEPS(1)    !electricity
   collapsedTotal(2) = gatherTotalsBySourceBEPS(2)    !natural gas
-  collapsedTotal(3) = gatherTotalsBySourceBEPS(6)  & !other fuel       <- gasoline
+  collapsedTotal(3) = gatherTotalsBySourceBEPS(6)  & !Additional fuel  <- gasoline
                     + gatherTotalsBySourceBEPS(8)  & !                 <- diesel
                     + gatherTotalsBySourceBEPS(9)  & !                 <- coal
                     + gatherTotalsBySourceBEPS(10) & !                 <- fuel oil #1
                     + gatherTotalsBySourceBEPS(11) & !                 <- fuel oil #2
-                    + gatherTotalsBySourceBEPS(12)   !                 <- propane
+                    + gatherTotalsBySourceBEPS(12) & !                 <- propane
+                    + gatherTotalsBySourceBEPS(13) & !                 <- otherfuel1
+                    + gatherTotalsBySourceBEPS(14)   !                 <- otherfuel2
   collapsedTotal(4) = gatherTotalsBySourceBEPS(3)    !district cooling <- purchased cooling
   collapsedTotal(5) = gatherTotalsBySourceBEPS(4)  & !district heating <- purchased heating
                     + gatherTotalsBySourceBEPS(5)    !                 <- steam
@@ -7832,19 +8576,19 @@ IF (displaySourceEnergyEndUseSummary) THEN
     CASE (unitsStyleJtoKWH)
       columnHead(1) = 'Source Electricity [kWh]'
       columnHead(2) = 'Source Natural Gas [kWh]'
-      columnHead(3) = 'Source Other Fuel [kWh]'
+      columnHead(3) = 'Source Additional Fuel [kWh]'
       columnHead(4) = 'Source District Cooling [kWh]'
       columnHead(5) = 'Source District Heating [kWh]'
     CASE (unitsStyleInchPound)
       columnHead(1) = 'Source Electricity [kBtu]'
       columnHead(2) = 'Source Natural Gas [kBtu]'
-      columnHead(3) = 'Source Other Fuel [kBtu]'
+      columnHead(3) = 'Source Additional Fuel [kBtu]'
       columnHead(4) = 'Source District Cooling [kBtu]'
       columnHead(5) = 'Source District Heating [kBtu]'
     CASE DEFAULT
       columnHead(1) = 'Source Electricity [GJ]'
       columnHead(2) = 'Source Natural Gas [GJ]'
-      columnHead(3) = 'Source Other Fuel [GJ]'
+      columnHead(3) = 'Source Additional Fuel [GJ]'
       columnHead(4) = 'Source District Cooling [GJ]'
       columnHead(5) = 'Source District Heating [GJ]'
       largeConversionFactor = 1000.d0 ! for converting MJ to GJ
@@ -7864,7 +8608,7 @@ IF (displaySourceEnergyEndUseSummary) THEN
 
   ! heading for the entire sub-table
   CALL writeSubtitle('Source Energy End Use Components Summary')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                     'SourceEnergyEndUseComponentsSummary',&
                                     'Entire Facility',&
@@ -7879,19 +8623,19 @@ IF (displaySourceEnergyEndUseSummary) THEN
     CASE (unitsStyleJtoKWH)
       columnHead(1) = 'Source Electricity [kWh/m2]'
       columnHead(2) = 'Source Natural Gas [kWh/m2]'
-      columnHead(3) = 'Source Other Fuel [kWh/m2]'
+      columnHead(3) = 'Source Additional Fuel [kWh/m2]'
       columnHead(4) = 'Source District Cooling [kWh/m2]'
       columnHead(5) = 'Source District Heating [kWh/m2]'
     CASE (unitsStyleInchPound)
       columnHead(1) = 'Source Electricity [kBtu/ft2]'
       columnHead(2) = 'Source Natural Gas [kBtu/ft2]'
-      columnHead(3) = 'Source Other Fuel [kBtu/ft2]'
+      columnHead(3) = 'Source Additional Fuel [kBtu/ft2]'
       columnHead(4) = 'Source District Cooling [kBtu/ft2]'
       columnHead(5) = 'Source District Heating [kBtu/ft2]'
     CASE DEFAULT
       columnHead(1) = 'Source Electricity [MJ/m2]'
       columnHead(2) = 'Source Natural Gas [MJ/m2]'
-      columnHead(3) = 'Source Other Fuel [MJ/m2]'
+      columnHead(3) = 'Source Additional Fuel [MJ/m2]'
       columnHead(4) = 'Source District Cooling [MJ/m2]'
       columnHead(5) = 'Source District Heating [MJ/m2]'
   END SELECT
@@ -7910,7 +8654,7 @@ IF (displaySourceEnergyEndUseSummary) THEN
 
   ! heading for the entire sub-table
   CALL writeSubtitle('Source Energy End Use Components Per Conditioned Floor Area')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                     'SourceEnergyEndUseComponentsSummary',&
                                     'Entire Facility',&
@@ -7931,7 +8675,7 @@ IF (displaySourceEnergyEndUseSummary) THEN
 
   ! heading for the entire sub-table
   CALL writeSubtitle('Source Energy End Use Components Per Total Floor Area')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                     'SourceEnergyEndUseComponentsSummary',&
                                     'Entire Facility',&
@@ -7969,8 +8713,6 @@ SUBROUTINE WriteDemandEndUseSummary
 USE OutputProcessor, ONLY: MaxNumSubcategories, EndUseCategory
 USE DataWater       , ONlY: WaterStorage
 USE ManageElectricPower , ONLY: ElecStorage, NumElecStorageDevices
-USE OutputReportPredefined, ONLY: TotalNotMetHeatingOccupiedForABUPS, &
-    TotalNotMetCoolingOccupiedForABUPS,TotalTimeNotSimpleASH55EitherForABUPS
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -7981,7 +8723,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE PARAMETER DEFINITIONS:
 INTEGER, parameter  ::  colElectricity        = 1
 INTEGER, parameter  ::  colGas                = 2
-INTEGER, parameter  ::  colOtherFuel          = 3
+INTEGER, parameter  ::  colAdditionalFuel          = 3
 INTEGER, parameter  ::  colPurchCool          = 4
 INTEGER, parameter  ::  colPurchHeat          = 5
 INTEGER, parameter  ::  colWater              = 6
@@ -8012,18 +8754,27 @@ INTEGER                                        :: kEndUseSub
 INTEGER                                        :: i
 INTEGER                                        :: numRows
 CHARACTER(len=100)                             :: footnote = ''
-REAL(r64)                                      :: otherFuelMax
-INTEGER                                        :: otherFuelSelected
-INTEGER                                        :: otherFuelNonZeroCount
+REAL(r64)                                      :: additionalFuelMax
+INTEGER                                        :: additionalFuelSelected
+INTEGER                                        :: additionalFuelNonZeroCount
 INTEGER                                        :: distrHeatSelected
 LOGICAL                                        :: bothDistrHeatNonZero
 REAL(r64)                                      :: powerConversion
 REAL(r64)                                      :: flowConversion
 
+REAL(r64),DIMENSION(6)                         :: leedFansParkFromFan
+REAL(r64),DIMENSION(6)                         :: leedFansParkFromExtFuelEquip
+REAL(r64),DIMENSION(6)                         :: leedIntLightProc
+REAL(r64),DIMENSION(6)                         :: leedCook
+REAL(r64),DIMENSION(6)                         :: leedIndProc
+REAL(r64),DIMENSION(6)                         :: leedElevEsc
+REAL(r64)                                      :: unconvert
+CHARACTER(len=MaxNameLength)                   :: subCatName
+
 IF (displayDemandEndUse) THEN
   ! show the headers of the report
   CALL WriteReportHeaders('Demand End Use Components Summary','Entire Facility',isAverage)
-  ! totals - select which other fuel to display and which other district heating
+  ! totals - select which additional fuel to display and which other district heating
   collapsedTotal=0.0
   collapsedTotal(1) = gatherDemandTotal(1)    !electricity
   collapsedTimeStep(1) = gatherDemandTimeStamp(1)
@@ -8033,48 +8784,62 @@ IF (displayDemandEndUse) THEN
   collapsedTimeStep(4) = gatherDemandTimeStamp(3)
   collapsedTotal(6) = gatherDemandTotal(7)    !water
   collapsedTimeStep(6) = gatherDemandTimeStamp(7)
-  ! select which of the other fuels should be displayed based on which has the highest
-  ! demand. This is usually likely to be the only other fuel that is actually being used.
-  ! If another fuel is non-zero, a footnote to the table is added.
-  ! First step is to see if any other fuels are non-zero
-  otherFuelNonZeroCount = 0
-  IF (gatherDemandTotal(6) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (gatherDemandTotal(8) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (gatherDemandTotal(9) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (gatherDemandTotal(10) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (gatherDemandTotal(11) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (gatherDemandTotal(12) .GT. 0.0) otherFuelNonZeroCount = otherFuelNonZeroCount + 1
-  IF (otherFuelNonZeroCount .GT. 1) THEN
-    footnote = 'Other fuels have non-zero demand but are not shown on this report.'
+  ! select which of the additional fuels should be displayed based on which has the highest
+  ! demand. This is usually likely to be the only additional fuel that is actually being used.
+  ! If an additional fuel is non-zero, a footnote to the table is added.
+  ! First step is to see if any additional fuels are non-zero
+  additionalFuelNonZeroCount = 0
+  IF (gatherDemandTotal(6) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(8) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(9) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(10) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(11) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(12) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(13) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (gatherDemandTotal(14) .GT. 0.0) additionalFuelNonZeroCount = additionalFuelNonZeroCount + 1
+  IF (additionalFuelNonZeroCount .GT. 1) THEN
+    footnote = 'Additional fuels have non-zero demand but are not shown on this report.'
   END IF
   !assuming that at least one of these is non-zero
-  otherFuelSelected = 12 !default is propane if no other given
-  otherFuelMax = gatherDemandTotal(12)
-  IF (otherFuelNonZeroCount .GT. 0) THEN
-    IF (gatherDemandTotal(6) .GT. otherFuelMax) THEN ! gasoline
-      otherFuelSelected = 6
-      otherFuelMax = gatherDemandTotal(6)
+  additionalFuelSelected = 12 !default is propane if no other given
+  additionalFuelMax = gatherDemandTotal(12)
+  IF (additionalFuelNonZeroCount .GT. 0) THEN
+    IF (gatherDemandTotal(6) .GT. additionalFuelMax) THEN ! gasoline
+      additionalFuelSelected = 6
+      additionalFuelMax = gatherDemandTotal(6)
     END IF
-    IF (gatherDemandTotal(8) .GT. otherFuelMax) THEN ! diesel
-      otherFuelSelected = 8
-      otherFuelMax = gatherDemandTotal(8)
+    IF (gatherDemandTotal(8) .GT. additionalFuelMax) THEN ! diesel
+      additionalFuelSelected = 8
+      additionalFuelMax = gatherDemandTotal(8)
     END IF
-    IF (gatherDemandTotal(9) .GT. otherFuelMax) THEN ! coal
-      otherFuelSelected = 9
-      otherFuelMax = gatherDemandTotal(9)
+    IF (gatherDemandTotal(9) .GT. additionalFuelMax) THEN ! coal
+      additionalFuelSelected = 9
+      additionalFuelMax = gatherDemandTotal(9)
     END IF
-    IF (gatherDemandTotal(10) .GT. otherFuelMax) THEN ! fuel oil #1
-      otherFuelSelected = 10
-      otherFuelMax = gatherDemandTotal(10)
+    IF (gatherDemandTotal(10) .GT. additionalFuelMax) THEN ! fuel oil #1
+      additionalFuelSelected = 10
+      additionalFuelMax = gatherDemandTotal(10)
     END IF
-    IF (gatherDemandTotal(11) .GT. otherFuelMax) THEN ! fuel oil #2
-      otherFuelSelected = 11
-      otherFuelMax = gatherDemandTotal(11)
+    IF (gatherDemandTotal(11) .GT. additionalFuelMax) THEN ! fuel oil #2
+      additionalFuelSelected = 11
+      additionalFuelMax = gatherDemandTotal(11)
+    END IF
+    IF (gatherDemandTotal(12) .GT. additionalFuelMax) THEN ! propane
+      additionalFuelSelected = 12
+      additionalFuelMax = gatherDemandTotal(12)
+    END IF
+    IF (gatherDemandTotal(13) .GT. additionalFuelMax) THEN ! otherfuel1
+      additionalFuelSelected = 13
+      additionalFuelMax = gatherDemandTotal(13)
+    END IF
+    IF (gatherDemandTotal(14) .GT. additionalFuelMax) THEN ! otherfuel2
+      additionalFuelSelected = 14
+      additionalFuelMax = gatherDemandTotal(14)
     END IF
   END IF
-  !set the time of peak demand and total demand for the other fuel selected
-  collapsedTimeStep(3) = gatherDemandTimeStamp(otherFuelSelected)
-  collapsedTotal(3) = gatherDemandTotal(otherFuelSelected)
+  !set the time of peak demand and total demand for the additinoal fuel selected
+  collapsedTimeStep(3) = gatherDemandTimeStamp(additionalFuelSelected)
+  collapsedTotal(3) = gatherDemandTotal(additionalFuelSelected)
   !set flag if both puchased heating and steam both have positive demand
   bothDistrHeatNonZero = (gatherDemandTotal(4) .GT. 0.0) .AND. (gatherDemandTotal(5) .GT. 0.0)
   !select the district heating source that has a larger demand
@@ -8107,7 +8872,7 @@ IF (displayDemandEndUse) THEN
   DO jEndUse=1,numEndUses
     collapsedEndUse(jEndUse,1) = gatherDemandEndUse(jEndUse,1) * powerConversion    !electricity
     collapsedEndUse(jEndUse,2) = gatherDemandEndUse(jEndUse,2) * powerConversion    !natural gas
-    collapsedEndUse(jEndUse,3) = gatherDemandEndUse(jEndUse,otherFuelSelected) * powerConversion  !other fuel
+    collapsedEndUse(jEndUse,3) = gatherDemandEndUse(jEndUse,additionalFuelSelected) * powerConversion  !additional fuel
     collapsedEndUse(jEndUse,4) = gatherDemandEndUse(jEndUse,3) * powerConversion    ! purchased cooling
     collapsedEndUse(jEndUse,5) = gatherDemandEndUse(jEndUse,distrHeatSelected) * powerConversion !district heating
     collapsedEndUse(jEndUse,6) = gatherDemandEndUse(jEndUse,7) * flowConversion    !water
@@ -8119,7 +8884,7 @@ IF (displayDemandEndUse) THEN
       collapsedEndUseSub(2,jEndUse,kEndUseSub) =   &
          gatherDemandEndUseSub(2,jEndUse,kEndUseSub) * powerConversion    !natural gas
       collapsedEndUseSub(3,jEndUse,kEndUseSub) =   &
-         gatherDemandEndUseSub(otherFuelSelected,jEndUse,kEndUseSub) * powerConversion !other fuel
+         gatherDemandEndUseSub(additionalFuelSelected,jEndUse,kEndUseSub) * powerConversion !additional fuel
       collapsedEndUseSub(4,jEndUse,kEndUseSub) =   &
          gatherDemandEndUseSub(3,jEndUse,kEndUseSub) * powerConversion    !purch cooling
       collapsedEndUseSub(5,jEndUse,kEndUseSub) =   &
@@ -8131,7 +8896,7 @@ IF (displayDemandEndUse) THEN
   !convert totals
   collapsedTotal(1) = collapsedTotal(1) * powerConversion !electricity
   collapsedTotal(2) = collapsedTotal(2) * powerConversion !natural gas
-  collapsedTotal(3) = collapsedTotal(3) * powerConversion !other fuel
+  collapsedTotal(3) = collapsedTotal(3) * powerConversion !additional fuel
   collapsedTotal(4) = collapsedTotal(4) * powerConversion !purchased cooling
   collapsedTotal(5) = collapsedTotal(5) * powerConversion !district heating
   collapsedTotal(6) = collapsedTotal(6) * flowConversion  !water
@@ -8182,7 +8947,7 @@ IF (displayDemandEndUse) THEN
   IF (unitsStyle .EQ. unitsStyleInchPound) THEN
     columnHead(1) = 'Electricity [kBtuh]'
     columnHead(2) = 'Natural Gas [kBtuh]'
-    SELECT CASE (otherFuelSelected)
+    SELECT CASE (additionalFuelSelected)
       CASE(6) ! gasoline
         columnHead(3) = 'Gasoline [kBtuh]'
       CASE(8) ! Diesel
@@ -8195,6 +8960,10 @@ IF (displayDemandEndUse) THEN
         columnHead(3) = 'Fuel Oil #2 [kBtuh]'
       CASE(12) ! Propane
         columnHead(3) = 'Propane [kBtuh]'
+      CASE(13) ! OtherFuel1
+        columnHead(3) = 'Other Fuel 1 [kBtuh]'
+      CASE(14) ! OtherFuel2
+        columnHead(3) = 'Other Fuel 2 [kBtuh]'
     END SELECT
     columnHead(4) = 'District Cooling [kBtuh]'
     SELECT CASE (distrHeatSelected)
@@ -8207,7 +8976,7 @@ IF (displayDemandEndUse) THEN
   ELSE
     columnHead(1) = 'Electricity [W]'
     columnHead(2) = 'Natural Gas [W]'
-    SELECT CASE (otherFuelSelected)
+    SELECT CASE (additionalFuelSelected)
       CASE(6) ! gasoline
         columnHead(3) = 'Gasoline [W]'
       CASE(8) ! Diesel
@@ -8220,6 +8989,10 @@ IF (displayDemandEndUse) THEN
         columnHead(3) = 'Fuel Oil #2 [W]'
       CASE(12) ! Propane
         columnHead(3) = 'Propane [W]'
+      CASE(13) ! OtherFuel1
+        columnHead(3) = 'Other Fuel 1 [W]'
+      CASE(14) ! OtherFuel2
+        columnHead(3) = 'Other Fuel 2 [W]'
     END SELECT
     columnHead(4) = 'District Cooling [W]'
     SELECT CASE (distrHeatSelected)
@@ -8239,8 +9012,122 @@ IF (displayDemandEndUse) THEN
     tableBody(1,iResource) = TRIM(DateToString(collapsedTimeStep(iResource)))
     tableBody(17,iResource) = TRIM(RealToStr(collapsedTotal(iResource),2))
   END DO
+
+    !complete the LEED end use table using the same values
+  ! for certain rows in the LEED table the subcategories are necessary so first compute those values
+  leedFansParkFromFan = 0.0
+  leedFansParkFromExtFuelEquip = 0.0
+  leedIntLightProc = 0.0
+  leedCook = 0.0
+  leedIndProc = 0.0
+  leedElevEsc = 0.0
+  DO iResource = 1, 5    ! don't bother with water
+    DO jEndUse = 1, NumEndUses
+      IF (EndUseCategory(jEndUse)%NumSubcategories > 0) THEN
+        DO kEndUseSub = 1, EndUseCategory(jEndUse)%NumSubcategories
+          subCatName = EndUseCategory(jEndUse)%SubcategoryName(kEndUseSub)
+          IF (SameString(subCatName,'Fans - Parking Garage')) THEN
+            IF (jEndUse .EQ. 7) THEN  !fans
+              leedFansParkFromFan(iResource) = leedFansParkFromFan(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+            ELSE
+              leedFansParkFromExtFuelEquip(iResource) = leedFansParkFromExtFuelEquip(iResource) &
+                  + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+            END IF
+          ELSEIF (SameString(subCatName,'Interior Lighting - Process')) THEN
+            leedIntLightProc(iResource) = leedIntLightProc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Cooking')) THEN
+            leedCook(iResource) = leedCook(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Industrial Process')) THEN
+            leedIndProc(iResource) = leedIndProc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          ELSEIF (SameString(subCatName,'Elevators and Escalators')) THEN
+            leedElevEsc(iResource) = leedElevEsc(iResource) + collapsedEndUseSub(iResource,jEndUse,kEndUseSub)
+          END IF
+        END DO
+      END IF
+    END DO
+  END DO
+
+    !complete the LEED end use table using the same values
+  unconvert = 1/powerConversion
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Interior Lighting',unconvert * (useVal(3,colElectricity) &
+                - leedIntLightProc(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Exterior Lighting',unconvert * useVal(4,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Space Heating',unconvert * useVal(1,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Space Cooling',unconvert * useVal(2,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Pumps',unconvert * useVal(8,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Heat Rejection',unconvert * useVal(9,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Fans-Interior',unconvert * (useVal(7,colElectricity) &
+                - leedFansParkFromFan(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colElectricity) &
+                + leedFansParkFromExtFuelEquip(colElectricity)),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Service Water Heating',unconvert * useVal(12,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Receptacle Equipment',unconvert * useVal(5,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Interior Lighting (process)',unconvert * leedIntLightProc(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Refrigeration Equipment',unconvert * useVal(13,colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Cooking',unconvert * leedCook(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Industrial Process',unconvert * leedIndProc(colElectricity),2)
+  CALL PreDefTableEntry(pdchLeedPerfElDem,'Elevators and Escalators',unconvert * leedElevEsc(colElectricity),2)
+ !CALL PreDefTableEntry(pdchLeedPerfElDem,'Total',useVal(15,colElectricity),2)
+
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Interior Lighting',unconvert * (useVal(3,colGas) - leedIntLightProc(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Exterior Lighting',unconvert * useVal(4,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Space Heating',unconvert * useVal(1,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Space Cooling',unconvert * useVal(2,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Pumps',unconvert * useVal(8,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Heat Rejection',unconvert * useVal(9,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Fans-Interior',unconvert * (useVal(7,colGas)- leedFansParkFromFan(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colGas) &
+               + leedFansParkFromExtFuelEquip(colGas)),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Service Water Heating',unconvert * useVal(12,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Receptacle Equipment',unconvert * useVal(5,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Interior Lighting (process)',unconvert * leedIntLightProc(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Refrigeration Equipment',unconvert * useVal(13,colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Cooking',unconvert * leedCook(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Industrial Process',unconvert * leedIndProc(colGas),2)
+  CALL PreDefTableEntry(pdchLeedPerfGasDem,'Elevators and Escalators',unconvert * leedElevEsc(colGas),2)
+  !CALL PreDefTableEntry(pdchLeedPerfGasDem,'Total',useVal(15,colGas),2)
+
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Interior Lighting',unconvert * (useVal(3,colAdditionalFuel) + useVal(3,colPurchCool)  &
+                                 + useVal(3,colPurchHeat) - (leedIntLightProc(colAdditionalFuel) + leedIntLightProc(colPurchCool) &
+                                 + leedIntLightProc(colPurchHeat))) ,2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Exterior Lighting',unconvert * (useVal(4,colAdditionalFuel) + useVal(4,colPurchCool) &
+                                 + useVal(4,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Space Heating',unconvert * (useVal(1,colAdditionalFuel) + useVal(1,colPurchCool) &
+                                 + useVal(1,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Space Cooling',unconvert * (useVal(2,colAdditionalFuel) + useVal(2,colPurchCool) &
+                                 + useVal(2,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Pumps',unconvert * (useVal(8,colAdditionalFuel) + useVal(8,colPurchCool) &
+                                 + useVal(8,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Heat Rejection',unconvert * (useVal(9,colAdditionalFuel) + useVal(9,colPurchCool) &
+                                 + useVal(9,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Fans-Interior',unconvert * (useVal(7,colAdditionalFuel) +  useVal(7,colPurchCool) &
+                             + useVal(7,colPurchHeat) - (leedFansParkFromFan(colAdditionalFuel)   &
+                             + leedFansParkFromFan(colPurchCool) &
+                             + leedFansParkFromFan(colPurchHeat))),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Fans-Parking Garage',unconvert * (leedFansParkFromFan(colAdditionalFuel) &
+                             + leedFansParkFromFan(colPurchCool) + leedFansParkFromFan(colPurchHeat) &
+                             + leedFansParkFromExtFuelEquip(colAdditionalFuel) + leedFansParkFromExtFuelEquip(colPurchCool) &
+                             + leedFansParkFromExtFuelEquip(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Service Water Heating',unconvert * (useVal(12,colAdditionalFuel) &
+                             + useVal(12,colPurchCool) + useVal(12,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Receptacle Equipment',unconvert *   &
+                           (useVal(5,colAdditionalFuel) + useVal(5,colPurchCool) &
+                             + useVal(5,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Interior Lighting (process)',unconvert * (leedIntLightProc(colAdditionalFuel) &
+                             + leedIntLightProc(colPurchCool) + leedIntLightProc(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Refrigeration Equipment',unconvert * (useVal(13,colAdditionalFuel) &
+                             + useVal(13,colPurchCool) + useVal(13,colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Cooking',unconvert * (leedCook(colAdditionalFuel) + leedCook(colPurchCool) &
+                             + leedCook(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Industrial Process',unconvert * (leedIndProc(colAdditionalFuel) &
+                             + leedIndProc(colPurchCool) + leedIndProc(colPurchHeat)),2)
+  CALL PreDefTableEntry(pdchLeedPerfOthDem,'Elevators and Escalators',unconvert * (leedElevEsc(colAdditionalFuel) &
+                             + leedElevEsc(colPurchCool) + leedElevEsc(colPurchHeat)),2)
+  !CALL PreDefTableEntry(pdchLeedPerfOthDem,'Total',useVal(15,colAdditionalFuel) + useVal(15,colPurchCool) + useVal(15,colPurchHeat),2)
+
+
   CALL writeSubtitle('End Uses')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.false.,footnote)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'DemandEndUseComponentsSummary',&
                                       'Entire Facility',&
@@ -8292,7 +9179,7 @@ IF (displayDemandEndUse) THEN
     columnHead(1) = 'Subcategory'
     columnHead(2) = 'Electricity [kBtuh]'
     columnHead(3) = 'Natural Gas [kBtuh]'
-    SELECT CASE (otherFuelSelected)
+    SELECT CASE (additionalFuelSelected)
       CASE(6) ! gasoline
         columnHead(4) = 'Gasoline [kBtuh]'
       CASE(8) ! Diesel
@@ -8305,6 +9192,10 @@ IF (displayDemandEndUse) THEN
         columnHead(4) = 'Fuel Oil #2 [kBtuh]'
       CASE(12) ! Propane
         columnHead(4) = 'Propane [kBtuh]'
+      CASE(13) ! OtherFuel1
+        columnHead(4) = 'Other Fuel 1 [kBtuh]'
+      CASE(14) ! OtherFuel2
+        columnHead(4) = 'Other Fuel 2 [kBtuh]'
     END SELECT
     columnHead(5) = 'District Cooling [kBtuh]'
     SELECT CASE (distrHeatSelected)
@@ -8318,7 +9209,7 @@ IF (displayDemandEndUse) THEN
     columnHead(1) = 'Subcategory'
     columnHead(2) = 'Electricity [W]'
     columnHead(3) = 'Natural Gas [W]'
-    SELECT CASE (otherFuelSelected)
+    SELECT CASE (additionalFuelSelected)
       CASE(6) ! gasoline
         columnHead(4) = 'Gasoline [W]'
       CASE(8) ! Diesel
@@ -8331,6 +9222,10 @@ IF (displayDemandEndUse) THEN
         columnHead(4) = 'Fuel Oil #2 [W]'
       CASE(12) ! Propane
         columnHead(4) = 'Propane [W]'
+      CASE(13) ! OtherFuel1
+        columnHead(4) = 'Other Fuel 1 [W]'
+      CASE(14) ! OtherFuel2
+        columnHead(4) = 'Other Fuel 2 [W]'
     END SELECT
     columnHead(5) = 'District Cooling [W]'
     SELECT CASE (distrHeatSelected)
@@ -8359,7 +9254,7 @@ IF (displayDemandEndUse) THEN
 
   ! heading for the entire sub-table
   CALL writeSubtitle('End Uses By Subcategory')
-  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,footnote)
+  CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.false.,footnote)
   CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                       'DemandEndUseComponentsSummary',&
                                       'Entire Facility',&
@@ -8453,7 +9348,7 @@ REAL(r64) :: IPvaluePer
   rowHead(3)    = 'Regional Adjustment (~~$~~)'
   rowHead(4)    = 'Design Fee (~~$~~)'
   rowHead(5)    = 'Contractor Fee (~~$~~)'
-  rowHead(6)    = 'Contigency (~~$~~)'
+  rowHead(6)    = 'Contingency (~~$~~)'
   rowHead(7)    = 'Permits, Bonds, Insurance (~~$~~)'
   rowHead(8)    = 'Commissioning (~~$~~)'
   rowHead(9)    = 'Cost Estimate Total (~~$~~)'
@@ -9196,6 +10091,15 @@ IF (displayTabularVeriSum) THEN
     END IF
     tableBody(iZone,1) = TRIM(RealToStr(Zone(iZone)%FloorArea * m2_unitConv,2))
     tableBody(iZone,4) = TRIM(RealToStr(Zone(iZone)%Volume * m3_unitConv,2))
+    !no unit conversion necessary since done automatically
+    CALL PreDefTableEntry(pdchLeedSutSpArea,Zone(iZone)%Name,Zone(iZone)%FloorArea,2)
+    IF (zoneIsCOnd) THEN
+      CALL PreDefTableEntry(pdchLeedSutOcArea,Zone(iZone)%Name,Zone(iZone)%FloorArea,2)
+      CALL PreDefTableEntry(pdchLeedSutUnArea,Zone(iZone)%Name,'0.00')
+    ELSE
+      CALL PreDefTableEntry(pdchLeedSutOcArea,Zone(iZone)%Name,'0.00')
+      CALL PreDefTableEntry(pdchLeedSutUnArea,Zone(iZone)%Name,Zone(iZone)%FloorArea,2)
+    ENDIF
     tableBody(iZone,5) = TRIM(RealToStr(mult,2))
     tableBody(iZone,6) = TRIM(RealToStr(Zone(iZone)%ExtGrossWallArea * m2_unitConv,2))
     tableBody(iZone,7) = TRIM(RealToStr(Zone(iZone)%ExtWindowArea * m2_unitConv,2))
@@ -9301,6 +10205,9 @@ IF (displayTabularVeriSum) THEN
       tableBody(NumOfZones + iTotal,9) = TRIM(RealToStr(zstArea(iTotal) * m2_unitConv / zstPeople(iTotal),2))
     END IF
   END DO
+  CALL PreDefTableEntry(pdchLeedSutSpArea,'Totals',zstArea(grandTotal),2)
+  CALL PreDefTableEntry(pdchLeedSutOcArea,'Totals',zstArea(condTotal),2)
+  CALL PreDefTableEntry(pdchLeedSutUnArea,'Totals',zstArea(uncondTotal),2)
 
   CALL writeSubtitle('Zone Summary')
   CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
@@ -9438,7 +10345,6 @@ SUBROUTINE WritePredefinedTables
           ! na
 
           ! USE STATEMENTS:
-USE OutputReportPredefined
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -9637,7 +10543,7 @@ DO iReportName = 1, numReportName
         END DO
         !create the actual output table
         CALL writeSubtitle(subTable(jSubTable)%name)
-        CALL writeTable(tableBody,rowHead,columnHead,columnWidth,subTable(jSubTable)%footnote)
+        CALL writeTable(tableBody,rowHead,columnHead,columnWidth,.false.,subTable(jSubTable)%footnote)
         CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
                                             reportName(iReportname)%name,&
                                             'Entire Facility',&
@@ -9683,7 +10589,6 @@ SUBROUTINE WriteComponentSizing
           ! na
 
           ! USE STATEMENTS:
-USE OutputReportPredefined
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -9909,7 +10814,6 @@ SUBROUTINE WriteSurfaceShadowing
           ! na
 
           ! USE STATEMENTS:
-USE OutputReportPredefined
 USE DataSurfaces, ONLY: Surface, TotSurfaces
 USE DataShadowingCombinations
 USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
@@ -10046,6 +10950,1871 @@ IF (displaySurfaceShadowing) THEN
 END IF
 END SUBROUTINE WriteSurfaceShadowing
 
+
+SUBROUTINE AddTOCZoneLoadComponentTable
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Add the table of contents entries for the Zone heat transfer
+          !   summary report.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Call the AddTOCEntry routine for each zone.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+USE DataHeatBalance,   ONLY: Zone
+USE DataZoneEquipment, ONLY: ZoneEquipConfig
+USE DataGlobals, ONLY: CompLoadReportIsReq
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+INTEGER :: iZone
+
+IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
+  DO iZone = 1, NumOfZones
+    IF (.not. ZoneEquipConfig(iZone)%IsControlled) CYCLE
+    CALL AddTOCEntry('Zone Component Load Summary',Zone(iZone)%Name)
+  END DO
+END IF
+END SUBROUTINE AddTOCZoneLoadComponentTable
+
+SUBROUTINE AllocateLoadComponentArrays
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   April 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Allocate the arrays related to the load component report
+
+          ! METHODOLOGY EMPLOYED:
+          !   Use the ALLOCATE command
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataSurfaces,      ONLY: TotSurfaces
+USE DataEnvironment, ONLY: TotDesDays, TotRunDesPersDays
+USE DataGlobals, ONLY: NumOfTimeStepInHour
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+LOGICAL, SAVE     :: DoAllocate = .TRUE.
+
+IF (DoAllocate) THEN
+	!For many of the following arrays the last dimension is the number of environments and is same as sizing arrays
+  ALLOCATE(radiantPulseUsed(NumOfZones,TotDesDays+TotRunDesPersDays))
+  radiantPulseUsed = 0.0
+  ALLOCATE(radiantPulseTimestep(NumOfZones,TotDesDays+TotRunDesPersDays))
+  radiantPulseTimestep = 0
+  ALLOCATE(radiantPulseReceived(TotSurfaces,TotDesDays+TotRunDesPersDays))
+  radiantPulseReceived = 0.0
+  ALLOCATE(loadConvectedNormal(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  loadConvectedNormal = 0.0
+  ALLOCATE(loadConvectedWithPulse(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  loadConvectedWithPulse = 0.0
+  ALLOCATE(netSurfRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  netSurfRadSeq = 0.0
+  ALLOCATE(decayCurveCool(TotSurfaces,NumOfTimeStepInHour*24))
+  decayCurveCool = 0.0
+  ALLOCATE(decayCurveHeat(TotSurfaces,NumOfTimeStepInHour*24))
+  decayCurveHeat = 0.0
+  ALLOCATE(ITABSFseq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  ITABSFseq = 0.0
+  ALLOCATE(TMULTseq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  TMULTseq = 0.0
+  ALLOCATE(peopleInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  peopleInstantSeq = 0.0
+  ALLOCATE(peopleLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  peopleLatentSeq = 0.0
+  ALLOCATE(peopleRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  peopleRadSeq = 0.0
+  ALLOCATE(peopleDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  peopleDelaySeq = 0.0
+  ALLOCATE(lightInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  lightInstantSeq = 0.0
+  ALLOCATE(lightRetAirSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  lightRetAirSeq = 0.0
+  ALLOCATE(lightLWRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  lightLWRadSeq = 0.0
+  ALLOCATE(lightSWRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  lightSWRadSeq = 0.0
+  ALLOCATE(lightDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  lightLWRadSeq = 0.0
+  ALLOCATE(equipInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  equipInstantSeq = 0.0
+  ALLOCATE(equipLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  equipLatentSeq = 0.0
+  ALLOCATE(equipRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  equipRadSeq = 0.0
+  ALLOCATE(equipDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  equipDelaySeq = 0.0
+  ALLOCATE(refrigInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  refrigInstantSeq = 0.0
+  ALLOCATE(refrigRetAirSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  refrigRetAirSeq = 0.0
+  ALLOCATE(refrigLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  refrigLatentSeq = 0.0
+  ALLOCATE(waterUseInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  waterUseInstantSeq = 0.0
+  ALLOCATE(waterUseLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  waterUseLatentSeq = 0.0
+  ALLOCATE(hvacLossInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  hvacLossInstantSeq = 0.0
+  ALLOCATE(hvacLossRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  hvacLossRadSeq = 0.0
+  ALLOCATE(hvacLossDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  hvacLossDelaySeq = 0.0
+  ALLOCATE(powerGenInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  powerGenInstantSeq = 0.0
+  ALLOCATE(powerGenRadSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  powerGenRadSeq = 0.0
+  ALLOCATE(powerGenDelaySeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  powerGenDelaySeq = 0.0
+  ALLOCATE(infilInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  infilInstantSeq = 0.0
+  ALLOCATE(infilLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  infilLatentSeq = 0.0
+  ALLOCATE(zoneVentInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  zoneVentInstantSeq = 0.0
+  ALLOCATE(zoneVentLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  zoneVentLatentSeq = 0.0
+  ALLOCATE(interZoneMixInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  interZoneMixInstantSeq = 0.0
+  ALLOCATE(interZoneMixLatentSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  interZoneMixLatentSeq = 0.0
+  ALLOCATE(feneCondInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  feneCondInstantSeq = 0.0
+!  ALLOCATE(feneSolarInstantSeq(NumOfZones,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+!  feneSolarInstantSeq = 0.0
+  ALLOCATE(feneSolarRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  feneSolarRadSeq = 0.0
+  ALLOCATE(feneSolarDelaySeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  feneSolarDelaySeq = 0.0
+  ALLOCATE(surfDelaySeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  surfDelaySeq = 0.0
+  DoAllocate = .FALSE.
+END IF
+END SUBROUTINE AllocateLoadComponentArrays
+
+SUBROUTINE DeallocateLoadComponentArrays
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   August 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Deallocate the arrays related to the load component report that will not
+          !   be needed in the reporting.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Use the DEALLOCATE command
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataSurfaces,      ONLY: TotSurfaces
+USE DataEnvironment, ONLY: TotDesDays, TotRunDesPersDays
+USE DataGlobals, ONLY: NumOfTimeStepInHour
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+DEALLOCATE(radiantPulseUsed)
+DEALLOCATE(radiantPulseTimestep)
+DEALLOCATE(radiantPulseReceived)
+!need for reporting  DEALLOCATE(loadConvectedNormal)
+DEALLOCATE(loadConvectedWithPulse)
+!need for reporting  DEALLOCATE(decayCurveCool)
+!need for reporting  DEALLOCATE(decayCurveHeat)
+END SUBROUTINE DeallocateLoadComponentArrays
+
+SUBROUTINE ComputeLoadComponentDecayCurve
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   August 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Determines the load component decay curve based on normal and pulse results from zone sizing.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Decay curve is the fraction of the heat convected from a surface over the initial radiant heat
+          ! absorbed by the surface.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing, ONLY: CalcFinalZoneSizing
+  USE DataZoneEquipment, ONLY: ZoneEquipConfig
+  USE DataSurfaces, ONLY: Surface, TotSurfaces
+  USE DataGlobals, ONLY: NumOfTimeStepInHour
+
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: ZoneNum = 0
+INTEGER :: SurfNum = 0
+INTEGER :: TimeStep = 0
+INTEGER :: TimeOfPulse  = 0
+INTEGER :: CoolDesSelected = 0  !design day selected for cooling
+INTEGER :: HeatDesSelected = 0  !design day selected for heating
+INTEGER :: i
+REAL(r64) :: diff
+
+DO SurfNum = 1, TotSurfaces
+  ZoneNum = Surface(SurfNum)%Zone
+  IF (ZoneNum .EQ. 0) CYCLE
+  IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+  CoolDesSelected = CalcFinalZoneSizing(ZoneNum)%CoolDDNum
+  IF (CoolDesSelected .EQ. 0) CYCLE
+  HeatDesSelected = CalcFinalZoneSizing(ZoneNum)%HeatDDNum
+  IF (HeatDesSelected .EQ. 0) CYCLE
+  !loop over timesteps after pulse occured
+  TimeOfPulse = radiantPulseTimestep(ZoneNum,CoolDesSelected)
+  ! if the CoolDesSelected time is on a different day than
+  ! when the pulse occurred, need to scan back and find when
+  ! the pulse occurred.
+  IF (TimeOfPulse .EQ. 0) THEN
+    DO i = CoolDesSelected, 1, -1
+      TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
+      IF (TimeOfPulse .NE. 0) EXIT
+    END DO
+  END IF
+  DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
+    IF (radiantPulseReceived(surfNum,CoolDesSelected) .NE. 0.0) THEN
+      diff = loadConvectedWithPulse(surfNum,TimeStep,CoolDesSelected) &
+                                - loadConvectedNormal(surfNum,TimeStep,CoolDesSelected)
+      decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = -diff / radiantPulseReceived(surfNum,CoolDesSelected)
+    ELSE
+      decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+    END IF
+  END DO
+  TimeOfPulse = radiantPulseTimestep(ZoneNum,HeatDesSelected)
+  ! scan back to the day that the heating pulse occurs, if necessary
+  IF (TimeOfPulse .EQ. 0) THEN
+    DO i = HeatDesSelected, 1, -1
+      TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
+      IF (TimeOfPulse .NE. 0) EXIT
+    END DO
+  END IF
+  DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
+    IF (radiantPulseReceived(surfNum,HeatDesSelected) .NE. 0.0) THEN
+      diff = loadConvectedWithPulse(surfNum,TimeStep,HeatDesSelected) &
+                                - loadConvectedNormal(surfNum,TimeStep,HeatDesSelected)
+      decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = -diff  / radiantPulseReceived(surfNum,HeatDesSelected)
+    ELSE
+      decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+    END IF
+  END DO
+END DO
+END SUBROUTINE ComputeLoadComponentDecayCurve
+
+SUBROUTINE GatherComponentLoadsSurface
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Gather values during sizing used for loads component report.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Save sequence of values for report during sizing.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataGlobals, ONLY: NumOfTimeStepInHour, CompLoadReportIsReq, isPulseZoneSizing
+USE DataSizing, ONLY: CurOverallSimDay
+USE DataSurfaces, ONLY: Surface, TotSurfaces, WinGainConvGlazToZoneRep,WinGainConvGlazShadGapToZoneRep, &
+                            WinGainConvShadeToZoneRep, WinGainFrameDividerToZoneRep,SurfaceClass_Window
+USE DataZoneEquipment, ONLY: ZoneEquipConfig
+
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iSurf = 0
+INTEGER :: ZoneNum = 0
+INTEGER :: TimeStepInDay = 0
+
+IF (CompLoadReportIsReq .AND. .NOT. isPulseZoneSizing) THEN
+  TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+  feneCondInstantSeq(:,TimeStepInDay,CurOverallSimDay) = 0
+  DO iSurf = 1, TotSurfaces
+    ZoneNum = Surface(iSurf)%Zone
+    IF (ZoneNum .EQ. 0) CYCLE
+    IF (Surface(iSurf)%Class /= SurfaceClass_Window) CYCLE
+   ! IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+    feneCondInstantSeq(ZoneNum,TimeStepInDay,CurOverallSimDay) = feneCondInstantSeq(ZoneNum,TimeStepInDay,CurOverallSimDay) &
+                                                + WinGainConvGlazToZoneRep(iSurf) &
+                                                + WinGainConvGlazShadGapToZoneRep(iSurf) &
+                                                + WinGainConvShadeToZoneRep(iSurf) &
+                                                + WinGainFrameDividerToZoneRep(iSurf)
+    ! for now assume zero instant solar - may change related
+    ! to how blinds and shades absorb solar radiation and
+    ! convect that heat that timestep.
+    !feneSolarInstantSeq(ZoneNum,TimeStepInDay,CurOverallSimDay) = 0
+  END DO
+END IF
+END SUBROUTINE GatherComponentLoadsSurface
+
+SUBROUTINE GatherComponentLoadsHVAC
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Gather values during sizing used for loads component report.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Save sequence of values for report during sizing.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataGlobals, ONLY: NumOfTimeStepInHour, CompLoadReportIsReq, isPulseZoneSizing
+USE DataSizing, ONLY: CurOverallSimDay
+USE DataHeatBalance, ONLY: ZnAirRpt, RefrigCaseCredit
+USE DataHVACGlobals, ONLY: TimeStepSys
+USE DataAirflowNetwork,  ONLY : SimulateAirflowNetwork,AirflowNetworkControlSimple,AirflowNEtworkReportData
+
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iZone = 0
+INTEGER :: TimeStepInDay = 0
+
+IF (CompLoadReportIsReq .AND. .NOT. isPulseZoneSizing) THEN
+  TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+  DO iZone = 1, NumOfZones
+    infilInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%InfilHeatGain &  !zone infiltration
+                         - ZnAirRpt(iZone)%InfilHeatLoss) /(TimeStepSys * SecInHour))
+    IF (SimulateAirflowNetwork .GT. AirflowNetworkControlSimple) THEN
+      infilInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) = infilInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) &
+                         + (AirflowNetworkReportData(iZone)%MultiZoneInfiSenGainW &                   !air flow network
+                             -  AirflowNEtworkReportData(iZone)%MultiZoneInfiSenLossW)
+    END IF
+    infilLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%InfilLatentGain &  !zone infiltration
+                         - ZnAirRpt(iZone)%InfilLatentLoss) /(TimeStepSys * SecInHour))
+    IF (SimulateAirflowNetwork .GT. AirflowNetworkControlSimple) THEN
+      infilLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) = infilLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) &
+                         + (AirflowNetworkReportData(iZone)%MultiZoneInfiLatGainW &                   !air flow network
+                             -  AirflowNEtworkReportData(iZone)%MultiZoneInfiLatLossW)
+    END IF
+
+    zoneVentInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%VentilHeatGain &  !zone ventilation
+                         - ZnAirRpt(iZone)%VentilHeatLoss) /(TimeStepSys * SecInHour))
+    zoneVentLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%VentilLatentGain &  !zone ventilation
+                         - ZnAirRpt(iZone)%VentilLatentLoss) /(TimeStepSys * SecInHour))
+
+    interZoneMixInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%MixHeatGain &  !zone mixing
+                         - ZnAirRpt(iZone)%MixHeatLoss) /(TimeStepSys * SecInHour))
+    IF (SimulateAirflowNetwork .GT. AirflowNetworkControlSimple) THEN
+      interZoneMixInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) = interZoneMixInstantSeq(iZone,TimeStepInDay,CurOverallSimDay) &
+                         + (AirflowNetworkReportData(iZone)%MultiZoneMixSenGainW &                   !air flow network
+                             -  AirflowNEtworkReportData(iZone)%MultiZoneMixSenLossW)
+    END IF
+    interZoneMixLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) = ((ZnAirRpt(iZone)%MixLatentGain &  !zone mixing
+                         - ZnAirRpt(iZone)%MixLatentLoss) /(TimeStepSys * SecInHour))
+    IF (SimulateAirflowNetwork .GT. AirflowNetworkControlSimple) THEN
+      interZoneMixLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) = interZoneMixLatentSeq(iZone,TimeStepInDay,CurOverallSimDay) &
+                         + (AirflowNetworkReportData(iZone)%MultiZoneMixLatGainW &                   !air flow network
+                             -  AirflowNEtworkReportData(iZone)%MultiZoneMixLatLossW)
+    END IF
+  END DO
+END IF
+END SUBROUTINE GatherComponentLoadsHVAC
+
+SUBROUTINE ComputeDelayedComponents
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   For load component report, convert the sequence of radiant gains
+          !   for people and equipment and other internal loads into convective
+          !   gains based on the decay curves.
+
+          ! METHODOLOGY EMPLOYED:
+          !   For each step of sequence from each design day, compute the
+          !   contributations from previous timesteps multiplied by the decay
+          !   curve. Rather than store every internal load's radiant contribution
+          !   to each surface, the TMULT and ITABSF sequences were also stored
+          !   which allocates the total radiant to each surface in the zone. The
+          !   formula used is:
+          !       QRadThermInAbs(SurfNum) = QL(NZ) * TMULT(NZ) * ITABSF(SurfNum)
+
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+USE DataSurfaces,      ONLY: Surface, TotSurfaces,SurfaceClass_Window
+USE DataEnvironment, ONLY: TotDesDays, TotRunDesPersDays
+USE DataGlobals, ONLY: NumOfTimeStepInHour
+USE DataSizing, ONLY: CalcFinalZoneSizing,NumTimeStepsInAvg
+USE DataZoneEquipment, ONLY: ZoneEquipConfig
+
+  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+INTEGER :: iZone
+INTEGER :: jSurf
+INTEGER :: kTimeStep
+INTEGER :: lDesHtCl
+INTEGER :: mStepBack
+INTEGER :: desSelected
+LOGICAL :: isCooling
+REAL(r64) :: QRadThermInAbsMult
+REAL(r64) :: peopleConvFromSurf
+REAL(r64) :: peopleConvIntoZone
+REAL(r64),DIMENSION(:),ALLOCATABLE :: peopleRadIntoSurf
+REAL(r64) :: equipConvFromSurf
+REAL(r64) :: equipConvIntoZone
+REAL(r64),DIMENSION(:),ALLOCATABLE :: equipRadIntoSurf
+REAL(r64) :: hvacLossConvFromSurf
+REAL(r64) :: hvacLossConvIntoZone
+REAL(r64),DIMENSION(:),ALLOCATABLE :: hvacLossRadIntoSurf
+REAL(r64) :: powerGenConvFromSurf
+REAL(r64) :: powerGenConvIntoZone
+REAL(r64),DIMENSION(:),ALLOCATABLE :: powerGenRadIntoSurf
+REAL(r64) :: lightLWConvFromSurf
+REAL(r64) :: lightLWConvIntoZone
+REAL(r64),DIMENSION(:),ALLOCATABLE :: lightLWRadIntoSurf
+REAL(r64) :: lightSWConvFromSurf
+REAL(r64) :: lightSWConvIntoZone
+REAL(r64) :: feneSolarConvFromSurf
+REAL(r64) :: feneSolarConvIntoZone
+REAL(r64) :: adjFeneSurfNetRadSeq
+
+ALLOCATE(peopleRadIntoSurf(NumOfTimeStepInHour*24))
+ALLOCATE(equipRadIntoSurf(NumOfTimeStepInHour*24))
+ALLOCATE(hvacLossRadIntoSurf(NumOfTimeStepInHour*24))
+ALLOCATE(powerGenRadIntoSurf(NumOfTimeStepInHour*24))
+ALLOCATE(lightLWRadIntoSurf(NumOfTimeStepInHour*24))
+IF (ALLOCATED(CalcFinalZoneSizing)) THEN
+  DO lDesHtCl = 1,2 !iterates between heating and cooling design day
+    isCooling = lDesHtCl .EQ. 2  !flag for when cooling design day otherwise heating design day
+    DO iZone = 1,NumOfZones
+      IF (.not. ZoneEquipConfig(iZone)%IsControlled) CYCLE
+      IF (isCooling) THEN
+        desSelected = CalcFinalZoneSizing(iZone)%CoolDDNum
+      ELSE
+        desSelected = CalcFinalZoneSizing(iZone)%HeatDDNum
+      END IF
+      IF (desSelected .EQ. 0)  CYCLE
+      DO kTimeStep = 1, NumOfTimeStepInHour*24
+        peopleConvIntoZone = 0.0
+        equipConvIntoZone = 0.0
+        hvacLossConvIntoZone = 0.0
+        powerGenConvIntoZone = 0.0
+        lightLWConvIntoZone = 0.0
+        lightSWConvIntoZone = 0.0
+        feneSolarConvIntoZone = 0.0
+        adjFeneSurfNetRadSeq = 0.0
+        DO jSurf = 1,TotSurfaces
+          IF (.NOT. Surface(jSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
+          IF (Surface(jSurf)%Zone .EQ. iZone) THEN
+            !determine for each timestep the amount of radiant heat for each end use absorbed in each surface
+            QRadThermInAbsMult = TMULTseq(iZone,kTimeStep,desSelected) * ITABSFseq(jSurf,kTimeStep,desSelected)  &
+                                 * Surface(jSurf)%area
+            peopleRadIntoSurf(kTimeStep) = peopleRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
+            equipRadIntoSurf(kTimeStep) = equipRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
+            hvacLossRadIntoSurf(kTimeStep) = hvacLossRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
+            powerGenRadIntoSurf(kTimeStep) = powerGenRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
+            lightLWRadIntoSurf(kTimeStep) = lightLWRadSeq(iZone,kTimeStep,DesSelected) * QRadThermInAbsMult
+            !for each time step, step back through time and apply decay curve
+            peopleConvFromSurf = 0.0
+            equipConvFromSurf = 0.0
+            hvacLossConvFromSurf = 0.0
+            powerGenConvFromSurf = 0.0
+            lightLWConvFromSurf = 0.0
+            lightSWConvFromSurf = 0.0
+            feneSolarConvFromSurf = 0.0
+            DO mStepBack = 1,kTimeStep
+              IF (isCooling) THEN
+                peopleConvFromSurf = peopleConvFromSurf + peopleRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                equipConvFromSurf = equipConvFromSurf + equipRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                hvacLossConvFromSurf = hvacLossConvFromSurf + hvacLossRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                powerGenConvFromSurf = powerGenConvFromSurf + powerGenRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                lightLWConvFromSurf = lightLWConvFromSurf + lightLWRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                ! short wave is already accumulated by surface
+                lightSWConvFromSurf = lightSWConvFromSurf + lightSWRadSeq(jSurf,kTimeStep - mStepBack + 1,DesSelected) &
+                                       * decayCurveCool(jSurf,mStepBack)
+                feneSolarConvFromSurf = feneSolarConvFromSurf + feneSolarRadSeq(jSurf,kTimeStep - mStepBack + 1,DesSelected) &
+                                       * decayCurveCool(jSurf,mStepBack)
+              ELSE
+                peopleConvFromSurf = peopleConvFromSurf + peopleRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                equipConvFromSurf = equipConvFromSurf + equipRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                hvacLossConvFromSurf = hvacLossConvFromSurf + hvacLossRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                powerGenConvFromSurf = powerGenConvFromSurf + powerGenRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                lightLWConvFromSurf = lightLWConvFromSurf + lightLWRadIntoSurf(kTimeStep - mStepBack + 1) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                ! short wave is already accumulated by surface
+                lightSWConvFromSurf = lightSWConvFromSurf + lightSWRadSeq(jSurf, kTimeStep - mStepBack + 1,DesSelected) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+                feneSolarConvFromSurf = feneSolarConvFromSurf + feneSolarRadSeq(jSurf,kTimeStep - mStepBack + 1,DesSelected) &
+                                       * decayCurveHeat(jSurf,mStepBack)
+              ENDIF
+            END DO
+            peopleConvIntoZone = peopleConvIntoZone + peopleConvFromSurf
+            equipConvIntoZone = equipConvIntoZone + equipConvFromSurf
+            hvacLossConvIntoZone = hvacLossConvIntoZone + hvacLossConvFromSurf
+            powerGenConvIntoZone = powerGenConvIntoZone + powerGenConvFromSurf
+            lightLWConvIntoZone = lightLWConvIntoZone + lightLWConvFromSurf
+            lightSWConvIntoZone = lightSWConvIntoZone + lightSWConvFromSurf
+            feneSolarConvIntoZone = feneSolarConvIntoZone + feneSolarConvFromSurf
+            ! determine the remaining convective heat from the surfaces that are not based
+            ! on any of these other loads
+            !negative because heat from surface should be positive
+            surfDelaySeq(jSurf,kTimeStep,desSelected) = -loadConvectedNormal(jSurf,kTimeStep,desSelected) &
+                 - netSurfRadSeq(jSurf,kTimeStep,desSelected) &         !remove net radiant for the surface
+                 - (peopleConvFromSurf + equipConvFromSurf + hvacLossConvFromSurf + powerGenConvFromSurf &
+                     + lightLWConvFromSurf + lightSWConvFromSurf + feneSolarConvFromSurf)
+            ! also remove the net radiant component on the instanteous conduction for fenestration
+            IF (surface(jSurf)%class .EQ. SurfaceClass_Window) THEN
+              adjFeneSurfNetRadSeq = adjFeneSurfNetRadSeq + netSurfRadSeq(jSurf,kTimeStep,desSelected)
+            END IF
+          END IF
+        END DO
+        peopleDelaySeq(iZone,kTimeStep,desSelected) = peopleConvIntoZone
+        equipDelaySeq(iZone,kTimeStep,desSelected) = equipConvIntoZone
+        hvacLossDelaySeq(iZone,kTimeStep,desSelected) = hvacLossConvIntoZone
+        powerGenDelaySeq(iZone,kTimeStep,desSelected) = powerGenConvIntoZone
+        !combine short wave (visible) and long wave (thermal) impacts
+        lightDelaySeq(iZone,kTimeStep,desSelected) = lightLWConvIntoZone + lightSWConvIntoZone
+        feneSolarDelaySeq(iZone,kTimeStep,desSelected) = feneSolarConvIntoZone
+        ! also remove the net radiant component on the instanteous conduction for fenestration
+        feneCondInstantSeq(iZone,kTimeStep,desSelected) = feneCondInstantSeq(iZone,kTimeStep,desSelected) - adjFeneSurfNetRadSeq
+      END DO
+    END DO
+  END DO
+ENDIF
+END SUBROUTINE ComputeDelayedComponents
+
+SUBROUTINE WriteZoneLoadComponentTable
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   March 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Write the tables for the ZoneLoadComponentSummary and
+          !   ZoneLoadComponentDetail reports which summarize the major
+          !   load components for each zone in the building.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Create arrays for the call to writeTable and then call it.
+          !   This report actually consists of many sub-tables each with
+          !   its own call to writeTable.
+!
+! The overall methodology is explained below:
+!
+! Determine decay curve - Pulse of radiant heat which is about 5% of lighting and
+! equipment input [radiantPulseUsed(iZone)] for a single timestep a few hours after
+! cooling or heat is scheduled on for each zone [radiantPulseTimestep(iZone)].
+! The radiant heat received on each wall is stored [radiantPulseReceived(jSurface)].
+! The load convected in the normal case [loadConvectedNormal(jSurface, kTime, mode)]
+! and in the case with the pulse [loadConvectedWithPulse(jSurface, kTime, mode)].
+! The difference divided by the pulse received by each surface
+! [radiantPulseReceived(jSurface)] is stored in [decayCurve(jSurface,kTime,mode)].
+!
+! Determine delayed loads - From the last timestep of the peak load on the zone
+! working backwards any radiant heat that was absorbed by the wall from an internal gain
+! or solar gain is multiplied by the appropriate timesteps in the decay curve
+! [decayCurve(jSurface,kTime,mode)] for timesteps that make up
+! the number of averaged timesteps are used to determine the peak load
+! [NumTimeStepsInAvg]. The sum for all surfaces in the zone are added together to
+! determine the delayed load.
+!
+! Determine instant loads - Average the convective portion of the internal gains
+! for the timesteps made up of the peak load period. Average those across the peak
+! load period.
+!
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+USE DataHeatBalance,   ONLY: Zone
+USE SQLiteProcedures, ONLY: CreateSQLiteTabularDataRecords
+USE DataZoneEquipment, ONLY: ZoneEquipConfig
+USE DataSurfaces, ONLY: Surface, TotSurfaces,ExternalEnvironment,Ground,GroundFCfactorMethod, &
+                        OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt, &
+                        SurfaceClass_Wall,SurfaceClass_Floor,SurfaceClass_Roof, &
+                        SurfaceClass_Door,OSC
+USE DataSizing, ONLY: CalcFinalZoneSizing,NumTimeStepsInAvg,CoolPeakDateHrMin,HeatPeakDateHrMin
+USE DataZoneEquipment, ONLY: ZoneEquipConfig
+USE DataGlobals, ONLY: NumOfTimeStepInHour, CompLoadReportIsReq,ShowDecayCurvesInEIO
+USE General, ONLY: MovingAvg
+USE Psychrometrics,  ONLY: PsyTwbFnTdbWPb,PsyRhFnTdbWPb
+
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+
+! These correspond to the columns in the load component table
+INTEGER, PARAMETER :: cSensInst = 1
+INTEGER, PARAMETER :: cSensDelay = 2
+INTEGER, PARAMETER :: cSensRA = 3
+INTEGER, PARAMETER :: cLatent = 4
+INTEGER, PARAMETER :: cTotal = 5
+INTEGER, PARAMETER :: cPerc = 6
+
+!internal gains
+INTEGER, PARAMETER :: rPeople =     1
+INTEGER, PARAMETER :: rLights =     2
+INTEGER, PARAMETER :: rEquip =      3
+INTEGER, PARAMETER :: rRefrig =     4
+INTEGER, PARAMETER :: rWaterUse =   5
+INTEGER, PARAMETER :: rHvacLoss =   6
+INTEGER, PARAMETER :: rPowerGen =   7
+!misc
+INTEGER, PARAMETER :: rInfil =      8
+INTEGER, PARAMETER :: rZoneVent =   9
+INTEGER, PARAMETER :: rIntZonMix =  10
+!opaque surfaces
+INTEGER, PARAMETER :: rRoof =       11
+INTEGER, PARAMETER :: rIntZonCeil = 12
+INTEGER, PARAMETER :: rOtherRoof =  13
+INTEGER, PARAMETER :: rExtWall =    14
+INTEGER, PARAMETER :: rIntZonWall = 15
+INTEGER, PARAMETER :: rGrdWall =    16
+INTEGER, PARAMETER :: rOtherWall =  17
+INTEGER, PARAMETER :: rExtFlr =     18
+INTEGER, PARAMETER :: rIntZonFlr =  19
+INTEGER, PARAMETER :: rGrdFlr =     20
+INTEGER, PARAMETER :: rOtherFlr =   21
+!subsurfaces
+INTEGER, PARAMETER :: rFeneCond =   22
+INTEGER, PARAMETER :: rFeneSolr =   23
+INTEGER, PARAMETER :: rOpqDoor =    24
+!total
+INTEGER, PARAMETER :: rGrdTot =     25
+
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+INTEGER :: CoolDesSelected = 0  !design day selected for cooling
+INTEGER :: HeatDesSelected = 0  !design day selected for heating
+INTEGER :: timeCoolMax = 0 !Time Step at Cool max
+INTEGER :: timeHeatMax = 0 !Time Step at Heat Max
+INTEGER :: iZone = 0
+INTEGER :: jTime = 0
+INTEGER :: k = 0
+INTEGER :: kSurf = 0
+INTEGER :: numObj = 0
+INTEGER :: objCount = 0
+INTEGER :: ZoneNum = 0
+INTEGER :: tempUnitConvIndex = 0
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: seqData  !raw data sequence that has not been averaged yet
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: avgData  !sequence data after averaging
+INTEGER :: NumOfTimeStepInDay
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: delayOpaque !hold values for report for delayed opaque
+REAL(r64) :: singleSurfDelay
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: totalColumn
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: percentColumn
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: grandTotalRow
+REAL(r64) :: totalGrandTotal
+REAL(r64) :: powerConversion
+INTEGER :: tempConvIndx !temperature conversion index
+CHARACTER(len=MaxNameLength) :: stringWithTemp
+INTEGER :: curExtBoundCond
+
+
+! all arrays are in the format: (row, column)
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:)     :: columnHead
+INTEGER,ALLOCATABLE,DIMENSION(:)                           :: columnWidth
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:)     :: rowHead
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:,:)   :: tableBody
+
+IF (displayZoneComponentLoadSummary .AND. CompLoadReportIsReq) THEN
+  CALL ComputeDelayedComponents
+  NumOfTimeStepInDay = NumOfTimeStepInHour*24
+  ALLOCATE(seqData(NumOfTimeStepInDay))
+  ALLOCATE(avgData(NumOfTimeStepInDay))
+  ALLOCATE(delayOpaque(rGrdTot))
+  ALLOCATE(totalColumn(rGrdTot))
+  ALLOCATE(percentColumn(rGrdTot))
+  ALLOCATE(grandTotalRow(cPerc))
+
+  !establish unit conversion factors
+  IF (unitsStyle .EQ. unitsStyleInchPound) THEN
+    powerConversion = getSpecificUnitMultiplier('W','Btu/h') !or kBtuh?
+    tempConvIndx = getSpecificUnitIndex('C','F')
+  ELSE
+    powerConversion = 1
+    tempConvIndx = 0 !when zero is used with ConvertIP the value is returned unconverted
+  END IF
+
+  ! show the line definition for the decay curves
+  IF (ShowDecayCurvesInEIO) THEN
+    WRITE (OutputFileInits, '(A)') '! <Radiant to Convective Decay Curves for Cooling>,Zone Name, Surface Name, Time ' &
+                  // '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36'
+    WRITE (OutputFileInits, '(A)') '! <Radiant to Convective Decay Curves for Heating>,Zone Name, Surface Name, Time ' &
+                  // '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36'
+  END IF
+
+  DO iZone = 1, NumOfZones
+    IF (.not. ZoneEquipConfig(iZone)%IsControlled) CYCLE
+
+    !
+    !---- Cooling Peak Load Components Sub-Table
+    !
+    CALL WriteReportHeaders('Zone Component Load Summary',TRIM(Zone(iZone)%Name),isAverage)
+
+    ALLOCATE(rowHead(rGrdTot))
+    ALLOCATE(columnHead(cPerc))
+    ALLOCATE(columnWidth(cPerc))
+    columnWidth = 14 !array assignment - same for all columns
+    ALLOCATE(tableBody(rGrdTot,cPerc))
+
+    IF (unitsStyle .NE. unitsStyleInchPound) THEN
+      columnHead(cSensInst) = 'Sensible - Instant [W]'
+      columnHead(cSensDelay) = 'Sensible - Delayed [W]'
+      columnHead(cSensRA) = 'Sensible - Return Air [W]'
+      columnHead(cLatent) = 'Latent [W]'
+      columnHead(cTotal) = 'Total [W]'
+      columnHead(cPerc) = '%Grand Total'
+    ELSE
+      columnHead(cSensInst) = 'Sensible - Instant [Btu/h]'
+      columnHead(cSensDelay) = 'Sensible - Delayed [Btu/h]'
+      columnHead(cSensRA) = 'Sensible - Return Air [Btu/h]'
+      columnHead(cLatent) = 'Latent [Btu/h]'
+      columnHead(cTotal) = 'Total [Btu/h]'
+      columnHead(cPerc) = '%Grand Total'
+    END IF
+
+    !internal gains
+    rowHead(rPeople) = 'People'
+    rowHead(rLights) = 'Lights'
+    rowHead(rEquip) = 'Equipment'
+    rowHead(rRefrig) = 'Refrigeration Equipment'
+    rowHead(rWaterUse) = 'Water Use Equipment'
+    rowHead(rPowerGen) = 'Power Generation Equipment'
+    rowHead(rHvacLoss) = 'HVAC Equipment Losses'
+    rowHead(rRefrig) = 'Refrigeration'
+    !misc
+    rowHead(rInfil) = 'Infiltration'
+    rowHead(rZoneVent) = 'Zone Ventilation'
+    rowHead(rIntZonMix) = 'Interzone Mixing'
+    !opaque surfaces
+    rowHead(rRoof) = 'Roof'
+    rowHead(rIntZonCeil) = 'Interzone Ceiling'
+    rowHead(rOtherRoof) = 'Other Roof'
+    rowHead(rExtWall) = 'Exterior Wall'
+    rowHead(rIntZonWall) = 'Interzone Wall'
+    rowHead(rGrdWall) = 'Ground Contact Wall'
+    rowHead(rOtherWall) = 'Other Wall'
+    rowHead(rExtFlr) = 'Exterior Floor'
+    rowHead(rIntZonFlr) = 'Interzone Floor'
+    rowHead(rGrdFlr) = 'Ground Contact Floor'
+    rowHead(rOtherFlr) = 'Other Floor'
+    !subsurfaces
+    rowHead(rFeneCond) = 'Fenestration Conduction'
+    rowHead(rFeneSolr) = 'Fenestration Solar'
+    rowHead(rOpqDoor) = 'Opaque Door'
+    rowHead(rGrdTot) = 'Grand Total'
+
+    tableBody = ''
+    totalColumn = 0.0
+    percentColumn = 0.0
+    grandTotalRow = 0.0
+
+    CoolDesSelected = CalcFinalZoneSizing(iZone)%CoolDDNum
+    timeCoolMax = CalcFinalZoneSizing(iZone)%TimeStepNumAtCoolMax
+    IF (CoolDesSelected .NE. 0 .AND. timeCoolMax .NE. 0) THEN
+
+      !PEOPLE
+      seqData = peopleInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = peopleLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      seqData = peopleDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !LIGHTS
+      seqData = lightInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = lightRetAirSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensRA)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeCoolMax)
+      grandTotalRow(cSensRA) = grandTotalRow(cSensRA) + AvgData(timeCoolMax)
+
+      seqData = lightDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !EQUIPMENT
+      seqData = equipInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = equipLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      seqData = equipDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !REFRIGERATION EQUIPMENT
+      seqData = refrigInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = refrigRetAirSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cSensRA)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeCoolMax)
+      grandTotalRow(cSensRA) = grandTotalRow(cSensRA) + AvgData(timeCoolMax)
+
+      seqData = refrigLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      !WATER USE EQUIPMENT
+      seqData = waterUseInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rWaterUse,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rWaterUse) = totalColumn(rWaterUse) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = waterUseLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rWaterUse,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rWaterUse) = totalColumn(rWaterUse) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      !HVAC EQUIPMENT LOSSES
+      seqData = hvacLossInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rHvacLoss,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rHvacLoss) = totalColumn(rHvacLoss) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = hvacLossDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rHvacLoss,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rHvacLoss) = totalColumn(rHvacLoss) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !POWER GENERATION EQUIPMENT
+      seqData = powerGenInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPowerGen,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rPowerGen) = totalColumn(rPowerGen) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = powerGenDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPowerGen,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rPowerGen) = totalColumn(rPowerGen) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !INFILTRATION
+      seqData = infilInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rInfil,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rInfil) = totalColumn(rInfil) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = infilLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rInfil,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rInfil) = totalColumn(rInfil) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      !ZONE VENTILATION
+      seqData = zoneVentInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rZoneVent,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rZoneVent) = totalColumn(rZoneVent) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = zoneVentLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rZoneVent,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rZoneVent) = totalColumn(rZoneVent) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      !INTERZONE MIXING
+      seqData = interZoneMixInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rIntZonMix,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rIntZonMix) = totalColumn(rIntZonMix) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = interZoneMixLatentSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rIntZonMix,cLatent)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rIntZonMix) = totalColumn(rIntZonMix) + AvgData(timeCoolMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeCoolMax)
+
+      !FENESTRATION CONDUCTION
+      seqData = feneCondInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rFeneCond,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rFeneCond) = totalColumn(rFeneCond) + AvgData(timeCoolMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      !FENESTRATION SOLAR
+!      seqData = feneSolarInstantSeq(iZone,:,CoolDesSelected) * powerConversion
+!      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+!      tableBody(rFeneSolr,cSensInst)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+!      totalColumn(rFeneSolr) = totalColumn(rFeneSolr) + AvgData(timeCoolMax)
+!      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeCoolMax)
+
+      seqData = feneSolarDelaySeq(iZone,:,CoolDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rFeneSolr,cSensDelay)  = TRIM(RealToStr(AvgData(timeCoolMax),2))
+      totalColumn(rFeneSolr) = totalColumn(rFeneSolr) + AvgData(timeCoolMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeCoolMax)
+
+      !opaque surfaces - must combine individual surfaces by class and other side conditions
+      delayOpaque = 0.0
+      DO kSurf = 1,TotSurfaces
+        IF (.NOT. Surface(kSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
+        IF (Surface(kSurf)%Zone .EQ. iZone) THEN
+          curExtBoundCond = surface(kSurf)%ExtBoundCond
+          !if exterior is other side coefficients using ground preprocessor terms then
+          !set it to ground instead of other side coefficients
+          IF (curExtBoundCond .EQ. OtherSideCoefNoCalcExt .OR. curExtBoundCond .EQ. OtherSideCoefCalcExt) THEN
+            IF (SameString(OSC(Surface(kSurf)%OSCPtr)%Name(1:17), 'surfPropOthSdCoef')) THEN
+              curExtBoundCond = Ground
+            END IF
+          END IF
+          seqData = surfDelaySeq(kSurf,:,CoolDesSelected)
+          CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+          singleSurfDelay = AvgData(timeCoolMax) * powerConversion
+          SELECT CASE (surface(kSurf)%class)
+            CASE (SurfaceClass_Wall)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rExtWall) = delayOpaque(rExtWall) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod)
+                  delayOpaque(rGrdWall) = delayOpaque(rGrdWall) + singleSurfDelay
+                CASE (OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherWall) = delayOpaque(rOtherWall) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonWall) = delayOpaque(rIntZonWall) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Floor)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rExtFlr) = delayOpaque(rExtFlr) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod)
+                  delayOpaque(rGrdFlr) = delayOpaque(rGrdFlr) + singleSurfDelay
+                CASE (OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherFlr) = delayOpaque(rOtherFlr) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonFlr) = delayOpaque(rIntZonFlr) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Roof)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rRoof) = delayOpaque(rRoof) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod,OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherRoof) = delayOpaque(rOtherRoof) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonCeil) = delayOpaque(rIntZonCeil) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Door)
+              delayOpaque(rOpqDoor) = delayOpaque(rOpqDoor) + singleSurfDelay
+          END SELECT
+        END IF
+      END DO
+      DO k = rRoof,rOtherFlr
+        tableBody(k,cSensDelay)  = TRIM(RealToStr(delayOpaque(k),2))
+        totalColumn(k) = totalColumn(k) + delayOpaque(k)
+        grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + delayOpaque(k)
+      END DO
+      tableBody(rOpqDoor,cSensDelay) = TRIM(RealToStr(delayOpaque(rOpqDoor),2))
+      totalColumn(rOpqDoor) = totalColumn(rOpqDoor) + delayOpaque(rOpqDoor)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + delayOpaque(rOpqDoor)
+    END IF
+
+    !GRAND TOTAL ROW
+    totalGrandTotal = 0
+    DO k = 1,cLatent
+      tableBody(rGrdTot,k)  = TRIM(RealToStr(grandTotalRow(k),2))
+      totalGrandTotal = totalGrandTotal + grandTotalRow(k)
+    END DO
+    tableBody(rGrdTot,cTotal)  = TRIM(RealToStr(totalGrandTotal,2))
+
+    !TOTAL COLUMN AND PERCENT COLUMN
+    DO k = 1,rOpqDoor !to last row before total
+      tableBody(k,cTotal) = TRIM(RealToStr(totalColumn(k),2))
+      IF (totalGrandTotal .NE. 0.0) THEN
+        tableBody(k,cPerc) = TRIM(RealToStr(100 * totalColumn(k)/totalGrandTotal,2))
+      END IF
+    END DO
+
+    CALL writeSubtitle('Estimated Cooling Peak Load Components')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                        'ZoneComponentLoadSummary',&
+                                        TRIM(Zone(iZone)%Name),&
+                                        'Estimated Cooling Peak Load Components')
+
+    DEALLOCATE(columnHead)
+    DEALLOCATE(rowHead)
+    DEALLOCATE(columnWidth)
+    DEALLOCATE(tableBody)
+
+    !
+    !---- Cooling Peak Conditions
+    !
+
+    ALLOCATE(rowHead(10))
+    ALLOCATE(columnHead(1))
+    ALLOCATE(columnWidth(1))
+    columnWidth = 14 !array assignment - same for all columns
+    ALLOCATE(tableBody(10,1))
+
+    columnHead(1) = 'Value'
+    IF (unitsStyle .NE. unitsStyleInchPound) THEN
+      rowHead(1) = 'Time of Peak Load'
+      rowHead(2) = 'Outside  Dry Bulb Temperature [C]'
+      rowHead(3) = 'Outside  Wet Bulb Temperature [C]'
+      rowHead(4) = 'Outside Humidity Ratio at Peak [kgWater/kgAir]'
+      rowHead(5) = 'Zone Dry Bulb Temperature [C]'
+      rowHead(6) = 'Zone Relative Humdity [%]'
+      rowHead(7) = 'Zone Humidity Ratio at Peak [kgWater/kgAir]'
+      rowHead(8) = 'Peak Design Sensible Load [W]'
+      rowHead(9) = 'Estimated Instant + Delayed Sensible Load [W]'
+      rowHead(10) = 'Difference [W]'
+    ELSE
+      rowHead(1) = 'Time of Peak Load'
+      rowHead(2) = 'Outside  Dry Bulb Temperature [F]'
+      rowHead(3) = 'Outside  Wet Bulb Temperature [F]'
+      rowHead(4) = 'Outside Humidity Ratio at Peak [lbWater/lbAir]'
+      rowHead(5) = 'Zone Dry Bulb Temperature [F]'
+      rowHead(6) = 'Zone Relative Humdity [%]'
+      rowHead(7) = 'Zone Humidity Ratio at Peak [lbWater/lbAir]'
+      rowHead(8) = 'Peak Design Sensible Load [Btu/h]'
+      rowHead(9) = 'Estimated Instant + Delayed Sensible Load [Btu/h]'
+      rowHead(10) = 'Difference [Btu/h]'
+    END IF
+
+    tableBody = ''
+
+    IF (timeCoolMax .NE. 0) THEN
+
+      !Time of Peak Load
+      tableBody(1,1) = TRIM(CoolPeakDateHrMin(iZone))
+
+      !Outside  Dry Bulb Temperature
+      tableBody(2,1) = TRIM(RealToStr(convertIP(tempConvIndx,CalcFinalZoneSizing(iZone)%CoolOutTempSeq(timeCoolMax)),2))
+
+      !Outside  Wet Bulb Temperature
+      !use standard sea level air pressure because air pressure is not tracked with sizing data
+      IF (CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .LT. 1.0 .AND.     &
+          CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax) .GT. 0.0) THEN
+        tableBody(3,1) = TRIM(RealToStr(convertIP(tempConvIndx, &
+                                     PsyTwbFnTdbWPb(CalcFinalZoneSizing(iZone)%CoolOutTempSeq(timeCoolMax), &
+                                     CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax), &
+                                     101325.0d0))  ,2))
+      END IF
+
+      !Outside Humidity Ratio at Peak
+      tableBody(4,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%CoolOutHumRatSeq(timeCoolMax),5))
+
+      !Zone Dry Bulb Temperature
+      tableBody(5,1) = TRIM(RealToStr(convertIP(tempConvIndx,CalcFinalZoneSizing(iZone)%CoolZoneTempSeq(timeCoolMax)),2))
+
+      !Zone Relative Humdity
+      !use standard sea level air pressure because air pressure is not tracked with sizing data
+      tableBody(6,1) = TRIM(RealToStr(100 * PsyRhFnTdbWPb(CalcFinalZoneSizing(iZone)%CoolZoneTempSeq(timeCoolMax), &
+                                                     CalcFinalZoneSizing(iZone)%CoolZoneHumRatSeq(timeCoolMax), &
+                                                     101325.0d0)  ,2))
+
+      !Zone Humidity Ratio at Peak
+      tableBody(7,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%CoolZoneHumRatSeq(timeCoolMax),5))
+
+    END IF
+
+    !Peak Design Sensible Load
+    tableBody(8,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%DesCoolLoad * powerConversion,2))
+
+    !Estimated Instant + Delayed Sensible Load
+    tableBody(9,1) = TRIM(RealToStr(grandTotalRow(cSensInst) + grandTotalRow(cSensDelay),2))
+
+    !Difference
+    tableBody(10,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%DesCoolLoad * powerConversion &
+                         - (grandTotalRow(cSensInst) + grandTotalRow(cSensDelay)),2))
+
+    CALL writeSubtitle('Cooling Peak Conditions')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                        'ZoneComponentLoadSummary',&
+                                        TRIM(Zone(iZone)%Name),&
+                                        'Cooling Peak Conditions')
+
+    DEALLOCATE(columnHead)
+    DEALLOCATE(rowHead)
+    DEALLOCATE(columnWidth)
+    DEALLOCATE(tableBody)
+
+
+!    !
+!    !---- Radiant to Convective Decay Curves for Cooling
+!    !
+!    numObj = 0
+!    !determine the number of surfaces to include
+!    DO kSurf = 1, TotSurfaces
+!      ZoneNum = Surface(kSurf)%Zone
+!      IF (ZoneNum .NE. iZone) CYCLE
+!      IF (ZoneNum .EQ. 0) CYCLE
+!      IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+!      numObj = numObj + 1
+!    END DO
+!
+!    ALLOCATE(rowHead(numObj))
+!    ALLOCATE(columnHead(16))
+!    ALLOCATE(columnWidth(16))
+!    columnWidth = 14 !array assignment - same for all columns
+!    ALLOCATE(tableBody(numObj,16))
+!
+!    columnHead(1) = 'Time 1'
+!    columnHead(2) = 'Time 2'
+!    columnHead(3) = 'Time 3'
+!    columnHead(4) = 'Time 4'
+!    columnHead(5) = 'Time 5'
+!    columnHead(6) = 'Time 6'
+!    columnHead(7) = 'Time 7'
+!    columnHead(8) = 'Time 8'
+!    columnHead(9) = 'Time 9'
+!    columnHead(10) = 'Time 10'
+!    columnHead(11) = 'Time 11'
+!    columnHead(12) = 'Time 12'
+!    columnHead(13) = 'Time 13'
+!    columnHead(14) = 'Time 14'
+!    columnHead(15) = 'Time 15'
+!    columnHead(16) = 'Time 16'
+!
+!    tableBody = ''
+!    objCount = 0
+!    DO kSurf = 1, TotSurfaces
+!      ZoneNum = Surface(kSurf)%Zone
+!      IF (ZoneNum .NE. iZone) CYCLE
+!      IF (ZoneNum .EQ. 0) CYCLE
+!      IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+!      objCount = objCount + 1
+!      rowHead(objCount) = TRIM(Surface(kSurf)%Name)
+!      DO jTime = 1, 16
+!        tableBody(objCount,jTime) = TRIM(RealToStr(decayCurveCool(kSurf,jTime),3))
+!      END DO
+!    END DO
+!
+!    CALL writeSubtitle('Radiant to Convective Decay Curves for Cooling')
+!    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+!    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+!                                        'ZoneComponentLoadDetail',&
+!                                        TRIM(Zone(iZone)%Name),&
+!                                        'Radiant to Convective Decay Curves for Cooling')
+!
+!    DEALLOCATE(columnHead)
+!    DEALLOCATE(rowHead)
+!    DEALLOCATE(columnWidth)
+!    DEALLOCATE(tableBody)
+
+    ! Put the decay curve into the EIO file
+    IF (ShowDecayCurvesInEIO) THEN
+      DO kSurf = 1, TotSurfaces
+        ZoneNum = Surface(kSurf)%Zone
+        IF (ZoneNum .NE. iZone) CYCLE
+        IF (ZoneNum .EQ. 0) CYCLE
+        IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+        WRITE (OutputFileInits, '(4A)',ADVANCE='NO')  'Radiant to Convective Decay Curves for Cooling,' &
+                            ,TRIM(Zone(iZone)%Name),',',TRIM(Surface(kSurf)%Name)
+        DO jTime = 1, MIN(NumOfTimeStepInHour*24,36)
+          WRITE(OutputFileInits,'(A,F6.3)',ADVANCE='NO') ',',decayCurveCool(kSurf,jTime)
+        END DO
+        WRITE(OutputFileInits,'()',ADVANCE='YES') !put a line feed at the end of the line
+      END DO
+    END IF
+
+    !
+    !---- Heating Peak Load Components Sub-Table
+    !
+    ALLOCATE(rowHead(rGrdTot))
+    ALLOCATE(columnHead(cPerc))
+    ALLOCATE(columnWidth(cPerc))
+    columnWidth = 14 !array assignment - same for all columns
+    ALLOCATE(tableBody(rGrdTot,cPerc))
+
+    IF (unitsStyle .NE. unitsStyleInchPound) THEN
+      columnHead(cSensInst) = 'Sensible - Instant [W]'
+      columnHead(cSensDelay) = 'Sensible - Delayed [W]'
+      columnHead(cSensRA) = 'Sensible - Return Air [W]'
+      columnHead(cLatent) = 'Latent [W]'
+      columnHead(cTotal) = 'Total [W]'
+      columnHead(cPerc) = '%Grand Total'
+    ELSE
+      columnHead(cSensInst) = 'Sensible - Instant [Btu/h]'
+      columnHead(cSensDelay) = 'Sensible - Delayed [Btu/h]'
+      columnHead(cSensRA) = 'Sensible - Return Air [Btu/h]'
+      columnHead(cLatent) = 'Latent [Btu/h]'
+      columnHead(cTotal) = 'Total [Btu/h]'
+      columnHead(cPerc) = '%Grand Total'
+    END IF
+
+    !internal gains
+    rowHead(rPeople) = 'People'
+    rowHead(rLights) = 'Lights'
+    rowHead(rEquip) = 'Equipment'
+    rowHead(rRefrig) = 'Refrigeration Equipment'
+    rowHead(rWaterUse) = 'Water Use Equipment'
+    rowHead(rPowerGen) = 'Power Generation Equipment'
+    rowHead(rHvacLoss) = 'HVAC Equipment Losses'
+    rowHead(rRefrig) = 'Refrigeration'
+    !misc
+    rowHead(rInfil) = 'Infiltration'
+    rowHead(rZoneVent) = 'Zone Ventilation'
+    rowHead(rIntZonMix) = 'Interzone Mixing'
+    !opaque surfaces
+    rowHead(rRoof) = 'Roof'
+    rowHead(rIntZonCeil) = 'Interzone Ceiling'
+    rowHead(rOtherRoof) = 'Other Roof'
+    rowHead(rExtWall) = 'Exterior Wall'
+    rowHead(rIntZonWall) = 'Interzone Wall'
+    rowHead(rGrdWall) = 'Ground Contact Wall'
+    rowHead(rOtherWall) = 'Other Wall'
+    rowHead(rExtFlr) = 'Exterior Floor'
+    rowHead(rIntZonFlr) = 'Interzone Floor'
+    rowHead(rGrdFlr) = 'Ground Contact Floor'
+    rowHead(rOtherFlr) = 'Other Floor'
+    !subsurfaces
+    rowHead(rFeneCond) = 'Fenestration Conduction'
+    rowHead(rFeneSolr) = 'Fenestration Solar'
+    rowHead(rOpqDoor) = 'Opaque Door'
+    rowHead(rGrdTot) = 'Grand Total'
+
+    tableBody = ''
+    totalColumn = 0.0
+    percentColumn = 0.0
+    grandTotalRow = 0.0
+
+    HeatDesSelected = CalcFinalZoneSizing(iZone)%HeatDDNum
+    timeHeatMax = CalcFinalZoneSizing(iZone)%TimeStepNumAtHeatMax
+    IF (HeatDesSelected .NE. 0 .AND. timeHeatMax .NE. 0) THEN
+
+      !PEOPLE
+      seqData = peopleInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = peopleLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      seqData = peopleDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPeople,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rPeople) = totalColumn(rPeople) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !LIGHTS
+      seqData = lightInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = lightRetAirSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensRA)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeHeatMax)
+      grandTotalRow(cSensRA) = grandTotalRow(cSensRA) + AvgData(timeHeatMax)
+
+      seqData = lightDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rLights,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rLights) = totalColumn(rLights) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !EQUIPMENT
+      seqData = equipInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = equipLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      seqData = equipDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rEquip,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rEquip) = totalColumn(rEquip) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !REFRIGERATION EQUIPMENT
+      seqData = refrigInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = refrigRetAirSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cSensRA)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeHeatMax)
+      grandTotalRow(cSensRA) = grandTotalRow(cSensRA) + AvgData(timeHeatMax)
+
+      seqData = refrigLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rRefrig,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rRefrig) = totalColumn(rRefrig) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      !WATER USE EQUIPMENT
+      seqData = waterUseInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rWaterUse,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rWaterUse) = totalColumn(rWaterUse) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = waterUseLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rWaterUse,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rWaterUse) = totalColumn(rWaterUse) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      !HVAC EQUIPMENT LOSSES
+      seqData = hvacLossInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rHvacLoss,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rHvacLoss) = totalColumn(rHvacLoss) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = hvacLossDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rHvacLoss,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rHvacLoss) = totalColumn(rHvacLoss) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !POWER GENERATION EQUIPMENT
+      seqData = powerGenInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPowerGen,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rPowerGen) = totalColumn(rPowerGen) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = powerGenDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rPowerGen,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rPowerGen) = totalColumn(rPowerGen) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !INFILTRATION
+      seqData = infilInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rInfil,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rInfil) = totalColumn(rInfil) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = infilLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rInfil,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rInfil) = totalColumn(rInfil) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      !ZONE VENTILATION
+      seqData = zoneVentInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rZoneVent,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rZoneVent) = totalColumn(rZoneVent) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = zoneVentLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rZoneVent,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rZoneVent) = totalColumn(rZoneVent) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      !INTERZONE MIXING
+      seqData = interZoneMixInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rIntZonMix,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rIntZonMix) = totalColumn(rIntZonMix) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = interZoneMixLatentSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rIntZonMix,cLatent)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rIntZonMix) = totalColumn(rIntZonMix) + AvgData(timeHeatMax)
+      grandTotalRow(cLatent) = grandTotalRow(cLatent) + AvgData(timeHeatMax)
+
+      !FENESTRATION CONDUCTION
+      seqData = feneCondInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rFeneCond,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rFeneCond) = totalColumn(rFeneCond) + AvgData(timeHeatMax)
+      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      !FENESTRATION SOLAR
+!      seqData = feneSolarInstantSeq(iZone,:,HeatDesSelected) * powerConversion
+!      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+!      tableBody(rFeneSolr,cSensInst)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+!      totalColumn(rFeneSolr) = totalColumn(rFeneSolr) + AvgData(timeHeatMax)
+!      grandTotalRow(cSensInst) = grandTotalRow(cSensInst) + AvgData(timeHeatMax)
+
+      seqData = feneSolarDelaySeq(iZone,:,HeatDesSelected) * powerConversion
+      CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+      tableBody(rFeneSolr,cSensDelay)  = TRIM(RealToStr(AvgData(timeHeatMax),2))
+      totalColumn(rFeneSolr) = totalColumn(rFeneSolr) + AvgData(timeHeatMax)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + AvgData(timeHeatMax)
+
+      !opaque surfaces - must combine individual surfaces by class and other side conditions
+      delayOpaque = 0.0
+      DO kSurf = 1,TotSurfaces
+        IF (.NOT. Surface(kSurf)%HeatTransSurf) CYCLE ! Skip non-heat transfer surfaces
+        IF (Surface(kSurf)%Zone .EQ. iZone) THEN
+          curExtBoundCond = surface(kSurf)%ExtBoundCond
+          !if exterior is other side coefficients using ground preprocessor terms then
+          !set it to ground instead of other side coefficients
+          IF (curExtBoundCond .EQ. OtherSideCoefNoCalcExt .OR. curExtBoundCond .EQ. OtherSideCoefCalcExt) THEN
+            IF (SameString(OSC(Surface(kSurf)%OSCPtr)%Name(1:17), 'surfPropOthSdCoef')) THEN
+              curExtBoundCond = Ground
+            END IF
+          END IF
+          seqData = surfDelaySeq(kSurf,:,HeatDesSelected)
+          CALL MovingAvg(seqData,NumOfTimeStepInDay,NumTimeStepsInAvg,AvgData)
+          singleSurfDelay = AvgData(timeHeatMax) * powerConversion
+          SELECT CASE (surface(kSurf)%class)
+            CASE (SurfaceClass_Wall)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rExtWall) = delayOpaque(rExtWall) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod)
+                  delayOpaque(rGrdWall) = delayOpaque(rGrdWall) + singleSurfDelay
+                CASE (OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherWall) = delayOpaque(rOtherWall) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonWall) = delayOpaque(rIntZonWall) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Floor)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rExtFlr) = delayOpaque(rExtFlr) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod)
+                  delayOpaque(rGrdFlr) = delayOpaque(rGrdFlr) + singleSurfDelay
+                CASE (OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherFlr) = delayOpaque(rOtherFlr) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonFlr) = delayOpaque(rIntZonFlr) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Roof)
+              SELECT CASE (curExtBoundCond)
+                CASE (ExternalEnvironment)
+                  delayOpaque(rRoof) = delayOpaque(rRoof) + singleSurfDelay
+                CASE (Ground,GroundFCfactorMethod,OtherSideCoefNoCalcExt,OtherSideCoefCalcExt,OtherSideCondModeledExt)
+                  delayOpaque(rOtherRoof) = delayOpaque(rOtherRoof) + singleSurfDelay
+                CASE DEFAULT !interzone
+                  delayOpaque(rIntZonCeil) = delayOpaque(rIntZonCeil) + singleSurfDelay
+              END SELECT
+            CASE (SurfaceClass_Door)
+              delayOpaque(rOpqDoor) = delayOpaque(rOpqDoor) + singleSurfDelay
+          END SELECT
+        END IF
+      END DO
+      DO k = rRoof,rOtherFlr
+        tableBody(k,cSensDelay)  = TRIM(RealToStr(delayOpaque(k),2))
+        totalColumn(k) = totalColumn(k) + delayOpaque(k)
+        grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + delayOpaque(k)
+      END DO
+      tableBody(rOpqDoor,cSensDelay) = TRIM(RealToStr(delayOpaque(rOpqDoor),2))
+      totalColumn(rOpqDoor) = totalColumn(rOpqDoor) + delayOpaque(rOpqDoor)
+      grandTotalRow(cSensDelay) = grandTotalRow(cSensDelay) + delayOpaque(rOpqDoor)
+    END IF
+
+    !GRAND TOTAL ROW
+    totalGrandTotal = 0
+    DO k = 1,cLatent
+      tableBody(rGrdTot,k)  = TRIM(RealToStr(grandTotalRow(k),2))
+      totalGrandTotal = totalGrandTotal + grandTotalRow(k)
+    END DO
+    tableBody(rGrdTot,cTotal)  = TRIM(RealToStr(totalGrandTotal,2))
+
+    !TOTAL COLUMN AND PERCENT COLUMN
+    DO k = 1,rOpqDoor !to last row before total
+      tableBody(k,cTotal) = TRIM(RealToStr(totalColumn(k),2))
+      IF (totalGrandTotal .NE. 0.0) THEN
+        tableBody(k,cPerc) = TRIM(RealToStr(100 * totalColumn(k)/totalGrandTotal,2))
+      END IF
+    END DO
+
+    CALL writeSubtitle('Estimated Heating Peak Load Components')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                        'ZoneComponentLoadSummary',&
+                                        TRIM(Zone(iZone)%Name),&
+                                        'Estimated Heating Peak Load Components')
+
+    DEALLOCATE(columnHead)
+    DEALLOCATE(rowHead)
+    DEALLOCATE(columnWidth)
+    DEALLOCATE(tableBody)
+
+    !
+    !---- Heating Peak Conditions Sub-Table
+    !
+
+
+    ALLOCATE(rowHead(10))
+    ALLOCATE(columnHead(1))
+    ALLOCATE(columnWidth(1))
+    columnWidth = 14 !array assignment - same for all columns
+    ALLOCATE(tableBody(10,1))
+
+    columnHead(1) = 'Value'
+    IF (unitsStyle .NE. unitsStyleInchPound) THEN
+      rowHead(1) = 'Time of Peak Load'
+      rowHead(2) = 'Outside  Dry Bulb Temperature [C]'
+      rowHead(3) = 'Outside  Wet Bulb Temperature [C]'
+      rowHead(4) = 'Outside Humidity Ratio at Peak [kgWater/kgAir]'
+      rowHead(5) = 'Zone Dry Bulb Temperature [C]'
+      rowHead(6) = 'Zone Relative Humdity [%]'
+      rowHead(7) = 'Zone Humidity Ratio at Peak [kgWater/kgAir]'
+      rowHead(8) = 'Peak Design Sensible Load [W]'
+      rowHead(9) = 'Estimated Instant + Delayed Sensible Load [W]'
+      rowHead(10) = 'Difference [W]'
+    ELSE
+      rowHead(1) = 'Time of Peak Load'
+      rowHead(2) = 'Outside  Dry Bulb Temperature [F]'
+      rowHead(3) = 'Outside  Wet Bulb Temperature [F]'
+      rowHead(4) = 'Outside Humidity Ratio at Peak [lbWater/lbAir]'
+      rowHead(5) = 'Zone Dry Bulb Temperature [F]'
+      rowHead(6) = 'Zone Relative Humdity [%]'
+      rowHead(7) = 'Zone Humidity Ratio at Peak [lbWater/lbAir]'
+      rowHead(8) = 'Peak Design Sensible Load [Btu/h]'
+      rowHead(9) = 'Estimated Instant + Delayed Sensible Load [Btu/h]'
+      rowHead(10) = 'Difference [Btu/h]'
+    END IF
+
+    tableBody = ''
+
+    IF (timeHeatMax .NE. 0) THEN
+       !Time of Peak Load
+      tableBody(1,1) = TRIM(HeatPeakDateHrMin(iZone))
+
+      !Outside  Dry Bulb Temperature
+      tableBody(2,1) = TRIM(RealToStr(convertIP(tempConvIndx,CalcFinalZoneSizing(iZone)%HeatOutTempSeq(timeHeatMax)),2))
+
+      !Outside  Wet Bulb Temperature
+      !use standard sea level air pressure because air pressure is not tracked with sizing data
+      IF (CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .LT. 1.0 .AND.       &
+          CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax) .GT. 0.0) THEN
+        tableBody(3,1) = TRIM(RealToStr(convertIP(tempConvIndx, &
+                                       PsyTwbFnTdbWPb(CalcFinalZoneSizing(iZone)%HeatOutTempSeq(timeHeatMax), &
+                                       CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax), &
+                                       101325.0d0))  ,2))
+      END IF
+
+      !Humidity Ratio at Peak
+      tableBody(4,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%HeatOutHumRatSeq(timeHeatMax),5))
+
+      !Zone Dry Bulb Temperature
+      tableBody(5,1) = TRIM(RealToStr(convertIP(tempConvIndx,CalcFinalZoneSizing(iZone)%HeatZoneTempSeq(timeHeatMax)),2))
+
+      !Zone Relative Temperature
+      !use standard sea level air pressure because air pressure is not tracked with sizing data
+      tableBody(6,1) = TRIM(RealToStr(100 * PsyRhFnTdbWPb(CalcFinalZoneSizing(iZone)%HeatZoneTempSeq(timeHeatMax), &
+                                                     CalcFinalZoneSizing(iZone)%HeatZoneHumRatSeq(timeHeatMax), &
+                                                     101325.0d0)  ,2))
+
+      !Zone Relative Humdity
+      tableBody(7,1) = TRIM(RealToStr(CalcFinalZoneSizing(iZone)%HeatZoneHumRatSeq(timeHeatMax),5))
+
+    END IF
+
+    !Peak Design Sensible Load
+    tableBody(8,1) = TRIM(RealToStr(-CalcFinalZoneSizing(iZone)%DesHeatLoad * powerConversion,2))    !change sign
+
+    !Estimated Instant + Delayed Sensible Load
+    tableBody(9,1) = TRIM(RealToStr(grandTotalRow(cSensInst) + grandTotalRow(cSensDelay),2))
+
+    !Difference
+    tableBody(10,1) = TRIM(RealToStr(-CalcFinalZoneSizing(iZone)%DesHeatLoad * powerConversion &
+                             - (grandTotalRow(cSensInst) + grandTotalRow(cSensDelay)),2))
+
+    CALL writeSubtitle('Heating Peak Conditions')
+    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+                                        'ZoneComponentLoadSummary',&
+                                        TRIM(Zone(iZone)%Name),&
+                                        'Heating Peak Conditions')
+
+    DEALLOCATE(columnHead)
+    DEALLOCATE(rowHead)
+    DEALLOCATE(columnWidth)
+    DEALLOCATE(tableBody)
+
+!    !
+!    !---- Radiant to Convective Decay Curves for Heating
+!    !
+!    numObj = 0
+!    !determine the number of surfaces to include
+!    DO kSurf = 1, TotSurfaces
+!      ZoneNum = Surface(kSurf)%Zone
+!      IF (ZoneNum .NE. iZone) CYCLE
+!      IF (ZoneNum .EQ. 0) CYCLE
+!      IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+!      numObj = numObj + 1
+!    END DO
+!
+!    ALLOCATE(rowHead(numObj))
+!    ALLOCATE(columnHead(16))
+!    ALLOCATE(columnWidth(16))
+!    columnWidth = 14 !array assignment - same for all columns
+!    ALLOCATE(tableBody(numObj,16))
+!
+!    columnHead(1) = 'Time 1'
+!    columnHead(2) = 'Time 2'
+!    columnHead(3) = 'Time 3'
+!    columnHead(4) = 'Time 4'
+!    columnHead(5) = 'Time 5'
+!    columnHead(6) = 'Time 6'
+!    columnHead(7) = 'Time 7'
+!    columnHead(8) = 'Time 8'
+!    columnHead(9) = 'Time 9'
+!    columnHead(10) = 'Time 10'
+!    columnHead(11) = 'Time 11'
+!    columnHead(12) = 'Time 12'
+!    columnHead(13) = 'Time 13'
+!    columnHead(14) = 'Time 14'
+!    columnHead(15) = 'Time 15'
+!    columnHead(16) = 'Time 16'
+!
+!    tableBody = ''
+!    objCount = 0
+!    DO kSurf = 1, TotSurfaces
+!      ZoneNum = Surface(kSurf)%Zone
+!      IF (ZoneNum .NE. iZone) CYCLE
+!      IF (ZoneNum .EQ. 0) CYCLE
+!      IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+!      objCount = objCount + 1
+!      rowHead(objCount) = TRIM(Surface(kSurf)%Name)
+!      DO jTime = 1, 16
+!        tableBody(objCount,jTime) = TRIM(RealToStr(decayCurveHeat(kSurf,jTime),3))
+!      END DO
+!    END DO
+!
+!    CALL writeSubtitle('Radiant to Convective Decay Curves for Heating')
+!    CALL writeTable(tableBody,rowHead,columnHead,columnWidth)
+!    CALL CreateSQLiteTabularDataRecords(tableBody,rowHead,columnHead,&
+!                                        'ZoneComponentLoadDetail',&
+!                                        TRIM(Zone(iZone)%Name),&
+!                                        'Radiant to Convective Decay Curves for Heating')
+!
+!    DEALLOCATE(columnHead)
+!    DEALLOCATE(rowHead)
+!    DEALLOCATE(columnWidth)
+!    DEALLOCATE(tableBody)
+
+    ! Put the decay curve into the EIO file
+    IF (ShowDecayCurvesInEIO) THEN
+      DO kSurf = 1, TotSurfaces
+        ZoneNum = Surface(kSurf)%Zone
+        IF (ZoneNum .NE. iZone) CYCLE
+        IF (ZoneNum .EQ. 0) CYCLE
+        IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
+        WRITE (OutputFileInits, '(4A)',ADVANCE='NO')  'Radiant to Convective Decay Curves for Heating,', &
+                                       TRIM(Zone(iZone)%Name),',',TRIM(Surface(kSurf)%Name)
+        DO jTime = 1, MIN(NumOfTimeStepInHour*24,36)
+          WRITE(OutputFileInits,'(A,F6.3)',ADVANCE='NO') ',', decayCurveHeat(kSurf,jTime)
+        END DO
+        WRITE(OutputFileInits,'()',ADVANCE='YES') !put a line feed at the end of the line
+      END DO
+    END IF
+
+  END DO
+END IF
+
+END SUBROUTINE WriteZoneLoadComponentTable
+
+
 SUBROUTINE WriteReportHeaders(reportName,objectName,averageOrSum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Jason Glazer
@@ -10111,8 +12880,19 @@ DO iStyle = 1, numStyles
       WRITE(curFH,fmta) '<p>For:<b>'         // curDel //TRIM(objectName) //'</b></p>'
       WRITE(curFH,TimeStampFmt1) "<p>Timestamp: <b>", td(1),'-', td(2),'-',td(3)
       WRITE(curFH,TimeStampFmt2) '  ',td(5),':', td(6),':',td(7),'</b></p>'
+    CASE (tableStyleXML)
+      IF (LEN_TRIM(prevReportName) .NE. 0) THEN
+        WRITE(curFH,fmta) '</' // TRIM(prevReportName) //'>'  !close the last element if it was used.
+      END IF
+      WRITE(curFH,fmta) '<' // TRIM(ConvertToElementTag(modifiedReportName)) //'>'
+      WRITE(curFH,fmta) '  <for>' //TRIM(objectName) //'</for>'
+      prevReportName = ConvertToElementTag(modifiedReportName) !save the name for next time
   END SELECT
 END DO
+!clear the active subtable name for the XML reporting
+activeSubTableName = ''
+!save the report name if the subtable name is not available during XML processing
+activeReportName = modifiedReportName
 END SUBROUTINE WriteReportHeaders
 
 SUBROUTINE writeSubtitle(subtitle)
@@ -10148,6 +12928,10 @@ DO iStyle = 1, numStyles
       WRITE(TabularOutputFile(iStyle),fmta) ''
     CASE (tableStyleHTML)
       WRITE(TabularOutputFile(iStyle),fmta) '<b>'// TRIM(subtitle) // '</b><br><br>'
+    CASE (tableStyleXML)
+      !save the active subtable name for the XML reporting
+      activeSubTableName = subtitle
+      !no other output is needed since writeTable uses the subtable name for each record.
   END SELECT
 END DO
 END SUBROUTINE WriteSubtitle
@@ -10184,11 +12968,15 @@ DO iStyle = 1, numStyles
       WRITE(TabularOutputFile(iStyle),fmta) TRIM(lineOfText)
     CASE (tableStyleHTML)
       WRITE(TabularOutputFile(iStyle),fmta) TRIM(lineOfText) // '<br>'
+    CASE (tableStyleXML)
+      IF (LEN_TRIM(lineOfText) .NE. 0) THEN
+        WRITE(TabularOutputFile(iStyle),fmta) '<note>' // TRIM(lineOfText) // '</note>'
+      END IF
   END SELECT
 END DO
 END SUBROUTINE writeTextLine
 
-SUBROUTINE WriteTable(body,rowLabels,columnLabels,widthColumn,footnoteText)
+SUBROUTINE WriteTable(body,rowLabels,columnLabels,widthColumn,transposeXML,footnoteText)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Jason Glazer
           !       DATE WRITTEN   August 2003
@@ -10197,7 +12985,7 @@ SUBROUTINE WriteTable(body,rowLabels,columnLabels,widthColumn,footnoteText)
 
           ! PURPOSE OF THIS SUBROUTINE:
           !   Output a table to the tabular output file in the selected
-          !   style (comma, tab, space, html).
+          !   style (comma, tab, space, html, xml).
           !
           !   The widthColumn array is only used for fixed space formatted reports
           !   if columnLables contain a vertical bar '|', they are broken into multiple
@@ -10217,6 +13005,7 @@ CHARACTER(len=*),INTENT(IN),DIMENSION(:,:)    :: body  ! row,column
 CHARACTER(len=*),INTENT(IN),DIMENSION(:)      :: rowLabels
 CHARACTER(len=*),INTENT(IN),DIMENSION(:)      :: columnLabels
 INTEGER,INTENT(INOUT),DIMENSION(:)               :: widthColumn
+LOGICAL,INTENT(IN),OPTIONAL                   :: transposeXML
 CHARACTER(len=*),INTENT(IN),OPTIONAL          :: footnoteText
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -10231,7 +13020,13 @@ CHARACTER(len=*), PARAMETER :: blank=' '
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 CHARACTER(len=MaxNameLength*2),DIMENSION(:,:), ALLOCATABLE  :: colLabelMulti
-CHARACTER(len=1000)                                       :: workColumn
+CHARACTER(len=1000)                                         :: workColumn
+CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE       :: rowLabelTags
+CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE       :: columnLabelTags
+CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE       :: rowUnitStrings
+CHARACTER(len=MaxNameLength),DIMENSION(:),ALLOCATABLE       :: columnUnitStrings
+CHARACTER(len=MaxNameLength),DIMENSION(:,:),ALLOCATABLE       :: bodyEsc
+
 INTEGER :: numColLabelRows
 INTEGER :: maxNumColLabelRows
 INTEGER :: widthRowLabel
@@ -10253,8 +13048,17 @@ CHARACTER(LEN=1000) :: spaces
 INTEGER :: iStyle
 INTEGER :: curFH
 CHARACTER(LEN=1)    :: curDel
+CHARACTER(len=MaxNameLength) :: tagWithAttrib
 integer :: col1start
+LOGICAL :: doTransposeXML
+LOGICAL :: isTableBlank
+LOGICAL :: isRecordBlank
 
+IF (Present(transposeXML)) THEN
+  doTransposeXML = transposeXML
+ELSE
+  doTransposeXML = .FALSE. !if not present assume that the XML table should not be transposed
+END IF
 ! create blank string
 spaces = blank ! REPEAT(' ',1000)
 ! get sizes of arrays
@@ -10276,6 +13080,12 @@ IF ((colsBody .NE. colsColumnLabels) .OR. (colsBody .NE.colsWidthColumn))  THEN
   colsWidthColumn = colsBody
   colsColumnLabels = colsBody
 ENDIF
+! create arrays to hold the XML tags
+ALLOCATE(rowLabelTags(rowsBody))
+ALLOCATE(columnLabelTags(colsBody))
+ALLOCATE(rowUnitStrings(rowsBody))
+ALLOCATE(columnUnitStrings(colsBody))
+ALLOCATE(bodyEsc(rowsBody,colsBody))
 ! create new array to hold multiple line column lables
 ALLOCATE(colLabelMulti(50,colsColumnLabels))
 colLabelMulti = blank  !set array to blank
@@ -10428,7 +13238,136 @@ DO iStyle = 1, numStyles
         END IF
       END IF
       WRITE(curFH,fmta) '<br><br>'
-
+    CASE (tableStyleXML)
+      !check if entire table is blank and it if is skip generating anything
+      isTableBlank = .TRUE.
+      DO jRow = 1, rowsBody
+        DO iCol = 1, colsBody
+          IF (LEN_TRIM(body(jRow, iCol)) .GT. 0) THEN
+            isTableBlank = .FALSE.
+            EXIT
+          END IF
+        END DO
+        IF (.NOT. isTableBlank) EXIT
+      END DO
+      ! if non-blank cells in the table body were found create the table.
+      IF (.NOT. isTableBlank) THEN
+        !if report name and subtable name the same add "record" to the end
+        activeSubTableName = ConvertToElementTag(activeSubTableName)
+        activeReportName = ConvertToElementTag(activeReportName)
+        IF (SameString(activeSubTableName,activeReportName)) THEN
+          activeSubTableName = TRIM(activeSubTableName) // 'Record'
+        END IF
+        !if no subtable name use the report name and add "record" to the end
+        IF (LEN_TRIM(activeSubTableName) .EQ. 0) THEN
+          activeSubTableName = TRIM(activeReportName) // 'Record'
+        END IF
+        ! if a single column table, transpose it automatically
+        IF ((colsBody .EQ. 1) .AND. (rowsBody .GT. 1)) THEN
+          doTransposeXML = .TRUE.
+        END IF
+        ! first convert all row and column headers into tags compatible with XML strings
+        DO jRow = 1, rowsBody
+          rowLabelTags(jRow) = ConvertToElementTag(rowLabels(jRow))
+          rowUnitStrings(jRow) = GetUnitSubString(rowLabels(jRow))
+          IF (SameString(rowUnitStrings(jRow),'Invalid/Undefined')) THEN
+            rowUnitStrings(jRow) = ''
+          END IF
+        END DO
+        DO iCol = 1, colsBody
+          columnLabelTags(iCol) = ConvertToElementTag(columnLabels(iCol))
+          columnUnitStrings(iCol) = GetUnitSubString(columnLabels(iCol))
+          IF (SameString(columnUnitStrings(iCol),'Invalid/Undefined')) THEN
+            columnUnitStrings(iCol) = ''
+          END IF
+        END DO
+        ! convert entire table body to one with escape characters (no " ' < > &)
+        DO jRow = 1, rowsBody
+          DO iCol = 1, colsBody
+            bodyEsc(jRow,iCol) = ConvertToEscaped(body(jRow,iCol))
+          END DO
+        END DO
+        IF (.NOT. doTransposeXML) THEN
+          ! body with row headers
+          DO jRow = 1, rowsBody
+            !check if record is blank and it if is skip generating anything
+            isRecordBlank = .TRUE.
+            DO iCol = 1, colsBody
+              IF (LEN_TRIM(bodyEsc(jRow, iCol)) .GT. 0) THEN
+                isRecordBlank = .FALSE.
+                EXIT
+              END IF
+            END DO
+            IF (.NOT. isRecordBlank) THEN
+              WRITE(curFH,fmta) '  <' // TRIM(activeSubTableName) // '>'
+              IF (LEN_TRIM(rowLabelTags(jRow)) .GT. 0) THEN
+                WRITE(curFH, fmta) '    <name>' // TRIM(rowLabelTags(jRow)) // '</name>'
+              ENDIF
+              DO iCol = 1, colsBody
+                IF (LEN_TRIM(ADJUSTL(bodyEsc(jRow, iCol))) .GT. 0) THEN !skip blank cells
+                  tagWithAttrib = '<' // TRIM(columnLabelTags(iCol))
+                  IF (LEN_TRIM(columnUnitStrings(iCol)) .GT. 0) THEN
+                    tagWithAttrib = TRIM(tagWithAttrib) // &
+                                    ' units=' // CHAR(34) // TRIM(columnUnitStrings(iCol)) // CHAR(34) &
+                                    // '>' !if units are present add them as an attribute
+                  ELSE
+                    tagWithAttrib = TRIM(tagWithAttrib) //  '>'
+                  ENDIF
+                  WRITE(curFH, fmta) '    ' // TRIM(tagWithAttrib) // &
+                                      TRIM(ADJUSTL(bodyEsc(jRow, iCol))) // &
+                                      '</' // TRIM(columnLabelTags(iCol)) // '>'
+                END IF
+              END DO
+              WRITE(curFH,fmta) '  </' // TRIM(activeSubTableName) // '>'
+            END IF
+          END DO
+        ELSE !transpose XML table
+          ! body with row headers
+          DO iCol = 1, colsBody
+            !check if record is blank and it if is skip generating anything
+            isRecordBlank = .TRUE.
+            DO jRow = 1, rowsBody
+              IF (LEN_TRIM(bodyEsc(jRow, iCol)) .GT. 0) THEN
+                isRecordBlank = .FALSE.
+                EXIT
+              END IF
+            END DO
+            IF (.NOT. isRecordBlank) THEN
+              WRITE(curFH,fmta) '  <' // TRIM(activeSubTableName) // '>'
+              ! if the column has units put them into the name tag
+              IF (LEN_TRIM(columnLabelTags(iCol)) .GT. 0) THEN
+                IF (LEN_TRIM(columnUnitStrings(iCol)) .GT. 0) THEN
+                  WRITE(curFH, fmta) '    <name units=' // CHAR(34) // TRIM(columnUnitStrings(iCol)) // CHAR(34) &
+                                      // '>' // TRIM(columnLabelTags(iCol)) // '</name>'
+                ELSE
+                  WRITE(curFH, fmta) '    <name>' // TRIM(columnLabelTags(iCol)) // '</name>'
+                END IF
+              ENDIF
+              DO jRow = 1, rowsBody
+                IF (LEN_TRIM(bodyEsc(jRow, iCol)) .GT. 0) THEN !skip blank cells
+                  tagWithAttrib = '<' // TRIM(rowLabelTags(jRow))
+                  IF (LEN_TRIM(rowUnitStrings(jRow)) .GT. 0) THEN
+                    tagWithAttrib = TRIM(tagWithAttrib) // &
+                                    ' units=' // CHAR(34) // TRIM(rowUnitStrings(jRow)) // CHAR(34) &
+                                    // '>' !if units are present add them as an attribute
+                  ELSE
+                    tagWithAttrib = TRIM(tagWithAttrib) //  '>'
+                  ENDIF
+                  WRITE(curFH, fmta) '    ' // TRIM(tagWithAttrib) // &
+                                      TRIM(ADJUSTL(bodyEsc(jRow, iCol))) // &
+                                      '</' // TRIM(rowLabelTags(jRow)) // '>'
+                END IF
+              END DO
+              WRITE(curFH,fmta) '  </' // TRIM(activeSubTableName) // '>'
+            END IF
+          END DO
+        END IF
+        IF (PRESENT(footnoteText)) THEN
+          IF (LEN_TRIM(footnoteText) .GT. 0) THEN
+            WRITE(curFH, fmta) '  <footnote>' // TRIM(footnoteText) // '</footnote>'
+          END IF
+        END IF
+      END IF
     CASE DEFAULT
 
   END SELECT
@@ -10531,6 +13470,143 @@ DO WHILE (loc .GT. 0)
 END DO
 END FUNCTION InsertCurrencySymbol
 
+FUNCTION ConvertToElementTag(inString) RESULT (outString)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   February 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Convert report column or row header into a tag string
+          !   that just has A-Z, a-z, or 0-1 characters and is
+          !   shown in camelCase.
+
+          ! METHODOLOGY EMPLOYED:
+          !   na
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+CHARACTER(len=*), INTENT(IN) :: inString             ! Input String
+CHARACTER(len=LEN(inString)) :: outString            ! Result String
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iIn   !index through the string
+INTEGER :: jOut  !index of the output string
+INTEGER :: curCharVal !ascii value of current character
+LOGICAL :: foundOther !flag if character found besides A-Z, a-z, 0-9
+
+outString = " "
+jOut = 0
+foundOther = .TRUE.
+DO iIn = 1,LEN_TRIM(inString)
+  curCharVal = ICHAR(inString(iIn:iIn))
+  SELECT CASE (curCharVal)
+    CASE (65:90)  !A-Z upper case
+      jOut = jOut + 1
+      IF (foundOther) THEN
+        outString(jOut:jOut) = CHAR(curCharVal) !keep as upper case after finding a space or another character
+      ELSE
+        outString(jOut:jOut) = CHAR(curCharVal + 32) !convert to lower case
+      ENDIF
+      foundOther = .FALSE.
+    CASE (97:122) !A-Z lower case
+      jOut = jOut + 1
+      IF (foundOther) THEN
+        outString(jOut:jOut) = CHAR(curCharVal - 32) !convert to upper case
+      ELSE
+        outString(jOut:jOut) = CHAR(curCharVal) !leave as lower case
+      ENDIF
+      foundOther = .FALSE.
+    CASE (48:57)   !0-9 numbers
+      jOut = jOut + 1
+      ! if first character is a number then prepend with the letter "t"
+      IF (jOut .EQ. 1) THEN
+        outString(1:1) = 't'
+        jOut = 2
+      END IF
+      outString(jOut:jOut) = CHAR(curCharVal)
+      foundOther = .FALSE.
+    CASE (91) ! [ bracket
+      EXIT !stop parsing because unit string was found
+    CASE DEFAULT
+      foundOther = .TRUE.
+  END SELECT
+END DO
+END FUNCTION ConvertToElementTag
+
+FUNCTION ConvertToEscaped(inString) RESULT (outString)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   February 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Convert to XML safe escaped character string
+          !   so it excludes:
+          !               " ' < > &
+
+          ! METHODOLOGY EMPLOYED:
+          !   na
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+CHARACTER(len=*), INTENT(IN) :: inString             ! Input String
+CHARACTER(len=LEN(inString)) :: outString            ! Result String
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iIn   !index through the string
+INTEGER :: jOut  !index of the output string
+INTEGER :: curCharVal !ascii value of current character
+
+outString = " "
+jOut = 0
+DO iIn = 1,LEN_TRIM(inString)
+  curCharVal = ICHAR(inString(iIn:iIn))
+  SELECT CASE (curCharVal)
+    CASE (34)  !  "
+      jOut = jOut + 6
+      outString(jOut-5:jOut) = '&quot;'
+    CASE (38) !   &
+      jOut = jOut + 5
+      outString(jOut-4:jOut) = '&amp;'
+    CASE (39) !   '
+      jOut = jOut + 6
+      outString(jOut-6:jOut) = '&apos;'
+    CASE (60) !   <
+      jOut = jOut + 4
+      outString(jOut-3:jOut) = '&lt;'
+    CASE (62) !   >
+      jOut = jOut + 4
+      outString(jOut-3:jOut) = '&gt;'
+    CASE (176) !   degree
+      jOut = jOut + 1
+      outString(jOut:jOut) = '*' !replace degree symbol with asterisk to avoid errors from various XML editors
+    CASE DEFAULT !most characters are fine
+      jOut = jOut + 1
+      outString(jOut:jOut) = CHAR(curCharVal)
+  END SELECT
+END DO
+END FUNCTION ConvertToEscaped
 
 
 SUBROUTINE DetermineBuildingFloorArea
@@ -10982,7 +14058,7 @@ ELSE
     CopyOfTOCEntries = TOCEntries
     DEALLOCATE(TOCEntries)
     ! double the size of the array
-    ALLOCATE(TOCEntries(TOCEntriesSize * 2))
+    ALLOCATE(TOCEntries(TOCEntriesSize + 20))
     TOCEntries(1:TOCEntriesSize) = CopyOfTOCEntries
     DEALLOCATE(CopyOfTOCEntries)
     TOCEntriesSize = TOCEntriesSize * 2
@@ -11027,7 +14103,7 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           !    na
-UnitConvSize = 91
+UnitConvSize = 94
 ALLOCATE(UnitConv(UnitConvSize))
 UnitConv(1)%siName = '%'
 UnitConv(2)%siName = '°C'
@@ -11119,7 +14195,10 @@ UnitConv(87)%siName = 'GJ'
 UnitConv(88)%siName = 'GJ'
 UnitConv(89)%siName = 'GJ'
 UnitConv(90)%siName = 'GJ'
-UnitConv(91)%siName = 'Invalid/Undefined'
+UnitConv(91)%siName = 'MJ/m2'
+UnitConv(92)%siName = 'MJ/m2'
+UnitConv(93)%siName = 'MJ/m2'
+UnitConv(94)%siName = 'Invalid/Undefined'
 
 UnitConv(1)%ipName = '%'
 UnitConv(2)%ipName = 'F'
@@ -11211,7 +14290,10 @@ UnitConv(87)%ipName = 'therm'
 UnitConv(88)%ipName = 'MMBtu'
 UnitConv(89)%ipName = 'Wh'
 UnitConv(90)%ipName = 'ton-hrs'
-UnitConv(91)%ipName = 'Invalid/Undefined'
+UnitConv(91)%ipName = 'kWh/ft2'
+UnitConv(92)%ipName = 'kBtu/ft2'
+UnitConv(93)%ipName = 'kBtu/ft2'
+UnitConv(94)%ipName = 'Invalid/Undefined'
 
 UnitConv(1)%mult = 1.d0
 UnitConv(2)%mult = 1.8d0
@@ -11303,7 +14385,10 @@ UnitConv(87)%mult = 0.0000000094845d0 * 1000000000d0
 UnitConv(88)%mult = 0.00000000094845d0 * 1000000000d0
 UnitConv(89)%mult = 0.000277777777777778d0 * 1000000000d0
 UnitConv(90)%mult = 0.0000000789847d0 * 1000000000d0
-UnitConv(91)%mult = 1.0d0
+UnitConv(91)%mult = 0.277777777777778d0/10.764961d0
+UnitConv(92)%mult = 0.94708628903179d0/10.764961d0
+UnitConv(93)%mult = 0.94708628903179d0/10.764961d0
+UnitConv(94)%mult = 1.0d0
 
 
 UnitConv(2)%offset = 32.d0
@@ -11324,6 +14409,9 @@ UnitConv(85)%hint = 'CONSUMP'
 UnitConv(86)%hint = 'ELEC'
 UnitConv(87)%hint = 'GAS'
 UnitConv(90)%hint = 'COOL'
+UnitConv(91)%hint = 'ELEC'
+UnitConv(92)%hint = 'GAS'
+UnitConv(92)%hint = 'ADDITIONAL'
 
 UnitConv(19)%several = .TRUE.
 UnitConv(20)%several = .TRUE.
@@ -11367,7 +14455,54 @@ UnitConv(87)%several = .TRUE.
 UnitConv(88)%several = .TRUE.
 UnitConv(89)%several = .TRUE.
 UnitConv(90)%several = .TRUE.
+UnitConv(91)%several = .TRUE.
+UnitConv(92)%several = .TRUE.
 END SUBROUTINE SetupUnitConversions
+
+FUNCTION GetUnitSubString(inString) RESULT (outUnit)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   February 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   return the substring contained in brackets []
+          !   that contains the units.
+
+          ! METHODOLOGY EMPLOYED:
+          !   na
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+CHARACTER(len=*), INTENT(IN) :: inString             ! Input String
+CHARACTER(len=LEN(inString)) :: outUnit             ! Result String
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+
+INTEGER :: posLBrac
+INTEGER :: posRBrac
+
+outUnit = " "
+!check if string has brackets or parentheses
+posLBrac = INDEX(inString, '[')  ! left bracket
+posRBrac = INDEX(inString, ']')  ! right bracket
+!extract the substring with the units
+IF ((posLBrac .GT. 0) .AND. (posRBrac .GT. 0) .AND. ((posRBrac - posLBrac) .GE. 2)) THEN
+  outUnit = inString(posLBrac+1:posRBrac-1)
+ELSE
+  outUnit = " "
+END IF
+END FUNCTION GetUnitSubString
 
 SUBROUTINE LookupSItoIP(stringInWithSI,unitConvIndex,stringOutWithIP)
           ! SUBROUTINE INFORMATION:
@@ -11401,9 +14536,9 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-CHARACTER(len=MaxNameLength), INTENT(IN) :: stringInWithSI
-INTEGER,INTENT(OUT)                      :: unitConvIndex
-CHARACTER(len=MaxNameLength), INTENT(OUT) :: stringOutWithIP
+CHARACTER(len=*), INTENT(IN)  :: stringInWithSI
+INTEGER,INTENT(OUT)           :: unitConvIndex
+CHARACTER(len=*), INTENT(OUT) :: stringOutWithIP
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           !    na
@@ -11429,7 +14564,7 @@ INTEGER :: iUnit = 0
 INTEGER :: defaultConv = 0
 INTEGER :: foundConv = 0
 INTEGER :: firstOfSeveral = 0
-CHARACTER(len=MaxNameLength) :: stringInUpper
+CHARACTER(len=MaxNameLength*2) :: stringInUpper  ! *2 to take care of >100 characters in string.
 INTEGER :: selectedConv = 0
 
 stringOutWithIP = ''
@@ -11514,12 +14649,14 @@ REAL(r64) FUNCTION ConvertIP(unitConvIndex,SIvalue)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   February 13, 2009
-          !    MODIFIED       na
+          !    MODIFIED       September 2012
           !    RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
           !   Apply the selected unit conversion to the input value
           !   expressed in SI units to result in IP units.
+          !   If zero is provided as unit index, return the original
+          !   value (no conversion)
 
           ! METHODOLOGY EMPLOYED:
 
@@ -11544,8 +14681,9 @@ REAL(r64), INTENT(IN)                   :: SIvalue
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           !    na
-
-IF ((unitConvIndex .GT. 0) .AND. (unitConvIndex .LE. UnitConvSize)) THEN
+IF (unitConvIndex .EQ. 0) THEN
+  ConvertIP = SIvalue
+ELSEIF ((unitConvIndex .GT. 0) .AND. (unitConvIndex .LE. UnitConvSize)) THEN
   ConvertIP = (SIvalue * UnitConv(unitConvIndex)%mult) + UnitConv(unitConvIndex)%offset
 ELSE
   ConvertIP = 0
@@ -11765,9 +14903,65 @@ ELSE
 END IF
 END FUNCTION getSpecificUnitDivider
 
+REAL(r64) FUNCTION getSpecificUnitIndex(SIunit,IPunit)
+          ! SUBROUTINE INFORMATION:
+          !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
+          !    DATE WRITTEN   September 21, 2012
+          !    MODIFIED       na
+          !    RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Return of the unit conversion index for a specific
+          !   SI to IP unit conversion.
+          !
+          !   Unlike LookupSItoIP, this function does not expect more
+          !   the units in the two input parameters. No hints or
+          !   defaults are used since both the SI and IP units are
+          !   input by the user.
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+          !    na
+
+          ! USE STATEMENTS:
+IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+CHARACTER(len=*), INTENT(IN) :: SIunit
+CHARACTER(len=*), INTENT(IN) :: IPunit
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          !    na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          !    na
+
+          ! DERIVED TYPE DEFINITIONS:
+          !    na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: found = 0
+INTEGER :: iUnit = 0
+
+DO iUnit = 1,UnitConvSize
+  IF (SameString(UnitConv(iUnit)%siName,SIunit)) THEN
+    IF (SameString(UnitConv(iUnit)%ipName,IPunit)) THEN
+      found = iUnit
+      EXIT
+    END IF
+  END IF
+END DO
+IF (found .NE. 0) THEN
+  getSpecificUnitIndex = found
+ELSE
+  getSpecificUnitIndex = 0
+END IF
+END FUNCTION getSpecificUnitIndex
+
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -582,7 +582,7 @@ CurveNum=0
 ! Loop over biquadratic curves and load data
 CurrentModuleObject='Curve:Biquadratic'
 DO CurveIndex=1,NumBiQuad
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -661,7 +661,7 @@ END DO
 ! Loop over cubic curves and load data
 CurrentModuleObject='Curve:Cubic'
 DO CurveIndex=1,NumCubic
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -723,7 +723,7 @@ END DO
 ! Loop over quadrinomial curves and load data
 CurrentModuleObject='Curve:Quartic'
 DO CurveIndex=1,NumQuartic
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -786,7 +786,7 @@ END DO
 ! Loop over quadratic curves and load data
 CurrentModuleObject='Curve:Quadratic'
 DO CurveIndex=1,NumQuad
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -847,7 +847,7 @@ END DO
 ! Loop over quadratic-linear curves and load data
 CurrentModuleObject='Curve:QuadraticLinear'
 DO CurveIndex=1,NumQuadLinear
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -924,7 +924,7 @@ END DO
 ! Loop over linear curves and load data
 CurrentModuleObject='Curve:Linear'
 DO CurveIndex=1,NumLinear
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -983,7 +983,7 @@ END DO
 ! Loop over bicubic curves and load data
 CurrentModuleObject='Curve:Bicubic'
 DO CurveIndex=1,NumBicubic
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1064,7 +1064,7 @@ END DO
 ! Loop over Triquadratic curves and load data
 CurrentModuleObject='Curve:Triquadratic'
 DO CurveIndex=1,NumTriQuad
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1179,7 +1179,7 @@ END DO
 ! Loop over quad linear curves and load data
 CurrentModuleObject='Curve:QuadLinear'
 DO CurveIndex=1,NumQLinear
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1287,7 +1287,7 @@ END DO
 ! Loop over Exponent curves and load data
 CurrentModuleObject='Curve:Exponent'
 DO CurveIndex=1,NumExponent
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1341,7 +1341,7 @@ END DO
 ! cpw22Aug2010 Loop over Fan Pressure Rise curves and load data - udated 15Sep2010 for unit types
 CurrentModuleObject='Curve:FanPressureRise'
 DO CurveIndex=1,NumFanPressRise
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1400,7 +1400,7 @@ END DO !Fan Pressure Rise
 ! cpw22Aug2010 Loop over Exponential Skew Normal curves and load data
 CurrentModuleObject='Curve:ExponentialSkewNormal'
 DO CurveIndex=1,NumExpSkewNorm
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1463,7 +1463,7 @@ END DO !Exponential Skew Normal
 ! cpw22Aug2010 Loop over Sigmoid curves and load data
 CurrentModuleObject='Curve:Sigmoid'
 DO CurveIndex=1,NumSigmoid
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1527,7 +1527,7 @@ END DO !Sigmoid
 ! cpw22Aug2010 Loop over Rectangular Hyperbola Type 1 curves and load data
 CurrentModuleObject='Curve:RectangularHyperbola1'
 DO CurveIndex=1,NumRectHyper1
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1589,7 +1589,7 @@ END DO !Rectangular Hyperbola Type 1
 ! cpw22Aug2010 Loop over Rectangular Hyperbola Type 2 curves and load data
 CurrentModuleObject='Curve:RectangularHyperbola2'
 DO CurveIndex=1,NumRectHyper2
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1651,7 +1651,7 @@ END DO !Rectangular Hyperbola Type 2
 ! cpw22Aug2010 Loop over Exponential Decay curves and load data
 CurrentModuleObject='Curve:ExponentialDecay'
 DO CurveIndex=1,NumExpDecay
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1714,7 +1714,7 @@ END DO !Exponential Decay
 ! ykt July,2011 Loop over DoubleExponential Decay curves and load data
 CurrentModuleObject='Curve:DoubleExponentialDecay'
 DO CurveIndex=1,NumDoubleExpDecay
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   IsNotOK=.FALSE.
@@ -1779,7 +1779,7 @@ TableNum = 0
 ! Loop over one variable tables and load data
 CurrentModuleObject='Table:OneIndependentVariable'
 DO CurveIndex=1,NumOneVarTab
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   TableNum = TableNum + 1
@@ -1971,7 +1971,7 @@ END DO
 ! Loop over two variable tables and load data
 CurrentModuleObject='Table:TwoIndependentVariables'
 DO CurveIndex=1,NumTwoVarTab
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
   TableNum = TableNum + 1
@@ -2246,7 +2246,7 @@ END DO
 CurrentModuleObject='Table:MultiVariableLookup'
 TableNum = NumTables
 DO CurveIndex=1,NumMultVarLookup
-  CALL GetObjectItem(TRIM(CurrentModuleObject),CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+  CALL GetObjectItem(CurrentModuleObject,CurveIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks,AlphaFieldnames=cAlphaFieldNames, &
                 NumericFieldNames=cNumericFieldNames)
   CurveNum = CurveNum+1
@@ -2577,97 +2577,97 @@ SUBROUTINE InitCurveReporting
       CASE(CurveType_TableMultiIV)
         SELECT CASE(TableLookup(PerfCurve(CurveIndex)%TableIndex)%NumIndependentVars)
           CASE(1) !- 1 independent variable
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(2) !- 2 independent variables
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(3) !- 3 independent variables
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 3 []',PerfCurve(CurveIndex)%CurveInput3, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(4) !- 4 independent variables
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 3 []',PerfCurve(CurveIndex)%CurveInput3, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 4 []',PerfCurve(CurveIndex)%CurveInput4, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 4 Value []',PerfCurve(CurveIndex)%CurveInput4, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(5) !- 5 independent variables
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 3 []',PerfCurve(CurveIndex)%CurveInput3, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 4 []',PerfCurve(CurveIndex)%CurveInput4, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 4 Value []',PerfCurve(CurveIndex)%CurveInput4, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 5 []',PerfCurve(CurveIndex)%CurveInput5, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 5 Value []',PerfCurve(CurveIndex)%CurveInput5, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE DEFAULT
         END SELECT
       CASE(CurveType_TableOneIV)
         ! CurrentModuleObject='Table:OneIndependentVariable'
-        CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+        CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
       CASE(CurveType_TableTwoIV)
         ! CurrentModuleObject='Table:TwoIndependentVariables'
-        CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+        CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-        CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+        CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
       CASE DEFAULT
         SELECT CASE(PerfCurve(CurveIndex)%CurveType)
           CASE(Linear, Quadratic, Cubic, Quartic, Exponent, FuncPressDrop)
             ! CurrentModuleObject='Curve:Linear/Quadratic/Cubic/Quartic/Exponent/Functional:PressureDrop'
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(BiQuadratic, QuadraticLinear, BiCubic)
             ! CurrentModuleObject='Curve:BiQuadratic/QuadraticLinear/BiCubic'
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(TriQuadratic)
             ! CurrentModuleObject='Curve:TriQuadratic'
-            CALL SetupOutputVariable('Performance Curve Input 1 []',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2 []',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 3 []',PerfCurve(CurveIndex)%CurveInput3, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
           CASE(QuadLinear)
             ! CurrentModuleObject='Curve:QuadLinear'
-            CALL SetupOutputVariable('Performance Curve Input 1',PerfCurve(CurveIndex)%CurveInput1, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PerfCurve(CurveIndex)%CurveInput1, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 2',PerfCurve(CurveIndex)%CurveInput2, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PerfCurve(CurveIndex)%CurveInput2, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 3',PerfCurve(CurveIndex)%CurveInput3, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PerfCurve(CurveIndex)%CurveInput3, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
-            CALL SetupOutputVariable('Performance Curve Input 4',PerfCurve(CurveIndex)%CurveInput4, &
+            CALL SetupOutputVariable('Performance Curve Input Variable 4 Value []',PerfCurve(CurveIndex)%CurveInput4, &
                   'HVAC','Average',PerfCurve(CurveIndex)%Name)
         END SELECT
     END SELECT
   ! set the output up last so it shows up after the input in the csv file
-    CALL SetupOutputVariable('Performance Curve Output []',PerfCurve(CurveIndex)%CurveOutput, &
+    CALL SetupOutputVariable('Performance Curve Output Value []',PerfCurve(CurveIndex)%CurveOutput, &
                               'HVAC','Average',PerfCurve(CurveIndex)%Name)
   END DO
 
   DO CurveIndex = 1, NumPressureCurves
-    CALL SetupOutputVariable('Performance Curve Input 1',PressureCurve(CurveIndex)%CurveInput1, &
+    CALL SetupOutputVariable('Performance Curve Input Variable 1 Value []',PressureCurve(CurveIndex)%CurveInput1, &
             'HVAC','Average',PressureCurve(CurveIndex)%Name)
-    CALL SetupOutputVariable('Performance Curve Input 2',PressureCurve(CurveIndex)%CurveInput2, &
+    CALL SetupOutputVariable('Performance Curve Input Variable 2 Value []',PressureCurve(CurveIndex)%CurveInput2, &
             'HVAC','Average',PressureCurve(CurveIndex)%Name)
-    CALL SetupOutputVariable('Performance Curve Input 3',PressureCurve(CurveIndex)%CurveInput3, &
+    CALL SetupOutputVariable('Performance Curve Input Variable 3 Value []',PressureCurve(CurveIndex)%CurveInput3, &
             'HVAC','Average',PressureCurve(CurveIndex)%Name)
-    CALL SetupOutputVariable('Performance Curve Output []',PressureCurve(CurveIndex)%CurveOutput, &
+    CALL SetupOutputVariable('Performance Curve Output Value []',PressureCurve(CurveIndex)%CurveOutput, &
                               'HVAC','Average',PressureCurve(CurveIndex)%Name)
   ENDDO
 
@@ -3886,7 +3886,7 @@ SELECT CASE (PerfCurve(CurveIndex)%CurveType)
 
     CurveValueExp = EXP((PerfCurve(CurveIndex)%Coeff3 - V1) / PerfCurve(CurveIndex)%Coeff4)
     CurveValue = PerfCurve(CurveIndex)%Coeff1 + PerfCurve(CurveIndex)%Coeff2 &
-                 / (1.0d0 + CurveValueExp**PerfCurve(CurveIndex)%Coeff5)
+                 / ((1.0d0 + CurveValueExp)**PerfCurve(CurveIndex)%Coeff5)
 
   !cpw22Aug2010 Added Rectangular Hyperbola Type 1 curve
   CASE(RectangularHyperbola1)
@@ -5591,7 +5591,7 @@ SUBROUTINE GetPressureSystemInput()
   NumPressure = GetNumObjectsFound(CurveObjectName)
   ALLOCATE(PressureCurve(NumPressure))
   DO CurveNum = 1, NumPressure
-    CALL GetObjectItem(TRIM(CurveObjectName),CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+    CALL GetObjectItem(CurveObjectName,CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.FALSE.
     IsBlank=.FALSE.
@@ -5830,6 +5830,9 @@ REAL(r64) FUNCTION PressureCurveValue(PressureCurveIndex, MassFlow, Density, Vis
   !Pressure drop calculation
   PressureCurveValue  =  (FrictionFactor * (Length / Diameter) + MinorLossCoeff) * (Density * Velocity**2) / 2.0d0
 
+  IF (PressureCurve(PressureCurveIndex)%EMSOverrideOn)   &
+     PressureCurveValue = PressureCurve(PressureCurveIndex)%EMSOverrideCurveValue
+
   PressureCurve(PressureCurveIndex)%CurveInput1=MassFlow
   PressureCurve(PressureCurveIndex)%CurveInput2=Density
   PressureCurve(PressureCurveIndex)%CurveInput3=Velocity
@@ -5918,7 +5921,7 @@ END FUNCTION CalculateMoodyFrictionFactor
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

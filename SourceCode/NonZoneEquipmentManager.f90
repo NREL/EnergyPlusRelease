@@ -73,7 +73,7 @@ SUBROUTINE ManageNonZoneEquipment(FirstHVACIteration,SimNonZoneEquipment)
     CountNonZoneEquip = .FALSE.
   END IF
 
-  CALL SimulateWaterUse(FirstHVACIteration) ! simulate non-plant loop water use. 
+  CALL SimulateWaterUse(FirstHVACIteration) ! simulate non-plant loop water use.
 
   IF (.not. ZoneSizingCalc) THEN
     DO WaterHeaterNum = 1, NumOfWaterHeater
@@ -93,7 +93,7 @@ END SUBROUTINE ManageNonZoneEquipment
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

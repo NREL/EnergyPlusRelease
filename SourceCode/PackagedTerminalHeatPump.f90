@@ -32,7 +32,7 @@ MODULE PackagedTerminalHeatPump
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataSizing
-USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, SysSizingCalc, SecInHour, InitConvTemp, NumOfZones
+USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, SysSizingCalc, SecInHour, InitConvTemp, NumOfZones, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: SetupOutputVariable, ShowWarningError, ShowRecurringWarningErrorAtEnd, &
                            ShowFatalError, ShowSevereError, ShowContinueError, ShowContinueErrorTimeStamp, &
                            ShowWarningMessage
@@ -132,54 +132,56 @@ TYPE PTUnitData
  REAL(r64)                    :: HeatConvergenceTol   = 0.0 ! Convergence tolerance, fraction (ZoneLoad - Equip Output)/ZoneLoad
  REAL(r64)                    :: MinOATCompressor     = 0.0 ! Minimum OAT for compressor operation [C]
  INTEGER                      :: IterErrIndex         = 0   ! index for recurring warnings
+ CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
+ INTEGER   :: WaterCyclingMode                    = 0  ! Heat Pump Coil water flow mode; See definitions in DataHVACGlobals,
+                                                       ! 1=water cycling, 2=water constant, 3=water constant on demand (old mode)
 
 ! Water source HP specific variables
- REAL(r64)    :: MaxONOFFCyclesperHour            =0.0 ! Maximum ON/OFF Cycling Rate [cycles/hr]
- REAL(r64)    :: HPTimeConstant                   =0.0 ! Heat Pump Time Constant [s]
- REAL(r64)    :: OnCyclePowerFraction             =0.0 ! Fraction of on-cycle power use [~]
+ REAL(r64) :: MaxONOFFCyclesperHour            =0.0 ! Maximum ON/OFF Cycling Rate [cycles/hr]
+ REAL(r64) :: HPTimeConstant                   =0.0 ! Heat Pump Time Constant [s]
+ REAL(r64) :: OnCyclePowerFraction             =0.0 ! Fraction of on-cycle power use [~]
                                                         ! supplemental heating coil operation
- REAL(r64)    :: FanDelayTime                     =0.0 ! Fan delay time, time delay for the HP's fan to
+ REAL(r64) :: FanDelayTime                     =0.0 ! Fan delay time, time delay for the HP's fan to
                                                         ! shut off after compressor cycle off  [s]
- REAL(r64)    :: DesignHeatingCapacity            =0.0 ! Nominal Capacity of Heating Coil [W]
- REAL(r64)    :: DesignCoolingCapacity            =0.0 ! Nominal Capacity of Cooling Coil [W]
- REAL(r64)    :: DesignSuppHeatingCapacity        =0.0 ! Nominal Capacity of Supplemental Heating Coil [W]
+ REAL(r64) :: DesignHeatingCapacity            =0.0 ! Nominal Capacity of Heating Coil [W]
+ REAL(r64) :: DesignCoolingCapacity            =0.0 ! Nominal Capacity of Cooling Coil [W]
+ REAL(r64) :: DesignSuppHeatingCapacity        =0.0 ! Nominal Capacity of Supplemental Heating Coil [W]
 
  ! Report data
- REAL(r64)                    :: TotHeatEnergyRate    = 0.0 ! total heating output [W]
- REAL(r64)                    :: TotHeatEnergy        = 0.0 ! total heating output [J]
- REAL(r64)                    :: TotCoolEnergyRate    = 0.0 ! total cooling output [W]
- REAL(r64)                    :: TotCoolEnergy        = 0.0 ! total cooling output [J]
- REAL(r64)                    :: SensHeatEnergyRate   = 0.0 ! sensible heating output [W]
- REAL(r64)                    :: SensHeatEnergy       = 0.0 ! sensible heating output [J]
- REAL(r64)                    :: SensCoolEnergyRate   = 0.0 ! sensible cooling output [W]
- REAL(r64)                    :: SensCoolEnergy       = 0.0 ! sensible cooling output [J]
- REAL(r64)                    :: LatHeatEnergyRate    = 0.0 ! latent heating output [W]
- REAL(r64)                    :: LatHeatEnergy        = 0.0 ! latent heating output [J]
- REAL(r64)                    :: LatCoolEnergyRate    = 0.0 ! latent cooling output [W]
- REAL(r64)                    :: LatCoolEnergy        = 0.0 ! latent cooling output [J]
- REAL(r64)                    :: ElecPower            = 0.0 ! electricity consumed [W]
- REAL(r64)                    :: ElecConsumption      = 0.0 ! electricity consumed [J]
- REAL(r64)                    :: FanPartLoadRatio     = 0.0 ! fan part-load ratio for time step
- REAL(r64)                    :: CompPartLoadRatio    = 0.0 ! compressor part-load ratio for time step
- INTEGER                      :: LastMode             = 0   ! last mode of operation, coolingmode or heatingmode
- INTEGER                      :: AirFlowControl       = 0   ! fan control mode, UseCompressorOnFlow or UseCompressorOffFlow
- REAL(r64)                    :: CompPartLoadFrac     = 0.0 ! compressor part load ratio
- INTEGER                      :: HotWaterControlNode  = 0   ! control node for simple water heating coil
- INTEGER                      :: PlantCoilOutletNode  = 0   ! outlet node for water coil
- INTEGER                      :: LoopNum              = 0   ! plant loop index for water heating coil
- INTEGER                      :: LoopSide             = 0   ! plant loop side  index for water heating coil
- INTEGER                      :: BranchNum            = 0   ! plant loop branch index for water heating coil
- INTEGER                      :: CompNum              = 0   ! plant loop component index for water heating coil
- REAL(r64)                    :: MaxHeatCoilFluidFlow = 0.0 ! water or steam mass flow rate for heating coil [kg/s]
- REAL(r64)                    :: MaxSuppCoilFluidFlow = 0.0 ! water or steam mass flow rate supp. heating coil [kg/s]
- Integer                      :: HotWaterCoilMaxIterIndex   = 0  ! Index to recurring warning message
- Integer                      :: HotWaterCoilMaxIterIndex2  = 0  ! Index to recurring warning message
- REAL(r64)                    :: ActualFanVolFlowRate = 0.0 ! Volumetric flow rate from fan object
- REAL(r64)                    :: HeatingSpeedRatio    = 1.0 ! Fan speed ratio in heating mode
- REAL(r64)                    :: CoolingSpeedRatio    = 1.0 ! Fan speed ratio in cooling mode
- REAL(r64)                    :: NoHeatCoolSpeedRatio = 1.0 ! Fan speed ratio when no cooling or heating
- INTEGER                      :: AvailStatus          = 0
- CHARACTER(len=MaxNameLength) :: AvailManagerListName = ' ' ! Name of an availability manager list object
+ REAL(r64) :: TotHeatEnergyRate    = 0.0 ! total heating output [W]
+ REAL(r64) :: TotHeatEnergy        = 0.0 ! total heating output [J]
+ REAL(r64) :: TotCoolEnergyRate    = 0.0 ! total cooling output [W]
+ REAL(r64) :: TotCoolEnergy        = 0.0 ! total cooling output [J]
+ REAL(r64) :: SensHeatEnergyRate   = 0.0 ! sensible heating output [W]
+ REAL(r64) :: SensHeatEnergy       = 0.0 ! sensible heating output [J]
+ REAL(r64) :: SensCoolEnergyRate   = 0.0 ! sensible cooling output [W]
+ REAL(r64) :: SensCoolEnergy       = 0.0 ! sensible cooling output [J]
+ REAL(r64) :: LatHeatEnergyRate    = 0.0 ! latent heating output [W]
+ REAL(r64) :: LatHeatEnergy        = 0.0 ! latent heating output [J]
+ REAL(r64) :: LatCoolEnergyRate    = 0.0 ! latent cooling output [W]
+ REAL(r64) :: LatCoolEnergy        = 0.0 ! latent cooling output [J]
+ REAL(r64) :: ElecPower            = 0.0 ! electricity consumed [W]
+ REAL(r64) :: ElecConsumption      = 0.0 ! electricity consumed [J]
+ REAL(r64) :: FanPartLoadRatio     = 0.0 ! fan part-load ratio for time step
+ REAL(r64) :: CompPartLoadRatio    = 0.0 ! compressor part-load ratio for time step
+ INTEGER   :: LastMode             = 0   ! last mode of operation, coolingmode or heatingmode
+ INTEGER   :: AirFlowControl       = 0   ! fan control mode, UseCompressorOnFlow or UseCompressorOffFlow
+ REAL(r64) :: CompPartLoadFrac     = 0.0 ! compressor part load ratio
+ INTEGER   :: HotWaterControlNode  = 0   ! control node for simple water heating coil
+ INTEGER   :: PlantCoilOutletNode  = 0   ! outlet node for water coil
+ INTEGER   :: LoopNum              = 0   ! plant loop index for water heating coil
+ INTEGER   :: LoopSide             = 0   ! plant loop side  index for water heating coil
+ INTEGER   :: BranchNum            = 0   ! plant loop branch index for water heating coil
+ INTEGER   :: CompNum              = 0   ! plant loop component index for water heating coil
+ REAL(r64) :: MaxHeatCoilFluidFlow = 0.0 ! water or steam mass flow rate for heating coil [kg/s]
+ REAL(r64) :: MaxSuppCoilFluidFlow = 0.0 ! water or steam mass flow rate supp. heating coil [kg/s]
+ Integer   :: HotWaterCoilMaxIterIndex   = 0  ! Index to recurring warning message
+ Integer   :: HotWaterCoilMaxIterIndex2  = 0  ! Index to recurring warning message
+ REAL(r64) :: ActualFanVolFlowRate = 0.0 ! Volumetric flow rate from fan object
+ REAL(r64) :: HeatingSpeedRatio    = 1.0 ! Fan speed ratio in heating mode
+ REAL(r64) :: CoolingSpeedRatio    = 1.0 ! Fan speed ratio in cooling mode
+ REAL(r64) :: NoHeatCoolSpeedRatio = 1.0 ! Fan speed ratio when no cooling or heating
+ INTEGER   :: AvailStatus          = 0
 ! starting added varibles for variable speed water source heat pump, Bo Shen, ORNL, March 2012
   INTEGER  :: HeatCoolMode          = 0  ! System operating mode (0 = floating, 1 = cooling, 2 = heating)
   INTEGER  :: NumOfSpeedCooling     =0   ! The number of speeds for cooling
@@ -195,10 +197,10 @@ TYPE PTUnitData
   REAL(r64):: CoolMassFlowRate(MaxSpedLevels) = 0  ! Supply air mass flow rate during cooling operation
   REAL(r64):: MSHeatingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in heating mode
   REAL(r64):: MSCoolingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in cooling mode
-  INTEGER :: CompSpeedNum
-  REAL(r64)     :: CompSpeedRatio
-  INTEGER :: ErrIndexCyc
-  INTEGER :: ErrIndexVar
+  INTEGER :: CompSpeedNum                        = 0
+  REAL(r64):: CompSpeedRatio                     = 0.0
+  INTEGER :: ErrIndexCyc                         = 0
+  INTEGER :: ErrIndexVar                         = 0
  ! end of the additional variables for variable speed water source heat pump
 END TYPE PTUnitData
 
@@ -489,8 +491,9 @@ SUBROUTINE SimPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,QSensUnitOut,OnOffAirF
     QSensUnitOut   = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
   END IF
 
-  SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-  SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(OutletNode)%HumRat
+  SpecHumIn  = Node(InletNode)%HumRat
   QLatUnitOut = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
 
   QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -593,6 +596,7 @@ SUBROUTINE GetPTUnit
                                           SetVarSpeedCoilData, GetVSCoilCondenserInletNode
   USE OutAirNodeManager, ONLY: CheckOutAirNodeNumber
   USE DataZoneEquipment, ONLY: ZoneEquipConfig, PkgTermHPAirToAir_Num, PkgTermHPWaterToAir_Num, PkgTermACAirToAir_Num
+  USE DataHVACGlobals,   ONLY: WaterCycling, WaterConstant, WaterConstantOnDemand
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -659,20 +663,20 @@ SUBROUTINE GetPTUnit
 
   ! find the number of each type of packaged terminal unit
   CurrentModuleObject = 'ZoneHVAC:PackagedTerminalHeatPump'
-  NumPTHP = GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+  NumPTHP = GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
   MaxNumbers=MAX(MaxNumbers,NumNumbers)
   MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
   CurrentModuleObject = 'ZoneHVAC:PackagedTerminalAirConditioner'
-  NumPTAC = GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+  NumPTAC = GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
   MaxNumbers=MAX(MaxNumbers,NumNumbers)
   MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
   CurrentModuleObject = 'ZoneHVAC:WaterToAirHeatPump'
-  NumPTWSHP = GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+  NumPTWSHP = GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
   MaxNumbers=MAX(MaxNumbers,NumNumbers)
   MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
@@ -710,9 +714,10 @@ SUBROUTINE GetPTUnit
     HeatCoilOutletNodeNum = 0
     SuppHeatHWInletNodeNum = 0
     SuppHeatHWOutletNodeNum = 0
+    OANodeNums = 0
 
     CurrentModuleObject = 'ZoneHVAC:PackagedTerminalHeatPump'
-    CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -728,11 +733,15 @@ SUBROUTINE GetPTUnit
     PTUnit(PTUnitNum)%UnitType = CurrentModuleObject
     PTUnit(PTUnitNum)%UnitType_Num = PTHPUnit
     PTUnit(PTUnitNum)%ZoneEquipType = PkgTermHPAirToAir_Num
-    PTUnit(PTUnitNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
-    IF (PTUnit(PTUnitNum)%SchedPtr .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' schedule not found = '//TRIM(Alphas(2)))
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
-      ErrorsFound=.TRUE.
+    IF (lAlphaBlanks(2)) THEN
+      PTUnit(PTUnitNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      PTUnit(PTUnitNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
+      IF (PTUnit(PTUnitNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid-not found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
     END IF
 
     PTUnit(PTUnitNum)%AirInNode = &
@@ -1143,7 +1152,7 @@ SUBROUTINE GetPTUnit
       END IF
       IF(CoolCoilOutletNodeNum /= HeatCoilInletNodeNum)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
-                           '" Cooling coil outlet node name must be the same as the heatng coil inlet node name.')
+                           '" Cooling coil outlet node name must be the same as the heating coil inlet node name.')
         CALL ShowContinueError('..Cooling coil outlet node name = '//TRIM(NodeID(CoolCoilOutletNodeNum)))
         CALL ShowContinueError('..Heating coil inlet node name  = '//TRIM(NodeID(HeatCoilInletNodeNum)))
         ErrorsFound=.TRUE.
@@ -1397,7 +1406,7 @@ SUBROUTINE GetPTUnit
     SuppHeatInletNodeNum   = 0
 
     CurrentModuleObject = 'ZoneHVAC:PackagedTerminalAirConditioner'
-    CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1413,11 +1422,15 @@ SUBROUTINE GetPTUnit
     PTUnit(PTUnitNum)%UnitType = CurrentModuleObject
     PTUnit(PTUnitNum)%UnitType_Num = PTACUnit
     PTUnit(PTUnitNum)%ZoneEquipType = PkgTermACAirToAir_Num
-    PTUnit(PTUnitNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
-    IF (PTUnit(PTUnitNum)%SchedPtr .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
-      ErrorsFound=.TRUE.
+    IF (lAlphaBlanks(2)) THEN
+      PTUnit(PTUnitNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      PTUnit(PTUnitNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
+      IF (PTUnit(PTUnitNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid-not found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
     END IF
 
     PTUnit(PTUnitNum)%AirInNode = &
@@ -2006,9 +2019,10 @@ SUBROUTINE GetPTUnit
     SuppHeatOutletNodeNum = 0
     SuppHeatHWInletNodeNum = 0
     SuppHeatHWOutletNodeNum = 0
+    OANodeNums = 0
 
     CurrentModuleObject = 'ZoneHVAC:WaterToAirHeatPump'
-    CALL GetObjectItem(TRIM(CurrentModuleObject),PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,PTUnitIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -2024,11 +2038,15 @@ SUBROUTINE GetPTUnit
     PTUnit(PTUnitNum)%UnitType = CurrentModuleObject
     PTUnit(PTUnitNum)%UnitType_Num = PTWSHPUnit
     PTUnit(PTUnitNum)%ZoneEquipType = PkgTermHPWaterToAir_Num
-    PTUnit(PTUnitNum)%SchedPtr     = GetScheduleIndex(Alphas(2))
-    IF (PTUnit(PTUnitNum)%SchedPtr == 0) THEN
-      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' ="'//TRIM(Alphas(1))//'", invalid')
-      CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
-      ErrorsFound=.TRUE.
+    IF (lAlphaBlanks(2)) THEN
+      PTUnit(PTUnitNum)%SchedPtr     = ScheduleAlwaysOn
+    ELSE
+      PTUnit(PTUnitNum)%SchedPtr     = GetScheduleIndex(Alphas(2))
+      IF (PTUnit(PTUnitNum)%SchedPtr == 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'" invalid data.')
+        CALL ShowContinueError('invalid-not found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+        ErrorsFound=.TRUE.
+      ENDIF
     ENDIF
 
 
@@ -2217,12 +2235,29 @@ SUBROUTINE GetPTUnit
       ErrorsFound=.TRUE.
     END IF
 
+    IF (NumAlphas >= 19) THEN
+      ! get water flow mode info before calling SetSimpleWSHPData
+      IF (SameString(Alphas(19),'Constant')) PTUnit(PTUnitNum)%WaterCyclingMode = WaterConstant
+      IF (SameString(Alphas(19),'Cycling')) PTUnit(PTUnitNum)%WaterCyclingMode = WaterCycling
+      IF (SameString(Alphas(19),'ConstantOnDemand'))   PTUnit(PTUnitNum)%WaterCyclingMode = WaterConstantOnDemand
+         !default to draw through if not specified in input
+      IF (lAlphaBlanks(19))           PTUnit(PTUnitNum)%WaterCyclingMode = WaterCycling
+      IF (PTUnit(PTUnitNum)%WaterCyclingMode .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(19))//' = '//TRIM(Alphas(19)))
+        CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(PTUnit(PTUnitNum)%Name))
+        ErrorsFound = .TRUE.
+      END IF
+    ELSE
+      PTUnit(PTUnitNum)%WaterCyclingMode = WaterCycling
+    ENDIF
+
+      ! end get water flow mode info
     IF (Alphas(9) == 'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT' .AND.   &
         Alphas(11) == 'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT') THEN
       IF(PTUnit(PTUnitNum)%DXHeatCoilIndex .GT. 0 .AND. PTUnit(PTUnitNum)%DXCoolCoilIndexNum .GT. 0)THEN
-         CALL SetSimpleWSHPData(PTUnit(PTUnitNum)%DXCoolCoilIndexNum,ErrorsFound, &
+         CALL SetSimpleWSHPData(PTUnit(PTUnitNum)%DXCoolCoilIndexNum,ErrorsFound,PTUnit(PTUnitNum)%WaterCyclingMode,  &
                                 CompanionHeatingCoilNum=PTUnit(PTUnitNum)%DXHeatCoilIndex)
-!         CALL SetSimpleWSHPData(PTUnit(PTUnitNum)%DXHeatCoilIndex,ErrorsFound, &
+!         CALL SetSimpleWSHPData(PTUnit(PTUnitNum)%WaterCyclingMode, PTUnit(PTUnitNum)%DXHeatCoilIndex,ErrorsFound, &
 !                                CompanionCoolingCoilNum=PTUnit(PTUnitNum)%DXCoolCoilIndexNum)
       END IF
     ELSE IF (Alphas(9) == 'COIL:HEATING:WATERTOAIRHEATPUMP:VARIABLESPEEDEQUATIONFIT' .AND.   &
@@ -2400,7 +2435,7 @@ SUBROUTINE GetPTUnit
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
           CALL ShowContinueError('..Fan inlet node name must be the same as the heat pumps inlet air node name')
           CALL ShowContinueError('..when blow through '// &
-                                TRIM(cAlphaFields(15))//' is specified and an outdoor air mixer is not used.')
+                                TRIM(cAlphaFields(16))//' is specified and an outdoor air mixer is not used.')
           CALL ShowContinueError('..Fan inlet node name           = '//TRIM(NodeID(FanInletNodeNum)))
           CALL ShowContinueError('..Heat pump air inlet node name = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirInNode)))
           ErrorsFound=.TRUE.
@@ -2411,7 +2446,7 @@ SUBROUTINE GetPTUnit
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
           CALL ShowContinueError('..Fan inlet node name must be the same as the heat pumps OutdoorAir:Mixer mixed air node name')
           CALL ShowContinueError('..when blow through '// &
-                                TRIM(cAlphaFields(15))//' is specified.')
+                                TRIM(cAlphaFields(16))//' is specified.')
           CALL ShowContinueError('..Fan inlet node name                   = '//TRIM(NodeID(FanInletNodeNum)))
           CALL ShowContinueError('..OutdoorAir:Mixer mixed air node name = '//TRIM(NodeID(OANodeNums(4))))
           ErrorsFound=.TRUE.
@@ -2428,14 +2463,14 @@ SUBROUTINE GetPTUnit
       IF(CoolCoilInletNodeNum /= FanOutletNodeNum)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Fan outlet node name must be the same as the cooling coil inlet node name')
-        CALL ShowContinueError('..when blow through '//TRIM(cAlphaFields(15))//' is specified.')
+        CALL ShowContinueError('..when blow through '//TRIM(cAlphaFields(16))//' is specified.')
         CALL ShowContinueError('..Fan outlet node name         = '//TRIM(NodeID(FanOutletNodeNum)))
         CALL ShowContinueError('..Cooling coil inlet node name = '//TRIM(NodeID(CoolCoilInletNodeNum)))
         ErrorsFound=.TRUE.
       END IF
       IF(CoolCoilOutletNodeNum /= HeatCoilInletNodeNum)THEN
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
-                           '" Cooling coil outlet node name must be the same as the heatng coil inlet node name.')
+                           '" Cooling coil outlet node name must be the same as the heating coil inlet node name.')
         CALL ShowContinueError('..Cooling coil outlet node name = '//TRIM(NodeID(CoolCoilOutletNodeNum)))
         CALL ShowContinueError('..Heating coil inlet node name  = '//TRIM(NodeID(HeatCoilInletNodeNum)))
         ErrorsFound=.TRUE.
@@ -2443,7 +2478,7 @@ SUBROUTINE GetPTUnit
       IF(HeatCoilOutletNodeNum /= SuppHeatInletNodeNum)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Heating coil outlet node name must be the same as the supplemental heating coil inlet node name')
-        CALL ShowContinueError('..when blow through '//TRIM(cAlphaFields(15))//' is specified.')
+        CALL ShowContinueError('..when blow through '//TRIM(cAlphaFields(16))//' is specified.')
         CALL ShowContinueError('..Heating coil outlet node name              = '//TRIM(NodeID(HeatCoilOutletNodeNum)))
         CALL ShowContinueError('..Supplemental heating coil inlet node name  = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
@@ -2497,7 +2532,7 @@ SUBROUTINE GetPTUnit
         IF(CoolCoilInletNodeNum /= PTUnit(PTUnitNum)%AirInNode)THEN
           CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
           CALL ShowContinueError('..Heat pump air inlet node name must be the same as the cooling coil inlet node name')
-          CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(15))// &
+          CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(16))// &
                                  ' is specified and an outdoor air mixer is not used.')
           CALL ShowContinueError('..Heat pump air inlet node name = '//TRIM(NodeID(PTUnit(PTUnitNum)%AirInNode)))
           CALL ShowContinueError('..Cooling coil inlet node name  = '//TRIM(NodeID(CoolCoilInletNodeNum)))
@@ -2508,7 +2543,7 @@ SUBROUTINE GetPTUnit
         IF(CoolCoilInletNodeNum /= OANodeNums(4))THEN
           CALL ShowSevereError(TRIM(CurrentModuleObject)//' "'//TRIM(PTUnit(PTUnitNum)%Name)//&
                            '" OutdoorAir:Mixer mixed air node name must be the same as the cooling coil')
-          CALL ShowContinueError(' inlet node name when draw through '//TRIM(cAlphaFields(15))//' is specified.')
+          CALL ShowContinueError(' inlet node name when draw through '//TRIM(cAlphaFields(16))//' is specified.')
           CALL ShowContinueError('..OutdoorAir:Mixer mixed air name = '//TRIM(NodeID(OANodeNums(4))))
           CALL ShowContinueError('..Cooling coil inlet node name    = '//TRIM(NodeID(CoolCoilInletNodeNum)))
           ErrorsFound=.TRUE.
@@ -2532,7 +2567,7 @@ SUBROUTINE GetPTUnit
       IF(HeatCoilOutletNodeNum /= FanInletNodeNum)THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Heating coil outlet node name must be the same as the fan inlet node name')
-        CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(15))//' is specified.')
+        CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(16))//' is specified.')
         CALL ShowContinueError('..Heating coil outlet node name = '//TRIM(NodeID(HeatCoilOutletNodeNum)))
         CALL ShowContinueError('..Fan inlet node name           = '//TRIM(NodeID(FanInletNodeNum)))
         ErrorsFound=.TRUE.
@@ -2540,7 +2575,7 @@ SUBROUTINE GetPTUnit
       IF (SuppHeatInletNodeNum /= FanOutletNodeNum) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(PTUnit(PTUnitNum)%Name)//'"')
         CALL ShowContinueError('..Fan outlet node name must be the same as the supplemental heating coil inlet node name ')
-        CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(15))//' is specified.')
+        CALL ShowContinueError('..when draw through '//TRIM(cAlphaFields(16))//' is specified.')
         CALL ShowContinueError('..Fan outlet node = '//TRIM(NodeID(FanOutletNodeNum)))
         CALL ShowContinueError('..Supplemental heating coil inlet node = '//TRIM(NodeID(SuppHeatInletNodeNum)))
         ErrorsFound=.TRUE.
@@ -2846,39 +2881,39 @@ SUBROUTINE GetPTUnit
 
   DO PTUnitNum=1,NumPTHP
     ! Setup Report variables for the Packaged Terminal Heat Psmps,   CurrentModuleObject = 'ZoneHVAC:PackagedTerminalHeatPump'
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Total Zone Heating Rate[W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Total Heating Rate [W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Total Zone Heating Energy[J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Total Heating Energy [J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Total Zone Cooling Rate[W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Total Cooling Rate [W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Total Zone Cooling Energy[J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Total Cooling Energy [J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Sensible Zone Heating Rate[W]',PTUnit(PTUnitNum)%SensHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Sensible Heating Rate [W]',PTUnit(PTUnitNum)%SensHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Sensible Zone Heating Energy[J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Sensible Heating Energy [J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Sensible Zone Cooling Rate[W]',PTUnit(PTUnitNum)%SensCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Sensible Cooling Rate [W]',PTUnit(PTUnitNum)%SensCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Sensible Zone Cooling Energy[J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Sensible Cooling Energy [J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Latent Zone Heating Rate[W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Latent Heating Rate [W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Latent Zone Heating Energy[J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Latent Heating Energy [J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Latent Zone Cooling Rate[W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Latent Cooling Rate [W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Latent Zone Cooling Energy[J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Latent Cooling Energy [J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Electric Power[W]',PTUnit(PTUnitNum)%ElecPower,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Electric Power [W]',PTUnit(PTUnitNum)%ElecPower,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Electric Consumption[J]',PTUnit(PTUnitNum)%ElecConsumption,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Electric Energy [J]',PTUnit(PTUnitNum)%ElecConsumption,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Fan Part-Load Ratio',PTUnit(PTUnitNum)%FanPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Fan Part Load Ratio []',PTUnit(PTUnitNum)%FanPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Compressor Part-Load Ratio',PTUnit(PTUnitNum)%CompPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Compressor Part Load Ratio []',PTUnit(PTUnitNum)%CompPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Heat Pump Fan Availability Status',PTUnit(PTUnitNum)%AvailStatus,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Heat Pump Fan Availability Status []',PTUnit(PTUnitNum)%AvailStatus,&
                                'System','Average',PTUnit(PTUnitNum)%Name)
   END DO
 
@@ -2886,79 +2921,80 @@ SUBROUTINE GetPTUnit
   DO PTUnitNum=1+NumPTHP,NumPTHP+NumPTAC
     ! Setup Report variables for the Packaged Terminal Air Conditioners,
     ! CurrentModuleObject = 'ZoneHVAC:PackagedTerminalAirConditioner'
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Total Zone Heating Rate[W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Total Heating Rate [W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Total Zone Heating Energy[J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Total Heating Energy [J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Total Zone Cooling Rate[W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Total Cooling Rate [W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Total Zone Cooling Energy[J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Total Cooling Energy [J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Sensible Zone Heating Rate[W]',  &
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Sensible Heating Rate [W]',  &
                               PTUnit(PTUnitNum)%SensHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Sensible Zone Heating Energy[J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Sensible Heating Energy [J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Sensible Zone Cooling Rate[W]',  &
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Sensible Cooling Rate [W]',  &
                               PTUnit(PTUnitNum)%SensCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Sensible Zone Cooling Energy[J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Sensible Cooling Energy [J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Latent Zone Heating Rate[W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Latent Heating Rate [W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Latent Zone Heating Energy[J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Latent Heating Energy [J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Latent Zone Cooling Rate[W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Latent Cooling Rate [W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Latent Zone Cooling Energy[J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Latent Cooling Energy [J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Electric Power[W]',PTUnit(PTUnitNum)%ElecPower,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Electric Power [W]',PTUnit(PTUnitNum)%ElecPower,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Electric Consumption[J]',PTUnit(PTUnitNum)%ElecConsumption,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Electric Energy [J]',PTUnit(PTUnitNum)%ElecConsumption,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Fan Part-Load Ratio',PTUnit(PTUnitNum)%FanPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Fan Part Load Ratio []',PTUnit(PTUnitNum)%FanPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Part-Load Ratio',PTUnit(PTUnitNum)%CompPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Compressor Part Load Ratio []',&
+                              PTUnit(PTUnitNum)%CompPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Packaged Terminal Air Conditioner Fan Availability Status',PTUnit(PTUnitNum)%AvailStatus,&
+    CALL SetupOutputVariable('Zone Packaged Terminal Air Conditioner Fan Availability Status []',PTUnit(PTUnitNum)%AvailStatus,&
                                'System','Average',PTUnit(PTUnitNum)%Name)
   END DO
 
   DO PTUnitNum=1+NumPTHP+NumPTAC,NumPTUs
     ! Setup Report variables for the Zone Water Source Heat Pumps, CurrentModuleObject='ZoneHVAC:WaterToAirHeatPump'
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Total Zone Heating Rate[W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Total Heating Rate [W]',PTUnit(PTUnitNum)%TotHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Total Zone Heating Energy[J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Total Heating Energy [J]',PTUnit(PTUnitNum)%TotHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Total Zone Cooling Rate[W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Total Cooling Rate [W]',PTUnit(PTUnitNum)%TotCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Total Zone Cooling Energy[J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Total Cooling Energy [J]',PTUnit(PTUnitNum)%TotCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Sensible Zone Heating Rate[W]',PTUnit(PTUnitNum)%SensHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Sensible Heating Rate [W]',PTUnit(PTUnitNum)%SensHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Sensible Zone Heating Energy[J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Sensible Heating Energy [J]',PTUnit(PTUnitNum)%SensHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Sensible Zone Cooling Rate[W]',PTUnit(PTUnitNum)%SensCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Sensible Cooling Rate [W]',PTUnit(PTUnitNum)%SensCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Sensible Zone Cooling Energy[J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Sensible Cooling Energy [J]',PTUnit(PTUnitNum)%SensCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Latent Zone Heating Rate[W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Latent Heating Rate [W]',PTUnit(PTUnitNum)%LatHeatEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Latent Zone Heating Energy[J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Latent Heating Energy [J]',PTUnit(PTUnitNum)%LatHeatEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Latent Zone Cooling Rate[W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Latent Cooling Rate [W]',PTUnit(PTUnitNum)%LatCoolEnergyRate,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Latent Zone Cooling Energy[J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Latent Cooling Energy [J]',PTUnit(PTUnitNum)%LatCoolEnergy,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Electric Power[W]',PTUnit(PTUnitNum)%ElecPower,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Electric Power [W]',PTUnit(PTUnitNum)%ElecPower,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Electric Consumption[J]',PTUnit(PTUnitNum)%ElecConsumption,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Electric Energy [J]',PTUnit(PTUnitNum)%ElecConsumption,&
                              'System','Sum',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Fan Part-Load Ratio',PTUnit(PTUnitNum)%FanPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Fan Part Load Ratio []',PTUnit(PTUnitNum)%FanPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Compressor Part-Load Ratio',PTUnit(PTUnitNum)%CompPartLoadRatio,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Compressor Part Load Ratio []',PTUnit(PTUnitNum)%CompPartLoadRatio,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
-    CALL SetupOutputVariable('Zone Water Source Heat Pump Fan Availability Status',PTUnit(PTUnitNum)%AvailStatus,&
+    CALL SetupOutputVariable('Zone Water to Air Heat Pump Fan Availability Status []',PTUnit(PTUnitNum)%AvailStatus,&
                              'System','Average',PTUnit(PTUnitNum)%Name)
   END DO
   RETURN
@@ -3002,6 +3038,7 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   USE PlantUtilities,       ONLY: SetComponentFlowRate, InitComponentNodes
   USE General,              ONLY: TrimSigDigits
   USE DataZoneEquipment,    ONLY: ZoneEquipConfig
+  USE VariableSpeedCoils,   ONLY: SimVariableSpeedCoils, VarSpeedCoil
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3051,6 +3088,8 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   INTEGER             :: NumOfSpeedHeating                ! Number of speeds for heating
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject     ! Object type for getting and error messages
   INTEGER             ::I                                 ! Loop index
+  INTEGER             :: Iter !speed iteration count
+  REAL(r64)           :: MulSpeedFlowScale !variable speed air flow scaling factor
 
   InNode  = PTUnit(PTUnitNum)%AirInNode
   OutNode = PTUnit(PTUnitNum)%AirOutNode
@@ -3208,6 +3247,80 @@ SUBROUTINE InitPTUnit(PTUnitNum,ZoneNum,FirstHVACIteration,OnOffAirFlowRatio,Zon
   IF ( .NOT. SysSizingCalc .AND. MySizeFlag(PTUnitNum) ) THEN
     CALL SizePTUnit(PTUnitNum)
     MySizeFlag(PTUnitNum) = .FALSE.
+  END IF
+
+  IF ((PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit &
+    .OR. PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingAirToAirVariableSpeed) .AND. &
+      (0 == PTUnit(PTUnitNum)%NumOfSpeedCooling)) THEN
+
+    CALL SimVariableSpeedCoils('',PTUnit(PTUnitNum)%DXCoolCoilIndexNum,&
+           0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,&
+           0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 )     !conduct the sizing operation in the VS WSHP
+    PTUnit(PTUnitNum)%NumOfSpeedCooling = VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NumOfSpeeds
+
+    MulSpeedFlowScale = VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%RatedAirVolFlowRate/ &
+    VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
+                (VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NormSpedLevel)
+    Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedCooling
+      PTUnit(PTUnitNum)%CoolVolumeFlowRate(Iter) = &
+            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%CoolMassFlowRate(Iter) = &
+            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirMassFlowRate(Iter) * &
+            MulSpeedFlowScale
+      PTUnit(PTUnitNum)%MSCoolingSpeedRatio(Iter) = &
+            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter)/ &
+            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
+            (PTUnit(PTUnitNum)%NumOfSpeedCooling)
+    End Do
+
+    IF (PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit &
+        .OR. PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingAirToAirVariableSpeed ) THEN
+
+        CALL SimVariableSpeedCoils('',PTUnit(PTUnitNum)%DXHeatCoilIndex,&
+               0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
+               PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,&
+               0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 ) !conduct the sizing operation in the VS WSHP
+
+        PTUnit(PTUnitNum)%NumOfSpeedHeating = VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NumOfSpeeds
+
+        MulSpeedFlowScale = VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%RatedAirVolFlowRate/ &
+        VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate &
+                    (VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NormSpedLevel)
+        Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedHeating
+          PTUnit(PTUnitNum)%HeatVolumeFlowRate(Iter) = &
+                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter) * &
+                MulSpeedFlowScale
+          PTUnit(PTUnitNum)%HeatMassFlowRate(Iter) = &
+                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirMassFlowRate(Iter) * &
+                MulSpeedFlowScale
+          PTUnit(PTUnitNum)%MSHeatingSpeedRatio(Iter) = &
+                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
+                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate&
+                (PTUnit(PTUnitNum)%NumOfSpeedHeating)
+        End Do
+   END IF
+    ! intialize idle flow
+
+   IF(PTUnit(PTUnitNum)%NumOfSpeedHeating > 0) THEN
+       PTUnit(PTUnitNum)%IdleMassFlowRate = &
+            min(PTUnit(PTUnitNum)%HeatMassFlowRate(1), PTUnit(PTUnitNum)%CoolMassFlowRate(1))
+       PTUnit(PTUnitNum)%IdleSpeedRatio = &
+            min(PTUnit(PTUnitNum)%MSHeatingSpeedRatio(1), PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1))
+       PTUnit(PTUnitNum)%IdleVolumeAirRate = &
+            min(PTUnit(PTUnitNum)%HeatVolumeFlowRate(1), PTUnit(PTUnitNum)%CoolVolumeFlowRate(1))
+   ELSE
+       PTUnit(PTUnitNum)%IdleMassFlowRate = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
+       PTUnit(PTUnitNum)%IdleSpeedRatio =   PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1)
+       PTUnit(PTUnitNum)%IdleVolumeAirRate = PTUnit(PTUnitNum)%CoolVolumeFlowRate(1)
+   END IF
+
+   IF (PTUnit(PTUnitNum)%OpMode .EQ. ContFanCycCoil) THEN
+        PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow = PTUnit(PTUnitNum)%IdleVolumeAirRate
+        PTUnit(PTUnitNum)%MaxNoCoolHeatAirMassFlow = PTUnit(PTUnitNum)%IdleMassFlowRate
+        PTUnit(PTUnitNum)%NoHeatCoolSpeedRatio= PTUnit(PTUnitNum)%IdleSpeedRatio
+   END IF
   END IF
 
   IF(MyFanFlag(PTUnitNum))THEN
@@ -3856,7 +3969,6 @@ SUBROUTINE SizePTUnit(PTUnitNum)
           ! USE STATEMENTS:
   USE WaterCoils,     ONLY: SetCoilDesFlow
   USE ReportSizingManager, ONLY: ReportSizingOutput
-  USE VariableSpeedCoils,   ONLY: SimVariableSpeedCoils, VarSpeedCoil
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3874,8 +3986,6 @@ SUBROUTINE SizePTUnit(PTUnitNum)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL :: ErrorsFound
-  INTEGER :: Iter !speed iteration count
-  REAL(r64) :: MulSpeedFlowScale !variable speed air flow scaling factor
 
   ErrorsFound=.false.
 
@@ -4005,80 +4115,6 @@ SUBROUTINE SizePTUnit(PTUnitNum)
 
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Preceding sizing errors cause program termination')
-  END IF
-
-
- IF (PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit &
-    .OR. PTUnit(PTUnitNum)%DXCoolCoilType_Num == Coil_CoolingAirToAirVariableSpeed ) THEN
-
-    CALL SimVariableSpeedCoils('',PTUnit(PTUnitNum)%DXCoolCoilIndexNum,&
-           0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-           PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,&
-           0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 )     !conduct the sizing operation in the VS WSHP
-    PTUnit(PTUnitNum)%NumOfSpeedCooling = VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NumOfSpeeds
-
-    MulSpeedFlowScale = VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%RatedAirVolFlowRate/ &
-    VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
-                (VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%NormSpedLevel)
-    Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedCooling
-      PTUnit(PTUnitNum)%CoolVolumeFlowRate(Iter) = &
-            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter) * &
-            MulSpeedFlowScale
-      PTUnit(PTUnitNum)%CoolMassFlowRate(Iter) = &
-            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirMassFlowRate(Iter) * &
-            MulSpeedFlowScale
-      PTUnit(PTUnitNum)%MSCoolingSpeedRatio(Iter) = &
-            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate(Iter)/ &
-            VarSpeedCoil(PTUnit(PTUnitNum)%DXCoolCoilIndexNum)%MSRatedAirVolFlowRate&
-            (PTUnit(PTUnitNum)%NumOfSpeedCooling)
-    End Do
-
-    IF (PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingWaterToAirHPVSEquationFit &
-        .OR. PTUnit(PTUnitNum)%DXHeatCoilType_Num == Coil_HeatingAirToAirVariableSpeed ) THEN
-
-        CALL SimVariableSpeedCoils('',PTUnit(PTUnitNum)%DXHeatCoilIndex,&
-               0,PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-               PTUnit(PTUnitNum)%HPTimeConstant,PTUnit(PTUnitNum)%FanDelayTime,&
-               0, 0.0d0, 0.0d0,1, 0.0d0,0.0d0, 0.0d0 ) !conduct the sizing operation in the VS WSHP
-
-        PTUnit(PTUnitNum)%NumOfSpeedHeating = VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NumOfSpeeds
-
-        MulSpeedFlowScale = VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%RatedAirVolFlowRate/ &
-        VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate &
-                    (VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%NormSpedLevel)
-        Do Iter = 1,PTUnit(PTUnitNum)%NumOfSpeedHeating
-          PTUnit(PTUnitNum)%HeatVolumeFlowRate(Iter) = &
-                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter) * &
-                MulSpeedFlowScale
-          PTUnit(PTUnitNum)%HeatMassFlowRate(Iter) = &
-                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirMassFlowRate(Iter) * &
-                MulSpeedFlowScale
-          PTUnit(PTUnitNum)%MSHeatingSpeedRatio(Iter) = &
-                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate(Iter)/ &
-                VarSpeedCoil(PTUnit(PTUnitNum)%DXHeatCoilIndex)%MSRatedAirVolFlowRate&
-                (PTUnit(PTUnitNum)%NumOfSpeedHeating)
-        End Do
-   END IF
-    ! intialize idle flow
-
-   IF(PTUnit(PTUnitNum)%NumOfSpeedHeating > 0) THEN
-       PTUnit(PTUnitNum)%IdleMassFlowRate = &
-            min(PTUnit(PTUnitNum)%HeatMassFlowRate(1), PTUnit(PTUnitNum)%CoolMassFlowRate(1))
-       PTUnit(PTUnitNum)%IdleSpeedRatio = &
-            min(PTUnit(PTUnitNum)%MSHeatingSpeedRatio(1), PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1))
-       PTUnit(PTUnitNum)%IdleVolumeAirRate = &
-            min(PTUnit(PTUnitNum)%HeatVolumeFlowRate(1), PTUnit(PTUnitNum)%CoolVolumeFlowRate(1))
-   ELSE
-       PTUnit(PTUnitNum)%IdleMassFlowRate = PTUnit(PTUnitNum)%CoolMassFlowRate(1)
-       PTUnit(PTUnitNum)%IdleSpeedRatio =   PTUnit(PTUnitNum)%MSCoolingSpeedRatio(1)
-       PTUnit(PTUnitNum)%IdleVolumeAirRate = PTUnit(PTUnitNum)%CoolVolumeFlowRate(1)
-   END IF
-
-   IF (PTUnit(PTUnitNum)%OpMode .EQ. ContFanCycCoil) THEN
-        PTUnit(PTUnitNum)%MaxNoCoolHeatAirVolFlow = PTUnit(PTUnitNum)%IdleVolumeAirRate
-        PTUnit(PTUnitNum)%MaxNoCoolHeatAirMassFlow = PTUnit(PTUnitNum)%IdleMassFlowRate
-        PTUnit(PTUnitNum)%NoHeatCoolSpeedRatio= PTUnit(PTUnitNum)%IdleSpeedRatio
-   END IF
   END IF
 
   RETURN
@@ -4483,7 +4519,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
         PTUnit(PTUnitNum)%DXCoolCoilIndexNum, &
                           QZnReq, 1.0d0, &
                           OpMode,WSHPRuntimeFrac, PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-                          PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 1, PartLoadFrac, &
+                          PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 1, PartLoadFrac, FirstHVACIteration, &
                           OnOffAirFlowRat=OnOffAirFlowRatio)
         SaveCompressorPLR = PartLoadFrac
       CASE DEFAULT
@@ -4504,7 +4540,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
         PTUnit(PTUnitNum)%DXCoolCoilIndexNum, &
                          0.0d0, 0.0d0, &
                          OpMode,0.0d0, PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-                         PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0)
+                         PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0, FirstHVACIteration )
       CASE DEFAULT
     END SELECT
   END IF
@@ -4556,7 +4592,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
                      PTUnit(PTUnitNum)%DXHeatCoilIndex, &
                      QZnReq, 0.0d0, &
                      OpMode,WSHPRuntimeFrac, PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-                     PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 1, PartLoadFrac, &
+                     PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 1, PartLoadFrac, FirstHVACIteration, &
                      OnOffAirFlowRat=OnOffAirFlowRatio)
             SaveCompressorPLR = PartLoadFrac
           CASE DEFAULT
@@ -4571,7 +4607,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
                    PTUnit(PTUnitNum)%DXHeatCoilIndex, &
                    0.0d0, 0.0d0, &
                    OpMode, 0.0d0, PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-                   PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0)
+                   PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0, FirstHVACIteration)
 
           CASE DEFAULT
         END SELECT
@@ -4623,7 +4659,7 @@ SUBROUTINE CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,LoadMet,QZnReq,O
                    PTUnit(PTUnitNum)%DXHeatCoilIndex, &
                    0.0d0, 0.0d0, &
                    OpMode, 0.0d0, PTUnit(PTUnitNum)%MaxONOFFCyclesperHour, &
-                   PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0)
+                   PTUnit(PTUnitNum)%HPTimeConstant, PTUnit(PTUnitNum)%FanDelayTime, 0, 0.0d0, FirstHVACIteration )
 
         CASE DEFAULT
       END SELECT
@@ -5075,6 +5111,7 @@ REAL(r64) FUNCTION PLRResidual(PartLoadFrac,Par)
   LOGICAL :: FirstHVACIteration ! FirstHVACIteration flag
   INTEGER :: OpMode             ! Compressor operating mode
   REAL(r64)    :: QZnReq             ! zone load (W)
+  REAL(r64)    :: QZnReqTemp         ! denominator representing zone load (W)
   REAL(r64)    :: OnOffAirFlowRatio  ! ratio of compressor ON airflow to average airflow over timestep
   REAL(r64)    :: ActualOutput       ! delivered capacity of PTHP
   REAL(r64)    :: SupHeaterLoad      ! load passed to supplemental heater (W)
@@ -5090,6 +5127,8 @@ REAL(r64) FUNCTION PLRResidual(PartLoadFrac,Par)
   END IF
   OpMode = INT(Par(4))
   QZnReq = Par(5)
+  QZnReqTemp = QZnReq
+  IF(ABS(QZnReq) .LT. 100.d0)QZnReqTemp=SIGN(100.d0,QZnReq)
   OnOffAirFlowRatio = Par(6)
   SupHeaterLoad     = Par(7) * PartLoadFrac
   IF(Par(8) .EQ. 1.0)THEN
@@ -5099,7 +5138,7 @@ REAL(r64) FUNCTION PLRResidual(PartLoadFrac,Par)
   END IF
 
   CALL CalcPTUnit(PTUnitNum,FirstHVACIteration,PartLoadFrac,ActualOutput,QZnReq,OnOffAirFlowRatio,SupHeaterLoad, HXUnitOn)
-  PLRResidual = (ActualOutput - QZnReq)/QZnReq
+  PLRResidual = (ActualOutput - QZnReq)/QZnReqTemp
 
   RETURN
 END FUNCTION PLRResidual
@@ -6909,7 +6948,7 @@ SUBROUTINE SetOnOffMassFlowRateVSCoil(PTUnitNum, ZoneNum, FirstHVACIteration, &
 END SUBROUTINE SetOnOffMassFlowRateVSCoil
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

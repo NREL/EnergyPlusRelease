@@ -87,12 +87,14 @@ SUBROUTINE  ManageSizing
 
           ! USE STATEMENTS:
   USE InputProcessor, ONLY: GetNumRangeCheckErrorsFound
-  USE ZoneEquipmentManager, ONLY: UpdateZoneSizing, ManageZoneEquipment
+  USE ZoneEquipmentManager, ONLY: UpdateZoneSizing, ManageZoneEquipment, RezeroZoneSizingArrays
   USE SimAirServingZones, ONLY: ManageAirLoops, UpdateSysSizing
   USE DataEnvironment, ONLY : TotDesDays, OutDryBulbTemp, OutHumRat, OutBaroPress, CurEnvirNum, Month, DayOfMonth, EndMonthFlag
   USE OutputReportPredefined
   USE DataHeatBalance, ONLY: Zone
   USE General, ONLY: TrimSigDigits
+  USE OutputReportTabular, ONLY: isCompLoadRepReq,AllocateLoadComponentArrays, DeallocateLoadComponentArrays,   &
+     ComputeLoadComponentDecayCurve
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -127,6 +129,9 @@ SUBROUTINE  ManageSizing
   CHARACTER(len=MaxNameLength) :: curName
   INTEGER :: NumSizingPeriodsPerformed
   INTEGER :: write_stat
+  INTEGER :: numZoneSizeIter !number of times to repeat zone sizing calcs. 1 normal, 2 load component reporting
+  INTEGER :: iZoneCalcIter !index for repeating the zone sizing calcs
+  LOGICAL :: runZeroingOnce = .TRUE.
 
           ! FLOW:
 
@@ -152,6 +157,18 @@ SUBROUTINE  ManageSizing
       CALL ShowFatalError('Program terminates for preceding conditions.')
     ENDIF
   ENDIF
+
+  ! determine if the second set of zone sizing calculations should be performed
+  ! that include a pulse for the load component reporting
+  IF (DoZoneSizing  .AND. (NumZoneSizingInput .GT. 0)) THEN
+    CompLoadReportIsReq = isCompLoadRepReq() !check getinput structure if load component report is requested
+  END IF
+  IF (CompLoadReportIsReq) THEN  !if that report is created then zone sizing calculations are repeated
+    numZoneSizeIter = 2
+  ELSE
+    numZoneSizeIter = 1
+  END IF
+
 
   IF ( (DoZoneSizing) .AND. (NumZoneSizingInput == 0) ) THEN
     CALL ShowWarningError(RoutineName//'For a zone sizing run, there must be at least 1 Sizing:Zone input object.'//  &
@@ -188,134 +205,180 @@ SUBROUTINE  ManageSizing
 
     CALL ResetEnvironmentCounter
     KickOffSizing=.true.
-    CALL SetupZoneSizing(ErrorsFound)
+    CALL SetupZoneSizing(ErrorsFound)  ! Should only be done ONCE
     KickOffSizing=.false.
 
-    CALL ResetEnvironmentCounter
-    CurOverallSimDay=0
-    NumSizingPeriodsPerformed=0
-    DO WHILE (Available) ! loop over environments
+    DO iZoneCalcIter = 1, numZoneSizeIter !normally this is performed once but if load component
+                                          !report is requested, these are repeated with a pulse in
+                                          !each zone.
 
-      CALL GetNextEnvironment(Available,ErrorsFound) ! get an environment
+      !set flag if performing a "pulse" set of sizing calcs
+      !the pulse simulation needs to be done first (the 1 in the following line) otherwise
+      !the difference seen in the loads in the epluspls and epluszsz files are not
+      !simple decreasing curves but appear as amost random fluctuations.
+      isPulseZoneSizing = (CompLoadReportIsReq .AND. (iZoneCalcIter .EQ. 1))
 
-      IF (.not. Available) EXIT
-      IF (ErrorsFound) EXIT
+      Available=.true.
 
-      ! check that environment is one of the design days
-      IF (KindOfSim == ksRunPeriodWeather) THEN
-        CYCLE
-      ENDIF
+      CALL ResetEnvironmentCounter
+      CurOverallSimDay=0
+      NumSizingPeriodsPerformed=0
+      DO WHILE (Available) ! loop over environments
 
-      NumSizingPeriodsPerformed=NumSizingPeriodsPerformed+1
+        CALL GetNextEnvironment(Available,ErrorsFound) ! get an environment
 
-      BeginEnvrnFlag = .TRUE.
-      EndEnvrnFlag   = .FALSE.
-      EndMonthFlag   = .FALSE.
-      WarmupFlag     = .TRUE.
-      DayOfSim       =  0
-      DayOfSimChr    ='0'
-      CurEnvirNumSimDay=1
-      CurOverallSimDay=CurOverallSimDay+1
-      DO WHILE ((DayOfSim.LT.NumOfDayInEnvrn).OR.(WarmupFlag))  ! Begin day loop ...
+        IF (.not. Available) EXIT
+        IF (ErrorsFound) EXIT
 
-        DayOfSim     = DayOfSim + 1
-        IF (.not. WarmupFlag .and. DayOfSim > 1) THEN
-          CurEnvirNumSimDay=CurEnvirNumSimDay+1
+        ! check that environment is one of the design days
+        IF (KindOfSim == ksRunPeriodWeather) THEN
+          CYCLE
         ENDIF
 
-        WRITE(DayOfSimChr,*) DayOfSim
-        DayOfSimChr=ADJUSTL(DayOfSimChr)
-        BeginDayFlag = .TRUE.
-        EndDayFlag   = .FALSE.
+        NumSizingPeriodsPerformed=NumSizingPeriodsPerformed+1
 
-        IF (WarmupFlag) THEN
-          CALL DisplayString('Warming up')
-        ELSE ! (.NOT.WarmupFlag)
-          IF (DayOfSim.EQ.1)   CALL DisplayString('Performing Zone Sizing Simulation')
-          CALL UpdateZoneSizing(BeginDay)
-        END IF
+        BeginEnvrnFlag = .TRUE.
+        EndEnvrnFlag   = .FALSE.
+        EndMonthFlag   = .FALSE.
+        WarmupFlag     = .TRUE.
+        DayOfSim       =  0
+        DayOfSimChr    ='0'
+        CurEnvirNumSimDay=1
+        CurOverallSimDay=CurOverallSimDay+1
+        DO WHILE ((DayOfSim.LT.NumOfDayInEnvrn).OR.(WarmupFlag))  ! Begin day loop ...
 
-        DO HourOfDay = 1, 24      ! Begin hour loop ...
+          DayOfSim     = DayOfSim + 1
+          IF (.not. WarmupFlag .and. DayOfSim > 1) THEN
+            CurEnvirNumSimDay=CurEnvirNumSimDay+1
+          ENDIF
 
-          BeginHourFlag = .TRUE.
-          EndHourFlag   = .FALSE.
+          WRITE(DayOfSimChr,*) DayOfSim
+          DayOfSimChr=ADJUSTL(DayOfSimChr)
+          BeginDayFlag = .TRUE.
+          EndDayFlag   = .FALSE.
 
-          DO TimeStep = 1, NumOfTimeStepInHour  ! Begin time step (TINC) loop ...
-
-            BeginTimeStepFlag = .TRUE.
-
-            ! Set the End__Flag variables to true if necessary.  Note that
-            ! each flag builds on the previous level.  EndDayFlag cannot be
-            ! .true. unless EndHourFlag is also .true., etc.  Note that the
-            ! EndEnvrnFlag and the EndSimFlag cannot be set during warmup.
-            ! Note also that BeginTimeStepFlag, EndTimeStepFlag, and the
-            ! SubTimeStepFlags can/will be set/reset in the HVAC Manager.
-
-            IF ((TimeStep.EQ.NumOfTimeStepInHour)) THEN
-              EndHourFlag = .TRUE.
-              IF (HourOfDay.EQ.24) THEN
-                EndDayFlag = .TRUE.
-                IF ((.NOT.WarmupFlag).AND.(DayOfSim.EQ.NumOfDayInEnvrn)) THEN
-                  EndEnvrnFlag = .TRUE.
+          IF (WarmupFlag) THEN
+            CALL DisplayString('Warming up')
+          ELSE ! (.NOT.WarmupFlag)
+              IF (DayOfSim.EQ.1) THEN
+                IF (.NOT. isPulseZoneSizing) THEN
+                  CALL DisplayString('Performing Zone Sizing Simulation')
+                ELSE
+                  CALL DisplayString('Performing Zone Sizing Simulation for Load Component Report')
                 END IF
               END IF
-            END IF
+            CALL UpdateZoneSizing(BeginDay)
+          END IF
 
-            CALL ManageWeather
+          DO HourOfDay = 1, 24      ! Begin hour loop ...
 
-            IF (.not. WarmupFlag) THEN
-              TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
-              IF (HourOfDay == 1 .and. TimeStep == 1) THEN
-                DesDayWeath(CurOverallSimDay)%DateString=TRIM(TrimSigDigits(Month))//'/'//TRIM(TrimSigDigits(DayOfMonth))
+            BeginHourFlag = .TRUE.
+            EndHourFlag   = .FALSE.
+
+            DO TimeStep = 1, NumOfTimeStepInHour  ! Begin time step (TINC) loop ...
+
+              BeginTimeStepFlag = .TRUE.
+
+              ! Set the End__Flag variables to true if necessary.  Note that
+              ! each flag builds on the previous level.  EndDayFlag cannot be
+              ! .true. unless EndHourFlag is also .true., etc.  Note that the
+              ! EndEnvrnFlag and the EndSimFlag cannot be set during warmup.
+              ! Note also that BeginTimeStepFlag, EndTimeStepFlag, and the
+              ! SubTimeStepFlags can/will be set/reset in the HVAC Manager.
+
+              IF ((TimeStep.EQ.NumOfTimeStepInHour)) THEN
+                EndHourFlag = .TRUE.
+                IF (HourOfDay.EQ.24) THEN
+                  EndDayFlag = .TRUE.
+                  IF ((.NOT.WarmupFlag).AND.(DayOfSim.EQ.NumOfDayInEnvrn)) THEN
+                    EndEnvrnFlag = .TRUE.
+                  END IF
+                END IF
+              END IF
+
+                !set flag for pulse used in load component reporting
+                doLoadComponentPulseNow = .FALSE.
+                IF (isPulseZoneSizing) THEN
+                  IF (.NOT. WarmupFlag) THEN
+                    IF (DayOfSim .EQ. 1) THEN       !first day of sizing period
+                      IF (HourOfDay .EQ. 10) THEN   !at 10am
+                        IF (TimeStep .EQ. 1) THEN   !first timestep in hour
+                          doLoadComponentPulseNow = .TRUE.
+                        END IF
+                      END IF
+                    END IF
+                  END IF
+                END IF
+
+
+              CALL ManageWeather
+
+              IF (.not. WarmupFlag) THEN
+                TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+                IF (HourOfDay == 1 .and. TimeStep == 1) THEN
+                  DesDayWeath(CurOverallSimDay)%DateString=TRIM(TrimSigDigits(Month))//'/'//TRIM(TrimSigDigits(DayOfMonth))
+                ENDIF
+                DesDayWeath(CurOverallSimDay)%Temp(TimeStepInDay) = OutDryBulbTemp
+                DesDayWeath(CurOverallSimDay)%HumRat(TimeStepInDay) = OutHumRat
+                DesDayWeath(CurOverallSimDay)%Press(TimeStepInDay) = OutBaroPress
               ENDIF
-              DesDayWeath(CurOverallSimDay)%Temp(TimeStepInDay) = OutDryBulbTemp
-              DesDayWeath(CurOverallSimDay)%HumRat(TimeStepInDay) = OutHumRat
-              DesDayWeath(CurOverallSimDay)%Press(TimeStepInDay) = OutBaroPress
-            ENDIF
 
 
-            CALL ManageHeatBalance
+              CALL ManageHeatBalance
 
-            !  After the first iteration of HeatBalance, all the "input" has been gotten
-            IF (BeginSimFlag) THEN
-              IF (GetNumRangeCheckErrorsFound() > 0) THEN
-                CALL ShowFatalError(RoutineName//'Out of "range" values found in input')
+              !  After the first iteration of HeatBalance, all the "input" has been gotten
+              IF (BeginSimFlag) THEN
+                IF (GetNumRangeCheckErrorsFound() > 0) THEN
+                  CALL ShowFatalError(RoutineName//'Out of "range" values found in input')
+                ENDIF
               ENDIF
-            ENDIF
 
-            BeginHourFlag  = .FALSE.
-            BeginDayFlag   = .FALSE.
-            BeginEnvrnFlag = .FALSE.
-            BeginSimFlag   = .FALSE.
+              BeginHourFlag  = .FALSE.
+              BeginDayFlag   = .FALSE.
+              BeginEnvrnFlag = .FALSE.
+              BeginSimFlag   = .FALSE.
 
-          END DO                              ! ... End time step (TINC) loop.
+            END DO                              ! ... End time step (TINC) loop.
 
-          PreviousHour=HourOfDay
+            PreviousHour=HourOfDay
 
-        END DO                    ! ... End hour loop.
+          END DO                    ! ... End hour loop.
 
-        IF (EndDayFlag) CALL UpdateZoneSizing(EndDay)
+          IF (EndDayFlag) CALL UpdateZoneSizing(EndDay)
 
-        IF (.not. WarmupFlag .and. (DayOfSim > 0) .and. (DayOfSim.LT.NumOfDayInEnvrn)) THEN
-          CurOverallSimDay=CurOverallSimDay+1
-        ENDIF
+          IF (.not. WarmupFlag .and. (DayOfSim > 0) .and. (DayOfSim.LT.NumOfDayInEnvrn)) THEN
+            CurOverallSimDay=CurOverallSimDay+1
+          ENDIF
 
-      END DO                      ! ... End day loop.
+        END DO                      ! ... End day loop.
 
-      LastMonth=Month
-      LastDayOfMonth=DayOfMonth
+        LastMonth=Month
+        LastDayOfMonth=DayOfMonth
 
-    END DO  ! ... End environment loop
+      END DO  ! ... End environment loop
 
-    IF (NumSizingPeriodsPerformed > 0) THEN
-      CALL UpdateZoneSizing(EndZoneSizingCalc)
-      ZoneSizingRunDone = .TRUE.
-    ELSE
-      CALL ShowSevereError(RoutineName//'No Sizing periods were performed for Zone Sizing.'//  &
-          ' No Zone Sizing calculations saved.')
-      ErrorsFound=.true.
-    ENDIF
+      IF (NumSizingPeriodsPerformed > 0) THEN
+        CALL UpdateZoneSizing(EndZoneSizingCalc)
+        ZoneSizingRunDone = .TRUE.
+      ELSE
+        CALL ShowSevereError(RoutineName//'No Sizing periods were performed for Zone Sizing.'//  &
+            ' No Zone Sizing calculations saved.')
+        ErrorsFound=.true.
+      ENDIF
 
+      IF (isPulseZoneSizing .AND. runZeroingOnce) THEN
+        CALL RezeroZoneSizingArrays  !zero all arrays related to zone sizing.
+        runZeroingOnce = .FALSE.
+      END IF
+   END DO !loop that repeats the zone sizing calcs for the load component report, if requested
+
+   ! both the pulse and normal zone sizing is complete so now post processing of the results is performed
+   IF (CompLoadReportIsReq) THEN
+     ! call the routine that computes the decay curve
+     CALL ComputeLoadComponentDecayCurve
+     ! remove some of the arrays used to derive the decay curves
+     CALL DeallocateLoadComponentArrays
+   END IF
   END IF
 
   ZoneSizingCalc = .FALSE.
@@ -655,7 +718,7 @@ SUBROUTINE GetOARequirements
     LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
 
   CurrentModuleObject='DesignSpecification:OutdoorAir'
-  NumOARequirements = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumOARequirements = GetNumObjectsFound(CurrentModuleObject)
   CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 
     ALLOCATE(Alphas(NumAlphas))
@@ -677,7 +740,7 @@ SUBROUTINE GetOARequirements
     !Start Loading the System Input
     DO OAIndex = 1,  NumOARequirements
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OAIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(CurrentModuleObject,OAIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -826,7 +889,7 @@ SUBROUTINE GetZoneAirDistribution
     LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
 
   CurrentModuleObject='DesignSpecification:ZoneAirDistribution'
-  NumZoneAirDistribution = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumZoneAirDistribution = GetNumObjectsFound(CurrentModuleObject)
   CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 
     ALLOCATE(Alphas(NumAlphas))
@@ -848,7 +911,7 @@ SUBROUTINE GetZoneAirDistribution
     !Start Loading the zone air distribution input
     DO ZADIndex = 1,  NumZoneAirDistribution
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),ZADIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(CurrentModuleObject,ZADIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -967,10 +1030,10 @@ SUBROUTINE GetSizingParams
   INTEGER :: Temp
 
   cCurrentModuleObject='Sizing:Parameters'
-  NumSizParams = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSizParams = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSizParams == 1) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (lNumericFieldBlanks(1) .or. rNumericArgs(1) < 0.0) THEN
@@ -1003,13 +1066,13 @@ SUBROUTINE GetSizingParams
   ENDIF
 
   cCurrentModuleObject='OutputControl:Sizing:Style'
-  Temp = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  Temp = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (Temp == 0) THEN
     cAlphaArgs(1)='Comma'
     SizingFileColSep = CharComma !comma
   ELSEIF (Temp == 1) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (cAlphaArgs(1) == 'COMMA') THEN
@@ -1101,7 +1164,7 @@ SUBROUTINE GetZoneSizingInput
   INTEGER ObjIndex ! Index of zone air distribution effectiveness object name
 
   cCurrentModuleObject='Sizing:Zone'
-  NumSizingZoneStatements=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSizingZoneStatements=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(SizingZoneObjects(NumSizingZoneStatements))
 
   IF (NumSizingZoneStatements > 0) THEN
@@ -1113,7 +1176,7 @@ SUBROUTINE GetZoneSizingInput
   NumZoneSizingInput=0
   ErrFlag=.false.
   DO Item=1,NumSizingZoneStatements
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1169,7 +1232,7 @@ SUBROUTINE GetZoneSizingInput
     ZoneSizIndex=0
     DO Item = 1, NumSizingZoneStatements
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1350,8 +1413,8 @@ SUBROUTINE GetZoneSizingInput
             CALL ShowContinueError('... incorrect '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
              ErrorsFound=.true.
            ENDIF
-         ELSE ! If no design spec object specified, i.e. no OA, then set OA method to Flow/Person as default but flows to 0
-             ZoneSizingInput(ZoneSizIndex)%OADesMethod = 1
+         ELSE ! If no design spec object specified, i.e. no OA, then set OA method to None as default but flows to 0
+             ZoneSizingInput(ZoneSizIndex)%OADesMethod = 0
              ZoneSizingInput(ZoneSizIndex)%DesOAFlowPPer = 0
              ZoneSizingInput(ZoneSizIndex)%DesOAFlowPerArea = 0
              ZoneSizingInput(ZoneSizIndex)%DesOAFlow = 0
@@ -1655,7 +1718,7 @@ SUBROUTINE GetZoneAndZoneListNames(ErrorsFound,NumZones,ZoneNames,NumZoneLists,Z
   ALLOCATE(ZoneNames(NumZones))
 
   DO Item=1,NumZones
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ! validation, but no error
@@ -1672,7 +1735,7 @@ SUBROUTINE GetZoneAndZoneListNames(ErrorsFound,NumZones,ZoneNames,NumZoneLists,Z
   ALLOCATE(ZoneListNames(NumZoneLists))
 
   DO Item=1,NumZoneLists
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ! validation, but no error
@@ -1743,7 +1806,7 @@ SUBROUTINE GetSystemSizingInput
 
   NumAirLoops = GetNumObjectsFound('AirLoopHVAC')
   cCurrentModuleObject='Sizing:System'
-  NumSysSizInput = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSysSizInput = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSysSizInput > 0) THEN
     NumDesDays = GetNumObjectsFound('SizingPeriod:DesignDay') + GetNumObjectsFound('SizingPeriod:WeatherFileDays') +   &
@@ -1756,7 +1819,7 @@ SUBROUTINE GetSystemSizingInput
   END IF
 
   DO SysSizIndex=1,NumSysSizInput
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),SysSizIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,SysSizIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.FALSE.
@@ -2004,7 +2067,7 @@ SUBROUTINE GetPlantSizingInput
   INTEGER :: NumDesDays       ! Number of design days in input
 
   cCurrentModuleObject='Sizing:Plant'
-  NumPltSizInput = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumPltSizInput = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumPltSizInput > 0) THEN
     NumDesDays = GetNumObjectsFound('SizingPeriod:DesignDay') + GetNumObjectsFound('SizingPeriod:WeatherFileDays') +   &
@@ -2022,7 +2085,7 @@ SUBROUTINE GetPlantSizingInput
   END IF
 
   DO PltSizIndex=1,NumPltSizInput
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PltSizIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,PltSizIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.FALSE.
@@ -2325,7 +2388,7 @@ END SUBROUTINE ReportSysSizing
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -308,25 +308,26 @@ SUBROUTINE CalcEcoRoof(SurfNum,ZoneNum,ConstrNum,TempExt)
 
 ! DJS NOVEMBER 2010 - Make calls to SetupOutput Variable to allow for reporting of ecoroof variables
 
-    CALL SetupOutputVariable('Ecoroof Soil Temperature [C]',Tg, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Vegetation Temperature [C]',Tf, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Soil Root Moisture []',MeanRootMoisture, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Soil Near Surface Moisture []',Moisture, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Soil Sensible Flux [W/m2]',sensibleg, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Vegetation Sensible Flux [W/m2]',sensiblef, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Vegetation Water Flux [m/s]',vfluxf, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Soil Water Flux [m/s]',vfluxg, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Vegetation Latent Flux [W/m2]',Lf, 'Zone','State','Environment')
-    CALL SetupOutputVariable('Ecoroof Soil Latent Flux [W/m2]',Lg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Temperature [C]',Tg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Vegetation Temperature [C]',Tf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Root Moisture Ratio []',MeanRootMoisture, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Near Surface Moisture Ratio []',Moisture, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Sensible Heat Transfer Rate per Area [W/m2]',sensibleg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Vegetation Sensible Heat Transfer Rate per Area [W/m2]',sensiblef,   &
+       'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Vegetation Moisture Transfer Rate [m/s]',vfluxf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Moisture Transfer Rate [m/s]',vfluxg, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Vegetation Latent Heat Transfer Rate per Area [W/m2]',Lf, 'Zone','State','Environment')
+    CALL SetupOutputVariable('Green Roof Soil Latent Heat Transfer Rate per Area [W/m2]',Lg, 'Zone','State','Environment')
 
-    CALL SetupOutputVariable('Ecoroof Cumulative Precipitation [m]',CumPrecip, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Cumulative Irrigation [m]',CumIrrigation, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Cumulative Runoff [m]',CumRunoff, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Cumulative Evapotranspiration [m]',CumET, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Current Precipitation [m]',CurrentPrecipitation, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Current Irrigation [m]',CurrentIrrigation, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Current Runoff [m]',CurrentRunoff, 'Zone','Sum','Environment')
-    CALL SetupOutputVariable('Ecoroof Current Evapotranspiration [m]',CurrentET, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Cumulative Precipitation Depth [m]',CumPrecip, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Cumulative Irrigation Depth [m]',CumIrrigation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Cumulative Runoff Depth [m]',CumRunoff, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Cumulative Evapotranspiration Depth [m]',CumET, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Current Precipitation Depth [m]',CurrentPrecipitation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Current Irrigation Depth [m]',CurrentIrrigation, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Current Runoff Depth [m]',CurrentRunoff, 'Zone','Sum','Environment')
+    CALL SetupOutputVariable('Green Roof Current Evapotranspiration Depth [m]',CurrentET, 'Zone','Sum','Environment')
 
 ! DJS NOVEMBER 2010 - end of calls to setup output of ecoroof variables
 
@@ -727,14 +728,14 @@ SUBROUTINE UpdateSoilProps(Moisture,MeanRootMoisture,MoistureMax,MoistureResidua
   ! Recall MeanRootMoisture = root zone moisture value (m^3/m^3)
 
     !DJS 2009 set the ratiomax and ratiomin values in the code now (rather than as parameters) so that
-  !DJS 2009 we can link them to timesteps and make these limits apply to actual RATES... 
+  !DJS 2009 we can link them to timesteps and make these limits apply to actual RATES...
   !DJS 2009 reasonable rates are +/- 10% change in properties per 15 minute period... Otherwise we have
   !DJS 2009 stability issues.
   !DJS 2011 FEB - Since we no longer use CTF with soil-dependent properties (Do not RECALL INITCONDUCTION...
   !DJS 2011 FEB - we may be able to get away with NO limits on rates of change when using CFD routine.
   !DJS 2011 FEB - for now we stick with 20% per quarter hour.
-   RatioMax = 1.0 + 0.20*minutespertimestep/15.0 
-   RatioMin = 1.0 - 0.20*minutespertimestep/15.0 
+   RatioMax = 1.0 + 0.20*minutespertimestep/15.0
+   RatioMin = 1.0 - 0.20*minutespertimestep/15.0
 
   If (UpdatebeginFlag) then
 
@@ -1073,7 +1074,7 @@ END SUBROUTINE UpdateSoilProps
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

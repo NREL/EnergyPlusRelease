@@ -222,7 +222,7 @@ SUBROUTINE GetBoilerInput
 
     ! USE STATEMENTS:
     USE DataGlobalConstants
-    USE InputProcessor,     ONLY: GetNumObjectsFound, GetObjectItem, VerifyName
+    USE InputProcessor,     ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString
     USE DataIPShortCuts  ! Data for field names, blank numerics
     USE BranchNodeConnections, ONLY: TestCompSet
     USE NodeInputManager,   ONLY: GetOnlySingleNode
@@ -249,7 +249,7 @@ SUBROUTINE GetBoilerInput
 
     SteamFluidIndex=0
     cCurrentModuleObject = 'Boiler:Steam'
-    NumBoilers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumBoilers = GetNumObjectsFound(cCurrentModuleObject)
 
     IF (NumBoilers<=0) THEN
       CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -271,7 +271,7 @@ SUBROUTINE GetBoilerInput
 
          !LOAD ARRAYS WITH CURVE FIT Boiler DATA
     DO BoilerNum = 1 , NumBoilers
-       CALL GetObjectItem(TRIM(cCurrentModuleObject),BoilerNum,cAlphaArgs,NumAlphas, &
+       CALL GetObjectItem(cCurrentModuleObject,BoilerNum,cAlphaArgs,NumAlphas, &
                                rNumericArgs,NumNums,IOSTAT,AlphaFieldnames=cAlphaFieldNames, &
                                NumericFieldNames=cNumericFieldNames)
 
@@ -321,6 +321,14 @@ SUBROUTINE GetBoilerInput
        CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
           BoilerFuelTypeForOutputVariable(BoilerNum) = 'Propane'
           Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('PROPANE')
+
+       CASE ('OTHERFUEL1')
+          BoilerFuelTypeForOutputVariable(BoilerNum) = 'OtherFuel1'
+          Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('OTHERFUEL1')
+
+       CASE ('OTHERFUEL2')
+          BoilerFuelTypeForOutputVariable(BoilerNum) = 'OtherFuel2'
+          Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('OTHERFUEL2')
 
        CASE DEFAULT
           CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
@@ -390,19 +398,24 @@ SUBROUTINE GetBoilerInput
     ENDIF
 
     DO BoilerNum = 1, NumBoilers
-       CALL SetupOutputVariable('Boiler Heating Output Rate [W]', &
+       CALL SetupOutputVariable('Boiler Heating Rate [W]', &
             BoilerReport(BoilerNum)%BoilerLoad,'System','Average',Boiler(BoilerNum)%Name)
-       CALL SetupOutputVariable('Boiler Heating Output Energy [J]', &
+       CALL SetupOutputVariable('Boiler Heating Energy [J]', &
             BoilerReport(BoilerNum)%BoilerEnergy,'System','Sum',Boiler(BoilerNum)%Name,  &
                   ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BOILERS',GroupKey='Plant')
-       CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Consumption Rate [W]', &
-            BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
-       CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Consumption [J]', &
+       IF (SameString(BoilerFuelTypeForOutputVariable(BoilerNum), 'Electric')) THEN
+         CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Power [W]', &
+              BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
+       ELSE
+         CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Rate [W]', &
+              BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
+       ENDIF
+       CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Energy [J]', &
             BoilerReport(BoilerNum)%FuelConsumed,'System','Sum',Boiler(BoilerNum)%Name,  &
                   ResourceTypeKey=TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)),EndUseKey='Heating',GroupKey='Plant')
-       CALL SetupOutputVariable('Boiler Steam Inlet Temp [C]', &
+       CALL SetupOutputVariable('Boiler Steam Inlet Temperature [C]', &
             BoilerReport(BoilerNum)%BoilerInletTemp,'System','Average',Boiler(BoilerNum)%Name)
-       CALL SetupOutputVariable('Boiler Steam Outlet Temp [C]', &
+       CALL SetupOutputVariable('Boiler Steam Outlet Temperature [C]', &
             BoilerReport(BoilerNum)%BoilerOutletTemp,'System','Average',Boiler(BoilerNum)%Name)
        CALL SetupOutputVariable('Boiler Steam Mass Flow Rate [kg/s]', &
             BoilerReport(BoilerNum)%Mdot,'System','Average',Boiler(BoilerNum)%Name)
@@ -815,7 +828,7 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
       IF (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock==0) THEN
         ! Calculate the flow for the boiler
-        
+
         SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
         CASE (SingleSetPoint)
           BoilerDeltaTemp = Node(BoilerOutletNode)%TempSetPoint-Node(BoilerInletNode)%Temp
@@ -1041,15 +1054,10 @@ SUBROUTINE UpdateBoilerRecords(MyLoad,RunFlag,Num,FirstHVACIteration)
       BoilerReport(Num)%Mdot                      = Node(BoilerOutletNode)%MassFlowRate
       LoopNum = Boiler(Num)%LoopNum
       LoopSideNum = Boiler(Num)%LoopSideNum
-!      IF(FirstHVACIteration .and. (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0)) THEN
-!        Node(BoilerOutletNode)%MassFlowRateMaxAvail = Node(BoilerInletNode)%MassFlowRateMaxAvail
-!      ELSE
-!        Node(BoilerOutletNode)%MassFlowRateMaxAvail = Boiler(Num)%DesMassFlowRate
-!      END IF
-!      Node(BoilerOutletNode)%MassFlowRateMinAvail = Node(BoilerInletNode)%MassFlowRateMinAvail
+
       BoilerReport(Num)%BoilerEnergy   = BoilerReport(Num)%BoilerLoad*ReportingConstant
       BoilerReport(Num)%FuelConsumed   = BoilerReport(Num)%FuelUsed*ReportingConstant
-      !Node(BoilerInletNode)%MassFlowRateMaxAvail = Boiler(Num)%DesMassFlowRate
+
 
   RETURN
 
@@ -1060,7 +1068,7 @@ END SUBROUTINE UpdateBoilerRecords
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

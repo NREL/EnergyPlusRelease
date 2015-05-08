@@ -2,7 +2,11 @@
 ! HeatPumpWaterToWaterHEATING
 ! HeatPumpWaterToWaterCOOLING
 ! HeatPumpWaterToWaterSimple
-
+!************************************************************************************
+!
+!==================================== MODULE HeatPumpWaterToWaterHEATING ======================
+!
+!************************************************************************************
 MODULE HeatPumpWaterToWaterHEATING
   ! Module containing the routines dealing with the Water to Water Heat Pump (Heating)
 
@@ -476,33 +480,33 @@ SUBROUTINE GetGshpInput
 
   ! CurrentModuleObject='HeatPump:WaterToWater:ParameterEstimation:Heating'
   DO GSHPNum = 1,NumGshps
-   CALL SetupOutputVariable('GSHP HEATING Electric Power [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Electric Power [W]', &
         GshpReport(GSHPNum)%Power,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Electric Consumption [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
         GshpReport(GSHPNum)%Energy,'System','Sum',GSHP(GSHPNum)%Name,  &
         ResourceTypeKey='Electricity',EndUseKey='Heating',GroupKey='Plant')
 
-   CALL SetupOutputVariable('GSHP HEATING Load Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Rate [W]', &
         GshpReport(GSHPNum)%QLoad,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Load Side Heat Transferred [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Energy [J]', &
         GshpReport(GSHPNum)%QLoadEnergy,'System','Sum',GSHP(GSHPNum)%Name)
 
-   CALL SetupOutputVariable('GSHP HEATING Source Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Rate [W]', &
         GshpReport(GSHPNum)%QSource,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Source Side Heat Transferred [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Energy [J]', &
         GshpReport(GSHPNum)%QSourceEnergy,'System','Sum',GSHP(GSHPNum)%Name)
 
-   CALL SetupOutputVariable('GSHP HEATING Load Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Outlet Temperature [C]', &
         GshpReport(GSHPNum)%LoadSideWaterOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Load Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Inlet Temperature [C]', &
         GshpReport(GSHPNum)%LoadSideWaterInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Source Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Outlet Temperature [C]', &
         GshpReport(GSHPNum)%SourceSideWaterOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Source Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Inlet Temperature [C]', &
         GshpReport(GSHPNum)%SourceSideWaterInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Load Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Mass Flow Rate [kg/s]', &
         GshpReport(GSHPNum)%LoadSidemdot,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP HEATING Source Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Mass Flow Rate [kg/s]', &
         GshpReport(GSHPNum)%SourceSidemdot,'System','Average',GSHP(GSHPNum)%Name)
 
     !scan for loop connection data
@@ -795,7 +799,7 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
     IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
 
         ! Normal pump operation
-      TIMEIF: IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
+      IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
         IF(MyLoad > 0.0 ) THEN
           GSHP(GSHPNum)%isOn = .TRUE.
           GSHP(GSHPNum)%MustRun = .TRUE.
@@ -809,20 +813,20 @@ SUBROUTINE CalcGshpModel( GSHPType, GSHPName, GSHPNum, MyLoad,FirstHVACIteration
         END IF
 
       ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN TIMEIF
+      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN
         ! Even if there is NO zone demand we run the heat pump for the cycle time
         IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock== 0 )THEN
           GSHP(GSHPNum)%MustRun = .TRUE.
           CALL ForceEquipment( GshpType, GshpName, .TRUE. )
         END IF
       ! Keep the pump turned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN TIMEIF
+      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN
         ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
         IF( MyLoad > 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
           GSHP(GSHPNum)%MustRun = .FALSE.
           CALL ForceEquipment( GshpType, GshpName, .FALSE. )
         END IF
-      END IF TIMEIF
+      END IF
 
     ELSE ! FIRSTHVAC .OR. WARMUP FLAG
 
@@ -1246,7 +1250,7 @@ END SUBROUTINE UpdateGSHPRecords
 END MODULE HeatPumpWaterToWaterHEATING
 !************************************************************************************
 !
-!********************************** NEW MODULE *********  NEW  MODULE *************
+!==================================== MODULE HeatPumpWaterToWaterCOOLING ======================
 !
 !************************************************************************************
 MODULE HeatPumpWaterToWaterCOOLING
@@ -1736,33 +1740,33 @@ SUBROUTINE GetGshpInput
 
    !CurrentModuleObject='HeatPump:WaterToWater:ParameterEstimation:Cooling'
   DO GSHPNum = 1,NumGshps
-   CALL SetupOutputVariable('GSHP COOLING Electric Power [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Electric Power [W]', &
         GshpReport(GSHPNum)%Power,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Electric Consumption [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
         GshpReport(GSHPNum)%Energy,'System','Sum',GSHP(GSHPNum)%Name,  &
         ResourceTypeKey='Electricity',EndUseKey='Cooling',GroupKey='Plant')
 
-   CALL SetupOutputVariable('GSHP COOLING Load Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Rate [W]', &
         GshpReport(GSHPNum)%QLoad,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Load Side Heat Transferred [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Energy [J]', &
         GshpReport(GSHPNum)%QLoadEnergy,'System','Sum',GSHP(GSHPNum)%Name)
 
-   CALL SetupOutputVariable('GSHP COOLING Source Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Rate [W]', &
         GshpReport(GSHPNum)%QSource,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Source Side Heat Transferred [J]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Energy [J]', &
         GshpReport(GSHPNum)%QSourceEnergy,'System','Sum',GSHP(GSHPNum)%Name)
 
-   CALL SetupOutputVariable('GSHP COOLING Load Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Outlet Temperature [C]', &
         GshpReport(GSHPNum)%LoadSideWaterOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Load Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Inlet Temperature [C]', &
         GshpReport(GSHPNum)%LoadSideWaterInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Source Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Outlet Temperature [C]', &
         GshpReport(GSHPNum)%SourceSideWaterOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Source Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Inlet Temperature [C]', &
         GshpReport(GSHPNum)%SourceSideWaterInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Load Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Mass Flow Rate [kg/s]', &
         GshpReport(GSHPNum)%LoadSidemdot,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP COOLING Source Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Mass Flow Rate [kg/s]', &
         GshpReport(GSHPNum)%SourceSidemdot,'System','Average',GSHP(GSHPNum)%Name)
 
     !scan for loop connection data
@@ -2012,9 +2016,9 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
    REAL(r64)              :: CompSuctionSatTemp
    REAL(r64)              :: HighPressCutOff
    REAL(r64)              :: LowPressCutOff
-  CHARACTER(len=25)      :: ErrString
-  REAL(r64)              :: DutyFactor
-  INTEGER                :: IterationCount
+   CHARACTER(len=25)      :: ErrString
+   REAL(r64)              :: DutyFactor
+   INTEGER                :: IterationCount
 
   REAL(r64), SAVE :: CurrentSimTime = 0.0
   REAL(r64), SAVE :: PrevSimTime = 0.0
@@ -2068,7 +2072,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
     IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
 
       ! Normal pump operation
-      TIMEIF: IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
+      IF ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) < CurrentSimTime ) THEN
         IF(ABS(MyLoad) > 0.0 ) THEN !.AND. LoadSideWaterMassFlowRate > MassFlowTolerance )THEN
           GSHP(GSHPNum)%isOn = .TRUE.
           GSHP(GSHPNum)%MustRun = .TRUE.
@@ -2083,7 +2087,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
         END IF
 
       ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN TIMEIF
+      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ( (GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime) > CurrentSimTime) ) THEN
 
         ! Even if there is NO zone demand we run the heat pump for the cycle time
         IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
@@ -2092,13 +2096,13 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
         END IF
 
       ! Keep the pump truned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN TIMEIF
+      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + GSHP(GSHPNum)%CycleTime)>CurrentSimTime)) THEN
         ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
         IF( ABS(MyLoad) > 0.d0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
           GSHP(GSHPNum)%MustRun = .FALSE.
           CALL ForceEquipment( GshpType, GshpName, .FALSE. ) !DSU?  still need? looks like a band aid?
         END IF
-      END IF TIMEIF
+      END IF
     ELSE ! FIRSTHVAC .OR. WARMUP FLAG
 
       IF(MyLoad < 0.d0)THEN
@@ -2206,9 +2210,9 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
 
 
   !Determine effectiveness of Load Side
-  LoadSideEffect   = 1- EXP ( -LoadSideUA / (CpLoadSide * LoadSidewaterMassFlowRate))
+  LoadSideEffect   = 1.0d0 - EXP ( -LoadSideUA / (CpLoadSide * LoadSidewaterMassFlowRate))
   ! Determine effectiveness of Source Side
-  SourceSideEffect = 1- EXP( -SourceSideUA / (CpSourceSide * SourceSideWaterMassFlowRate ))
+  SourceSideEffect = 1.0d0 - EXP( -SourceSideUA / (CpSourceSide * SourceSideWaterMassFlowRate ))
 
   ! main iteration loop to solve model equations
   LOOPSourceEnth: DO
@@ -2290,7 +2294,7 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
 
     T110 = CompSuctionSatTemp
     !            Shoot into the super heated region
-    T111 = CompSuctionSatTemp + 100
+    T111 = CompSuctionSatTemp + 100.d0
     ! Iterate to find the Suction State
     LOOP: DO
       CompSuctionTemp = 0.5d0 * ( T110 + T111 )
@@ -2355,7 +2359,6 @@ SUBROUTINE CalcGshpModel(GSHPType,GSHPName,GSHPNum, MyLoad,FirstHVACIteration)
     END IF
 
   END DO LOOPSourceEnth
-
 
   !Control Strategy
 !  IF( GSHP(GSHPNum)%CycleTime  < TimeStepSys )THEN
@@ -2541,7 +2544,7 @@ END SUBROUTINE UpdateGSHPRecords
 END MODULE HeatPumpWaterToWaterCOOLING
 !************************************************************************************
 !
-!********************************** NEW MODULE *********  NEW  MODULE *************
+!==================================== MODULE HeatPumpWaterToWaterSimple ======================
 !
 !************************************************************************************
 MODULE HeatPumpWaterToWaterSimple
@@ -3025,12 +3028,12 @@ SUBROUTINE GetWatertoWaterHPInput
         CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%RatedSourceVolFlowCool)
 
         ! CurrentModuleObject='HeatPump:WatertoWater:EquationFit:Cooling'
-        CALL SetupOutputVariable('GSHP Electric Consumption [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
              GSHPReport(GSHPNum)%Energy,'System','Sum',GSHP(GSHPNum)%Name,  &
              ResourceTypeKey='Electricity',EndUseKey='Cooling',GroupKey='Plant')
-        CALL SetupOutputVariable('GSHP Load Side Heat Transferred [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Energy [J]', &
              GSHPReport(GSHPNum)%QLoadEnergy,'System','Sum',GSHP(GSHPNum)%Name)
-        CALL SetupOutputVariable('GSHP Source Side Heat Transferred [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Energy [J]', &
              GSHPReport(GSHPNum)%QSourceEnergy,'System','Sum',GSHP(GSHPNum)%Name)
   END DO
 
@@ -3091,34 +3094,34 @@ SUBROUTINE GetWatertoWaterHPInput
         CALL RegisterPlantCompDesignFlow(GSHP(GSHPNum)%SourceSideInletNodeNum,0.5*GSHP(GSHPNum)%RatedSourceVolFlowHeat)
 
         ! CurrentModuleObject='HeatPump:WatertoWater:EquationFit:Heating'
-        CALL SetupOutputVariable('GSHP Electric Consumption [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Electric Energy [J]', &
              GSHPReport(GSHPNum)%Energy,'System','Sum',GSHP(GSHPNum)%Name,  &
              ResourceTypeKey='Electricity',EndUseKey='Heating',GroupKey='Plant')
-        CALL SetupOutputVariable('GSHP Load Side Heat Transferred [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Energy [J]', &
              GSHPReport(GSHPNum)%QLoadEnergy,'System','Sum',GSHP(GSHPNum)%Name)
-        CALL SetupOutputVariable('GSHP Source Side Heat Transferred [J]', &
+        CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Energy [J]', &
              GSHPReport(GSHPNum)%QSourceEnergy,'System','Sum',GSHP(GSHPNum)%Name)
   END DO
 
   DO GSHPNum = 1,NumGSHPs
     !setup output variables
-   CALL SetupOutputVariable('GSHP Electric Power [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Electric Power [W]', &
         GSHPReport(GSHPNum)%Power,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Load Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Heat Transfer Rate [W]', &
         GSHPReport(GSHPNum)%QLoad,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Source Side Heat Transfer Rate [W]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Heat Transfer Rate [W]', &
         GSHPReport(GSHPNum)%QSource,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Load Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Outlet Temperature [C]', &
         GSHPReport(GSHPNum)%LoadSideOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Load Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Inlet Temperature [C]', &
         GSHPReport(GSHPNum)%LoadSideInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Source Side Outlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Outlet Temperature [C]', &
         GSHPReport(GSHPNum)%SourceSideOutletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Source Side Inlet Temperature [C]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Inlet Temperature [C]', &
         GSHPReport(GSHPNum)%SourceSideInletTemp,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Load Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Load Side Mass Flow Rate [kg/s]', &
         GSHPReport(GSHPNum)%LoadSideMassFlowRate,'System','Average',GSHP(GSHPNum)%Name)
-   CALL SetupOutputVariable('GSHP Source Side Water Mass Flow Rate[kg/s]', &
+   CALL SetupOutputVariable('Water to Water Heat Pump Source Side Mass Flow Rate [kg/s]', &
         GSHPReport(GSHPNum)%SourceSideMassFlowRate,'System','Average',GSHP(GSHPNum)%Name)
 
     !scan for loop connection data
@@ -3333,7 +3336,7 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
 
     IF(.Not. WarmupFlag .AND. .NOT. FirstHVACIteration )THEN
       ! Normal pump operation
-      TIMEIF: IF ( (GSHP(GSHPNum)%LastEventTime + CycleTime) < CurrentSimTime ) THEN
+      IF ( (GSHP(GSHPNum)%LastEventTime + CycleTime) < CurrentSimTime ) THEN
 
         IF(MyLoad > 0.0 .AND. GSHPTypeNum == TypeOf_HPWaterEFHeating ) THEN
           GSHP(GSHPNum)%IsOn    = .TRUE.
@@ -3352,7 +3355,7 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
         END IF
 
       ! Keep the pump running
-      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime) > CurrentSimTime) ) THEN TIMEIF
+      ELSE IF(GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime) > CurrentSimTime) ) THEN
         ! Even if there is NO zone demand we run the heat pump for the cycle time
         IF( MyLoad == 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
           GSHP(GSHPNum)%MustRun = .TRUE.
@@ -3360,13 +3363,13 @@ SUBROUTINE InitWatertoWaterHP(GSHPTypeNum, GSHPName, GSHPNum, FirstHVACIteration
         END IF
 
       ! Keep the pump turned off
-      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime)>CurrentSimTime)) THEN TIMEIF
+      ELSE IF(.NOT. GSHP(GSHPNum)%WasOn .AND. ((GSHP(GSHPNum)%LastEventTime + CycleTime)>CurrentSimTime)) THEN
         ! Even if there is zone demand we DO NOT run the heat pump for the cycle time
         IF( ABS(MyLoad) > 0.0 .AND. PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock == 0 )THEN
           GSHP(GSHPNum)%MustRun = .FALSE.
           CALL ForceEquipment( GSHPTypeNum, GSHPName, .FALSE. ) !DSU?  still need? looks like a band aid?
         END IF
-      END IF TIMEIF
+      END IF
 
     ELSE ! FIRSTHVAC .OR. WARMUP FLAG
 
@@ -4022,7 +4025,7 @@ END MODULE HeatPumpWaterToWaterSimple
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

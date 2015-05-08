@@ -931,7 +931,7 @@ SUBROUTINE CalcUCSDCV(ZoneNum)
   REAL(r64)     :: MCpT_Total
   REAL(r64)     :: L
   REAL(r64)     :: ZoneMult   ! total zone multiplier
-  REAL(r64)     :: RetAirConvGain 
+  REAL(r64)     :: RetAirConvGain
 
   GainsFrac=0.0
   ZoneMult = Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
@@ -1120,7 +1120,7 @@ END SUBROUTINE CalcUCSDCV
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -219,31 +219,31 @@ SUBROUTINE GetZoneContaminanInputs
   MaxAlpha=-100
   MaxNumber=-100
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:Constant'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:PressureDriven'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:CutoffModel'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DecaySource'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:BoundaryLayerDiffusion'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:DepositionVelocitySink'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DepositionRateSink'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   ALLOCATE(IHGNumbers(MaxNumber))
@@ -252,13 +252,13 @@ SUBROUTINE GetZoneContaminanInputs
   AlphaName=' '
 
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:Constant'
-  TotGCGenConstant=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCGenConstant=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericConstant(TotGCGenConstant))
 
   DO Loop=1,TotGCGenConstant
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -348,14 +348,15 @@ SUBROUTINE GetZoneContaminanInputs
     IF (ZoneContamGenericConstant(Loop)%ActualZoneNum <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Constant Generation Rate [m3/s]',ZoneContamGenericConstant(Loop)%GCGenRate, &
+    CALL SetupOutputVariable('Generic Air Contaminant Constant Source Generation Volume Flow Rate [m3/s]', &
+                              ZoneContamGenericConstant(Loop)%GCGenRate, &
                              'Zone','Average',ZoneContamGenericConstant(Loop)%Name)
 
     ! Zone total report variables
     ZonePtr = ZoneContamGenericConstant(Loop)%ActualZoneNum
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -365,13 +366,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:PressureDriven'
-  TotGCGenPDriven=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCGenPDriven=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericPDriven(TotGCGenPDriven))
 
   DO Loop=1,TotGCGenPDriven
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -453,14 +454,14 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Pressure Driven Generation Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Pressure Driven Generation Volume Flow Rate [m3/s]', &
                              ZoneContamGenericPDriven(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericPDriven(Loop)%Name)
 
     ZonePtr = Surface(ZoneContamGenericPDriven(Loop)%SurfNum)%Zone
     ! Zone total report variables
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -470,13 +471,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:CutoffModel'
-  TotGCGenCutoff=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCGenCutoff=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericCutoff(TotGCGenCutoff))
 
   DO Loop=1,TotGCGenCutoff
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -546,14 +547,14 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Cutoff Model Generation Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Cutoff Model Generation Volume Flow Rate [m3/s]', &
                              ZoneContamGenericCutoff(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericCutoff(Loop)%Name)
 
     ! Zone total report variables
     ZonePtr = ZoneContamGenericCutoff(Loop)%ActualZoneNum
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -562,13 +563,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DecaySource'
-  TotGCGenDecay=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCGenDecay=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericDecay(TotGCGenDecay))
 
   DO Loop=1,TotGCGenDecay
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -638,16 +639,16 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Decay Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Decay Model Generation Volume Flow Rate [m3/s]', &
                              ZoneContamGenericDecay(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericDecay(Loop)%Name)
-    CALL SetupOutputVariable('Generic Contaminant Decay Time Since Emission Start [s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Decay Model Generation Emission Start Elapsed Time [s]', &
                              ZoneContamGenericDecay(Loop)%GCTime,'Zone','Average',ZoneContamGenericDecay(Loop)%Name)
 
     ! Zone total report variables
     ZonePtr = ZoneContamGenericDecay(Loop)%ActualZoneNum
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -656,13 +657,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:BoundaryLayerDiffusion'
-  TotGCBLDiff =GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCBLDiff =GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericBLDiff(TotGCBLDiff))
 
   DO Loop=1,TotGCBLDiff
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -731,17 +732,17 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Boundary Layer Diffusion Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Boundary Layer Diffusion Generation Volume Flow Rate [m3/s]', &
                              ZoneContamGenericBLDiff(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericBLDiff(Loop)%Name)
     If (ZoneContamGenericBLDiff(Loop)%SurfNum .GT. 0) &
-      CALL SetupOutputVariable('Generic Contaminant Interior Surface Concentration Level [ppm]', &
+      CALL SetupOutputVariable('Generic Air Contaminant Boundary Layer Diffusion Inside Face Concentration [ppm]', &
        Surface(ZoneContamGenericBLDiff(Loop)%SurfNum)%GenericContam,'Zone','Average',ZoneContamGenericBLDiff(Loop)%SurfName)
 
     ZonePtr = Surface(ZoneContamGenericBLDiff(Loop)%SurfNum)%Zone
     ! Zone total report variables
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -750,13 +751,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='SurfaceContaminantSourceAndSink:Generic:DepositionVelocitySink'
-  TotGCDVS =GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCDVS =GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericDVS(TotGCDVS))
 
   DO Loop=1,TotGCDVS
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -818,14 +819,14 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Deposition Velocity Sink Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Deposition Velocity Removal Volume Flow Rate [m3/s]', &
                              ZoneContamGenericDVS(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericDVS(Loop)%Name)
 
     ZonePtr = Surface(ZoneContamGenericDVS(Loop)%SurfNum)%Zone
     ! Zone total report variables
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -834,13 +835,13 @@ SUBROUTINE GetZoneContaminanInputs
   END DO
 
   CurrentModuleObject='ZoneContaminantSourceAndSink:Generic:DepositionRateSink'
-  TotGCDRS=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotGCDRS=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneContamGenericDRS(TotGCDRS))
 
   DO Loop=1,TotGCDRS
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -903,14 +904,14 @@ SUBROUTINE GetZoneContaminanInputs
     End If
 
     ! Object report variables
-    CALL SetupOutputVariable('Generic Contaminant Deposition Rate Sink Rate [m3/s]', &
+    CALL SetupOutputVariable('Generic Air Contaminant Deposition Rate Removal Volume Flow Rate [m3/s]', &
                              ZoneContamGenericDRS(Loop)%GCGenRate,'Zone','Average',ZoneContamGenericDRS(Loop)%Name)
 
     ZonePtr = ZoneContamGenericDRS(Loop)%ActualZoneNum
     ! Zone total report variables
     IF (RepVarSet(ZonePtr)) THEN
       RepVarSet(ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Generic Contaminant Source and Sink Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Generic Air Contaminant Generation Volume Flow Rate [m3/s]', &
           ZnRpt(ZonePtr)%GCRate,'Zone','Average', Zone(ZonePtr)%Name)
     ENDIF
     CALL SetupZoneInternalGain(ZonePtr, 'ZoneContaminantSourceAndSink:GenericContaminant', &
@@ -991,14 +992,14 @@ SUBROUTINE GetZoneContaminanSetpoints
 
           ! FLOW:
   cCurrentModuleObject='ZoneControl:ContaminantController'
-  NumContControlledZones = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumContControlledZones = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumContControlledZones .GT. 0) THEN
     ALLOCATE(ContaminantControlledZone(NumContControlledZones))
   ENDIF
 
   DO ContControlledZoneNum = 1, NumContControlledZones
-    CALL GetObjectItem(trim(cCurrentModuleObject),ContControlledZoneNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,ContControlledZoneNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1021,24 +1022,28 @@ SUBROUTINE GetZoneContaminanSetpoints
     END IF
 
     ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedule = cAlphaArgs(3)
-    ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr=GetScheduleIndex(cAlphaArgs(3))
-    IF (ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr == 0) THEN
-      CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
-         trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'" not found.')
-      ErrorsFound = .TRUE.
+    IF (lAlphaFieldBlanks(3)) THEN
+      ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr=ScheduleAlwaysOn ! (Returns 1.0)
     ELSE
-      ! Check validity of control types.
-      ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr,'>=',0.0,'<=',1.0)
-      IF (.not. ValidScheduleType) THEN
-        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
-           trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'"')
-        CALL ShowContinueError('..contains values outside of range [0,1].')
-        ErrorsFound=.TRUE.
+      ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr=GetScheduleIndex(cAlphaArgs(3))
+      IF (ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr == 0) THEN
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'" not found.')
+        ErrorsFound = .TRUE.
       ELSE
-        Zone(ContaminantControlledZone(ContControlledZoneNum)%ActualZoneNum)%ZoneContamControllerSchedIndex = &
-                                         ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr
-      ENDIF
-    END IF
+        ! Check validity of control types.
+        ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr,'>=',0.0,'<=',1.0)
+        IF (.not. ValidScheduleType) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
+             trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'"')
+          CALL ShowContinueError('..contains values outside of range [0,1].')
+          ErrorsFound=.TRUE.
+        ELSE
+          Zone(ContaminantControlledZone(ContControlledZoneNum)%ActualZoneNum)%ZoneContamControllerSchedIndex = &
+                                           ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr
+        ENDIF
+      END IF
+    ENDIF
 
     ContaminantControlledZone(ContControlledZoneNum)%SetPointSchedName = cAlphaArgs(4)
     ContaminantControlledZone(ContControlledZoneNum)%SPSchedIndex=GetScheduleIndex(cAlphaArgs(4))
@@ -1077,19 +1082,24 @@ SUBROUTINE GetZoneContaminanSetpoints
 
     If (NumAlphas .GT. 5) Then
       ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedule = cAlphaArgs(6)
-      ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedPtr=GetScheduleIndex(cAlphaArgs(6))
-      IF (ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr == 0) THEN
-        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
-         trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(6))//'" not found.')
-        ErrorsFound = .TRUE.
+      IF (lAlphaFieldBlanks(6)) THEN
+        ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedPtr=ScheduleAlwaysOn
       ELSE
+        ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedPtr=GetScheduleIndex(cAlphaArgs(6))
+        IF (ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr == 0) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//  &
+           trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(6))//'" not found.')
+          ErrorsFound = .TRUE.
+        ELSE
         ! Check validity of control types.
-        ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%AvaiSchedPtr,'>=',0.0,'<=',1.0)
-        IF (.not. ValidScheduleType) THEN
-          CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
-           trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(6))//'"')
-          CALL ShowContinueError('..contains values outside of range [0,1].')
-          ErrorsFound=.TRUE.
+          ValidScheduleType=CheckScheduleValueMinMax(ContaminantControlledZone(ContControlledZoneNum)%GCAvaiSchedPtr,  &
+             '>=',0.0,'<=',1.0)
+          IF (.not. ValidScheduleType) THEN
+            CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid range '//  &
+               trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(6))//'"')
+            CALL ShowContinueError('..contains values outside of range [0,1].')
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
       END IF
       If (lAlphaFieldBlanks(7)) Then
@@ -1245,12 +1255,12 @@ SUBROUTINE InitZoneContSetpoints
     DO Loop = 1, NumOfZones
       ! Zone CO2
       IF (Contaminant%CO2Simulation) Then
-        CALL SetupOutputVariable('Zone Air Carbon Dioxide Concentration [ppm]',ZoneAirCO2(Loop),'System','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Zone/Sys CO2 Load Rate Predicted to Carbon Dioxide Setpoint [kg/s]', &
+        CALL SetupOutputVariable('Zone Air CO2 Concentration [ppm]',ZoneAirCO2(Loop),'System','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Zone Air CO2 Predicted Load to Setpoint Mass Flow Rate [kg/s]', &
                                CO2PredictedRate(Loop),'System','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Zone/Sys Carbon Dioxide Setpoint [ppm]', ZoneCO2Setpoint(Loop), &
+        CALL SetupOutputVariable('Zone Air CO2 Setpoint Concentration [ppm]', ZoneCO2Setpoint(Loop), &
                                'System','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Zone Carbon Dioxide Internal Gain [m3/s]', ZoneCO2Gain(Loop), &
+        CALL SetupOutputVariable('Zone Air CO2 Internal Gain Volume Flow Rate [m3/s]', ZoneCO2Gain(Loop), &
                                'System','Average',Zone(Loop)%Name)
       END IF
 
@@ -1317,11 +1327,11 @@ SUBROUTINE InitZoneContSetpoints
     DO Loop = 1, NumOfZones
       ! Zone CO2
       IF (Contaminant%GenericContamSimulation) Then
-        CALL SetupOutputVariable('Zone Air Generic Contaminant Concentration [ppm]',ZoneAirGC(Loop),  &
+        CALL SetupOutputVariable('Zone Air Generic Air Contaminant Concentration [ppm]',ZoneAirGC(Loop),  &
            'System','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Zone/Sys Generic Contaminant Load Rate Predicted to Generic Contaminant Setpoint [kg/s]', &
+        CALL SetupOutputVariable('Zone Generic Air Contaminant Predicted Load to Setpoint Mass Flow Rate [kg/s]', &
                                GCPredictedRate(Loop),'System','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Zone/Sys Generic Contaminant Setpoint [ppm]', ZoneGCSetpoint(Loop), &
+        CALL SetupOutputVariable('Zone Generic Air Contaminant Setpoint Concentration [ppm]', ZoneGCSetpoint(Loop), &
                                'System','Average',Zone(Loop)%Name)
       END IF
     END DO ! Loop
@@ -2496,7 +2506,7 @@ END SUBROUTINE CorrectZoneContaminants
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

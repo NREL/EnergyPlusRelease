@@ -265,7 +265,7 @@ SUBROUTINE GetTranspiredCollectorInput
   USE InputProcessor,   ONLY: GetNumObjectsFound, GetObjectItem, GetObjectDefMaxArgs, FindItemInList , &
                               SameString
   USE DataIPShortCuts  ! Data for field names, blank numerics
-  USE DataGlobals,      ONLY: PI
+  USE DataGlobals,      ONLY: PI, ScheduleAlwaysOn
   USE DataInterfaces,   ONLY: ShowSevereError, SetupOutputVariable
   USE General,          ONLY: TrimSigDigits, RoundSigDigits
   USE DataSurfaces,     ONLY: Surface, OSCM, TotOSCM, TotSurfaces, OtherSideCondModeledExt
@@ -328,7 +328,7 @@ SUBROUTINE GetTranspiredCollectorInput
   CHARACTER(len=MaxNameLength)   :: CurrentModuleMultiObject  ! for ease in renaming.
 
   CurrentModuleObject = 'SolarCollector:UnglazedTranspired'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Dummy, MaxNumAlphas,MaxNumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Dummy, MaxNumAlphas,MaxNumNumbers)
 
   IF (MaxNumNumbers /= 11) THEN
     CALL ShowSevereError('GetTranspiredCollectorInput: '//TRIM(CurrentModuleObject)//' Object Definition indicates '// &
@@ -340,10 +340,10 @@ SUBROUTINE GetTranspiredCollectorInput
   Numbers = 0.0
   Alphas  = ' '
 
-  numUTSC = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  numUTSC = GetNumObjectsFound(CurrentModuleObject)
   numUTSCSplitter = 0 !init
   CurrentModuleMultiObject =  'SolarCollector:UnglazedTranspired:Multisystem'
-  numUTSCSplitter = GetNumObjectsFound(TRIM(CurrentModuleMultiObject))
+  numUTSCSplitter = GetNumObjectsFound(CurrentModuleMultiObject)
 
   ALLOCATE(UTSC(NumUTSC))
   ALLOCATE(CheckEquipName(NumUTSC))
@@ -352,8 +352,9 @@ SUBROUTINE GetTranspiredCollectorInput
   SplitterNameOK = .FALSE.
 
   DO Item=1,NumUTSC
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
-                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    CALL GetObjectItem(CurrentModuleObject,Item,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
+                AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
     ! first handle alphas
     UTSC(Item)%Name     = Alphas(1)
@@ -372,7 +373,7 @@ SUBROUTINE GetTranspiredCollectorInput
       NumbersSplit = 0.0
       AlphasSplit  = ' '
       Do ItemSplit = 1, NumUTSCSplitter
-         CALL GetObjectItem(TRIM(CurrentModuleMultiObject),ItemSplit,AlphasSplit,NumAlphasSplit, &
+         CALL GetObjectItem(CurrentModuleMultiObject,ItemSplit,AlphasSplit,NumAlphasSplit, &
                                 NumbersSplit,NumNumbersSplit,IOStatusSplit)
          If (.NOT.( SameString(AlphasSplit(1),Alphas(1)) ) ) Cycle
          SplitterNameOK(ItemSplit) = .true.
@@ -426,13 +427,17 @@ SUBROUTINE GetTranspiredCollectorInput
         ErrorsFound=.true.
     ENDIF
     UTSC(Item)%OSCMPtr = Found
-    UTSC(Item)%SchedPtr = GetScheduleIndex(Alphas(3))
-    IF (UTSC(Item)%SchedPtr == 0) THEN
-       CALL ShowSevereError(TRIM(cAlphaFieldNames(3))//'not found='//TRIM(Alphas(3))// &
-              ' in '//TRIM(CurrentModuleObject)//' ='//TRIM(UTSC(Item)%Name))
-       ErrorsFound=.true.
-       CYCLE
-    ENDIF
+    IF (lAlphaFieldBlanks(3)) THEN
+      UTSC(Item)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      UTSC(Item)%SchedPtr = GetScheduleIndex(Alphas(3))
+      IF (UTSC(Item)%SchedPtr == 0) THEN
+        CALL ShowSevereError(TRIM(cAlphaFieldNames(3))//'not found='//TRIM(Alphas(3))// &
+             ' in '//TRIM(CurrentModuleObject)//' ='//TRIM(UTSC(Item)%Name))
+        ErrorsFound=.true.
+        CYCLE
+     ENDIF
+   ENDIF
 
    !now if UTSC(Item)%NumOASysAttached still not set, assume no multisystem
     IF (UTSC(Item)%NumOASysAttached == 0) THEN
@@ -641,35 +646,35 @@ SUBROUTINE GetTranspiredCollectorInput
     UTSC(Item)%HdeltaNPL     = MAX(tempHdeltaNPL, UTSC(Item)%PlenGapThick)
 
 
-    CALL SetupOutputVariable('UTSC Heat Exchanger Effectiveness[]',UTSC(Item)%HXeff, &
+    CALL SetupOutputVariable('Solar Collector Heat Exchanger Effectiveness []',UTSC(Item)%HXeff, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Leaving Air Drybulb from Collector[C]',UTSC(Item)%TairHX, &
+    CALL SetupOutputVariable('Solar Collector Leaving Air Temperature [C]',UTSC(Item)%TairHX, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Average Suction Face Velocity [m/s]',UTSC(Item)%Vsuction, &
+    CALL SetupOutputVariable('Solar Collector Outside Face Suction Velocity [m/s]',UTSC(Item)%Vsuction, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Collector Temperature[C]',UTSC(Item)%Tcoll, &
+    CALL SetupOutputVariable('Solar Collector Surface Temperature [C]',UTSC(Item)%Tcoll, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Plenum Drybulb Temperature[C]',UTSC(Item)%Tplen, &
+    CALL SetupOutputVariable('Solar Collector Plenum Air Temperature [C]',UTSC(Item)%Tplen, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Sensible Heating Rate [W]',UTSC(Item)%SensHeatingRate, &
+    CALL SetupOutputVariable('Solar Collector Sensible Heating Rate [W]',UTSC(Item)%SensHeatingRate, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Sensible Heating Energy [J]',UTSC(Item)%SensHeatingEnergy, &
+    CALL SetupOutputVariable('Solar Collector Sensible Heating Energy [J]',UTSC(Item)%SensHeatingEnergy, &
                                'System','Sum',UTSC(Item)%Name, &
                                 ResourceTypeKey='SolarAir' , EndUseKey='HeatProduced',GroupKey = 'System')
 
-    CALL SetupOutputVariable('UTSC Air Changes per Hour Passive[ACH]',UTSC(Item)%PassiveACH, &
+    CALL SetupOutputVariable('Solar Collector Natural Ventilation Air Change Rate [ACH]',UTSC(Item)%PassiveACH, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Total Natural Vent Mass Flow[kg/s]',UTSC(Item)%PassiveMdotVent, &
+    CALL SetupOutputVariable('Solar Collector Natural Ventilation Mass Flow Rate [kg/s]',UTSC(Item)%PassiveMdotVent, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Total Natural Vent Mass Flow from Wind[kg/s]',UTSC(Item)%PassiveMdotWind, &
+    CALL SetupOutputVariable('Solar Collector Wind Natural Ventilation Mass Flow Rate [kg/s]',UTSC(Item)%PassiveMdotWind, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Total Natural Vent Mass Flow from Bouyancy[kg/s]',UTSC(Item)%PassiveMdotTherm, &
+    CALL SetupOutputVariable('Solar Collector Buoyancy Natural Ventilation Mass Flow Rate [kg/s]',UTSC(Item)%PassiveMdotTherm, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Incident Solar Radiation[W/m2]',UTSC(Item)%Isc, &
+    CALL SetupOutputVariable('Solar Collector Incident Solar Radiation [W/m2]',UTSC(Item)%Isc, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Overall Efficiency[]',UTSC(Item)%UTSCEfficiency, &
+    CALL SetupOutputVariable('Solar Collector System Efficiency []',UTSC(Item)%UTSCEfficiency, &
                                'System','Average',UTSC(Item)%Name)
-    CALL SetupOutputVariable('UTSC Collector Efficiency[]',UTSC(Item)%UTSCCollEff, &
+    CALL SetupOutputVariable('Solar Collector Surface Efficiency []',UTSC(Item)%UTSCCollEff, &
                                'System','Average',UTSC(Item)%Name)
 
   ENDDO
@@ -1528,7 +1533,7 @@ END SUBROUTINE GetUTSCTsColl
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

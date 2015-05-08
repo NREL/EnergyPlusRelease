@@ -27,7 +27,7 @@ MODULE HVACStandAloneERV
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, SecInHour, &
-                           SysSizingCalc, WarmupFlag
+                           SysSizingCalc, WarmupFlag, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: SetupOutputVariable, ShowContinueErrorTimeStamp,  &
                            ShowFatalError, ShowSevereError, ShowContinueError, ShowWarningError
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
@@ -354,7 +354,7 @@ SUBROUTINE GetStandAloneERV
   ! find the number of each type of Stand Alone ERV unit
   CurrentModuleObject = 'ZoneHVAC:EnergyRecoveryVentilator'
 
-  NumStandAloneERVs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumStandAloneERVs = GetNumObjectsFound(CurrentModuleObject)
 
   ! allocate the data structures
   ALLOCATE(StandAloneERV(NumStandAloneERVs))
@@ -364,7 +364,7 @@ SUBROUTINE GetStandAloneERV
 ! loop over Stand Alone ERV units; get and load the input data
   DO StandAloneERVIndex = 1,NumStandAloneERVs
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),StandAloneERVIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,StandAloneERVIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                        AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     StandAloneERVNum = StandAloneERVIndex ! separate variables in case other objects read by this module at some point later
@@ -378,11 +378,15 @@ SUBROUTINE GetStandAloneERV
     StandAloneERV(StandAloneERVNum)%Name = Alphas(1)
     StandAloneERV(StandAloneERVNum)%UnitType = CurrentModuleObject
 
-    StandAloneERV(StandAloneERVNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-    IF (StandAloneERV(StandAloneERVNum)%SchedPtr .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(StandAloneERV(StandAloneERVNum)%Name)//&
-           '" '//TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
-      ErrorsFound=.TRUE.
+    IF (lAlphaBlanks(2)) THEN
+      StandAloneERV(StandAloneERVNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      StandAloneERV(StandAloneERVNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (StandAloneERV(StandAloneERVNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(StandAloneERV(StandAloneERVNum)%Name)//&
+             '" '//TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
+        ErrorsFound=.TRUE.
+      ENDIF
     END IF
 
     CALL VerifyName(Alphas(3),StandAloneERV%HeatExchangerName,StandAloneERVNum-1,IsNotOK,IsBlank,  &
@@ -747,10 +751,10 @@ SUBROUTINE GetStandAloneERV
 
   OutAirNum = GetNumObjectsFound('Controller:OutdoorAir')
   CurrentModuleObject='ZoneHVAC:EnergyRecoveryVentilator:Controller'
-  NumERVCtrlrs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumERVCtrlrs = GetNumObjectsFound(CurrentModuleObject)
 
   DO ERVControllerNum=1,NumERVCtrlrs
-    CALL GetObjectItem(TRIM(CurrentModuleObject),ERVControllerNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,ERVControllerNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                        AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1050,40 +1054,40 @@ SUBROUTINE GetStandAloneERV
 
   ! Setup report variables for the stand alone ERVs
   DO StandAloneERVIndex = 1,NumStandAloneERVs
-    CALL SetupOutputVariable('Stand Alone ERV Zone Sensible Cooling Rate[W]',StandAloneERV(StandAloneERVIndex)%SensCoolingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Sensible Cooling Rate [W]',StandAloneERV(StandAloneERVIndex)%SensCoolingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Sensible Cooling Energy[J]',&
+    CALL SetupOutputVariable('Zone Ventilator Sensible Cooling Energy [J]',&
                               StandAloneERV(StandAloneERVIndex)%SensCoolingEnergy,'System','Sum',&
                               StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Latent Cooling Rate[W]',StandAloneERV(StandAloneERVIndex)%LatCoolingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Latent Cooling Rate [W]',StandAloneERV(StandAloneERVIndex)%LatCoolingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Latent Cooling Energy[J]',StandAloneERV(StandAloneERVIndex)%LatCoolingEnergy,&
+    CALL SetupOutputVariable('Zone Ventilator Latent Cooling Energy [J]',StandAloneERV(StandAloneERVIndex)%LatCoolingEnergy,&
                               'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Total Cooling Rate[W]',StandAloneERV(StandAloneERVIndex)%TotCoolingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Total Cooling Rate [W]',StandAloneERV(StandAloneERVIndex)%TotCoolingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Total Cooling Energy[J]',StandAloneERV(StandAloneERVIndex)%TotCoolingEnergy,&
+    CALL SetupOutputVariable('Zone Ventilator Total Cooling Energy [J]',StandAloneERV(StandAloneERVIndex)%TotCoolingEnergy,&
                               'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
 
-    CALL SetupOutputVariable('Stand Alone ERV Zone Sensible Heating Rate[W]',StandAloneERV(StandAloneERVIndex)%SensHeatingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Sensible Heating Rate [W]',StandAloneERV(StandAloneERVIndex)%SensHeatingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Sensible Heating Energy[J]',&
+    CALL SetupOutputVariable('Zone Ventilator Sensible Heating Energy [J]',&
                               StandAloneERV(StandAloneERVIndex)%SensHeatingEnergy,'System','Sum',&
                               StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Latent Heating Rate[W]',StandAloneERV(StandAloneERVIndex)%LatHeatingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Latent Heating Rate [W]',StandAloneERV(StandAloneERVIndex)%LatHeatingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Latent Heating Energy[J]',StandAloneERV(StandAloneERVIndex)%LatHeatingEnergy,&
+    CALL SetupOutputVariable('Zone Ventilator Latent Heating Energy [J]',StandAloneERV(StandAloneERVIndex)%LatHeatingEnergy,&
                               'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Total Heating Rate[W]',StandAloneERV(StandAloneERVIndex)%TotHeatingRate,&
+    CALL SetupOutputVariable('Zone Ventilator Total Heating Rate [W]',StandAloneERV(StandAloneERVIndex)%TotHeatingRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Zone Total Heating Energy[J]',StandAloneERV(StandAloneERVIndex)%TotHeatingEnergy,&
+    CALL SetupOutputVariable('Zone Ventilator Total Heating Energy [J]',StandAloneERV(StandAloneERVIndex)%TotHeatingEnergy,&
                               'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
 
 
-    CALL SetupOutputVariable('Stand Alone ERV Electric Power[W]',StandAloneERV(StandAloneERVIndex)%ElecUseRate,&
+    CALL SetupOutputVariable('Zone Ventilator Electric Power [W]',StandAloneERV(StandAloneERVIndex)%ElecUseRate,&
                               'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Electric Consumption[J]',StandAloneERV(StandAloneERVIndex)%ElecUseEnergy,&
+    CALL SetupOutputVariable('Zone Ventilator Electric Energy [J]',StandAloneERV(StandAloneERVIndex)%ElecUseEnergy,&
                              'System','Sum',StandAloneERV(StandAloneERVIndex)%Name)
-    CALL SetupOutputVariable('Stand Alone ERV Supply Fan Availability Status',StandAloneERV(StandAloneERVIndex)%AvailStatus, &
+    CALL SetupOutputVariable('Zone Ventilator Supply Fan Availability Status []',StandAloneERV(StandAloneERVIndex)%AvailStatus, &
                              'System','Average',StandAloneERV(StandAloneERVIndex)%Name)
   END DO
 
@@ -2119,7 +2123,7 @@ END FUNCTION GetStandAloneERVReturnAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

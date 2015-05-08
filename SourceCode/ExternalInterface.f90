@@ -184,6 +184,7 @@ END TYPE FMUType
   INTEGER, PUBLIC                         :: NumExternalInterfacesFMUImport = 0  ! Number of FMU ExternalInterface objects
   INTEGER, PUBLIC                         :: NumExternalInterfacesFMUExport = 0  ! Number of FMU ExternalInterface objects
   INTEGER, PUBLIC                         :: NumFMUObjects = 0                   ! Number of FMU objects
+  INTEGER, PUBLIC                         :: FMUExportActivate = 0               ! FMU Export flag
   LOGICAL, PUBLIC                         :: haveExternalInterfaceBCVTB  = .FALSE.          ! Flag for BCVTB interface
   LOGICAL, PUBLIC                         :: haveExternalInterfaceFMUImport = .FALSE.       ! Flag for FMU-Import interface
   LOGICAL, PUBLIC                         :: haveExternalInterfaceFMUExport = .FALSE.       ! Flag for FMU-Export interface
@@ -196,7 +197,7 @@ END TYPE FMUType
   INTEGER,      ALLOCATABLE, DIMENSION(:) :: varInd               ! Index of ErlVariables for ExternalInterface
   INTEGER                                 :: socketFD = -1        ! socket file descriptor
   LOGICAL                                 :: ErrorsFound=.false.  ! Set to true if errors are found
-  LOGICAL                                 :: noMoreValues=.false. ! Flag, true if no more values will
+  LOGICAL                                 :: noMoreValues=.false. ! Flag, true if no more values
                                                                   ! will be sent by the server
 
   CHARACTER(len=MaxNameLength), ALLOCATABLE, DIMENSION(:) :: varKeys  ! Keys of report variables used for data exchange
@@ -220,11 +221,11 @@ END TYPE FMUType
   PRIVATE StopExternalInterfaceIfError
   PRIVATE ValidateRunControl
   PRIVATE WarnIfExternalInterfaceObjectsAreUsed
-  PUBLIC CalcExternalInterfaceFMU
-  PUBLIC InitExternalInterfaceFMU
-  PUBLIC InstantiateInitializeFMU
-  PUBLIC TerminateResetFreeFMU
-  PUBLIC GetSetVariablesAndDoStepFMU
+  PUBLIC CalcExternalInterfaceFMUImport
+  PUBLIC InitExternalInterfaceFMUImport
+  PUBLIC InstantiateInitializeFMUImport
+  PUBLIC TerminateResetFreeFMUImport
+  PUBLIC GetSetVariablesAndDoStepFMUImport
 
 CONTAINS
 
@@ -309,10 +310,10 @@ SUBROUTINE ExternalInterfaceExchangeVariables
     CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW,.FALSE.)
     CALL IEEE_SET_HALTING_MODE(IEEE_INVALID,.FALSE.)
     CALL IEEE_SET_HALTING_MODE(IEEE_DIVIDE_BY_ZERO,.FALSE.)
-    CALL InitExternalInterfaceFMU()
+    CALL InitExternalInterfaceFMUImport()
     ! No Data exchange during design days
     ! Data Exchange data during warmup and after warmup
-    CALL CalcExternalInterfaceFMU()
+    CALL CalcExternalInterfaceFMUImport()
     CALL IEEE_SET_FLAG(ieee_all,.false.)
     CALL IEEE_SET_HALTING_MODE(IEEE_OVERFLOW,.TRUE.)
     CALL IEEE_SET_HALTING_MODE(IEEE_INVALID,.TRUE.)
@@ -374,7 +375,7 @@ SUBROUTINE GetExternalInterfaceInput
   NumExternalInterfaces = GetNumObjectsFound(cCurrentModuleObject)
 
   DO Loop=1,NumExternalInterfaces ! This loop determines whether the external interface is for FMU or BCVTB
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
            AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
     IF (SameString(cAlphaArgs(1), 'PtolemyServer')) THEN ! The BCVTB interface is activated.
       NumExternalInterfacesBCVTB = NumExternalInterfacesBCVTB + 1
@@ -384,15 +385,43 @@ SUBROUTINE GetExternalInterfaceInput
       NumExternalInterfacesFMUExport = NumExternalInterfacesFMUExport + 1
     END IF
   END DO
-
-  IF ((NumExternalInterfacesBCVTB == 0) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
+  ! Check if objects are used although BCVTB interface object is not defined
+  IF (NumExternalInterfacesBCVTB == 0) THEN
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Schedule')
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Variable')
      CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:Actuator')
   ENDIF
+
+  ! Check if objects are used although FMUExport interface is not defined
+  IF (NumExternalInterfacesFMUExport == 0) THEN
+     CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitExport:To:Schedule')
+     CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitExport:To:Variable')
+     CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitExport:To:Actuator')
+  ENDIF
+
+  ! Check if objects are used although FMU Import interface is not defined
+  IF (NumExternalInterfacesFMUImport == 0) THEN
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Schedule')
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Variable')
+    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Actuator')
+  ENDIF
+
   IF ((NumExternalInterfacesBCVTB == 1) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
      haveExternalInterfaceBCVTB = .TRUE.
      CALL DisplayString('Instantiating Building Controls Virtual Test Bed')
+     ALLOCATE(varKeys(maxVar))  ! Keys of report variables used for data exchange
+     varKeys=' '
+     ALLOCATE(varNames(maxVar)) ! Names of report variables used for data exchange
+     varNames=' '
+     ALLOCATE(inpVarTypes(maxVar)) ! Names of report variables used for data exchange
+     inpVarTypes=0
+     ALLOCATE(inpVarNames(maxVar)) ! Names of report variables used for data exchange
+     inpVarNames=' '
+     CALL VerifyExternalInterfaceObject
+  ELSEIF ((NumExternalInterfacesBCVTB == 0) .AND. (NumExternalInterfacesFMUExport == 1)) THEN
+     haveExternalInterfaceFMUExport = .TRUE.
+     FMUExportActivate = 1
+     CALL DisplayString('Instantiating FunctionalMockupUnitExport interface')
      ALLOCATE(varKeys(maxVar))  ! Keys of report variables used for data exchange
      varKeys=' '
      ALLOCATE(varNames(maxVar)) ! Names of report variables used for data exchange
@@ -406,28 +435,7 @@ SUBROUTINE GetExternalInterfaceInput
     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have Ptolemy and FMU-Export interface simultaneously.')
     ErrorsFound = .true.
   ENDIF
-  IF (NumExternalInterfacesBCVTB > 1) THEN
-     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one Ptolemy interface.')
-     CALL ShowContinueError('GetExternalInterfaceInput: Errors found in input.')
-     ErrorsFound = .true.
-  ENDIF
 
-  IF ((NumExternalInterfacesFMUExport == 1) .AND. (NumExternalInterfacesBCVTB == 0)) THEN
-    haveExternalInterfaceFMUExport = .TRUE.
-    CALL DisplayString('Instantiating FunctionalMockupUnitExport interface')
-    CALL VerifyExternalInterfaceObject
-  ENDIF
-  IF (NumExternalInterfacesFMUExport > 1) THEN
-     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-Export interface.')
-     CALL ShowContinueError('Errors found in input.')
-     ErrorsFound = .true.
-  ENDIF
-
-  IF (NumExternalInterfacesFMUImport == 0) THEN
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Schedule')
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Variable')
-    CALL WarnIfExternalInterfaceObjectsAreUsed('ExternalInterface:FunctionalMockupUnitImport:To:Actuator')
-  ENDIF
   IF ((NumExternalInterfacesFMUImport == 1) .AND. (NumExternalInterfacesFMUExport == 0)) THEN
     haveExternalInterfaceFMUImport = .TRUE.
     CALL DisplayString('Instantiating FunctionalMockupUnitImport interface')
@@ -438,6 +446,19 @@ SUBROUTINE GetExternalInterfaceInput
     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have FMU-Import and FMU-Export interface simultaneously.')
     ErrorsFound = .true.
   ENDIF
+
+  IF (NumExternalInterfacesBCVTB > 1) THEN
+     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one Ptolemy interface.')
+     CALL ShowContinueError('GetExternalInterfaceInput: Errors found in input.')
+     ErrorsFound = .true.
+  ENDIF
+
+  IF (NumExternalInterfacesFMUExport > 1) THEN
+     CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-Export interface.')
+     CALL ShowContinueError('Errors found in input.')
+     ErrorsFound = .true.
+  ENDIF
+
   IF (NumExternalInterfacesFMUImport > 1) THEN
      CALL ShowSevereError('GetExternalInterfaceInput: Cannot have more than one FMU-Import interface.')
      CALL ShowContinueError('Errors found in input.')
@@ -727,6 +748,32 @@ SUBROUTINE InitExternalInterface()
      END FUNCTION getepvariables
   END INTERFACE
 
+  INTERFACE
+     INTEGER(C_INT) FUNCTION getepvariablesFMU(fileName, outVarsNam, outVarsTyp, nOutVars, inVarsKey, &
+                             nInVarsKeys, inVars, nInVars, inVarsTyp, strLen) BIND (C, NAME="getepvariablesFMU")
+       ! Gets the EnergyPlus variables with which data is being exchanged.
+       ! This function return -1 if an error occurred, or 0 otherwise.
+       USE ISO_C_BINDING, ONLY: C_INT, C_CHAR
+       CHARACTER(kind=C_CHAR), DIMENSION(*) :: fileName    ! Name of the XMLfile
+       CHARACTER(kind=C_CHAR), DIMENSION(*) :: outVarsNam  ! Comma seperated string for returned
+                                                           ! output variable names
+       CHARACTER(kind=C_CHAR), DIMENSION(*) :: outVarsTyp  ! Comma seperated string for returned
+                                                           ! output variable types
+       INTEGER(C_INT)                :: nOutVars           ! Number of output variables found
+       CHARACTER(kind=C_CHAR), DIMENSION(*) :: inVarsKey   ! The available variable types from
+                                                           ! ExternalInterface for EP input(comma seperated)
+       INTEGER(C_INT)                :: nInVarsKeys        ! Number of available variables types
+                                                           ! from ExternalInterface for EP input
+       CHARACTER(kind=C_CHAR), DIMENSION(*) :: inVars      ! Comma seperated string for returned
+                                                           ! input variables names
+       INTEGER(C_INT)                :: nInVars            ! Number of input variables found
+       INTEGER(C_INT), DIMENSION(*)  :: inVarsTyp          ! Comma seperated string for returned
+                                                           ! input variable type
+       INTEGER(C_INT)                :: strLen             ! Length of the xml string
+                                                           ! to be returned
+     END FUNCTION getepvariablesFMU
+  END INTERFACE
+
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER, PARAMETER :: lenXmlStr = maxVar*MaxNameLength ! Length of xml string
@@ -751,150 +798,157 @@ SUBROUTINE InitExternalInterface()
                                                              ! file exists
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   IF (FirstCall) THEN
-     CALL DisplayString('ExternalInterface initializes.')
-     ! do one time initializations
-
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     ! Check version number
-     mainVersion = getmainversionnumber()
-     IF (mainVersion .LT. 0.0) THEN
+    CALL DisplayString('ExternalInterface initializes.')
+    ! do one time initializations
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    IF (haveExternalInterfaceBCVTB) THEN
+      ! Check version number
+      mainVersion = getmainversionnumber()
+      IF (mainVersion .LT. 0.0) THEN
         CALL ShowSevereError('ExternalInterface: BCVTB is not installed in this version.')
         ErrorsFound = .true.
         CALL StopExternalInterfaceIfError
-     END IF
+      END IF
+    END IF
 
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     ! Get port number
-      INQUIRE (FILE=socCfgFilNam, EXIST=socFileExist)
-      IF (socFileExist) THEN
-        socketFD = establishclientsocket(socCfgFilNam)
-        IF (socketFD .LT. 0) THEN
-           CALL ShowSevereError('ExternalInterface: Could not open socket. File descriptor = ' &
-                //TRIM(TrimSigDigits(socketFD))//'.')
-           ErrorsFound = .true.
-        END IF
-     ELSE
-        CALL ShowSevereError('ExternalInterface: Did not find file "'//socCfgFilNam//'".')
-        CALL ShowContinueError('This file needs to be in same directory as in.idf.')
-        CALL ShowContinueError('Check the documentation for the ExternalInterface.')
-        ErrorsFound = .true.
-     END IF
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     ! Make sure that idf file specified a run period other than
-     ! design day and system sizing.
-     CALL ValidateRunControl
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Get port number
+    INQUIRE (FILE=socCfgFilNam, EXIST=socFileExist)
+    IF (socFileExist) THEN
+      socketFD = establishclientsocket(socCfgFilNam)
+      IF (socketFD .LT. 0) THEN
+         CALL ShowSevereError('ExternalInterface: Could not open socket. File descriptor = ' &
+              //TRIM(TrimSigDigits(socketFD))//'.')
+         ErrorsFound = .true.
+      END IF
+    ELSE
+      CALL ShowSevereError('ExternalInterface: Did not find file "'//socCfgFilNam//'".')
+      CALL ShowContinueError('This file needs to be in same directory as in.idf.')
+      CALL ShowContinueError('Check the documentation for the ExternalInterface.')
+      ErrorsFound = .true.
+    END IF
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Make sure that idf file specified a run period other than
+    ! design day and system sizing.
+    CALL ValidateRunControl
 
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     CALL StopExternalInterfaceIfError
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    CALL StopExternalInterfaceIfError
 
-     xmlStrOut(1:lenXmlStr) = " "
-     xmlStrOutTyp(1:lenXmlStr) = " "
-     xmlStrInKey(1:lenXmlStr) = " "
-     xmlStrIn(1:lenXmlStr) = " "
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     ! Get input and output variables for EnergyPlus in sequence
-      xmlStrInKey= "schedule," &
-           //"variable," &
-           //"actuator"//char(0)
-      ! Check if simCfgFilNam exists.
-      INQUIRE (FILE=simCfgFilNam, EXIST=simFileExist)
-      IF (simFileExist) THEN
-         retVal = getepvariables(simCfgFilNam, &
-              xmlStrOutTyp ,xmlStrOut, nOutVal, &
-              xmlStrInKey, nInKeys, &
-              xmlStrIn, nInpVar, inpVarTypes, lenXmlStr)
-
-         ! handle errors when reading variables.cfg file
-         IF ( retVal .LT. 0 ) THEN
-            CALL ShowSevereError('ExternalInterface: Error when getting input and output variables for EnergyPlus,')
-            CALL ShowContinueError('check simulation.log for error message.')
-            ErrorsFound = .true.
-         END IF
-      ELSE
-        CALL ShowSevereError('ExternalInterface: Did not find file "'//simCfgFilNam//'".')
-        CALL ShowContinueError('This file needs to be in same directory as in.idf.')
-        CALL ShowContinueError('Check the documentation for the ExternalInterface.')
+    xmlStrOut(1:lenXmlStr) = " "
+    xmlStrOutTyp(1:lenXmlStr) = " "
+    xmlStrInKey(1:lenXmlStr) = " "
+    xmlStrIn(1:lenXmlStr) = " "
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! Get input and output variables for EnergyPlus in sequence
+    xmlStrInKey= "schedule," &
+          //"variable," &
+          //"actuator"//char(0)
+     ! Check if simCfgFilNam exists.
+    INQUIRE (FILE=simCfgFilNam, EXIST=simFileExist)
+    IF (simFileExist) THEN
+      IF (haveExternalInterfaceBCVTB) THEN
+        retVal = getepvariables(simCfgFilNam, &
+        xmlStrOutTyp ,xmlStrOut, nOutVal, &
+        xmlStrInKey, nInKeys, &
+        xmlStrIn, nInpVar, inpVarTypes, lenXmlStr)
+      ELSEIF (haveExternalInterfaceFMUExport) THEN
+        retVal = getepvariablesFMU(simCfgFilNam, &
+        xmlStrOutTyp ,xmlStrOut, nOutVal, &
+        xmlStrInKey, nInKeys, &
+        xmlStrIn, nInpVar, inpVarTypes, lenXmlStr)
+      END IF
+      ! handle errors when reading variables.cfg file
+      IF ( retVal .LT. 0 ) THEN
+        CALL ShowSevereError('ExternalInterface: Error when getting input and output variables for EnergyPlus,')
+        CALL ShowContinueError('check simulation.log for error message.')
         ErrorsFound = .true.
       END IF
-     CALL StopExternalInterfaceIfError
+    ELSE
+      CALL ShowSevereError('ExternalInterface: Did not find file "'//simCfgFilNam//'".')
+      CALL ShowContinueError('This file needs to be in same directory as in.idf.')
+      CALL ShowContinueError('Check the documentation for the ExternalInterface.')
+      ErrorsFound = .true.
+    END IF
+    CALL StopExternalInterfaceIfError
 
-     IF ( nOutVal + nInpVar .GT. maxVar ) THEN
-        CALL ShowSevereError('ExternalInterface: Too many variables to be exchanged.')
-        CALL ShowContinueError('Attempted to exchange '//TRIM(TrimSigDigits(nOutVal))//' outputs')
-        CALL ShowContinueError('plus '//TRIM(TrimSigDigits(nOutVal))//' inputs.')
-        CALL ShowContinueError('Maximum allowed is sum is '//TRIM(TrimSigDigits(maxVar))//'.')
-        CALL ShowContinueError('To fix, increase maxVar in ExternalInterface.f90')
-        ErrorsFound = .true.
-     END IF
-     CALL StopExternalInterfaceIfError
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     !!!!!!!!!!!!!!!!!!!!!
-     IF ( nOutVal .LT. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface: Error when getting number of xml values for outputs.')
-        ErrorsFound = .true.
-     ELSE
-        CALL ParseString(xmlStrOut, varNames, nOutVal)
-        CALL ParseString(xmlStrOutTyp, varkeys, nOutVal)
-     END IF
-     CALL StopExternalInterfaceIfError
+    IF ( nOutVal + nInpVar .GT. maxVar ) THEN
+      CALL ShowSevereError('ExternalInterface: Too many variables to be exchanged.')
+      CALL ShowContinueError('Attempted to exchange '//TRIM(TrimSigDigits(nOutVal))//' outputs')
+      CALL ShowContinueError('plus '//TRIM(TrimSigDigits(nOutVal))//' inputs.')
+      CALL ShowContinueError('Maximum allowed is sum is '//TRIM(TrimSigDigits(maxVar))//'.')
+      CALL ShowContinueError('To fix, increase maxVar in ExternalInterface.f90')
+      ErrorsFound = .true.
+    END IF
+    CALL StopExternalInterfaceIfError
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    !!!!!!!!!!!!!!!!!!!!!
+    IF ( nOutVal .LT. 0 ) THEN
+      CALL ShowSevereError('ExternalInterface: Error when getting number of xml values for outputs.')
+      ErrorsFound = .true.
+    ELSE
+      CALL ParseString(xmlStrOut, varNames, nOutVal)
+      CALL ParseString(xmlStrOutTyp, varkeys, nOutVal)
+    END IF
+    CALL StopExternalInterfaceIfError
 
-     IF ( nInpVar .LT. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface: Error when getting number of xml values for inputs.')
-        ErrorsFound = .true.
-     ELSE
-        CALL ParseString(xmlStrIn, inpVarNames, nInpVar)
-     END IF
-     CALL StopExternalInterfaceIfError
+    IF ( nInpVar .LT. 0 ) THEN
+      CALL ShowSevereError('ExternalInterface: Error when getting number of xml values for inputs.')
+      ErrorsFound = .true.
+    ELSE
+      CALL ParseString(xmlStrIn, inpVarNames, nInpVar)
+    END IF
+    CALL StopExternalInterfaceIfError
 
-     CALL DisplayString('Number of outputs in ExternalInterface = '//TrimSigDigits(nOutVal))
-     CALL DisplayString('Number of inputs  in ExternalInterface = '//TrimSigDigits(nInpVar))
+    CALL DisplayString('Number of outputs in ExternalInterface = '//TrimSigDigits(nOutVal))
+    CALL DisplayString('Number of inputs  in ExternalInterface = '//TrimSigDigits(nInpVar))
 
-     FirstCall = .FALSE.
+    FirstCall = .FALSE.
 
   ELSEIF (.NOT.ConfiguredControlPoints) THEN
-     ALLOCATE(keyVarIndexes( nOutVal ))
-     ALLOCATE(varTypes( nOutVal ))
-     CALL GetReportVariableKey(varKeys, nOutVal, varNames, keyVarIndexes, varTypes)
-     ALLOCATE(varInd( nInpVar ))
-     DO i=1, nInpVar
-        IF (inpVarTypes(i) .EQ. indexSchedule) THEN
-           varInd(i) = GetDayScheduleIndex(inpVarNames(i))
-        ELSEIF (inpVarTypes(i) .EQ. indexVariable) THEN
-           varInd(i) = FindEMSVariable(inpVarNames(i), 0)
-        ELSEIF (inpVarTypes(i) .EQ. indexActuator) THEN
-           varInd(i) = FindEMSVariable(inpVarNames(i), 0)
-        END IF
-        IF (varInd(i) .LE. 0) THEN
-           CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
-                //TRIM(inpVarNames(i))//'",')
-           CALL ShowContinueError('but variable was not found in idf file.')
-           ErrorsFound = .true.
-        END IF
-     ENDDO
-     CALL StopExternalInterfaceIfError
-     ! Configure Erl variables
-     DO i=1, nInpVar
-        IF (inpVarTypes(i) .EQ. indexVariable) THEN ! ems-globalvariable
-           useEMS = .true.
-           IF ( .NOT. isExternalInterfaceErlVariable(varInd(i)) ) THEN
-              CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
-                   //TRIM(inpVarNames(i))//'",')
-              CALL ShowContinueError('But this variable is an ordinary Erl variable, not an ExternalInterface variable.')
-              CALL ShowContinueError('You must specify a variable of type "ExternalInterface:Variable".')
-              ErrorsFound = .true.
-           ENDIF
-        ELSEIF (inpVarTypes(i) .EQ. indexActuator) THEN ! ems-actuator
-           useEMS = .true.
-           IF ( .NOT. isExternalInterfaceErlVariable(varInd(i)) ) THEN
-              CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
-                   //TRIM(inpVarNames(i))//'",')
-              CALL ShowContinueError('But this variable is an ordinary Erl actuator, not an ExternalInterface actuator.')
-              CALL ShowContinueError('You must specify a variable of type "ExternalInterface:Actuator".')
-              ErrorsFound = .true.
-           ENDIF
-        END IF
-     ENDDO
-     ConfiguredControlPoints = .TRUE.
+    ALLOCATE(keyVarIndexes( nOutVal ))
+    ALLOCATE(varTypes( nOutVal ))
+    CALL GetReportVariableKey(varKeys, nOutVal, varNames, keyVarIndexes, varTypes)
+    ALLOCATE(varInd( nInpVar ))
+    DO i=1, nInpVar
+      IF (inpVarTypes(i) .EQ. indexSchedule) THEN
+         varInd(i) = GetDayScheduleIndex(inpVarNames(i))
+      ELSEIF (inpVarTypes(i) .EQ. indexVariable) THEN
+         varInd(i) = FindEMSVariable(inpVarNames(i), 0)
+      ELSEIF (inpVarTypes(i) .EQ. indexActuator) THEN
+         varInd(i) = FindEMSVariable(inpVarNames(i), 0)
+      END IF
+      IF (varInd(i) .LE. 0) THEN
+         CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
+              //TRIM(inpVarNames(i))//'",')
+         CALL ShowContinueError('but variable was not found in idf file.')
+         ErrorsFound = .true.
+      END IF
+    ENDDO
+    CALL StopExternalInterfaceIfError
+    ! Configure Erl variables
+    DO i=1, nInpVar
+      IF (inpVarTypes(i) .EQ. indexVariable) THEN ! ems-globalvariable
+         useEMS = .true.
+         IF ( .NOT. isExternalInterfaceErlVariable(varInd(i)) ) THEN
+            CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
+                 //TRIM(inpVarNames(i))//'",')
+            CALL ShowContinueError('But this variable is an ordinary Erl variable, not an ExternalInterface variable.')
+            CALL ShowContinueError('You must specify a variable of type "ExternalInterface:Variable".')
+            ErrorsFound = .true.
+         ENDIF
+      ELSEIF (inpVarTypes(i) .EQ. indexActuator) THEN ! ems-actuator
+         useEMS = .true.
+         IF ( .NOT. isExternalInterfaceErlVariable(varInd(i)) ) THEN
+            CALL ShowSevereError('ExternalInterface: Error, xml file "' // simCfgFilNam // '" declares variable "' &
+                 //TRIM(inpVarNames(i))//'",')
+            CALL ShowContinueError('But this variable is an ordinary Erl actuator, not an ExternalInterface actuator.')
+            CALL ShowContinueError('You must specify a variable of type "ExternalInterface:Actuator".')
+            ErrorsFound = .true.
+         ENDIF
+      END IF
+    ENDDO
+    ConfiguredControlPoints = .TRUE.
   END IF
   CALL StopExternalInterfaceIfError
   RETURN
@@ -902,7 +956,7 @@ SUBROUTINE InitExternalInterface()
 END SUBROUTINE InitExternalInterface
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE GetSetVariablesAndDoStepFMU()
+SUBROUTINE GetSetVariablesAndDoStepFMUImport()
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
           !       DATE WRITTEN   08Aug2011
@@ -1115,7 +1169,7 @@ SUBROUTINE GetSetVariablesAndDoStepFMU()
           FMU(i)%Instance(j)%eplusOutputVariable(k)%ITSValue, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
           TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
           IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-            CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMU: Error when trying to set an input')
+            CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to set an input')
             CALL ShowContinueError ('in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
             CALL ShowContinueError ('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
             ErrorsFound = .true.
@@ -1129,7 +1183,7 @@ SUBROUTINE GetSetVariablesAndDoStepFMU()
           FMU(i)%Instance(j)%eplusOutputVariable(k)%RTSValue, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
           TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
           IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-            CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMU: Error when trying to set an input')
+            CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to set an input')
             CALL ShowContinueError ('in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
             CALL ShowContinueError ('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
             ErrorsFound = .true.
@@ -1139,16 +1193,14 @@ SUBROUTINE GetSetVariablesAndDoStepFMU()
         END IF
       END DO
 
+
       ! Call and simulate the FMUs to get values at the corresponding timestep.
-
-
-
       FMU(i)%Instance(j)%fmiStatus = &
       fmiDoStep(FMU(i)%Instance(j)%WorkingFolder_wLib, FMU(i)%Instance(j)%fmiComponent, &
       tComm, hStep, fmiTrue, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-        CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/GetSetVariablesAndDoStepFMUImport: Error when trying to')
         CALL ShowContinueError('do the coSimulation with instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
         CALL ShowContinueError('of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
@@ -1164,11 +1216,11 @@ SUBROUTINE GetSetVariablesAndDoStepFMU()
   END IF
   FirstCallGetSetDoStep = .FALSE.
 
-END SUBROUTINE GetSetVariablesAndDoStepFMU
+END SUBROUTINE GetSetVariablesAndDoStepFMUImport
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE InstantiateInitializeFMU()
+SUBROUTINE InstantiateInitializeFMUImport()
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
@@ -1249,7 +1301,7 @@ SUBROUTINE InstantiateInitializeFMU()
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)), &
       TRIM(FMU(i)%Instance(j)%modelGUID), LEN(TRIM(FMU(i)%Instance(j)%modelGUID)))
       IF (.NOT.(C_ASSOCIATED(FMU(i)%Instance(j)%fmiComponent))) THEN
-        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('instantiate instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         ErrorsFound = .true.
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1266,7 +1318,7 @@ SUBROUTINE InstantiateInitializeFMU()
       tStart, fmiTrue, tStop, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
-        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('initialize instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
         ErrorsFound = .true.
@@ -1275,7 +1327,7 @@ SUBROUTINE InstantiateInitializeFMU()
       END IF
     END DO
   END DO
-END SUBROUTINE InstantiateInitializeFMU
+END SUBROUTINE InstantiateInitializeFMUImport
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1338,7 +1390,7 @@ SUBROUTINE InitializeFMU()
       tStart, fmiTrue, tStop, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus .EQ. fmiOK )) THEN
-        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('initialize instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Error Code = "'//TrimSigDigits(FMU(i)%Instance(j)%fmiStatus)//'".')
         ErrorsFound = .true.
@@ -1350,7 +1402,7 @@ SUBROUTINE InitializeFMU()
 END SUBROUTINE InitializeFMU
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE TerminateResetFreeFMU()
+SUBROUTINE TerminateResetFreeFMUImport()
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
@@ -1408,7 +1460,7 @@ SUBROUTINE TerminateResetFreeFMU()
       END IF
       ! check if fmiComponent has been freed
       IF (.NOT.(C_ASSOCIATED(FMU(i)%Instance(j)%fmiComponent))) THEN
-        CALL ShowSevereError('ExternalInterface/TerminateResetFreeFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/TerminateResetFreeFMUImport: Error when trying to')
         CALL ShowContinueError('terminate instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         ErrorsFound = .true.
         !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1417,7 +1469,7 @@ SUBROUTINE TerminateResetFreeFMU()
     END DO
   END DO
 
-END SUBROUTINE TerminateResetFreeFMU
+END SUBROUTINE TerminateResetFreeFMUImport
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE ResetFMU()
@@ -1490,7 +1542,7 @@ SUBROUTINE ResetFMU()
 END SUBROUTINE ResetFMU
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE InitExternalInterfaceFMU()
+SUBROUTINE InitExternalInterfaceFMUImport()
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
@@ -1676,7 +1728,7 @@ IF (FirstCallIni) THEN
   LEN_FMU_ROOT_DIR = LEN_TRIM(CurrentWorkingFolder) + 9
   retValue = addFMURootFolderName(FMURootWorkingFolder, TRIM(CurrentWorkingFolder), LEN(TRIM(CurrentWorkingFolder)))
   IF (retValue .NE. 0 ) THEN
-     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: FMU root folder could not be added to working directory.')
+     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: FMU root folder could not be added to working directory.')
      ErrorsFound = .true.
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      CALL StopExternalInterfaceIfError
@@ -1709,7 +1761,7 @@ IF (FirstCallIni) THEN
       ENDIF
       fullFileName(Loop)=tempFullFileName
     ELSE
-      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: file not located="'//trim(cAlphaArgs(1))//'".')
+      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: file not located="'//trim(cAlphaArgs(1))//'".')
       ErrorsFound=.true.
     ENDIF
     ! Get fmu time out
@@ -1726,7 +1778,7 @@ IF (FirstCallIni) THEN
       IF (.not. SameString(strippedFileName(j),strippedFileName(k))) CYCLE
       ! base file names are the same
       IF (SameString(fullFileName(j),fullFileName(k))) CYCLE
-      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: duplicate file names (but not same file) entered.')
+      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: duplicate file names (but not same file) entered.')
       CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
       CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
       CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
@@ -1741,7 +1793,7 @@ IF (FirstCallIni) THEN
       IF (strippedFileName(j) /= strippedFileName(k)) CYCLE
       ! base file names are the same
       IF (fullFileName(j) /= fullFileName(k)) CYCLE
-      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: duplicate file names (but not same file) entered.')
+      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: duplicate file names (but not same file) entered.')
       CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
       CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
       CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
@@ -1756,7 +1808,7 @@ IF (FirstCallIni) THEN
       IF (strippedFileName(j) /= strippedFileName(k)) CYCLE
       ! base file names are the same
       IF (fullFileName(j) /= fullFileName(k)) CYCLE
-      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: duplicate file names (but not same file) entered.')
+      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: duplicate file names (but not same file) entered.')
       CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
       CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
       CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
@@ -1771,7 +1823,7 @@ IF (FirstCallIni) THEN
       IF (.not. SameString(strippedFileName(j),strippedFileName(k))) CYCLE
       ! base file names are the same
       IF (SameString(fullFileName(j),fullFileName(k))) CYCLE
-      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: duplicate file names (but not same file) entered.')
+      CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: duplicate file names (but not same file) entered.')
       CALL ShowContinueError('...entered file name="'//trim(FMU(j)%Name)//'"')
       CALL ShowContinueError('...   full file name="'//trim(fullFileName(j))//'"')
       CALL ShowContinueError('...entered file name="'//trim(FMU(k)%Name)//'"')
@@ -1824,7 +1876,7 @@ IF (FirstCallIni) THEN
 
   DO i = 1, NumFMUObjects
    IF (FMU(i)%NumInstances .EQ. 0 ) THEN
-     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: The FMU "'//TRIM(FMU(i)%Name)//'"')
+     CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: The FMU "'//TRIM(FMU(i)%Name)//'"')
      CALL ShowContinueError('does not have any instances or any input variable. An FMU should have at least one instance')
      CALL ShowContinueError('or one input variable defined in input file. Check FMU object in the input file.')
      ErrorsFound = .true.
@@ -1832,7 +1884,7 @@ IF (FirstCallIni) THEN
      CALL StopExternalInterfaceIfError
    END IF
    IF (NumFMUInputVariables .GT. 0 .AND. FMU(i)%TotNumInputVariablesInIDF .EQ. 0 ) THEN
-      CALL ShowWarningError('InitExternalInterfaceFMU: The FMU "'//TRIM(FMU(i)%Name)//'"')
+      CALL ShowWarningError('InitExternalInterfaceFMUImport: The FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no input variables.')
       CALL ShowContinueError('Check the input field of the corresponding object')
       CALL ShowContinueError('ExternalInterface:FunctionalMockupUnitImport:From:Variable.')
@@ -1858,7 +1910,7 @@ IF (FirstCallIni) THEN
 !      retVal = fmuUnpack ( TRIM(strippedFileName(i)), TRIM(FMU(i)%Instance(j)%WorkingFolder), &
 !       LEN_TRIM(strippedFileName(i)), LEN_TRIM(FMU(i)%Instance(j)%WorkingFolder))
       IF ( retVal .NE. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('unpack the FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Check if the FMU exists. Also check if the FMU folder is not write protected.')
         ErrorsFound = .true.
@@ -1869,7 +1921,7 @@ IF (FirstCallIni) THEN
       retValID = model_ID_GUID (TRIM(FMU(i)%Instance(j)%WorkingFolder),  LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)), &
       FMU(i)%Instance(j)%modelID, FMU(i)%Instance(j)%modelGUID)
       IF ( retValID .NE. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('get the model ID and model GUID')
         CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Check if modelDescription.xml exists in the folder where the FMU has been unpacked.')
@@ -1883,7 +1935,7 @@ IF (FirstCallIni) THEN
       TRIM(FMU(i)%Instance(j)%WorkingFolder), LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)), &
       TRIM(FMU(i)%Instance(j)%modelID), LEN(TRIM(FMU(i)%Instance(j)%modelID)))
       IF ( retValfmiPathLib .NE. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('get the path to the binaries of instance')
         CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('Check if binaries folder exists where the FMU has been unpacked.')
@@ -1897,7 +1949,7 @@ IF (FirstCallIni) THEN
       LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), TRIM(FMU(i)%Instance(j)%modelID), &
       LEN(TRIM(FMU(i)%Instance(j)%modelID)), FMU(i)%Instance(j)%fmiVersionNumber)
       IF ( retValfmiVersion .NE. 0 ) THEN
-        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
         CALL ShowContinueError('load FMI functions library of instance')
         CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmiVersionNumber)//'".')
@@ -1906,8 +1958,8 @@ IF (FirstCallIni) THEN
         CALL StopExternalInterfaceIfError
       END IF
 
-      IF (.NOT.(SameString (TRIM(FMU(i)%Instance(j)%fmiVersionNumber(1:3)), "1.0"))) THEN
-        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when getting version')
+      IF (FMU(i)%Instance(j)%fmiVersionNumber(1:3) /= '1.0') THEN
+        CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when getting version')
         CALL ShowContinueError('number of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
         CALL ShowContinueError('of FMU "'//TRIM(FMU(i)%Name)//'".')
         CALL ShowContinueError('The version number found ("'//TRIM(FMU(i)%Instance(j)%fmiVersionNumber(1:3))//'")')
@@ -1956,7 +2008,7 @@ IF (FirstCallIni) THEN
           LEN (TRIM(FMU(i)%Instance(j)%fmuInputVariable(k)%Name)))
 
           IF (FMU(i)%Instance(j)%fmuInputVariable(k)%ValueReference .EQ. -999) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
             CALL ShowContinueError('get the value reference of FMU input variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuInputVariable(k)%Name)//'" of instance '// &
             '"'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -1968,7 +2020,7 @@ IF (FirstCallIni) THEN
           ENDIF
 
           IF (FMU(i)%Instance(j)%fmuInputVariable(k)%ValueReference .EQ. -1) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to')
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to')
             CALL ShowContinueError('get the value reference of FMU input variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuInputVariable(k)%Name)//'" of instance '// &
             '"'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -1987,7 +2039,7 @@ IF (FirstCallIni) THEN
         END IF
       END DO
     IF (NumFMUInputVariables .GT. 0 .AND. FMU(i)%Instance(j)%NumInputVariablesInIDF .EQ. 0 ) THEN
-      CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)//  &
+      CALL ShowWarningError('InitExternalInterfaceFMUImport: The instance "'//TRIM(FMU(i)%Instance(j)%Name)//  &
          '"of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no input variables. Check the input field of')
       CALL ShowContinueError('the corresponding object: ExternalInterface:FunctionalMockupUnitImport:From:Variable.')
@@ -2005,7 +2057,7 @@ IF (FirstCallIni) THEN
       LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)))
        ! check whether the number of input variables in fmu is bigger than in the idf
       IF (FMU(i)%Instance(j)%NumInputVariablesInFMU .GT. FMU(i)%Instance(j)%NumInputVariablesInIDF) THEN
-        CALL ShowSevereError('InitExternalInterfaceFMU: The number of input variables defined in input file ('//&
+        CALL ShowSevereError('InitExternalInterfaceFMUImport: The number of input variables defined in input file ('//&
            TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumInputVariablesInIDF))//')')
         CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//  &
            '" is less than the number of input variables')
@@ -2018,7 +2070,7 @@ IF (FirstCallIni) THEN
       END IF
       ! check whether the number of input variables in fmu is less than in the idf
       IF (FMU(i)%Instance(j)%NumInputVariablesInFMU .LT. FMU(i)%Instance(j)%NumInputVariablesInIDF) THEN
-        CALL ShowSevereError('InitExternalInterfaceFMU: The number of input variables defined in input file ('//&
+        CALL ShowSevereError('InitExternalInterfaceFMUImport: The number of input variables defined in input file ('//&
           TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumInputVariablesInIDF))//')')
         CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)// &
         '" is bigger than the number of input variables')
@@ -2069,7 +2121,7 @@ IF (FirstCallIni) THEN
           FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name, LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)), &
           LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name)))
           IF (FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%ValueReference .EQ. -999) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to '// &
             'get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2082,7 +2134,7 @@ IF (FirstCallIni) THEN
           ENDIF
 
           IF (FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%ValueReference .EQ. -1) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying to '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying to '// &
             'get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableSchedule(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2098,7 +2150,7 @@ IF (FirstCallIni) THEN
           GetDayScheduleIndex(FMU(i)%Instance(j)%eplusInputVariableSchedule(k)%Name)
           FMU(i)%Instance(j)%NumOutputVariablesSchedule = k
           IF (FMU(i)%Instance(j)%eplusInputVariableSchedule(k)%VarIndex .LE. 0) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU:declares variable "'// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:declares variable "'// &
                  TRIM(FMU(i)%Instance(j)%eplusInputVariableSchedule(k)%Name)//'",')
             CALL ShowContinueError('but variable is not a schedule variable.')
             ErrorsFound = .true.
@@ -2109,7 +2161,7 @@ IF (FirstCallIni) THEN
         END IF
       END DO
     IF (NumFMUInputVariables .GT. 0 .AND. FMU(i)%Instance(j)%NumOutputVariablesSchedule .EQ. 0 ) THEN
-      CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
+      CALL ShowWarningError('InitExternalInterfaceFMUImport: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Schedule. Check the input field of')
       CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnitImport:To:Schedule.')
@@ -2155,7 +2207,7 @@ IF (FirstCallIni) THEN
           LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)), &
           LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name)))
           IF (FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%ValueReference .EQ. -999) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
             'to get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2168,7 +2220,7 @@ IF (FirstCallIni) THEN
           ENDIF
 
           IF (FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%ValueReference .EQ. -1) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
             'to get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableVariable(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2184,7 +2236,7 @@ IF (FirstCallIni) THEN
           FindEMSVariable(FMU(i)%Instance(j)%eplusInputVariableVariable(k)%Name, 0)
           FMU(i)%Instance(j)%NumOutputVariablesVariable = k
           IF (FMU(i)%Instance(j)%eplusInputVariableVariable(k)%VarIndex.LE. 0) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU:declares variable "'// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:declares variable "'// &
                  TRIM(FMU(i)%Instance(j)%eplusInputVariableVariable(k)%Name)//'",')
             CALL ShowContinueError('but variable is not an EMS variable.')
             ErrorsFound = .true.
@@ -2195,7 +2247,7 @@ IF (FirstCallIni) THEN
         END IF
       END DO
     IF (NumFMUInputVariables .GT. 0 .AND. FMU(i)%Instance(j)%NumOutputVariablesVariable .EQ. 0 ) THEN
-      CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
+      CALL ShowWarningError('InitExternalInterfaceFMUImport: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Variable. Check the input field of')
       CALL ShowContinueError('the corresponding object:ExternalInterface: FunctionalMockupUnitImport:To:Variable.')
@@ -2245,7 +2297,7 @@ IF (FirstCallIni) THEN
           LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder)), &
           LEN(TRIM(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name)))
           IF (FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%ValueReference .EQ. -999) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
             'to get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2258,7 +2310,7 @@ IF (FirstCallIni) THEN
           ENDIF
 
           IF (FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%ValueReference .EQ. -1) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU: Error when trying '// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport: Error when trying '// &
             'to get the value reference of the FMU output variable')
             CALL ShowContinueError('"'//TRIM(FMU(i)%Instance(j)%fmuOutputVariableActuator(k)%Name)// &
             '" of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
@@ -2274,7 +2326,7 @@ IF (FirstCallIni) THEN
           FindEMSVariable(FMU(i)%Instance(j)%eplusInputVariableActuator(k)%Name, 0)
           FMU(i)%Instance(j)%NumOutputVariablesActuator = k
           IF (FMU(i)%Instance(j)%eplusInputVariableActuator(k)%VarIndex.LE. 0) THEN
-            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMU:declares variable "'// &
+            CALL ShowSevereError('ExternalInterface/InitExternalInterfaceFMUImport:declares variable "'// &
                 TRIM(FMU(i)%Instance(j)%eplusInputVariableActuator(k)%Name)//'",')
             CALL ShowContinueError('but variable is not an EMS variable.')
             ErrorsFound = .true.
@@ -2285,7 +2337,7 @@ IF (FirstCallIni) THEN
         END IF
       END DO
     IF (NumFMUInputVariables .GT. 0 .AND. FMU(i)%Instance(j)%NumOutputVariablesActuator .EQ. 0 ) THEN
-      CALL ShowWarningError('InitExternalInterfaceFMU: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
+      CALL ShowWarningError('InitExternalInterfaceFMUImport: The instance "'//TRIM(FMU(i)%Instance(j)%Name)// &
       '" of FMU "'//TRIM(FMU(i)%Name)//'"')
       CALL ShowContinueError('is defined but has no output variables from type Actuator. Check the input field of')
       CALL ShowContinueError('the corresponding object:ExternalInterface:FunctionalMockupUnitImport:To:Actuator.')
@@ -2304,7 +2356,7 @@ IF (FirstCallIni) THEN
       FMU(i)%Instance(j)%NumOutputVariablesVariable + FMU(i)%Instance(j)%NumOutputVariablesActuator
       ! check whether the number of output variables in fmu is bigger than in the idf
       IF (FMU(i)%Instance(j)%NumOutputVariablesInFMU .GT. FMU(i)%Instance(j)%NumOutputVariablesInIDF) THEN
-        CALL ShowSevereError('InitExternalInterfaceFMU: The number of output variables defined in input file ('//&
+        CALL ShowSevereError('InitExternalInterfaceFMUImport: The number of output variables defined in input file ('//&
            TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumOutputVariablesInIDF))//')')
         CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)//  &
            '" is less than the number of output variables')
@@ -2317,7 +2369,7 @@ IF (FirstCallIni) THEN
       END IF
       ! check whether the number of output variables in fmu is less than in the idf
       IF (FMU(i)%Instance(j)%NumOutputVariablesInFMU .LT. FMU(i)%Instance(j)%NumOutputVariablesInIDF) THEN
-        CALL ShowSevereError('InitExternalInterfaceFMU: The number of output variables defined in input file ('//&
+        CALL ShowSevereError('InitExternalInterfaceFMUImport: The number of output variables defined in input file ('//&
           TRIM(TrimSigDigits(FMU(i)%Instance(j)%NumInputVariablesInIDF))//')')
         CALL ShowContinueError('of instance "'//TRIM(FMU(i)%Instance(j)%Name)//'" of FMU "'//TRIM(FMU(i)%Name)// &
         '" is bigger than the number of output variables')
@@ -2339,7 +2391,7 @@ IF (FirstCallIni) THEN
   CALL StopExternalInterfaceIfError
   FirstCallIni = .FALSE.
 END IF
-END SUBROUTINE InitExternalInterfaceFMU
+END SUBROUTINE InitExternalInterfaceFMUImport
 
 REAL(r64) FUNCTION GetCurSimStartTimeSeconds()
 
@@ -2448,7 +2500,7 @@ GetCurSimStartTimeSeconds = simtime
 
 END FUNCTION GetCurSimStartTimeSeconds
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-SUBROUTINE CalcExternalInterfaceFMU()
+SUBROUTINE CalcExternalInterfaceFMUImport()
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Thierry S. Nouidui, Michael Wetter, Wangda Zuo
@@ -2618,7 +2670,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
 
   IF (WarmupFlag .AND. (KindOfSim .NE. ksRunPeriodWeather)) THEN ! No data exchange during design days
     IF (FirstCallDesignDays) THEN
-      CALL ShowWarningError('ExternalInterface/CalcExternalInterfaceFMU: '//  &
+      CALL ShowWarningError('ExternalInterface/CalcExternalInterfaceFMUImport: '//  &
          'ExternalInterface does not exchange data during design days.')
     END IF
     FirstCallDesignDays = .FALSE.
@@ -2633,7 +2685,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
       tComm = tStart
 
       ! instantiate and initialize the unpack fmus
-      CALL InstantiateInitializeFMU ()
+      CALL InstantiateInitializeFMUImport ()
       ! allocate memory for a temporary FMU that will be used at the end of the warmup
       ALLOCATE(FMUTemp(NumFMUObjects))
       DO i =1, NumFMUObjects
@@ -2648,13 +2700,13 @@ SUBROUTINE CalcExternalInterfaceFMU()
           ALLOCATE(FMUTemp(i)%Instance(j)%fmuOutputVariableActuator(FMU(i)%Instance(j)%NumOutputVariablesActuator))
         END DO
       END DO
-      CALL GetSetVariablesAndDoStepFMU ()
+      CALL GetSetVariablesAndDoStepFMUImport ()
       tComm = tComm + hStep
       FirstCallWUp = .FALSE.
 
     ELSE
       IF (tComm .LT. tStop) THEN
-       CALL GetSetVariablesAndDoStepFMU ()
+       CALL GetSetVariablesAndDoStepFMUImport ()
        ! Advance the communication time step
        tComm = tComm + hStep
       ELSE
@@ -2713,7 +2765,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
                 LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), TRIM(FMU(i)%Instance(j)%modelID), &
                 LEN(TRIM(FMU(i)%Instance(j)%modelID)))
                 IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-                  CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying '// &
+                  CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying '// &
                   'to set an input value in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
                   CALL ShowContinueError('of FMU "'//TRIM(FMU(i)%Name)//'". &
                   Error Code = '//TRIM(TrimSigDigits(FMU(i)%Instance(j)%fmiStatus))//'.')
@@ -2728,7 +2780,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
                 LEN(TRIM(FMU(i)%Instance(j)%WorkingFolder_wLib)), TRIM(FMU(i)%Instance(j)%modelID), &
                 LEN(TRIM(FMU(i)%Instance(j)%modelID)))
                 IF ( .NOT. (FMU(i)%Instance(j)%fmiStatus.EQ. fmiOK)) THEN
-                  CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMU: Error when trying '// &
+                  CALL ShowSevereError('ExternalInterface/CalcExternalInterfaceFMUImport: Error when trying '// &
                   'to set an input value in instance "'//TRIM(FMU(i)%Instance(j)%Name)//'"')
                   CALL ShowContinueError('of FMU "'//TRIM(FMU(i)%Name)//'". &
                   Error Code = '//TRIM(TrimSigDigits(FMU(i)%Instance(j)%fmiStatus))//'.')
@@ -2742,7 +2794,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
         END DO
         ! set the flag to reinitialize states to be true
         FlagReIni = .TRUE.
-        CALL GetSetVariablesAndDoStepFMU
+        CALL GetSetVariablesAndDoStepFMUImport
         FlagReIni = .FALSE.
         ! advance one time step ahead for the next calculation
         tComm = tComm + hStep
@@ -2788,18 +2840,18 @@ SUBROUTINE CalcExternalInterfaceFMU()
       END DO
       ! set the flag to reinitialize states to be true
       FlagReIni = .TRUE.
-      CALL GetSetVariablesAndDoStepFMU ()
+      CALL GetSetVariablesAndDoStepFMUImport ()
       FlagReIni = .FALSE.
       ! advance one time step ahead for the next calculation
       tComm = tComm + hStep
       FirstCallTStep = .FALSE.
     ELSE
       IF (tComm .NE. tStop) THEN
-        CALL GetSetVariablesAndDoStepFMU ()
+        CALL GetSetVariablesAndDoStepFMUImport ()
         tComm = tComm + hStep
       ELSE
         ! Terminate reset and free Slaves
-        CALL TerminateResetFreeFMU ()
+        CALL TerminateResetFreeFMUImport ()
         DO i = 1, NumFMUObjects
           DO j = 1, FMU(i)%NumInstances
             ! Deallocate used objects
@@ -2840,7 +2892,7 @@ SUBROUTINE CalcExternalInterfaceFMU()
     END IF
   ENDIF
   RETURN
-END SUBROUTINE CalcExternalInterfaceFMU
+END SUBROUTINE CalcExternalInterfaceFMUImport
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 SUBROUTINE ValidateRunControl
@@ -2886,9 +2938,9 @@ SUBROUTINE ValidateRunControl
   INTEGER :: NumRunControl
 
   cCurrentModuleObject='SimulationControl'
-  NumRunControl = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumRunControl = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumRunControl > 0) THEN
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
+     CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
                     AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
      IF (cAlphaArgs(5).EQ.'NO') THEN ! This run does not have a weather file simulation.
         CALL ShowSevereError(  'ExternalInterface: Error in idf file, section SimulationControl:')
@@ -2965,6 +3017,35 @@ SUBROUTINE CalcExternalInterface()
      END FUNCTION exchangeDoublesWithSocket
   END INTERFACE
 
+          ! INTERFACE BLOCK SPECIFICATIONS:
+  INTERFACE
+     INTEGER(C_INT) FUNCTION exchangeDoublesWithSocketFMU(socketFD, &
+          flaWri, flaRea, &
+          nDblWri, nDblRea, &
+          simTimWri, dblValWri, &
+          simTimRea, dblValRea, epexport) BIND (C, NAME="exchangedoubleswithsocketFMU")
+       ! Exchanges data with the socket
+       USE ISO_C_BINDING, ONLY: C_INT
+       USE DataPrecisionGlobals
+
+       ! These parameters are also declared in an interface below.
+       ! Change all together.
+       INTEGER(C_INT), PARAMETER :: nDblMax = 1024       ! Maximum number of doubles
+
+       INTEGER(C_INT) socketFD                           ! socket file descriptor
+       INTEGER(C_INT) flaWri                             ! flag to write to the socket
+       INTEGER(C_INT) flaRea                             ! flag read from the socket
+       INTEGER(C_INT) nDblWri                            ! number of doubles to write to socket
+       INTEGER(C_INT) nDblRea                            ! number of doubles to read from socket
+       REAL(r64) simTimWri                               ! simulation time to write to socket
+       REAL(r64) simTimRea                               ! simulation time to read from socket
+       REAL(r64), DIMENSION(nDblMax) :: dblValWri        ! dbl values to be written to the socket
+       REAL(r64), DIMENSION(nDblMax) :: dblValRea        ! dbl values to be read from the socket
+       INTEGER(C_INT) epexport                           ! FMU Export flag
+     END FUNCTION exchangeDoublesWithSocketFMU
+  END INTERFACE
+
+
 
           ! DERIVED TYPE DEFINITIONS:
           ! na
@@ -2997,9 +3078,11 @@ SUBROUTINE CalcExternalInterface()
   ENDIF
 
   ! Socket asked to terminate simulation, but simulation continues
-  IF (noMoreValues .and. showContinuationWithoutUpdate) THEN
-     CALL ShowWarningError('ExternalInterface: Continue simulation without updated values from server at t =' &
+  IF (noMoreValues .AND. showContinuationWithoutUpdate) THEN
+      IF (haveExternalInterfaceBCVTB) THEN
+        CALL ShowWarningError('ExternalInterface: Continue simulation without updated values from server at t =' &
           //TrimSigDigits(preSimTim/3600, 2) // ' hours')
+      END IF
      showContinuationWithoutUpdate = .false.
   ENDIF
 
@@ -3026,36 +3109,50 @@ SUBROUTINE CalcExternalInterface()
      ! Exchange data with socket
      retVal = 0
      flaRea = 0
+     IF (haveExternalInterfaceBCVTB) THEN
      retVal = exchangeDoublesWithSocket(socketFD, &
           flaWri, flaRea, &
           nDblWri, nDblRea, &
           preSimTim, dblValWri, &
           curSimTim, dblValRea)
+     ELSEIF (haveExternalInterfaceFMUExport) THEN
+         retVal = exchangeDoublesWithSocketFMU(socketFD, &
+          flaWri, flaRea, &
+          nDblWri, nDblRea, &
+          preSimTim, dblValWri, &
+          curSimTim, dblValRea, &
+          FMUExportActivate)
+     ENDIF
      continueSimulation = .true.
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      ! Check for errors, in which case we terminate the simulation loop
-     IF (retVal .NE. 0) THEN
-        continueSimulation = .false.
-        write (retValCha,1000) retVal
-        CALL ShowSevereError('ExternalInterface: Socket communication received error value "' &
+     ! Added a check since the FMUExport is terminated with the flaRea set to 1.
+     IF (haveExternalInterfaceBCVTB .OR. (haveExternalInterfaceFMUExport .AND. (flaRea .EQ. 0))) THEN
+       IF (retVal .NE. 0) THEN
+         continueSimulation = .false.
+         write (retValCha,1000) retVal
+         CALL ShowSevereError('ExternalInterface: Socket communication received error value "' &
              //TRIM(retValCha)// '" at time = ' &
              //TRIM(TrimSigDigits(preSimTim/3600,2 ))// ' hours.')
-        write (retValCha,1000) flaRea
-        CALL ShowContinueError('ExternalInterface: Flag from server "' &
+         write (retValCha,1000) flaRea
+         CALL ShowContinueError('ExternalInterface: Flag from server "' &
              //TRIM(retValCha)// '".')
-
-        ErrorsFound = .true.
-        CALL StopExternalInterfaceIfError
+         ErrorsFound = .true.
+         CALL StopExternalInterfaceIfError
+       END IF
      END IF
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      ! Check communication flag
      IF (flaRea .NE. 0) THEN
         ! No more values will be received in future steps
+        ! Added a check since the FMUExport  is terminated with the flaRea set to 1.
         noMoreValues = .true.
         write (retValCha,1000) flaRea
-        CALL ShowSevereError('ExternalInterface: Received end of simulation flag at time = ' &
-             //TRIM(TrimSigDigits(preSimTim/3600,2 ))// ' hours.')
-        CALL StopExternalInterfaceIfError
+        IF (haveExternalInterfaceBCVTB) THEN
+          CALL ShowSevereError('ExternalInterface: Received end of simulation flag at time = ' &
+               //TRIM(TrimSigDigits(preSimTim/3600,2 ))// ' hours.')
+          CALL StopExternalInterfaceIfError
+        END IF
      END IF
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      ! Make sure we get the right number of double values, unless retVal != 0
@@ -3213,7 +3310,7 @@ SUBROUTINE WarnIfExternalInterfaceObjectsAreUsed(ObjectWord)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: NumObjects   ! Number of objects found in idf file
 
-  NumObjects = GetNumObjectsFound(TRIM(ObjectWord))
+  NumObjects = GetNumObjectsFound(ObjectWord)
   IF (NumObjects > 0) THEN
      CALL ShowWarningError( 'IDF file contains object "'//TRIM(ObjectWord)//'",')
      CALL ShowContinueError('but object "ExternalInterface" with appropriate key entry is not specified. '//  &
@@ -3276,7 +3373,7 @@ END SUBROUTINE VerifyExternalInterfaceObject
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

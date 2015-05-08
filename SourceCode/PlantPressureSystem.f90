@@ -156,87 +156,7 @@ END SUBROUTINE SimPressureDropSystem
 !=================================================================================================!
 
 !SUBROUTINE GetPressureSystemInput()
-!
-!          ! SUBROUTINE INFORMATION:
-!          !       AUTHOR         Edwin Lee
-!          !       DATE WRITTEN   August 2009
-!          !       MODIFIED       na
-!          !       RE-ENGINEERED  na
-!
-!          ! PURPOSE OF THIS SUBROUTINE:
-!          ! Currently it just reads the input for pressure curve objects
-!
-!          ! METHODOLOGY EMPLOYED:
-!          ! General EnergyPlus Methodology
-!
-!          ! REFERENCES:
-!          ! na
-!
-!          ! USE STATEMENTS:
-!  USE InputProcessor, ONLY  :  GetNumObjectsFound, GetObjectItem, VerifyName
-!  USE DataIPShortcuts
-!
-!  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-!
-!          ! SUBROUTINE ARGUMENT DEFINITIONS:
-!          ! na
-!
-!          ! SUBROUTINE PARAMETER DEFINITIONS:
-!  CHARACTER(len=MaxNameLength), PARAMETER :: CurveObjectName = 'Curve:Functional:PressureDrop'
-!
-!          ! INTERFACE BLOCK SPECIFICATIONS:
-!          ! na
-!
-!          ! DERIVED TYPE DEFINITIONS:
-!          ! na
-!
-!          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-!  INTEGER                         ::  NumPressure
-!  CHARACTER(len=MaxNameLength),DIMENSION(1) :: Alphas  ! Alpha items for object
-!  REAL(r64), DIMENSION(5)         :: Numbers ! Numeric items for object
-!  INTEGER                         :: NumAlphas  ! Number of Alphas for each GetObjectItem call
-!  INTEGER                         :: NumNumbers ! Number of Numbers for each GetObjectItem call
-!  INTEGER                         :: IOStatus   ! Used in GetObjectItem
-!  LOGICAL                         :: ErrsFound=.false.  ! Set to true if errors in input, fatal at end of routine
-!  LOGICAL                         :: IsNotOK              ! Flag to verify name
-!  LOGICAL                         :: IsBlank              ! Flag for blank name
-!  INTEGER                         :: CurveNum
-!
-!  NumPressure = GetNumObjectsFound(CurveObjectName)
-!  ALLOCATE(PressureCurve(NumPressure))
-!  DO CurveNum = 1, NumPressure
-!    CALL GetObjectItem(TRIM(CurveObjectName),CurveNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus,     &
-!                NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-!    IsNotOK=.FALSE.
-!    IsBlank=.FALSE.
-!    CALL VerifyName(Alphas(1),PressureCurve%Name,CurveNum-1,IsNotOK,IsBlank,TRIM(CurveObjectName)//' Name')
-!    IF (IsNotOK) THEN
-!      ErrsFound=.true.
-!      IF (IsBlank) Alphas(1)='xxxxx'
-!    ENDIF
-!    PressureCurve(CurveNum)%Name      = Alphas(1)
-!    PressureCurve(CurveNum)%EquivDiameter  = Numbers(1)
-!    PressureCurve(CurveNum)%MinorLossCoeff = Numbers(2)
-!    PressureCurve(CurveNum)%EquivLength    = Numbers(3)
-!    PressureCurve(CurveNum)%EquivRoughness = Numbers(4)
-!    IF (NumNumbers > 4 .AND. .NOT. lNumericFieldBlanks(5)) THEN
-!      IF (Numbers(5) .NE. 0.0d0) THEN
-!        PressureCurve(CurveNum)%ConstantFpresent   = .TRUE.
-!        PressureCurve(CurveNum)%ConstantF          = Numbers(5)
-!      END IF
-!    END IF
-!  END DO
-!
-!  IF (ErrsFound) THEN
-!    CALL ShowFatalError('GetCurveInput: Errors found in Curve Objects.  Preceding condition(s) cause termination.')
-!  END IF
-!
-!  GetInputFlag = .FALSE.
-!
-!  RETURN
-!
-!END SUBROUTINE
-!
+! Getinput for PressureSystem moved to CurveManager module
 !=================================================================================================!
 
 SUBROUTINE InitPressureDrop(LoopNum, FirstHVACIteration)
@@ -324,7 +244,7 @@ SUBROUTINE InitPressureDrop(LoopNum, FirstHVACIteration)
           PlantLoop(LoopNum)%HasPressureComponents = .TRUE.
 
           !Setup output variable
-          CALL SetupOutputVariable('Branch Pressure Drop[Pa]',  &
+          CALL SetupOutputVariable('Plant Branch Pressure Difference [Pa]',  &
                        PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%PressureDrop &
                        ,'Plant','Average', PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Name)
 
@@ -335,25 +255,17 @@ SUBROUTINE InitPressureDrop(LoopNum, FirstHVACIteration)
       !Set up loopside level variables if applicable
       IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%HasPressureComponents) THEN
         IF (LoopSideNum==DemandSide) THEN
-          IF (PlantLoop(LoopNum)%TypeOfLoop==LoopType_Plant) THEN
-            CALL SetupOutputVariable('Plant Loop Demand Side Pressure Drop[Pa]',  &
-                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%PressureDrop &
-                       ,'Plant','Average', PlantLoop(LoopNum)%Name)
-          ELSE IF ( PlantLoop(LoopNum)%TypeOfLoop == LoopType_Condenser ) THEN
-            CALL SetupOutputVariable('Cond Loop Demand Side Pressure Drop[Pa]',  &
-                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%PressureDrop &
-                       ,'Plant','Average', PlantLoop(LoopNum)%Name)
-          END IF
+
+          CALL SetupOutputVariable('Plant Demand Side Loop Pressure Difference [Pa]',  &
+                      PlantLoop(LoopNum)%LoopSide(LoopSideNum)%PressureDrop &
+                      ,'Plant','Average', PlantLoop(LoopNum)%Name)
+
         ELSE IF (LoopSideNum==SupplySide) THEN
-          IF (PlantLoop(LoopNum)%TypeOfLoop==LoopType_Plant) THEN
-            CALL SetupOutputVariable('Plant Loop Supply Side Pressure Drop[Pa]',  &
+
+          CALL SetupOutputVariable('Plant Supply Side Loop Pressure Difference [Pa]',  &
                        PlantLoop(LoopNum)%LoopSide(LoopSideNum)%PressureDrop &
                        ,'Plant','Average', PlantLoop(LoopNum)%Name)
-          ELSE IF ( PlantLoop(LoopNum)%TypeOfLoop == LoopType_Condenser ) THEN
-            CALL SetupOutputVariable('Cond Loop Supply Side Pressure Drop[Pa]',  &
-                       PlantLoop(LoopNum)%LoopSide(LoopSideNum)%PressureDrop &
-                       ,'Plant','Average', PlantLoop(LoopNum)%Name)
-          END IF
+
         END IF
       END IF
 
@@ -362,15 +274,11 @@ SUBROUTINE InitPressureDrop(LoopNum, FirstHVACIteration)
     IF (PlantLoop(LoopNum)%HasPressureComponents) THEN
 
       !Set up loop level variables if applicable
-      IF ( PlantLoop(LoopNum)%TypeOfLoop == LoopType_Plant ) THEN
-        CALL SetupOutputVariable('Plant Loop Pressure Drop[Pa]',  &
+
+      CALL SetupOutputVariable('Plant Loop Pressure Difference [Pa]',  &
                      PlantLoop(LoopNum)%PressureDrop &
                      ,'Plant','Average', PlantLoop(LoopNum)%Name)
-      ELSE IF ( PlantLoop(LoopNum)%TypeOfLoop == LoopType_Condenser ) THEN
-        CALL SetupOutputVariable('Cond Loop Pressure Drop[Pa]',  &
-                     PlantLoop(LoopNum)%PressureDrop &
-                     ,'Plant','Average', PlantLoop(LoopNum)%Name)
-      END IF
+
 
       !Check for illegal configurations on this plant loop
       DO LoopSideNum = DemandSide, SupplySide
@@ -1526,7 +1434,7 @@ REAL(r64) FUNCTION ResolveLoopFlowVsPressure(LoopNum, SystemMassFlow, PumpCurveN
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

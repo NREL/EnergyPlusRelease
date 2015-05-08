@@ -31,7 +31,7 @@ MODULE UnitHeater
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc
+USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, SetupOutputVariable
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallAirVolFlow, cFanTypes
 
@@ -245,7 +245,7 @@ SUBROUTINE GetUnitHeaterInput
   USE InputProcessor,   ONLY : GetNumObjectsFound, GetObjectItem, VerifyName, SameString,GetObjectDefMaxArgs
   USE NodeInputManager, ONLY : GetOnlySingleNode
   USE BranchNodeConnections, ONLY: SetUpCompSets
-  USE DataIPShortCuts
+!  USE DataIPShortCuts
   USE Fans,         ONLY: GetFanType, GetFanOutletNode, GetFanIndex, GetFanVolFlow, GetFanAvailSchPtr
   USE WaterCoils,   ONLY: GetCoilWaterInletNode
   USE SteamCoils,   ONLY: GetSteamCoilSteamInletNode=>GetCoilSteamInletNode, GetSteamCoilIndex
@@ -299,8 +299,8 @@ SUBROUTINE GetUnitHeaterInput
 
           ! Figure out how many unit heaters there are in the input file
   CurrentModuleObject = cMO_UnitHeater
-  NumOfUnitHeats = GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+  NumOfUnitHeats = GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
 
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
@@ -324,7 +324,7 @@ SUBROUTINE GetUnitHeaterInput
 
   DO UnitHeatNum = 1, NumOfUnitHeats    ! Begin looping over all of the unit heaters found in the input file...
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),UnitHeatNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,UnitHeatNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -338,17 +338,16 @@ SUBROUTINE GetUnitHeaterInput
 
     UnitHeat(UnitHeatNum)%Name      = Alphas(1)
     UnitHeat(UnitHeatNum)%SchedName = Alphas(2)
-    UnitHeat(UnitHeatNum)%SchedPtr  = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-    IF (UnitHeat(UnitHeatNum)%SchedPtr == 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      UnitHeat(UnitHeatNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      UnitHeat(UnitHeatNum)%SchedPtr  = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (UnitHeat(UnitHeatNum)%SchedPtr == 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
            ' entered ='//TRIM(Alphas(2))// &
            ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
 
           ! Main air nodes (except outside air node):
@@ -378,11 +377,11 @@ SUBROUTINE GetUnitHeaterInput
     ErrFlag = .FALSE.
     CALL ValidateComponent(UnitHeat(UnitHeatNum)%FanType,UnitHeat(UnitHeatNum)%FanName,ErrFlag,TRIM(CurrentModuleObject))
     IF (ErrFlag) THEN
-      CALL ShowContinueError('specified in '//TRIM(cCurrentModuleObject)//' = "'//TRIM(UnitHeat(UnitHeatNum)%Name)//'".')
+      CALL ShowContinueError('specified in '//TRIM(CurrentModuleObject)//' = "'//TRIM(UnitHeat(UnitHeatNum)%Name)//'".')
       ErrorsFound=.TRUE.
     ELSE
       CALL GetFanType(UnitHeat(UnitHeatNum)%FanName,UnitHeat(UnitHeatNum)%FanType_Num, &
-                    ErrFlag,cCurrentModuleObject,UnitHeat(UnitHeatNum)%Name)
+                    ErrFlag,CurrentModuleObject,UnitHeat(UnitHeatNum)%Name)
 
       SELECT CASE (UnitHeat(UnitHeatNum)%FanType_Num)
         CASE (FanType_SimpleConstVolume,FanType_SimpleVAV)
@@ -554,16 +553,16 @@ SUBROUTINE GetUnitHeaterInput
 
           ! Setup Report variables for the Unit Heaters, CurrentModuleObject='ZoneHVAC:UnitHeater'
   DO UnitHeatNum = 1, NumOfUnitHeats
-    CALL SetupOutputVariable('Unit Heater Heating Rate[W]',UnitHeat(UnitHeatNum)%HeatPower, &
+    CALL SetupOutputVariable('Zone Unit Heater Heating Rate [W]',UnitHeat(UnitHeatNum)%HeatPower, &
                              'System','Average',UnitHeat(UnitHeatNum)%Name)
-    CALL SetupOutputVariable('Unit Heater Heating Energy[J]',UnitHeat(UnitHeatNum)%HeatEnergy, &
+    CALL SetupOutputVariable('Zone Unit Heater Heating Energy [J]',UnitHeat(UnitHeatNum)%HeatEnergy, &
                              'System','Sum',UnitHeat(UnitHeatNum)%Name)
-    CALL SetupOutputVariable('Unit Heater Fan Electric Power[W]',UnitHeat(UnitHeatNum)%ElecPower, &
+    CALL SetupOutputVariable('Zone Unit Heater Fan Electric Power [W]',UnitHeat(UnitHeatNum)%ElecPower, &
                              'System','Average',UnitHeat(UnitHeatNum)%Name)
           ! Note that the unit heater fan electric is NOT metered because this value is already metered through the fan component
-    CALL SetupOutputVariable('Unit Heater Fan Electric Consumption[J]',UnitHeat(UnitHeatNum)%ElecEnergy, &
+    CALL SetupOutputVariable('Zone Unit Heater Fan Electric Energy [J]',UnitHeat(UnitHeatNum)%ElecEnergy, &
                              'System','Sum',UnitHeat(UnitHeatNum)%Name)
-    CALL SetupOutputVariable('Unit Heater Fan Availability Status', UnitHeat(UnitHeatNum)%AvailStatus,&
+    CALL SetupOutputVariable('Zone Unit Heater Fan Availability Status []', UnitHeat(UnitHeatNum)%AvailStatus,&
                              'System','Average',UnitHeat(UnitHeatNum)%Name)
   END DO
 
@@ -1189,8 +1188,9 @@ SUBROUTINE CalcUnitHeater(UnitHeatNum,ZoneNum,FirstHVACIteration,PowerMet,LatOut
 
   END IF    ! ...end of unit ON/OFF IF-THEN block
 
-  SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-  SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(OutletNode)%HumRat
+  SpecHumIn  = Node(InletNode)%HumRat
   LatentOutput = Node(OutletNode)%MassFlowRate * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
   QUnitOut = Node(OutletNode)%MassFlowRate * (PsyHFnTdbW(Node(OutletNode)%Temp,Node(InletNode)%HumRat)  &
@@ -1371,7 +1371,7 @@ END SUBROUTINE ReportUnitHeater
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

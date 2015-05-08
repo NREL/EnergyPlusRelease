@@ -85,6 +85,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
   LOGICAL :: TimingFlag=.false.          ! TRUE if timing flag is turned on. (turns on more timing displays to console)
   LOGICAL :: SutherlandHodgman=.true.    ! TRUE if SutherlandHodgman algorithm for polygon clipping is to be used.
   LOGICAL :: DetailedSkyDiffuseAlgorithm=.false.  ! use detailed diffuse shading algorithm for sky (shading transmittance varies)
+  LOGICAL :: DetailedSolarTimestepIntegration=.false. ! when true, use detailed timestep integration for all solar,shading, etc.
   LOGICAL :: TrackAirLoopEnvFlag=.FALSE. ! If TRUE generates a file with runtime statistics for each HVAC
                                          !  controller on each air loop
   LOGICAL :: TraceAirLoopEnvFlag=.FALSE. ! If TRUE generates a trace file with the converged solutions of all
@@ -264,7 +265,7 @@ end subroutine CheckForActualFileName
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

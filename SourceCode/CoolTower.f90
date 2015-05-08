@@ -220,7 +220,7 @@ SUBROUTINE GetCooltower
     LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
 
             ! Initializations and allocations
-   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumArgs,NumAlphas,NumNumbers)
+   CALL GetObjectDefMaxArgs(CurrentModuleObject,NumArgs,NumAlphas,NumNumbers)
    ALLOCATE(cAlphaArgs(NumAlphas))
    cAlphaArgs=' '
    ALLOCATE(cAlphaFields(NumAlphas))
@@ -255,16 +255,15 @@ DO CoolTowerNum = 1, NumCoolTowers
     CoolTowerSys(CoolTowerNum)%Name = cAlphaArgs(1)       ! Name of cooltower
 
     CoolTowerSys(CoolTowerNum)%Schedule = cAlphaArgs(2)   ! Get schedule
-    CoolTowerSys(CoolTowerNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-    IF (CoolTowerSys(CoolTowerNum)%SchedPtr == 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
-           trim(cAlphaFields(2))//' is required but input is blank.')
-      ELSE
-        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
-           trim(cAlphaFields(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+    IF (lAlphaBlanks(2)) THEN
+      CoolTowerSys(CoolTowerNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      CoolTowerSys(CoolTowerNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+      IF (CoolTowerSys(CoolTowerNum)%SchedPtr == 0) THEN
+        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError('Invalid-Schedule not found '//trim(cAlphaFields(2))//'="'//trim(cAlphaArgs(2))//'".')
+        ErrorsFound = .TRUE.
       ENDIF
-      ErrorsFound = .TRUE.
     ENDIF
 
     CoolTowerSys(CoolTowerNum)%ZoneName = cAlphaArgs(3)   ! Name of zone where cooltower is serving
@@ -426,47 +425,49 @@ END DO
   IF (ErrorsFound) Call ShowFatalError(CurrentModuleObject//' errors occurred in input.  Program terminates.')
 
 DO CoolTowerNum = 1, NumCoolTowers
-    CALL SetupOutputVariable('Cooltower Sensible Heat Loss [J]',CoolTowerSys(CoolTowerNum)%SenHeatLoss, &
+    CALL SetupOutputVariable('Zone Cooltower Sensible Heat Loss Energy [J]',CoolTowerSys(CoolTowerNum)%SenHeatLoss, &
                              'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Sensible Heat Loss Rate [W]',CoolTowerSys(CoolTowerNum)%SenHeatPower, &
+    CALL SetupOutputVariable('Zone Cooltower Sensible Heat Loss Rate [W]',CoolTowerSys(CoolTowerNum)%SenHeatPower, &
                               'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Latent Heat Loss [J]',CoolTowerSys(CoolTowerNum)%LatHeatLoss, &
+    CALL SetupOutputVariable('Zone Cooltower Latent Heat Loss Energy [J]',CoolTowerSys(CoolTowerNum)%LatHeatLoss, &
                              'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Latent Heat Loss Rate [W]',CoolTowerSys(CoolTowerNum)%LatHeatPower, &
+    CALL SetupOutputVariable('Zone Cooltower Latent Heat Loss Rate [W]',CoolTowerSys(CoolTowerNum)%LatHeatPower, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTAirVol, &
+    CALL SetupOutputVariable('Zone Cooltower Air Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTAirVol, &
                              'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Volume Flow Rate [m3/s]',CoolTowerSys(CoolTowerNum)%AirVolFlowRate, &
+    CALL SetupOutputVariable('Zone Cooltower Air Volume Flow Rate [m3/s]',CoolTowerSys(CoolTowerNum)%AirVolFlowRate, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Mass [kg]',CoolTowerSys(CoolTowerNum)%CoolTAirMass, &
+    CALL SetupOutputVariable('Zone Cooltower Air Mass [kg]',CoolTowerSys(CoolTowerNum)%CoolTAirMass, &
                              'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Mass Flow Rate [kg/s]',CoolTowerSys(CoolTowerNum)%AirMassFlowRate, &
+    CALL SetupOutputVariable('Zone Cooltower Air Mass Flow Rate [kg/s]',CoolTowerSys(CoolTowerNum)%AirMassFlowRate, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Inlet Temperature [C]',CoolTowerSys(CoolTowerNum)%InletDBTemp, &
+    CALL SetupOutputVariable('Zone Cooltower Air Inlet Temperature [C]',CoolTowerSys(CoolTowerNum)%InletDBTemp, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Inlet Humidity Ratio [kgWater/kgDryAir]',CoolTowerSys(CoolTowerNum)%InletHumRat, &
+    CALL SetupOutputVariable('Zone Cooltower Air Inlet Humidity Ratio [kgWater/kgDryAir]',CoolTowerSys(CoolTowerNum)%InletHumRat, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Outlet Temperature [C]',CoolTowerSys(CoolTowerNum)%OutletTemp, &
+    CALL SetupOutputVariable('Zone Cooltower Air Outlet Temperature [C]',CoolTowerSys(CoolTowerNum)%OutletTemp, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Outlet Humidity Ratio [kgWater/kgDryAir]',CoolTowerSys(CoolTowerNum)%OutletHumRat, &
+    CALL SetupOutputVariable('Zone Cooltower Air Outlet Humidity Ratio [kgWater/kgDryAir]',  &
+                             CoolTowerSys(CoolTowerNum)%OutletHumRat, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Pump Electric Power [W]',CoolTowerSys(CoolTowerNum)%PumpElecPower, &
+    CALL SetupOutputVariable('Zone Cooltower Pump Electric Power [W]',CoolTowerSys(CoolTowerNum)%PumpElecPower, &
                              'System','Average',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-    CALL SetupOutputVariable('Cooltower Pump Electric Consumption [J]',CoolTowerSys(CoolTowerNum)%PumpElecConsump, &
+    CALL SetupOutputVariable('Zone Cooltower Pump Electric Energy [J]',CoolTowerSys(CoolTowerNum)%PumpElecConsump, &
                              'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name, &
                              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
     IF (CoolTowerSys(CoolTowerNum)%CoolTWaterSupplyMode == WaterSupplyFromMains) THEN
-        CALL SetupOutputVariable('Cooltower Water Consumption [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
+        CALL SetupOutputVariable('Zone Cooltower Water Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
                                   'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Cooltower Mains Water Mains Draw [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
+        CALL SetupOutputVariable('Zone Cooltower Mains Water Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
                                  'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name, &
                                   ResourceTypeKey='MainsWater',EndUseKey='Cooling',GroupKey='System')
     ELSE IF  (CoolTowerSys(CoolTowerNum)%CoolTWaterSupplyMode == WaterSupplyFromTank) THEN
-        CALL SetupOutputVariable('Cooltower Water Consumption [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
+        CALL SetupOutputVariable('Zone Cooltower Water Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
                                   'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Cooltower Tank Water Consumption [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
+        CALL SetupOutputVariable('Zone Cooltower Storage Tank Water Volume [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterConsump, &
                                  'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Cooltower Starved Water Mains Draw [m3]',CoolTowerSys(CoolTowerNum)%CoolTWaterStarvMakeup, &
+        CALL SetupOutputVariable('Zone Cooltower Starved Mains Water Volume [m3]',  &
+                                  CoolTowerSys(CoolTowerNum)%CoolTWaterStarvMakeup, &
                                  'System','Sum',Zone(CoolTowerSys(CoolTowerNum)%ZonePtr)%Name, &
                                   ResourceTypeKey='MainsWater',EndUseKey='Cooling',GroupKey='System')
     END IF
@@ -778,7 +779,7 @@ END SUBROUTINE ReportCoolTower
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

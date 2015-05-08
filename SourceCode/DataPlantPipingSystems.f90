@@ -320,6 +320,9 @@ MODULE DataPlantPipingSystems
         ! Error handling flags
         LOGICAL :: PipeCellCoordinatesSet = .FALSE.
 
+        ! Other flags
+        LOGICAL :: IsActuallyPartOfAHorizontalTrench = .FALSE.
+
     END TYPE
 
     TYPE PipeCircuitInfo
@@ -361,6 +364,7 @@ MODULE DataPlantPipingSystems
         ! Flags
         LOGICAL :: CheckEquipName = .TRUE.
         LOGICAL :: NeedToFindOnPlantLoop = .TRUE.
+        LOGICAL :: IsActuallyPartOfAHorizontalTrench = .FALSE.
 
         ! Location of this pipe circuit in the PlantLoop topology
         INTEGER :: LoopNum    =0
@@ -403,6 +407,7 @@ MODULE DataPlantPipingSystems
         LOGICAL :: BeginSimEnvrn = .TRUE.
         LOGICAL :: DomainNeedsSimulation = .TRUE.
         LOGICAL :: DomainNeedsToBeMeshed = .TRUE.
+        LOGICAL :: IsActuallyPartOfAHorizontalTrench = .FALSE.
 
         ! "Input" data structure variables
         TYPE(MeshExtents) :: Extents
@@ -431,7 +436,7 @@ MODULE DataPlantPipingSystems
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

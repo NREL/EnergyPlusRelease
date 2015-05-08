@@ -46,6 +46,8 @@ INTEGER, PARAMETER :: DieselUse=9   ! Diesel
 INTEGER, PARAMETER :: SteamUse=10   ! Steam
 INTEGER, PARAMETER :: DistrictCoolUse=11  ! Purchased Cooling
 INTEGER, PARAMETER :: DistrictHeatUse=12  ! Purchased Heating
+INTEGER, PARAMETER :: OtherFuel1Use=13 ! OtherFuel1
+INTEGER, PARAMETER :: OtherFuel2Use=14 ! OtherFuel2
 
 INTEGER, PARAMETER, PUBLIC :: ScheduleOnly = 1  ! exterior lights only on schedule
 INTEGER, PARAMETER, PUBLIC :: AstroClockOverride = 2 !exterior lights controlled to turn off during day.
@@ -218,7 +220,7 @@ SUBROUTINE GetExteriorEnergyUseInput
 
   cCurrentModuleObject='Exterior:Lights'
   DO Item=1,NumExteriorLights
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorInName=.false.
@@ -285,10 +287,10 @@ SUBROUTINE GetExteriorEnergyUseInput
     ENDIF
 
     CALL SetupOutputVariable('Exterior Lights Electric Power [W]',ExteriorLights(Item)%Power, &
-                             'Zone','Average',TRIM(ExteriorLights(Item)%Name))
+                             'Zone','Average',ExteriorLights(Item)%Name)
 
-    CALL SetupOutputVariable('Exterior Lights Electric Consumption [J]',ExteriorLights(Item)%CurrentUse, &
-                             'Zone','Sum',TRIM(ExteriorLights(Item)%Name), &
+    CALL SetupOutputVariable('Exterior Lights Electric Energy [J]',ExteriorLights(Item)%CurrentUse, &
+                             'Zone','Sum',ExteriorLights(Item)%Name, &
                              ResourceTypeKey='Electricity',EndUseKey='Exterior Lights',EndUseSubKey=EndUseSubcategoryName)
 
     ! entries for predefined tables
@@ -309,7 +311,7 @@ SUBROUTINE GetExteriorEnergyUseInput
 
   cCurrentModuleObject='Exterior:FuelEquipment'
   DO Item=1,NumFuelEq
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorInName=.false.
@@ -342,22 +344,22 @@ SUBROUTINE GetExteriorEnergyUseInput
       ErrorsFound=.true.
     ELSE
       IF (ExteriorEquipment(NumExteriorEqs)%FuelType /= WaterUse) THEN
-        CALL SetupOutputVariable('Exterior Equipment Fuel Consumption Rate [W]',ExteriorEquipment(NumExteriorEqs)%Power, &
-                                 'Zone','Average',TRIM(ExteriorEquipment(NumExteriorEqs)%Name))
+        CALL SetupOutputVariable('Exterior Equipment Fuel Rate [W]',ExteriorEquipment(NumExteriorEqs)%Power, &
+                                 'Zone','Average',ExteriorEquipment(NumExteriorEqs)%Name)
 
         ConUnits='[J]'
-        CALL SetupOutputVariable('Exterior Equipment '//TRIM(TypeString)//' Consumption '//TRIM(ConUnits), &
+        CALL SetupOutputVariable('Exterior Equipment '//TRIM(TypeString)//' Energy '//TRIM(ConUnits), &
                              ExteriorEquipment(NumExteriorEqs)%CurrentUse, &
-                             'Zone','Sum',TRIM(ExteriorEquipment(NumExteriorEqs)%Name), &
+                             'Zone','Sum',ExteriorEquipment(NumExteriorEqs)%Name, &
                              ResourceTypeKey=TypeString,EndUseKey='ExteriorEquipment',EndUseSubKey=EndUseSubcategoryName)
       ELSE
-        CALL SetupOutputVariable('Exterior Equipment Water Consumption Rate [m3/s]',ExteriorEquipment(NumExteriorEqs)%Power, &
+        CALL SetupOutputVariable('Exterior Equipment Water Volume Flow Rate [m3/s]',ExteriorEquipment(NumExteriorEqs)%Power, &
                                  'Zone','Average',TRIM(ExteriorEquipment(NumExteriorEqs)%Name))
 
         ConUnits='[m3]'
-        CALL SetupOutputVariable('Exterior Equipment '//TRIM(TypeString)//' Consumption '//TRIM(ConUnits), &
+        CALL SetupOutputVariable('Exterior Equipment '//TRIM(TypeString)//' Volume '//TRIM(ConUnits), &
                              ExteriorEquipment(NumExteriorEqs)%CurrentUse, &
-                             'Zone','Sum',TRIM(ExteriorEquipment(NumExteriorEqs)%Name), &
+                             'Zone','Sum',ExteriorEquipment(NumExteriorEqs)%Name, &
                              ResourceTypeKey=TypeString,EndUseKey='ExteriorEquipment',EndUseSubKey=EndUseSubcategoryName)
       ENDIF
 
@@ -401,7 +403,7 @@ SUBROUTINE GetExteriorEnergyUseInput
 
   cCurrentModuleObject='Exterior:WaterEquipment'
   DO Item=1,NumWtrEq
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorInName=.false.
@@ -454,16 +456,16 @@ SUBROUTINE GetExteriorEnergyUseInput
 
     ExteriorEquipment(NumExteriorEqs)%DesignLevel=rNumericArgs(1)
 
-    CALL SetupOutputVariable('Exterior Equipment Water Consumption Rate [m3/s]',ExteriorEquipment(NumExteriorEqs)%Power, &
-                             'Zone','Average',TRIM(ExteriorEquipment(NumExteriorEqs)%Name))
+    CALL SetupOutputVariable('Exterior Equipment Water Volume Flow Rate [m3/s]',ExteriorEquipment(NumExteriorEqs)%Power, &
+                             'Zone','Average',ExteriorEquipment(NumExteriorEqs)%Name)
 
-    CALL SetupOutputVariable('Exterior Equipment Water Consumption [m3]', &
+    CALL SetupOutputVariable('Exterior Equipment Water Volume [m3]', &
                              ExteriorEquipment(NumExteriorEqs)%CurrentUse, &
-                             'Zone','Sum',TRIM(ExteriorEquipment(NumExteriorEqs)%Name), &
+                             'Zone','Sum',ExteriorEquipment(NumExteriorEqs)%Name, &
                              ResourceTypeKey='Water',EndUseKey='ExteriorEquipment',EndUseSubKey=EndUseSubcategoryName)
-    CALL SetupOutputVariable('Mains Water for Exterior Equipment [m3]', &
+    CALL SetupOutputVariable('Exterior Equipment Mains Water Volume [m3]', &
                              ExteriorEquipment(NumExteriorEqs)%CurrentUse, &
-                             'Zone','Sum',TRIM(ExteriorEquipment(NumExteriorEqs)%Name), &
+                             'Zone','Sum',ExteriorEquipment(NumExteriorEqs)%Name, &
                              ResourceTypeKey='MainsWater',EndUseKey='ExteriorEquipment',EndUseSubKey=EndUseSubcategoryName)
   ENDDO
 
@@ -563,6 +565,14 @@ SUBROUTINE ValidateFuelType(FuelTypeNumber,FuelTypeAlpha,FuelTypeString,CurrentM
     IF (SameString(FuelTypeAlpha,'FuelOil#2')) THEN
       FuelTypeNumber=FuelOil2Use
       FuelTypeString='FuelOil#2'
+    ENDIF
+    IF (SameString(FuelTypeAlpha,'OtherFuel1')) THEN
+      FuelTypeNumber=OtherFuel1Use
+      FuelTypeString='OtherFuel1'
+    ENDIF
+    IF (SameString(FuelTypeAlpha,'OtherFuel2')) THEN
+      FuelTypeNumber=OtherFuel1Use
+      FuelTypeString='OtherFuel2'
     ENDIF
     IF (SameString(FuelTypeAlpha,'Water')) THEN
       FuelTypeNumber=WaterUse
@@ -683,7 +693,7 @@ END SUBROUTINE ReportExteriorEnergyUse
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

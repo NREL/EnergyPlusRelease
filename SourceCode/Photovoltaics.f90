@@ -338,10 +338,10 @@ SUBROUTINE GetPVInput
   TYPE(SNLModuleParamsStuct),        ALLOCATABLE, DIMENSION(:) :: tmpSNLModuleParams  ! temporary, for processing input data
 
   ! count how many photovoltaic arrays of different types are in the .idf
-  NumPVs                 = GetNumObjectsFound(TRIM( cPVGeneratorObjectName       ) )
-  NumSimplePVModuleTypes = GetNumObjectsFound(TRIM( cPVSimplePerfObjectName      ) )
-  Num1DiodePVModuleTypes = GetNumObjectsFound(TRIM( cPVEquiv1DiodePerfObjectName ) )
-  NumSNLPVModuleTypes    = GetNumObjectsFound(TRIM( cPVSandiaPerfObjectName      ) )
+  NumPVs                 = GetNumObjectsFound(cPVGeneratorObjectName       )
+  NumSimplePVModuleTypes = GetNumObjectsFound(cPVSimplePerfObjectName      )
+  Num1DiodePVModuleTypes = GetNumObjectsFound(cPVEquiv1DiodePerfObjectName )
+  NumSNLPVModuleTypes    = GetNumObjectsFound(cPVSandiaPerfObjectName      )
 
   IF (NumPVs <= 0) THEN
     CALL ShowSevereError('Did not find any '//Trim(cPVGeneratorObjectName) )
@@ -354,7 +354,7 @@ SUBROUTINE GetPVInput
 
   cCurrentModuleObject = cPVGeneratorObjectName
   Do PVnum = 1, NumPVs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PVnum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,PVnum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT, &
                       AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames )
     IsNotOK = .FALSE.
     IsBlank = .FALSE.
@@ -457,7 +457,7 @@ SUBROUTINE GetPVInput
     ALLOCATE(tmpSimpleModuleParams(NumSimplePVModuleTypes))
     cCurrentModuleObject = cPVSimplePerfObjectName
     Do ModNum=1,NumSimplePVModuleTypes
-      CALL GetObjectItem(Trim(cCurrentModuleObject), ModNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject, ModNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                       AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
       IsNotOK=.FALSE.
@@ -505,7 +505,7 @@ SUBROUTINE GetPVInput
     ALLOCATE(tmpTNRSYSModuleParams(Num1DiodePVModuleTypes) )
     cCurrentModuleObject =cPVEquiv1DiodePerfObjectName
     Do ModNum=1,Num1DiodePVModuleTypes
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), ModNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject, ModNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                       AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames )
 
@@ -563,7 +563,7 @@ SUBROUTINE GetPVInput
     cCurrentModuleObject = cPVSandiaPerfObjectName
     Do ModNum=1, NumSNLPVModuleTypes
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), ModNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject, ModNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                       AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames )
 
@@ -664,25 +664,25 @@ SUBROUTINE GetPVInput
     END SELECT
 
     !set up report variables CurrentModuleObject='Photovoltaics'
-    CALL SetupOutputVariable('PV Generator DC Power [W]', &
+    CALL SetupOutputVariable('Generator Produced DC Electric Power [W]', &
                  PVArray(PVNum)%Report%DCPower,'System','Average', &
                  PVarray(PVNum)%Name)
-    CALL SetupOutputVariable('PV Generator DC Energy [J]', &
+    CALL SetupOutputVariable('Generator Produced DC Electric Energy [J]', &
                  PVArray(PVNum)%Report%DCEnergy,'System','Sum', &
                  PVarray(PVNum)%Name)
-    CALL SetupOutputVariable('PV Array Efficiency[]', &
+    CALL SetupOutputVariable('Generator PV Array Efficiency []', &
                  PVArray(PVNum)%Report%ArrayEfficiency,'System','Average', &
                  PVarray(PVNum)%Name)
 
     ! CurrentModuleObject='Equiv1Diode or Sandia Photovoltaics'
     IF ((PVArray(PVNum)%PVModelType == iTRNSYSPVModel) .OR. (PVArray(PVNum)%PVModelType == iSandiaPVModel)) THEN
-      CALL SetupOutputVariable('PV Cell Temperature [C]', &
+      CALL SetupOutputVariable('Generator PV Cell Temperature [C]', &
              PVArray(PVNum)%Report%CellTemp,'System','Average', &
              PVarray(PVNum)%Name)
-      CALL SetupOutputVariable('PV Array Short Circuit Current [A]', &
+      CALL SetupOutputVariable('Generator PV Short Circuit Current [A]', &
              PVArray(PVNum)%Report%ArrayIsc,'System','Average', &
              PVarray(PVNum)%Name)
-      CALL SetupOutputVariable('PV Array Open Circuit Voltage [V]', &
+      CALL SetupOutputVariable('Generator PV Open Circuit Voltage [V]', &
              PVArray(PVNum)%Report%ArrayVoc,'System','Average', &
              PVarray(PVNum)%Name)
     ENDIF
@@ -2042,7 +2042,7 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
           ! na
 
           ! USE STATEMENTS:
-          ! na
+    USE DataGlobals, ONLY: DegToRadians
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2064,7 +2064,7 @@ REAL(r64) FUNCTION FV(II,VV,IO,RSER,AA)
     REAL(r64) :: AM ! air mass working variable
 
     IF (SolZen.LT.89.9d0) THEN
-        AM = (Cos(SolZen * 0.01745329d0) + 0.5057d0 &
+        AM = (Cos(SolZen * DegToRadians) + 0.5057d0 &
               * (96.08d0 - SolZen)**(-1.634d0))**(-1.0d0)
 
         AbsoluteAirMass = Exp(-0.0001184d0 * Altitude) * AM
@@ -2674,7 +2674,7 @@ SUBROUTINE GetExtVentedCavityTsColl(VentModNum, TsColl)
 !
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

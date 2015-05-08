@@ -145,7 +145,7 @@ SUBROUTINE GetGeneratorFuelSupplyInput
 
 IF (MyOneTimeFlag) then
   cCurrentModuleObject = 'Generator:FuelSupply'
-  NumGeneratorFuelSups = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumGeneratorFuelSups = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumGeneratorFuelSups <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -155,7 +155,7 @@ IF (MyOneTimeFlag) then
   Allocate(FuelSupply(NumGeneratorFuelSups))
 
   DO FuelSupNum = 1 , NumGeneratorFuelSups
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FuelSupNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FuelSupNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -1060,8 +1060,8 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
   Pel      = PelInput
 
   ! get data to check if sufficient flow available from Plant
-  IF (InternalFlowControl) THEN
-    TrialMdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pel, TcwIn, FirstHVACIteration)
+  IF (InternalFlowControl .AND. (schedval > 0.d0) ) THEN
+    TrialMdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pel, TcwIn)
   ELSE
     TrialMdotcw = Node(InletCWnode)%MassFlowRate
   ENDIF
@@ -1073,6 +1073,7 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
     ! possible future states {Off, Standby, WarmUp,Normal }
      IF (schedval == 0.0) THEN
        newOpMode = OpModeOFF
+
      ELSEIF (((schedval /= 0.0)  .AND. ( .NOT. RunFlag)) .OR. (TrialMdotcw < LimitMinMdotcw)) THEN
        newOpMode = OpModeStandby
      ELSEIF ((schedval /= 0.0)  .AND. (Runflag) ) THEN
@@ -1403,6 +1404,13 @@ SUBROUTINE ManageGeneratorControlState(GeneratorType, GeneratorName, GeneratorNu
     Pel = 0.0 ! assumes no power generated during shut down
   ENDIF
 
+  IF (newOpmode == OpModeOFF) THEN
+    Pel = 0.0 ! assumes no power generated during OFF mode
+  ENDIF
+
+  IF (newOpmode == OpModeStandby) THEN
+    Pel = 0.0 ! assumes no power generated during standby mode
+  ENDIF
 
   ! Control step 3: adjust for max and min limits on Pel
 
@@ -1579,7 +1587,7 @@ RETURN
 
 END SUBROUTINE ManageGeneratorFuelFlow
 
-REAL(r64) FUNCTION FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
+REAL(r64) FUNCTION FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         B. Griffith
@@ -1608,7 +1616,7 @@ REAL(r64) FUNCTION FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnets
   INTEGER,   INTENT(IN) :: GeneratorNum ! ID of generator
   REAL(r64), INTENT(IN) :: Pnetss ! power net steady state
   REAL(r64), INTENT(IN) :: TcwIn ! temperature of cooling water at inlet
-  LOGICAL,   INTENT(IN) :: FirstHVACIteration ! true if this is
+
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
 
@@ -1680,7 +1688,7 @@ MODULE MicroCHPElectricGenerator
 USE DataPrecisionGlobals
 USE DataGenerators
 USE DataLoopNode
-USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, NumOfZones, KelvinConv, HoursInDay
+USE DataGlobals ,   ONLY : MaxNameLength, NumOfTimeStepInHour, NumOfZones, KelvinConv, HoursInDay, ScheduleAlwaysOn
 USE DataInterfaces
 USE DataGlobalConstants, ONLY: iGeneratorFuelCell
 USE GeneratorDynamicsManager
@@ -1874,7 +1882,7 @@ If (myonetimeflag) then
 
  ! First get the Micro CHP Parameters so they can be nested in structure later
   cCurrentModuleObject = 'Generator:MicroCHP:NonNormalizedParameters'
-  NumMicroCHPParams = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumMicroCHPParams = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumMicroCHPParams <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -1887,7 +1895,7 @@ If (myonetimeflag) then
 
 
   DO CHPParamNum = 1 , NumMicroCHPParams
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),CHPParamNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,CHPParamNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 !  Can't validate this name.
@@ -1979,7 +1987,7 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:MicroCHP'
-  NumMicroCHPs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumMicroCHPs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumMicroCHPs <= 0) THEN
     ! shouldn't ever come here?
@@ -1995,7 +2003,7 @@ If (myonetimeflag) then
 
   ! load in Micro CHPs
   DO GeneratorNum = 1 , NumMicroCHPs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),GeneratorNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,GeneratorNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2057,11 +2065,15 @@ If (myonetimeflag) then
        ErrorsFound = .true.
     ENDIF
 
-    MicroCHP(GeneratorNum)%AvailabilitySchedID = GetScheduleIndex(AlphArray(9))
-    IF ( MicroCHP(GeneratorNum)%AvailabilitySchedID == 0) THEN
-       CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(AlphArray(9)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
-       ErrorsFound = .true.
+    IF (lAlphaFieldBlanks(9)) THEN
+      MicroCHP(GeneratorNum)%AvailabilitySchedID = ScheduleAlwaysOn
+    ELSE
+      MicroCHP(GeneratorNum)%AvailabilitySchedID = GetScheduleIndex(AlphArray(9))
+      IF ( MicroCHP(GeneratorNum)%AvailabilitySchedID == 0) THEN
+        CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(AlphArray(9)))
+        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
+        ErrorsFound = .true.
+      ENDIF
     ENDIF
     MicroCHP(GeneratorNum)%A42Model%TengLast      = 20.0D0  ! inits
     MicroCHP(GeneratorNum)%A42Model%TempCWOutLast = 20.0D0  ! inits
@@ -2074,47 +2086,46 @@ If (myonetimeflag) then
 
 !setup report variables
   DO GeneratorNum = 1, NumMicroCHPs
-    ! CALL SetupOutputVariable('Generator operating mode', &
-    !      MicroCHP(GeneratorNum)%Report%mode, 'System', 'Average', MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Time in Off Mode [s]', &
+
+     CALL SetupOutputVariable('Generator Off Mode Time [s]', &
           MicroCHP(GeneratorNum)%Report%OffModeTime, 'System', 'Sum', MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Time in Standby Mode [s]', &
+     CALL SetupOutputVariable('Generator Standby Mode Time [s]', &
           MicroCHP(GeneratorNum)%Report%StandyByModeTime, 'System', 'Sum', MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Time in Warm Up Mode [s]', &
+     CALL SetupOutputVariable('Generator Warm Up Mode Time [s]', &
           MicroCHP(GeneratorNum)%Report%WarmUpModeTime, 'System', 'Sum', MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Time in Normal Operating Mode [s]', &
+     CALL SetupOutputVariable('Generator Normal Operating Mode Time [s]', &
           MicroCHP(GeneratorNum)%Report%NormalModeTime, 'System', 'Sum', MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Time in Cool Down Mode [s]', &
+     CALL SetupOutputVariable('Generator Cool Down Mode Time [s]', &
           MicroCHP(GeneratorNum)%Report%CoolDownModeTime, 'System', 'Sum', MicroCHP(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator Electric Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Electric Power [W]', &
           MicroCHP(GeneratorNum)%Report%ACPowerGen,'System','Average',MicroCHP(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Electric Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Electric Energy [J]', &
           MicroCHP(GeneratorNum)%Report%ACEnergyGen,'System','Sum',MicroCHP(GeneratorNum)%Name, &
                            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
-     CALL SetupOutputVariable('Generator Thermal Power Produced [W]', & !
+     CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', & !
           MicroCHP(GeneratorNum)%report%QdotHR, 'system', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', & !
+     CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', & !
           MicroCHP(GeneratorNum)%report%TotalHeatEnergyRec, 'system', 'Sum', MicroCHP(GeneratorNum)%Name , &
           ResourceTypeKey='ENERGYTRANSFER' , EndUseKey='COGENERATION',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator Electrical Efficiency [ ]',  &
+     CALL SetupOutputVariable('Generator Electric Efficiency []',  &
           MicroCHP(GeneratorNum)%Report%ElectEfficiency, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Thermal Efficiency [ ]',  &
+     CALL SetupOutputVariable('Generator Thermal Efficiency []',  &
           MicroCHP(GeneratorNum)%Report%ThermalEfficiency, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Gross Heat Input Rate to Engine [W]', & !
+     CALL SetupOutputVariable('Generator Gross Input Heat Rate [W]', & !
           MicroCHP(GeneratorNum)%report%QdotGross, 'system', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Steady-State Rate of Heat Generation in Engine [W]', & !
+     CALL SetupOutputVariable('Generator Steady State Engine Heat Generation Rate [W]', & !
           MicroCHP(GeneratorNum)%report%Qgenss, 'system', 'Average', MicroCHP(GeneratorNum)%Name )
 
 
-     CALL SetupOutputVariable('Generator Rate of Heat Exchange [W]', & !
+     CALL SetupOutputVariable('Generator Engine Heat Exchange Rate [W]', & !
           MicroCHP(GeneratorNum)%report%QdotHX, 'system', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Air Flow Rate [kg/s]',  &
+     CALL SetupOutputVariable('Generator Air Mass Flow Rate [kg/s]',  &
           MicroCHP(GeneratorNum)%Report%MdotAir, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Molar Fuel Flow Rate [kmol/s]' , &
+     CALL SetupOutputVariable('Generator Fuel Molar Flow Rate [kmol/s]' , &
           MicroCHP(GeneratorNum)%Report%NdotFuel, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Fuel Flow Rate [kg/s]' , &
+     CALL SetupOutputVariable('Generator Fuel Mass Flow Rate [kg/s]' , &
           MicroCHP(GeneratorNum)%Report%MdotFuel, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
      CALL SetupOutputVariable('Generator Engine Temperature [C]' , &
@@ -2126,32 +2137,32 @@ If (myonetimeflag) then
 
     ! this next one needs to be reconciled with non-gas fuel constituents.
     !   need custom resourceTypeKey or something for user defined fuel compositions.
-     CALL SetupOutputVariable('Generator Fuel Consumption HHV Basis [J]' , &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Energy [J]' , &
           MicroCHP(GeneratorNum)%Report%FuelEnergyHHV, 'System', 'Sum', MicroCHP(GeneratorNum)%Name , &
           ResourceTypeKey='Gas' , EndUseKey='COGENERATION', GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate HHV Basis [W]' , &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%FuelEnergyUseRateHHV, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
-     CALL SetupOutputVariable('Generator Fuel Consumption LHV Basis [J]' , &
+     CALL SetupOutputVariable('Generator Fuel LHV Basis Energy [J]' , &
           MicroCHP(GeneratorNum)%Report%FuelEnergyLHV, 'System', 'Sum', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate LHV Basis [W]' , &
+     CALL SetupOutputVariable('Generator Fuel LHV Basis Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%FuelEnergyUseRateLHV, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
-     CALL SetupOutputVariable('Generator Fuel Compressor Electrical Power [W]' , &
+     CALL SetupOutputVariable('Generator Fuel Compressor Electric Power [W]' , &
           MicroCHP(GeneratorNum)%Report%FuelCompressPower, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Fuel Compressor Electrical Energy [J]',  &
+     CALL SetupOutputVariable('Generator Fuel Compressor Electric Energy [J]',  &
           MicroCHP(GeneratorNum)%Report%FuelCompressEnergy, 'System', 'Sum', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Fuel Compressor Skin Losses [W]' , &
+     CALL SetupOutputVariable('Generator Fuel Compressor Skin Heat Loss Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%FuelCompressSkinLoss, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
-     CALL SetupOutputVariable('Generator Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Sensible Heat Transfer Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossPower, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Heat Loss Energy to Zone [J]' , &
+     CALL SetupOutputVariable('Generator Zone Sensible Heat Transfer Energy [J]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossEnergy, 'System', 'Sum', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Convection Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Convection Heat Transfer Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossConvect, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Radiation Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Radiation Heat Transfer Rate [W]' , &
           MicroCHP(GeneratorNum)%Report%SkinLossRadiat, 'System', 'Average', MicroCHP(GeneratorNum)%Name )
 
      CALL SetupZoneInternalGain(MicroCHP(GeneratorNum)%ZoneID, &
@@ -2376,25 +2387,17 @@ SUBROUTINE InitMicroCHPNoNormalizeGenerators(GeneratorNum, FirstHVACIteration)
   ENDIF
 
   IF ( .NOT.  MicroCHP(GeneratorNum)%A42Model%InternalFlowControl ) THEN
-    IF (FirstHVACIteration) Then
-      mdot     = MicroCHP(GeneratorNum)%PlantMassFlowRateMax
-      CALL SetComponentFlowRate(mdot, &
-                       MicroCHP(GeneratorNum)%PlantInletNodeID,  &
-                       MicroCHP(GeneratorNum)%PlantOutletNodeID, &
-                       MicroCHP(GeneratorNum)%CWLoopNum,     &
-                       MicroCHP(GeneratorNum)%CWLoopSideNum, &
-                       MicroCHP(GeneratorNum)%CWBranchNum,   &
-                       MicroCHP(GeneratorNum)%CWCompNum)
-      MicroCHP(GeneratorNum)%PlantMassFlowRate = mdot
-    ELSE
-      CALL SetComponentFlowRate(MicroCHP(GeneratorNum)%PlantMassFlowRate, &
-                       MicroCHP(GeneratorNum)%PlantInletNodeID,  &
-                       MicroCHP(GeneratorNum)%PlantOutletNodeID, &
-                       MicroCHP(GeneratorNum)%CWLoopNum,     &
-                       MicroCHP(GeneratorNum)%CWLoopSideNum, &
-                       MicroCHP(GeneratorNum)%CWBranchNum,   &
-                       MicroCHP(GeneratorNum)%CWCompNum)
-    ENDIF
+
+    mdot     = MicroCHP(GeneratorNum)%PlantMassFlowRateMax
+    CALL SetComponentFlowRate(mdot, &
+                      MicroCHP(GeneratorNum)%PlantInletNodeID,  &
+                      MicroCHP(GeneratorNum)%PlantOutletNodeID, &
+                      MicroCHP(GeneratorNum)%CWLoopNum,     &
+                      MicroCHP(GeneratorNum)%CWLoopSideNum, &
+                      MicroCHP(GeneratorNum)%CWBranchNum,   &
+                      MicroCHP(GeneratorNum)%CWCompNum)
+    MicroCHP(GeneratorNum)%PlantMassFlowRate = mdot
+
   ENDIF
 
   RETURN
@@ -2430,6 +2433,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
   USE DataGlobalConstants
   USE FluidProperties, ONLY: GetSpecificHeatGlycol
   USE DataPlant,       ONLY: PlantLoop
+  USE PlantUtilities,  ONLY: SetComponentFlowRate
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2509,7 +2513,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
     Pnetss   = 0.0
     Pstandby = 0.0
-    Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * (1.0 - PLRforSubtimestepShutDown)
+    Pcooler  = MicroCHP(GeneratorNum)%A42Model%PcoolDown * PLRforSubtimestepShutDown
     ElecEff  = 0.0
     ThermEff = 0.0
     Qgross   = 0.0
@@ -2517,9 +2521,16 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     MdotFuel = 0.0
     MdotAir  = 0.0
 
-    IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-      Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
-    ENDIF
+    Mdotcw = 0.d0
+    CALL SetComponentFlowRate(Mdotcw, &
+                    MicroCHP(GeneratorNum)%PlantInletNodeID,  &
+                    MicroCHP(GeneratorNum)%PlantOutletNodeID, &
+                    MicroCHP(GeneratorNum)%CWLoopNum,     &
+                    MicroCHP(GeneratorNum)%CWLoopSideNum, &
+                    MicroCHP(GeneratorNum)%CWBranchNum,   &
+                    MicroCHP(GeneratorNum)%CWCompNum)
+    MicroCHP(GeneratorNum)%PlantMassFlowRate = Mdotcw
+
 
   CASE (OpModeStandby)
     Qgenss = 0.0
@@ -2534,9 +2545,17 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     NdotFuel = 0.0
     MdotFuel = 0.0
     MdotAir  = 0.0
-    IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-      Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
-    ENDIF
+
+    Mdotcw = 0.d0
+    CALL SetComponentFlowRate(Mdotcw, &
+                    MicroCHP(GeneratorNum)%PlantInletNodeID,  &
+                    MicroCHP(GeneratorNum)%PlantOutletNodeID, &
+                    MicroCHP(GeneratorNum)%CWLoopNum,     &
+                    MicroCHP(GeneratorNum)%CWLoopSideNum, &
+                    MicroCHP(GeneratorNum)%CWBranchNum,   &
+                    MicroCHP(GeneratorNum)%CWCompNum)
+    MicroCHP(GeneratorNum)%PlantMassFlowRate = Mdotcw
+
 
   CASE (OpModeWarmUp)
 
@@ -2548,7 +2567,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
       IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-        Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
+        Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn)
       ENDIF
       ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss, Mdotcw , TcwIn )
       ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
@@ -2578,7 +2597,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
         DO I=1, 20 ! iterating here  could add use of seach method .
           Pnetss = Qgross * ElecEff
           IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-            Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
+            Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn)
           ENDIF
           ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss,  Mdotcw, TcwIN)
           ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
@@ -2666,7 +2685,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
     TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
     Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
     IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-      Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
+      Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn)
     ENDIF
 
     ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss, Mdotcw, TcwIN )
@@ -2695,7 +2714,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       DO I=1, 20 ! iterating here,  could add use of seach method error signal
         Pnetss = Qgross * ElecEff
         IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-          Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn, FirstHVACIteration)
+          Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn)
         ENDIF
         ElecEff  = CurveValue(MicroCHP(GeneratorNum)%A42Model%ElecEffCurveID, Pnetss, Mdotcw, TcwIN )
         ElecEff  = MAX(0.0D0, ElecEff) !protect against bad curve result
@@ -2722,7 +2741,7 @@ SUBROUTINE CalcMicroCHPNoNormalizeGeneratorModel(GeneratorNum,RunFlagElectCenter
       TcwIn    = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%Temp  !C
       Mdotcw   = Node(MicroCHP(GeneratorNum)%PlantInletNodeID)%MassFlowRate  !kg/s
       IF (MicroCHP(GeneratorNum)%A42Model%InternalFlowControl) THEN
-        Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn , FirstHVACIteration)
+        Mdotcw = FuncDetermineCWMdotForInternalFlowControl(GeneratorNum, Pnetss, TcwIn )
       ENDIF
       NdotFuel = 0.0
       MdotFuel = 0.0
@@ -2905,7 +2924,7 @@ REAL(r64) FUNCTION FuncDetermineCoolantWaterExitTemp(Tcwin, MCcw, UAHX, MdotCpcw
           ! na
 
           ! USE STATEMENTS:
-          ! na
+  USE DataGlobals , ONLY: MaxEXPArg
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2936,9 +2955,13 @@ REAL(r64) FUNCTION FuncDetermineCoolantWaterExitTemp(Tcwin, MCcw, UAHX, MdotCpcw
   a =  ( MdotCpcw * Tcwin / MCcw) + ( UAHX * Teng /  MCcw )
   b = ( ( -1.0 * MdotCpcw / MCcw )  + ( -1.0 * UAHX / MCcw ) )
 
-  FuncDetermineCoolantWaterExitTemp = (TcwoutLast + a/b )* exp(b*time) - a / b
+  IF (b*time < (-1.d0 * MaxEXPArg)) THEN
 
+    FuncDetermineCoolantWaterExitTemp = - a / b
+  ELSE
 
+    FuncDetermineCoolantWaterExitTemp = (TcwoutLast + a/b )* exp(b*time) - a / b
+  ENDIF
   RETURN
 
 END FUNCTION FuncDetermineCoolantWaterExitTemp
@@ -3676,7 +3699,7 @@ SUBROUTINE GetFuelCellGeneratorInput
 If (myonetimeflag) then
 
   cCurrentModuleObject = 'Generator:FuelCell'
-  NumFuelCellGenerators = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFuelCellGenerators = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFuelCellGenerators <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -3690,7 +3713,7 @@ If (myonetimeflag) then
 
   ! first load in FuelCell names
   DO GeneratorNum = 1 , NumFuelCellGenerators
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),GeneratorNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,GeneratorNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -3716,7 +3739,7 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:PowerModule'
-  NumFuelCellPMs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFuelCellPMs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFuelCellPMs <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -3725,7 +3748,7 @@ If (myonetimeflag) then
 
 
   DO FCPMNum = 1 , NumFuelCellPMs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCPMNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCPMNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -3848,7 +3871,7 @@ If (myonetimeflag) then
   ENDIF
 
   cCurrentModuleObject = 'Generator:FuelCell:AirSupply'
-  NumFuelCellAirSups = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFuelCellAirSups = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFuelCellAirSups <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -3856,7 +3879,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO FCAirSupNum = 1 , NumFuelCellAirSups
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCAirSupNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCAirSupNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4035,7 +4058,7 @@ If (myonetimeflag) then
   FuelCell(thisFuelCell)%FCPM%GasLibID(5) = 5 !Argon
 
   cCurrentModuleObject = 'Generator:FuelCell:WaterSupply'
-  NumFCWaterSups = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFCWaterSups = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFCWaterSups <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -4043,7 +4066,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO FCWaterSupNum = 1 , NumFCWaterSups
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCWaterSupNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCWaterSupNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4122,7 +4145,7 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:AuxiliaryHeater'
-  NumFuelCellAuxilHeaters = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFuelCellAuxilHeaters = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFuelCellAuxilHeaters <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -4130,7 +4153,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO FCAuxHeatNum = 1 , NumFuelCellAuxilHeaters
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCAuxHeatNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCAuxHeatNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4187,7 +4210,7 @@ If (myonetimeflag) then
 
   ! exhaust gas heat exchanger
   cCurrentModuleObject  = 'Generator:FuelCell:ExhaustGasToWaterHeatExchanger'
-  NumFCExhaustGasHXs    = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFCExhaustGasHXs    = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumFCExhaustGasHXs  <= 0) THEN
     CALL ShowWarningError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
     CALL ShowContinueError('Fuel Cell model requires an '//TRIM(cCurrentModuleObject)//' object')
@@ -4195,7 +4218,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO FCHXNum = 1 , NumFCExhaustGasHXs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCHXNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCHXNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4268,7 +4291,7 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:ElectricalStorage'
-  NumFCElecStorageUnits = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFCElecStorageUnits = GetNumObjectsFound(cCurrentModuleObject)
 
   If (NumFCElecStorageUnits <= 0) THEN
     Call ShowWarningError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -4277,7 +4300,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO StorageNum = 1, NumFCElecStorageUnits
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),StorageNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,StorageNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4319,7 +4342,7 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:Inverter'
-  NumFCPowerCondUnits = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFCPowerCondUnits = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFCPowerCondUnits  <= 0) THEN
     CALL ShowWarningError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -4329,7 +4352,7 @@ If (myonetimeflag) then
   ENDIF
 
   DO FCPCUNum = 1 , NumFCPowerCondUnits
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),FCPCUNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,FCPCUNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4374,11 +4397,11 @@ If (myonetimeflag) then
   ENDDO
 
   cCurrentModuleObject = 'Generator:FuelCell:StackCooler'
-  NumFCStackCoolers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFCStackCoolers = GetNumObjectsFound(cCurrentModuleObject)
 
   If (NumFCStackCoolers > 0) then  ! get stack cooler input data
     Do FCScoolNum = 1, NumFCStackCoolers
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),FCScoolNum,AlphArray,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,FCScoolNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
 
@@ -4440,30 +4463,30 @@ If (myonetimeflag) then
   ENDIF
 
   DO GeneratorNum = 1, NumFuelCellGenerators
-     CALL SetupOutputVariable('Generator Electric Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Electric Power [W]', &
           FuelCell(GeneratorNum)%Report%ACPowerGen,'System','Average',FuelCell(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Electric Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Electric Energy [J]', &
           FuelCell(GeneratorNum)%Report%ACEnergyGen,'System','Sum',FuelCell(GeneratorNum)%Name, &
                            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
-     CALL SetupOutputVariable('Generator Thermal Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', &
           FuelCell(GeneratorNum)%Report%qHX, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-     CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
           FuelCell(GeneratorNum)%Report%HXenergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name , &
           ResourceTypeKey='ENERGYTRANSFER' , EndUseKey='COGENERATION',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator Fuel Consumption HHV Basis [J]' , &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Energy [J]' , &
           FuelCell(GeneratorNum)%Report%FuelEnergyHHV, 'System', 'Sum', FuelCell(GeneratorNum)%Name , &
           ResourceTypeKey='Gas' , EndUseKey='COGENERATION',GroupKey='Plant')
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate HHV Basis [W]' , &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Rate [W]' , &
           FuelCell(GeneratorNum)%Report%FuelEnergyUseRateHHV, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-     CALL SetupOutputVariable('FuelCell Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Sensible Heat Transfer Rate [W]' , &
           FuelCell(GeneratorNum)%Report%SkinLossPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-     CALL SetupOutputVariable('FuelCell Heat Loss Energy to Zone [J]' , &
+     CALL SetupOutputVariable('Generator Zone Sensible Heat Transfer Energy [J]' , &
           FuelCell(GeneratorNum)%Report%SkinLossEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
-     CALL SetupOutputVariable('FuelCell Convection Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Convection Heat Transfer Rate [W]' , &
           FuelCell(GeneratorNum)%Report%SkinLossConvect, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-     CALL SetupOutputVariable('FuelCell Radiation Heat Loss Rate to Zone [W]' , &
+     CALL SetupOutputVariable('Generator Zone Radiation Heat Transfer Rate [W]' , &
           FuelCell(GeneratorNum)%Report%SkinLossRadiat, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
      CALL SetupZoneInternalGain(FuelCell(GeneratorNum)%FCPM%zoneID, &
@@ -4474,104 +4497,104 @@ If (myonetimeflag) then
                      ThermalRadiationGainRate = FuelCell(GeneratorNum)%Report%SkinLossRadiat)
 
      IF (DisplayAdvancedReportVariables) THEN ! show extra data originally needed for detailed comparative testing
-       CALL SetupOutputVariable('FuelCell Air Temperature at Inlet [C]', &
+       CALL SetupOutputVariable('Generator Air Inlet Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TairInlet, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Air Temperature Entering Power Module [C]', &
+       CALL SetupOutputVariable('Generator Power Module Entering Air Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TairIntoFCPM, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Air Flow Rate [kmol/s]',  &
+       CALL SetupOutputVariable('Generator Air Molar Flow Rate [kmol/s]',  &
             FuelCell(GeneratorNum)%Report%NdotAir, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Air Enthalpy Entering Power Module [W]' , &
+       CALL SetupOutputVariable('Generator Power Module Entering Air Enthalpy [W]' , &
             FuelCell(GeneratorNum)%Report%TotAirInEnthalphy, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Air Blower Electrical Power [W]',  &
+       CALL SetupOutputVariable('Generator Blower Electric Power [W]',  &
             FuelCell(GeneratorNum)%Report%BlowerPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Air Blower Electrical Energy [J]',  &
+       CALL SetupOutputVariable('Generator Blower Electric Energy [J]',  &
             FuelCell(GeneratorNum)%Report%BlowerEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name)
-       CALL SetupOutputVariable('FuelCell Air Blower Skin Losses [W]',  &
+       CALL SetupOutputVariable('Generator Blower Skin Heat Loss Rate [W]',  &
             FuelCell(GeneratorNum)%Report%BlowerSkinLoss, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Fuel Temperature at Inlet [C]' , &
+       CALL SetupOutputVariable('Generator Fuel Inlet Temperature [C]' , &
             FuelCell(GeneratorNum)%Report%TfuelInlet, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Fuel Temperature Entering Power Module [C]', &
+       CALL SetupOutputVariable('Generator Power Module Entering Fuel Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TfuelIntoFCPM, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Fuel Flow Rate [kmol/s]' , &
+       CALL SetupOutputVariable('Generator Fuel Molar Flow Rate [kmol/s]' , &
             FuelCell(GeneratorNum)%Report%NdotFuel, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('Generator Fuel Consumption LHV Basis [J]' , &
+       CALL SetupOutputVariable('Generator Fuel Consumption LHV Basis Energy [J]' , &
             FuelCell(GeneratorNum)%Report%FuelEnergyLHV, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
        CALL SetupOutputVariable('Generator Fuel Consumption Rate LHV Basis [W]' , &
             FuelCell(GeneratorNum)%Report%FuelEnergyUseRateLHV, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Fuel Enthalpy Entering Power Module [W]',  &
+       CALL SetupOutputVariable('Generator Power Module Entering Fuel Enthalpy [W]',  &
             FuelCell(GeneratorNum)%Report%TotFuelInEnthalpy, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Fuel Compressor Electrical Power [W]' , &
+       CALL SetupOutputVariable('Generator Fuel Compressor Electric Power [W]' , &
             FuelCell(GeneratorNum)%Report%FuelCompressPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Fuel Compressor Electrical Energy [J]',  &
+       CALL SetupOutputVariable('Generator Fuel Compressor Electric Energy [J]',  &
             FuelCell(GeneratorNum)%Report%FuelCompressEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Fuel Compressor Skin Losses [W]' , &
+       CALL SetupOutputVariable('Generator Fuel Compressor Skin Heat Loss Rate [W]' , &
             FuelCell(GeneratorNum)%Report%FuelCompressSkinLoss, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Reforming Water Temperature at Inlet [C]', &
+       CALL SetupOutputVariable('Generator Fuel Reformer Water Inlet Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TwaterInlet, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Reforming Water Temperature Entering Power Module [C]', &
+       CALL SetupOutputVariable('Generator Power Module Entering Reforming Water Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TwaterIntoFCPM, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Reforming Water Flow Rate [kmol/s]',  &
+       CALL SetupOutputVariable('Generator Fuel Reformer Water Molar Flow Rate [kmol/s]',  &
             FuelCell(GeneratorNum)%Report%NdotWater, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Reforming Water Pump Electrical Power [W]' , &
+       CALL SetupOutputVariable('Generator Fuel Reformer Water Pump Electric Power [W]' , &
             FuelCell(GeneratorNum)%Report%WaterPumpPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Reforming Water Pump Electrical Energy [J]' , &
+       CALL SetupOutputVariable('Generator Fuel Reformer Water Pump Electric Energy [J]' , &
             FuelCell(GeneratorNum)%Report%WaterPumpEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Reforming Water Enthalpy Entering Power Module [W]',  &
+       CALL SetupOutputVariable('Generator Power Module Entering Reforming Water Enthalpy [W]',  &
             FuelCell(GeneratorNum)%Report%WaterIntoFCPMEnthalpy, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Product Gas Temperature [C]', &
+       CALL SetupOutputVariable('Generator Product Gas Temperature [C]', &
             FuelCell(GeneratorNum)%Report%TprodGas, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Enthalpy [W]', &
+       CALL SetupOutputVariable('Generator Product Gas Enthalpy [W]', &
             FuelCell(GeneratorNum)%Report%EnthalProdGas, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdGas, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Argon Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas Ar Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdAr, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Carbon Dioxide Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas CO2 Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdCO2, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Water Vapor Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas H2O Vapor Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdH2O, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Nitrogen Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas N2 Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdN2, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Product Gas Oxygen Flow Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Product Gas O2 Molar Flow Rate [kmol/s]', &
             FuelCell(GeneratorNum)%Report%NdotProdO2, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Heat Recovery Exit Gas Temperature [C]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Exit Gas Temperature [C]', &
             FuelCell(GeneratorNum)%Report%THXexh, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Heat Recovery Exit Gas Water Vapor Fraction [ ]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Exit Gas H2O Vapor Fraction [ ]', &
               FuelCell(GeneratorNum)%Report%WaterVaporFractExh, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Heat Recovery Water Condensation Rate [kmol/s]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Water Condensate Molar Flow Rate [kmol/s]', &
               FuelCell(GeneratorNum)%Report%CondensateRate , 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Power Conditioning Losses [W]', &
+       CALL SetupOutputVariable('Generator Inverter Loss Power [W]', &
             FuelCell(GeneratorNum)%Report%PCUlosses, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell DC Power Generated [W]', &
+       CALL SetupOutputVariable('Generator Produced DC Electric Power [W]', &
             FuelCell(GeneratorNum)%Report%DCPowerGen, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell DC Power Efficiency [ ]', &
+       CALL SetupOutputVariable('Generator DC Power Efficiency [ ]', &
             FuelCell(GeneratorNum)%Report%DCPowerEff, 'System', 'Average', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Electrical Storage State of Charge [J]', &
+       CALL SetupOutputVariable('Generator Electric Storage Charge State [J]', &
             FuelCell(GeneratorNum)%Report%ElectEnergyinStorage, 'System', 'Average', FuelCell(GeneratorNum)%Name ) !? 'Sum'
-       CALL SetupOutputVariable('FuelCell DC Power Into Storage [W]', &
+       CALL SetupOutputVariable('Generator DC Storage Charging Power [W]', &
             FuelCell(GeneratorNum)%Report%StoredPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell DC Energy Into Storage [J]', &
+       CALL SetupOutputVariable('Generator DC Storage Charging Energy [J]', &
             FuelCell(GeneratorNum)%Report%StoredEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell DC Power From Storage [W]', &
+       CALL SetupOutputVariable('Generator DC Storage Discharging Power [W]', &
             FuelCell(GeneratorNum)%Report%DrawnPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell DC Energy From Storage [J]', &
+       CALL SetupOutputVariable('Generator DC Storage Discharging Energy [J]', &
             FuelCell(GeneratorNum)%Report%DrawnEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell AC Ancillaries Power [W]', &
+       CALL SetupOutputVariable('Generator Ancillary AC Electric Power [W]', &
             FuelCell(GeneratorNum)%Report%ACancillariesPower, 'System', 'Average', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell AC Ancillaries Energy [J]', &
+       CALL SetupOutputVariable('Generator Ancillary AC Electric Energy [J]', &
             FuelCell(GeneratorNum)%Report%ACancillariesEnergy, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
 
-       CALL SetupOutputVariable('FuelCell Model Iterations [ ]' , &
+       CALL SetupOutputVariable('Generator Fuel Cell Model Iteration Count [ ]' , &
             FuelCell(GeneratorNum)%Report%SeqSubstIterations, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
-       CALL SetupOutputVariable('FuelCell Regula Falsi Iterations [ ]', &
+       CALL SetupOutputVariable('Generator Regula Falsi Iteration Count [ ]', &
             FuelCell(GeneratorNum)%Report%RegulaFalsiIterations, 'System', 'Sum', FuelCell(GeneratorNum)%Name )
      ENDIF
   END DO
@@ -8426,7 +8449,7 @@ SUBROUTINE GetICEngineGeneratorInput
 
          !FLOW
   cCurrentModuleObject = 'Generator:InternalCombustionEngine'
-  NumICEngineGenerators = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumICEngineGenerators = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumICEngineGenerators <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -8443,7 +8466,7 @@ SUBROUTINE GetICEngineGeneratorInput
 
          !LOAD ARRAYS WITH IC ENGINE Generator CURVE FIT  DATA
   DO GeneratorNum = 1 , NumICEngineGenerators
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),GeneratorNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,GeneratorNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -8579,6 +8602,12 @@ SUBROUTINE GetICEngineGeneratorInput
     CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
        ICEngineGenerator(GeneratorNum)%FuelType = 'Propane'
 
+    CASE ('OTHERFUEL1')
+       ICEngineGenerator(GeneratorNum)%FuelType = 'OtherFuel1'
+
+    CASE ('OTHERFUEL2')
+       ICEngineGenerator(GeneratorNum)%FuelType = 'OtherFuel2'
+
     CASE DEFAULT
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(AlphArray(10)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
@@ -8596,28 +8625,28 @@ SUBROUTINE GetICEngineGeneratorInput
   ENDIF
 
   DO GeneratorNum = 1, NumICEngineGenerators
-     CALL SetupOutputVariable('Generator Electric Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Electric Power [W]', &
           ICEngineGeneratorReport(GeneratorNum)%PowerGen,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Electric Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Electric Energy [J]', &
           ICEngineGeneratorReport(GeneratorNum)%EnergyGen,'System','Sum',ICEngineGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator '// TRIM(ICEngineGenerator(GeneratorNum)%FuelType)//' Consumption Rate [W]', &
+     CALL SetupOutputVariable('Generator '// TRIM(ICEngineGenerator(GeneratorNum)%FuelType)//' Rate [W]', &
           ICEngineGeneratorReport(GeneratorNum)%FuelEnergyUseRate,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator '// TRIM(ICEngineGenerator(GeneratorNum)%FuelType)//' Consumption [J]', &
+     CALL SetupOutputVariable('Generator '// TRIM(ICEngineGenerator(GeneratorNum)%FuelType)//' Energy [J]', &
           ICEngineGeneratorReport(GeneratorNum)%FuelEnergy,'System','Sum',ICEngineGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey=ICEngineGenerator(GeneratorNum)%FuelType,EndUseKey='COGENERATION',GroupKey='Plant')
 
 !    general fuel use report to match other generators.
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate HHV Basis [W]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Rate [W]', &
           ICEngineGeneratorReport(GeneratorNum)%FuelEnergyUseRate,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Fuel Consumption HHV Basis [J]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Energy [J]', &
           ICEngineGeneratorReport(GeneratorNum)%FuelEnergy,'System','Sum',ICEngineGenerator(GeneratorNum)%Name )
 
      CALL SetupOutputVariable('Generator '// TRIM(ICEngineGenerator(GeneratorNum)%FuelType)//' Mass Flow Rate [kg/s]', &
           ICEngineGeneratorReport(GeneratorNum)%FuelMdot,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator Exhaust Stack Temp [C]', &
+     CALL SetupOutputVariable('Generator Exhaust Air Temperature [C]', &
           ICEngineGeneratorReport(GeneratorNum)%ExhaustStackTemp,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
 
 
@@ -8627,31 +8656,31 @@ SUBROUTINE GetICEngineGeneratorInput
 
        CALL SetupOutputVariable('Generator Jacket Heat Recovery Rate [W]', &
             ICEngineGeneratorReport(GeneratorNum)%QJacketRecovered,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Jacket Heat Recovery [J]', &
+       CALL SetupOutputVariable('Generator Jacket Heat Recovery Energy [J]', &
             ICEngineGeneratorReport(GeneratorNum)%JacketEnergyRec,'System','Sum',ICEngineGenerator(GeneratorNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
        CALL SetupOutputVariable('Generator Lube Heat Recovery Rate [W]', &
             ICEngineGeneratorReport(GeneratorNum)%QLubeOilRecovered,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Lube Heat Recovery [J]', &
+       CALL SetupOutputVariable('Generator Lube Heat Recovery Energy [J]', &
             ICEngineGeneratorReport(GeneratorNum)%LubeOilEnergyRec,'System','Sum',ICEngineGenerator(GeneratorNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
        CALL SetupOutputVariable('Generator Exhaust Heat Recovery Rate [W]', &
             ICEngineGeneratorReport(GeneratorNum)%QExhaustRecovered,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Exhaust Heat Recovery [J]', &
+       CALL SetupOutputVariable('Generator Exhaust Heat Recovery Energy [J]', &
             ICEngineGeneratorReport(GeneratorNum)%ExhaustEnergyRec,'System','Sum',ICEngineGenerator(GeneratorNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
-       CALL SetupOutputVariable('Generator Thermal Power Produced [W]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', &
             ICEngineGeneratorReport(GeneratorNum)%QTotalHEatRecovered,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
             ICEngineGeneratorReport(GeneratorNum)%TotalHeatEnergyRec,'System','Sum',ICEngineGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Heat Recovery Inlet Temp [C]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Inlet Temperature [C]', &
           ICEngineGeneratorReport(GeneratorNum)%HeatRecInletTemp,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Heat Recovery Outlet Temp [C]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Outlet Temperature [C]', &
           ICEngineGeneratorReport(GeneratorNum)%HeatRecOutletTemp,'System','Average',ICEngineGenerator(GeneratorNum)%Name)
     ENDIF
 
@@ -9126,8 +9155,8 @@ SUBROUTINE InitICEngineGenerators(GeneratorNum,RunFlag,MyLoad,FirstHVACIteration
     HeatRecInletNode    = ICEngineGenerator(GeneratorNum)%HeatRecInletNodeNum
     HeatRecOutletNode   = ICEngineGenerator(GeneratorNum)%HeatRecOutletNodeNum
     ! set the node Temperature, assuming freeze control
-    Node(HeatRecInletNode) %Temp = 20.0
-    Node(HeatRecOutletNode)%Temp = 20.0
+    Node(HeatRecInletNode)%Temp = 20.0d0
+    Node(HeatRecOutletNode)%Temp = 20.0d0
    ! set the node max and min mass flow rates
     Call InitComponentNodes(0.0D0,  ICEngineGenerator(GeneratorNum)%DesignHeatRecMassFlowRate,  &
                                  HeatRecInletNode,        &
@@ -9587,7 +9616,7 @@ SUBROUTINE GetCTGeneratorInput
          !FLOW
 
   cCurrentModuleObject = 'Generator:CombustionTurbine'
-  NumCTGenerators = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumCTGenerators = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumCTGenerators <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -9603,7 +9632,7 @@ SUBROUTINE GetCTGeneratorInput
 
          !LOAD ARRAYS WITH CT CURVE FIT Generator DATA
   DO GeneratorNum = 1 , NumCTGenerators
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),GeneratorNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,GeneratorNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -9741,6 +9770,12 @@ SUBROUTINE GetCTGeneratorInput
     CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
        CTGenerator(GeneratorNum)%FuelType = 'Propane'
 
+    CASE ('OTHERFUEL1')
+       CTGenerator(GeneratorNum)%FuelType = 'OtherFuel1'
+
+    CASE ('OTHERFUEL2')
+       CTGenerator(GeneratorNum)%FuelType = 'OtherFuel2'
+
     CASE DEFAULT
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(AlphArray(11)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(AlphArray(1)))
@@ -9774,52 +9809,52 @@ SUBROUTINE GetCTGeneratorInput
   ENDIF
 
   DO GeneratorNum = 1, NumCTGenerators
-     CALL SetupOutputVariable('Generator Electric Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Electric Power [W]', &
           CTGeneratorReport(GeneratorNum)%PowerGen,'System','Average',CTGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Electric Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Electric Energy [J]', &
           CTGeneratorReport(GeneratorNum)%EnergyGen,'System','Sum',CTGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator '// TRIM(CTGenerator(GeneratorNum)%FuelType)//' Consumption Rate [W]', &
+     CALL SetupOutputVariable('Generator '// TRIM(CTGenerator(GeneratorNum)%FuelType)//' Rate [W]', &
           CTGeneratorReport(GeneratorNum)%FuelEnergyUseRate,'System','Average',CTGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator '// TRIM(CTGenerator(GeneratorNum)%FuelType)//' Consumption [J]', &
+     CALL SetupOutputVariable('Generator '// TRIM(CTGenerator(GeneratorNum)%FuelType)//' Energy [J]', &
           CTGeneratorReport(GeneratorNum)%FuelEnergy,'System','Sum',CTGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey=CTGenerator(GeneratorNum)%FuelType,EndUseKey='COGENERATION',GroupKey='Plant')
 
 !    general fuel use report (to match other generators)
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate HHV Basis [W]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Rate [W]', &
           CTGeneratorReport(GeneratorNum)%FuelEnergyUseRate,'System','Average',CTGenerator(GeneratorNum)%Name)
-     CALL SetupOutputVariable('Generator Fuel Consumption HHV Basis [J]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Energy [J]', &
           CTGeneratorReport(GeneratorNum)%FuelEnergy,'System','Sum',CTGenerator(GeneratorNum)%Name)
 
      CALL SetupOutputVariable('Generator '// TRIM(CTGenerator(GeneratorNum)%FuelType)//' Mass Flow Rate [kg/s]', &
           CTGeneratorReport(GeneratorNum)%FuelMdot,'System','Average',CTGenerator(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator Exhaust Stack Temp [C]', &
+     CALL SetupOutputVariable('Generator Exhaust Air Temperature [C]', &
           CTGeneratorReport(GeneratorNum)%ExhaustStackTemp,'System','Average',CTGenerator(GeneratorNum)%Name)
 
 
      IF (CTGenerator(GeneratorNum)%HeatRecActive) THEN
        CALL SetupOutputVariable('Generator Exhaust Heat Recovery Rate [W]', &
             CTGeneratorReport(GeneratorNum)%QExhaustRecovered,'System','Average',CTGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Exhaust Heat Recovery [J]', &
+       CALL SetupOutputVariable('Generator Exhaust Heat Recovery Energy [J]', &
             CTGeneratorReport(GeneratorNum)%ExhaustEnergyRec,'System','Sum',CTGenerator(GeneratorNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
        CALL SetupOutputVariable('Generator Lube Heat Recovery Rate [W]', &
             CTGeneratorReport(GeneratorNum)%QLubeOilRecovered,'System','Average',CTGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Lube Heat Recovery [J]', &
+       CALL SetupOutputVariable('Generator Lube Heat Recovery Energy [J]', &
             CTGeneratorReport(GeneratorNum)%LubeOilEnergyRec,'System','Sum',CTGenerator(GeneratorNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
-       CALL SetupOutputVariable('Generator Thermal Power Produced [W]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', &
             CTGeneratorReport(GeneratorNum)%QTotalHeatRecovered,'System','Average',CTGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
             CTGeneratorReport(GeneratorNum)%TotalHeatEnergyRec,'System','Sum',CTGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Heat Recovery Inlet Temp [C]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Inlet Temperature [C]', &
             CTGeneratorReport(GeneratorNum)%HeatRecInletTemp,'System','Average',CTGenerator(GeneratorNum)%Name)
-       CALL SetupOutputVariable('Generator Heat Recovery Outlet Temp [C]', &
+       CALL SetupOutputVariable('Generator Heat Recovery Outlet Temperature [C]', &
             CTGeneratorReport(GeneratorNum)%HeatRecOutletTemp,'System','Average',CTGenerator(GeneratorNum)%Name)
        CALL SetupOutputVariable('Generator Heat Recovery Mass Flow Rate [kg/s]', &
             CTGeneratorReport(GeneratorNum)%HeatRecMdot,'System','Average',CTGenerator(GeneratorNum)%Name)
@@ -10213,8 +10248,8 @@ SUBROUTINE InitCTGenerators(GeneratorNum, RunFlag, MyLoad, FirstHVACIteration)
     HeatRecInletNode    = CTGenerator(GeneratorNum)%HeatRecInletNodeNum
     HeatRecOutletNode   = CTGenerator(GeneratorNum)%HeatRecOutletNodeNum
     ! set the node Temperature, assuming freeze control
-    Node(HeatRecInletNode) %Temp = 20.0
-    Node(HeatRecOutletNode)%Temp = 20.0
+    Node(HeatRecInletNode)%Temp = 20.0d0
+    Node(HeatRecOutletNode)%Temp = 20.0d0
    ! set the node max and min mass flow rates
     CALL InitComponentNodes(0.0D0,  CTGenerator(GeneratorNum)%DesignHeatRecMassFlowRate,  &
                                  HeatRecInletNode,        &
@@ -10821,7 +10856,7 @@ SUBROUTINE GetMTGeneratorInput
 
          ! FLOW:
   cCurrentModuleObject = 'Generator:MicroTurbine'
-  NumMTGenerators = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumMTGenerators = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumMTGenerators <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -10836,7 +10871,7 @@ SUBROUTINE GetMTGeneratorInput
 
          ! LOAD ARRAYS WITH MICROTURBINE GENERATOR DATA
   DO GeneratorNum = 1 , NumMTGenerators
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),GeneratorNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,GeneratorNum,AlphArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -11047,6 +11082,12 @@ SUBROUTINE GetMTGeneratorInput
 
     CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
       FuelType = 'Propane'
+
+!    CASE ('OTHERFUEL1')
+!       FuelType = 'OtherFuel1'
+
+!    CASE ('OTHERFUEL2')
+!       FuelType = 'OtherFuel2'
 
     CASE DEFAULT
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//' "'//TRIM(MTGenerator(GeneratorNum)%Name)//'"')
@@ -11586,21 +11627,21 @@ SUBROUTINE GetMTGeneratorInput
   END IF
 
   DO GeneratorNum = 1, NumMTGenerators
-     CALL SetupOutputVariable('Generator Electric Power Produced [W]', &
+     CALL SetupOutputVariable('Generator Produced Electric Power [W]', &
           MTGeneratorReport(GeneratorNum)%PowerGen,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator Electric Energy Produced [J]', &
+     CALL SetupOutputVariable('Generator Produced Electric Energy [J]', &
           MTGeneratorReport(GeneratorNum)%EnergyGen,'System','Sum',MTGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Generator Electric Efficiency LHV Basis [-]', &
+     CALL SetupOutputVariable('Generator LHV Basis Electric Efficiency []', &
           MTGeneratorReport(GeneratorNum)%ElectricEfficiencyLHV,'System','Average',MTGenerator(GeneratorNum)%Name)
 
 !    Fuel specific report variables
-     CALL SetupOutputVariable('Generator '// TRIM(FuelType)//' Consumption Rate HHV Basis [W]', &
+     CALL SetupOutputVariable('Generator '// TRIM(FuelType)//' HHV Basis Rate [W]', &
           MTGeneratorReport(GeneratorNum)%FuelEnergyUseRateHHV,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator '// TRIM(FuelType)//' Consumption HHV Basis [J]', &
+     CALL SetupOutputVariable('Generator '// TRIM(FuelType)//' HHV Basis Energy [J]', &
           MTGeneratorReport(GeneratorNum)%FuelEnergyHHV,'System','Sum',MTGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey=FuelType,EndUseKey='COGENERATION',GroupKey='Plant')
 
@@ -11608,23 +11649,23 @@ SUBROUTINE GetMTGeneratorInput
           MTGeneratorReport(GeneratorNum)%FuelMdot,'System','Average',MTGenerator(GeneratorNum)%Name)
 
 !    general fuel use report (to match other generators)
-     CALL SetupOutputVariable('Generator Fuel Consumption Rate HHV Basis [W]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Rate [W]', &
           MTGeneratorReport(GeneratorNum)%FuelEnergyUseRateHHV,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-     CALL SetupOutputVariable('Generator Fuel Consumption HHV Basis [J]', &
+     CALL SetupOutputVariable('Generator Fuel HHV Basis Energy [J]', &
           MTGeneratorReport(GeneratorNum)%FuelEnergyHHV,'System','Sum',MTGenerator(GeneratorNum)%Name)
 
 !    Heat recovery (to water) report variables
      IF (MTGenerator(GeneratorNum)%HeatRecActive) THEN
 
-       CALL SetupOutputVariable('Generator Thermal Power Produced [W]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', &
             MTGeneratorReport(GeneratorNum)%QHeatRecovered,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+       CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
             MTGeneratorReport(GeneratorNum)%ExhaustEnergyRec,'System','Sum',MTGenerator(GeneratorNum)%Name, &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
-       CALL SetupOutputVariable('Generator Thermal Efficiency LHV Basis [-]', &
+       CALL SetupOutputVariable('Generator Thermal Efficiency LHV Basis []', &
             MTGeneratorReport(GeneratorNum)%ThermalEfficiencyLHV,'System','Average',MTGenerator(GeneratorNum)%Name)
 
        CALL SetupOutputVariable('Generator Heat Recovery Inlet Temperature [C]', &
@@ -11642,7 +11683,7 @@ SUBROUTINE GetMTGeneratorInput
        CALL SetupOutputVariable('Generator Standby Electric Power [W]', &
             MTGeneratorReport(GeneratorNum)%StandbyPowerRate,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Standby Electric Consumption [J]', &
+       CALL SetupOutputVariable('Generator Standby Electric Energy [J]', &
             MTGeneratorReport(GeneratorNum)%StandbyEnergy,'System','Sum',MTGenerator(GeneratorNum)%Name, &
                            ResourceTypeKey='Electricity',EndUseKey='Cogeneration',GroupKey='Plant')
      END IF
@@ -11651,12 +11692,12 @@ SUBROUTINE GetMTGeneratorInput
        CALL SetupOutputVariable('Generator Ancillary Electric Power [W]', &
             MTGeneratorReport(GeneratorNum)%AncillaryPowerRate,'System','Average',MTGenerator(GeneratorNum)%Name)
 
-       CALL SetupOutputVariable('Generator Ancillary Electric Consumption [J]', &
+       CALL SetupOutputVariable('Generator Ancillary Electric Energy [J]', &
             MTGeneratorReport(GeneratorNum)%AncillaryEnergy,'System','Sum',MTGenerator(GeneratorNum)%Name)
      END IF
 !   Report combustion air outlet conditions if exhaust air calculations are active
    IF (MTGenerator(GeneratorNum)%ExhAirCalcsActive) THEN
-       CALL SetupOutputVariable('Generator Exhaust Air Flow Rate [kg/s]', &
+       CALL SetupOutputVariable('Generator Exhaust Air Mass Flow Rate [kg/s]', &
      MTGeneratorReport(GeneratorNum)%ExhAirMassFlowRate ,'System','Average',MTGenerator(GeneratorNum)%Name)
      CALL SetupOutputVariable('Generator Exhaust Air Temperature  [C]', &
        MTGeneratorReport(GeneratorNum)%ExhAirTemperature,'System','Average',MTGenerator(GeneratorNum)%Name)
@@ -11800,7 +11841,7 @@ SUBROUTINE InitMTGenerators(GenNum, RunFlag, MyLoad, FirstHVACIteration)
                                  MTGenerator(GenNum)%HRBranchNum, &
                                  MTGenerator(GenNum)%HRCompNum )
 
-    Node(HeatRecInletNode) %Temp = 20.0d0 ! Set the node temperature, assuming freeze control
+    Node(HeatRecInletNode)%Temp = 20.0d0 ! Set the node temperature, assuming freeze control
     Node(HeatRecOutletNode)%Temp = 20.0d0
 
     MyEnvrnFlag(GenNum) = .FALSE.
@@ -12776,7 +12817,7 @@ END MODULE MicroturbineElectricGenerator
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

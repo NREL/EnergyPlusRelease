@@ -95,7 +95,7 @@ LOGICAL   :: EMSOutDewPointTempOverrideOn = .FALSE. ! EMS flag for outdoor dewpo
 REAL(r64) :: EMSOutDewPointTempOverrideValue ! EMS override value for outdoor dewpoint temperature
 REAL(r64) :: SkyTemp                 ! Current sky temperature {C}
 REAL(r64) :: SkyTempKelvin           ! Current sky temperature {K}
-REAL(r64) :: LiquidPrecipitation     ! Current liquid precipitation amount (rain) {mm}
+REAL(r64) :: LiquidPrecipitation     ! Current liquid precipitation amount (rain) {m}
 LOGICAL   :: SunIsUp                 ! True when Sun is over horizon, False when not
 REAL(r64) :: WindDir                 ! Current outdoor air wind direction
 LOGICAL   :: EMSWindDirOverrideOn = .FALSE. ! EMS flag for outdoor air wind direction
@@ -136,6 +136,7 @@ REAL(r64) :: EquationOfTime          ! Value of the equation of time formula
 REAL(r64) :: SinLatitude             ! Sine of Latitude
 REAL(r64) :: CosLatitude             ! Cosine of Latitude
 REAL(r64) :: SinSolarDeclinAngle     ! Sine of the solar declination angle
+REAL(r64) :: TS1TimeOffset = -0.5d0   ! offset when TS=1 for solar calculations
 
 REAL(r64) :: WeatherFileWindModCoeff = 1.5863d0  ! =(WindBLHeight/WindSensorHeight)**WindExp for conditions at the weather station
 REAL(r64) :: WeatherFileTempModCoeff = 0.0d0     ! =AtmosphericTempGradient*EarthRadius*SensorHeight/(EarthRadius+SensorHeight)
@@ -450,7 +451,7 @@ END SUBROUTINE SetOutBulbTempAt
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

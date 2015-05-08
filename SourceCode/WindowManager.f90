@@ -2149,7 +2149,7 @@ integer :: temp
 
 !CurrentThermalAlgorithm = -1
 
-
+IF (KickoffSizing .or. KickOffSimulation) RETURN
 
 IF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
 
@@ -2160,6 +2160,19 @@ IF (SurfaceWindow(SurfNum)%WindowModelType  == WindowBSDFModel) THEN
 
   ConstrNum = Surface(SurfNum)%Construction
   TotGlassLay = Construct(ConstrNum)%TotGlassLayers
+  hcout = HextConvCoeff
+
+  ! This is code repeating and it is necessary to calculate report variables.  Do not know
+  ! how to solve this in more elegant way :(
+  IF(Surface(SurfNum)%ExtWind) THEN  ! Window is exposed to wind (and possibly rain)
+    IF(IsRain) THEN  ! Raining: since wind exposed, outside window surface gets wet
+      tout = Surface(SurfNum)%OutWetBulbTemp + TKelvin
+    ELSE             ! Dry
+      tout = Surface(SurfNum)%OutDryBulbTemp + TKelvin
+    END IF
+  ELSE                               ! Window not exposed to wind
+    tout = Surface(SurfNum)%OutDryBulbTemp + TKelvin
+  END IF
 
 ELSE ! regular window, not BSDF
 
@@ -2355,6 +2368,14 @@ ELSE ! regular window, not BSDF
       END IF
       IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == ExtShadeOn .OR. ShadeFlag == BGShadeOn .OR. ShadeFlag == ExtScreenOn) THEN
             ! Shade or screen on
+        IF (AnyEnergyManagementSystemInModel) THEN  ! check to make sure the user hasn't messed up the shade control values
+          IF (Material(ShadeLayPtr)%Group == WindowBlind) THEN
+            CALL ShowSevereError('CalcWindowHeatBalance: ShadeFlag indicates Shade but Blind="'//  &
+              trim(Material(ShadeLayPtr)%Name)//'" is being used.')
+            CALL ShowContinueError('This is most likely a fault of the EMS values for shading control.')
+            CALL ShowFatalError('Preceding condition terminates program.')
+          ENDIF
+        ENDIF
         thick(TotGlassLay+1) = Material(ShadeLayPtr)%Thickness
         scon(TotGlassLay+1) = Material(ShadeLayPtr)%Conductivity/Material(ShadeLayPtr)%Thickness
         IF(ShadeFlag == ExtScreenOn) THEN
@@ -2369,6 +2390,14 @@ ELSE ! regular window, not BSDF
         emis(nglface+2) = Material(ShadeLayPtr)%AbsorpThermal
 
       ELSE
+        IF (AnyEnergyManagementSystemInModel) THEN  ! check to make sure the user hasn't messed up the shade control values
+          IF (Material(ShadeLayPtr)%Group == Shade .or. Material(ShadeLayPtr)%Group == Screen) THEN
+            CALL ShowSevereError('CalcWindowHeatBalance: ShadeFlag indicates Blind but Shade/Screen="'//  &
+              trim(Material(ShadeLayPtr)%Name)//'" is being used.')
+            CALL ShowContinueError('This is most likely a fault of the EMS values for shading control.')
+            CALL ShowFatalError('Preceding condition terminates program.')
+          ENDIF
+        ENDIF
             ! Blind on
         BlNum = SurfaceWindow(SurfNum)%BlindNumber
         thick(TotGlassLay+1) = Blind(BlNum)%SlatThickness
@@ -8664,7 +8693,7 @@ END SUBROUTINE LUBKSB
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

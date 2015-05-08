@@ -59,7 +59,8 @@ PRIVATE FindAllNumbersinList
 
 CONTAINS
 
-SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,ConnectionType,FluidStream,IsParent,errFlag)
+SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,ConnectionType,FluidStream,IsParent,  &
+   errFlag,InputFieldName)
 
 
           ! SUBROUTINE INFORMATION:
@@ -79,7 +80,7 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor, ONLY: SameString, MakeUPPERCase
+  USE InputProcessor, ONLY: SameString, MakeUPPERCase, FindItemInList
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -92,9 +93,10 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
   INTEGER, INTENT(IN)          :: FluidStream    ! Count on Fluid Streams
   LOGICAL, INTENT(IN)          :: IsParent       ! True when node is a parent node
   LOGICAL, INTENT(INOUT)       :: errFlag        ! Will be True if errors already detected or if errors found here
+  CHARACTER(len=*), INTENT(IN),OPTIONAL :: InputFieldName ! Input Field Name
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='RegisterNodeConnection: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -106,10 +108,11 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
   LOGICAL ErrorsFoundHere
   INTEGER Count
   LOGICAL MakeNew
+  INTEGER Found
 
   ErrorsFoundHere=.false.
   IF (.not. IsValidConnectionType(ConnectionType)) THEN
-    CALL ShowSevereError('RegisterNodeConnection: Invalid ConnectionType='//TRIM(ConnectionType))
+    CALL ShowSevereError(RoutineName//'Invalid ConnectionType='//TRIM(ConnectionType))
     CALL ShowContinueError('Occurs for Node='//TRIM(NodeName)//', ObjectType='//TRIM(ObjectType)//  &
                            ', ObjectName='//TRIM(ObjectName))
     ErrorsFoundHere=.true.
@@ -124,7 +127,7 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
     IF (NodeConnections(Count)%FluidStream /= FluidStream) CYCLE
     IF ( (NodeConnections(Count)%ObjectIsParent .and. .not. IsParent) .or.  &
         (.not. NodeConnections(Count)%ObjectIsParent .and. IsParent) ) THEN
-      CALL ShowSevereError('RegisterNodeConnection: Node called for both Parent and "not" Parent')
+      CALL ShowSevereError(RoutineName//'Node registered for both Parent and "not" Parent')
       CALL ShowContinueError('Occurs for Node='//TRIM(NodeName)//', ObjectType='//TRIM(ObjectType)//  &
                            ', ObjectName='//TRIM(ObjectName))
       ErrorsFoundHere=.true.
@@ -133,15 +136,17 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
   ENDDO
   IF (MakeNew) THEN
     NumOfNodeConnections=NumOfNodeConnections+1
-    IF (NumOfNodeConnections > 1) THEN
-      ALLOCATE(TmpNodeConnections(NumOfNodeConnections-1))
+    IF (NumOfNodeConnections > 1 .and. NumOfNodeConnections > MaxNumOfNodeConnections) THEN
+      ALLOCATE(TmpNodeConnections(MaxNumOfNodeConnections+NodeConnectionAlloc))
       TmpNodeConnections(1:NumOfNodeConnections-1)=NodeConnections(1:NumOfNodeConnections-1)
       DEALLOCATE(NodeConnections)
-      ALLOCATE(NodeConnections(NumOfNodeConnections))
+      ALLOCATE(NodeConnections(MaxNumOfNodeConnections+NodeConnectionAlloc))
       NodeConnections(1:NumOfNodeConnections-1)=TmpNodeConnections(1:NumOfNodeConnections-1)
       DEALLOCATE(TmpNodeConnections)
-    ELSE
-      ALLOCATE(NodeConnections(NumOfNodeConnections))
+      MaxNumOfNodeConnections=MaxNumOfNodeConnections+NodeConnectionAlloc
+    ELSEIF (NumOfNodeConnections == 1) THEN
+      ALLOCATE(NodeConnections(NodeConnectionAlloc))
+      MaxNumOfNodeConnections=NodeConnectionAlloc
     ENDIF
 
     NodeConnections(NumOfNodeConnections)%NodeNumber=NodeNumber
@@ -152,6 +157,46 @@ SUBROUTINE RegisterNodeConnection(NodeNumber,NodeName,ObjectType,ObjectName,Conn
     NodeConnections(NumOfNodeConnections)%FluidStream=FluidStream
     NodeConnections(NumOfNodeConnections)%ObjectIsParent=IsParent
 
+  ENDIF
+
+  IF (SameString(ObjectType(1:MIN(len_Trim(ObjectType),12)),'AirTerminal:')) THEN
+    IF (PRESENT(InputFieldName)) THEN
+      NumOfAirTerminalNodes=NumOfAirTerminalNodes+1
+      IF (NumOfAirTerminalNodes > 1 .and. NumOfAirTerminalNodes > MaxNumOfAirTerminalNodes) THEN
+        ALLOCATE(tmpEqNodeConnections(MaxNumOfAirTerminalNodes))
+        tmpEqNodeConnections(1:NumOfAirTerminalNodes-1)=AirTerminalNodeConnections(1:NumOfAirTerminalNodes-1)
+        DEALLOCATE(AirTerminalNodeConnections)
+        ALLOCATE(AirTerminalNodeConnections(MaxNumOfAirTerminalNodes+EqNodeConnectionAlloc))
+        AirTerminalNodeConnections(1:NumOfAirTerminalNodes-1)=tmpEqNodeConnections(1:NumOfAirTerminalNodes-1)
+        DEALLOCATE(tmpEqNodeConnections)
+        MaxNumOfAirTerminalNodes=MaxNumOfAirTerminalNodes+EqNodeConnectionAlloc
+      ELSEIF (NumOfAirTerminalNodes == 1) THEN
+        ALLOCATE(AirTerminalNodeConnections(EqNodeConnectionAlloc))
+        MaxNumOfAirTerminalNodes=EqNodeConnectionAlloc
+      ENDIF
+
+      ! Check out AirTerminal inlet/outlet nodes
+      Found=FindItemInList(NodeName,AirTerminalNodeConnections%NodeName,NumOfAirTerminalNodes-1)
+      IF (Found /= 0) THEN  ! Nodename already used
+        CALL ShowSevereError(RoutineName//trim(ObjectType)//'="'//trim(ObjectName)//'" node name duplicated.')
+        CALL ShowContinueError('NodeName="'//trim(NodeName)//'", entered as type='//trim(ConnectionType))
+        CALL ShowContinueError('In Field='//trim(InputFieldName))
+        CALL ShowContinueError('Already used in '//trim(AirTerminalNodeConnections(Found)%ObjectType)//'="'//  &
+           trim(AirTerminalNodeConnections(Found)%ObjectName)//'".')
+        CALL ShowContinueError(' as type='//trim(AirTerminalNodeConnections(Found)%ConnectionType)//  &
+                                 ', In Field='//trim(AirTerminalNodeConnections(Found)%InputFieldName))
+        ErrorsFoundHere=.true.
+      ELSE
+        AirTerminalNodeConnections(NumOfAirTerminalNodes)%NodeName=NodeName
+        AirTerminalNodeConnections(NumOfAirTerminalNodes)%ObjectType=ObjectType
+        AirTerminalNodeConnections(NumOfAirTerminalNodes)%ObjectName=ObjectName
+        AirTerminalNodeConnections(NumOfAirTerminalNodes)%ConnectionType=ConnectionType
+        AirTerminalNodeConnections(NumOfAirTerminalNodes)%InputFieldName=InputFieldName
+      ENDIF
+    ELSE
+      CALL ShowSevereError(RoutineName//trim(ObjectType)//', Developer Error: Input Field Name not included.')
+      CALL ShowContinueError('Node names not checked for duplication.')
+    ENDIF
   ENDIF
 
   IF (ErrorsFoundHere) THEN
@@ -421,7 +466,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
 !      ErrorsFound=.true.
     ENDIF
   ENDDO
-  
+
   ! Check 5 -- return plenum induced air outlet nodes -- must be an inlet somewhere
   DO Loop1=1,NumOfNodeConnections
     IF (NodeConnections(Loop1)%ConnectionType /= ValidConnectionTypes(NodeConnectionType_InducedAir)) CYCLE
@@ -441,7 +486,7 @@ SUBROUTINE CheckNodeConnections(ErrorsFound)
       ErrorsFound=.true.
     ENDIF
   ENDDO
-  
+
   ! Check 6 -- every inlet should have a matching outlet, zonereturn, zoneexhaust, induced air, reliefair or outsideair
           !    a)  If an InletNode's object is AirLoopHVAC, CondenserLoop, or PlantLoop, then skip the test.
           !    b)  If an InletNode's object is not one of the above types, it is valid if the
@@ -1960,7 +2005,7 @@ END SUBROUTINE FindAllNumbersinList
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -526,7 +526,7 @@ SUBROUTINE CheckSysSizing(CompType,CompName)
       CALL ShowContinueError('No "Sizing:System" objects were entered.')
     ENDIF
     IF (.not. DoSystemSizing) THEN
-      CALL ShowContinueError('The SimulationControl object did not have the field "Do System Sizing Calculation" set to Yes.')
+      CALL ShowContinueError('The "SimulationControl" object did not have the field "Do System Sizing Calculation" set to Yes.')
     ENDIF
     CALL ShowFatalError('Program terminates due to previously shown condition(s).')
   END IF
@@ -690,7 +690,7 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   USE ConvectionCoefficients, ONLY: InitExteriorConvectionCoeff
   USE SolarCollectors,        ONLY: Collector
   USE DataGlobals,            ONLY: BeginEnvrnFlag
-  
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -769,12 +769,12 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
   REAL(r64)  :: LocalOutDryBulbTemp ! OutDryBulbTemp for here
   REAL(r64)  :: LocalWetBulbTemp ! OutWetBulbTemp for here
   REAL(r64)  :: LocalOutHumRat ! OutHumRat for here
-  LOGICAL    :: ICSCollectorIsOn  =.FALSE.  ! ICS collector has OSCM on 
+  LOGICAL    :: ICSCollectorIsOn  =.FALSE.  ! ICS collector has OSCM on
   INTEGER    :: CollectorNum         ! current solar collector index
   REAL(r64)  :: ICSWaterTemp         ! ICS solar collector water temp
   REAL(r64)  :: ICSULossbottom       ! ICS solar collector bottom loss Conductance
   LOGICAL, SAVE  :: MyICSEnvrnFlag = .TRUE.  ! Local environment flag for ICS
-    
+
 
   LocalOutDryBulbTemp = Sum(Surface(SurfPtrARR)%Area * Surface(SurfPtrARR)%OutDryBulbTemp) &
                         / Sum(Surface(SurfPtrARR)%Area)
@@ -828,23 +828,23 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
     ! Added for ICS collector OSCM
     IF ( Surface(SurfPtr)%IsICS ) THEN
          ICSCollectorIsOn = .TRUE.
-         CollectorNum = Surface(SurfPtr)%ICSPtr 
-    ENDIF    
+         CollectorNum = Surface(SurfPtr)%ICSPtr
+    ENDIF
   ENDDO
 
   IF (ICSCollectorIsOn) THEN
-   IF(BeginEnvrnFlag .AND. MyICSEnvrnFlag) THEN 
+   IF(BeginEnvrnFlag .AND. MyICSEnvrnFlag) THEN
      ICSULossbottom = 0.40d0
      ICSWaterTemp = 20.0d0
-   ELSE 
+   ELSE
      ICSULossbottom = Collector(CollectorNum)%UbLoss
-     ICSWaterTemp = Collector(CollectorNum)%TempOfWater  
+     ICSWaterTemp = Collector(CollectorNum)%TempOfWater
      MyICSEnvrnFlag = .FALSE.
-   ENDIF   
+   ENDIF
   ENDIF
   IF ( .NOT. BeginEnvrnFlag )THEN
       MyICSEnvrnFlag = .TRUE.
-  ENDIF    
+  ENDIF
   If (A == 0.0) then  ! should have been caught earlier
 
   ENDIF
@@ -899,7 +899,7 @@ SUBROUTINE CalcPassiveExteriorBaffleGap(SurfPtrARR, VentArea, Cv, Cd, HdeltaNPL,
                 Hcplen*TaGap  + QdotSource) &
                 /(HExt + HrAtm + HrSky + HrGround + Hrplen + Hcplen)
   ELSE
-      
+
      TsBaffle = (ICSULossbottom*ICSWaterTemp + HrPlen*Tso +  Hcplen*TaGap  + QdotSource) &
               / (ICSULossbottom + Hrplen + Hcplen)
   ENDIF
@@ -1911,7 +1911,7 @@ END SUBROUTINE TestReturnAirPathIntegrity
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -25,7 +25,7 @@ Module EvaporativeCoolers
   ! USE STATEMENTS:
   ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals, ONLY: BeginEnvrnFlag,BeginDayFlag, SysSizingCalc, SecInHour
+USE DataGlobals, ONLY: BeginEnvrnFlag,BeginDayFlag, SysSizingCalc, SecInHour, ScheduleAlwaysOn
 USE DataInterfaces, ONLY: ShowContinueError, ShowSevereError,ShowFatalError, SetupOutputVariable, &
                           ShowWarningError
 USE DataLoopNode
@@ -323,7 +323,7 @@ SUBROUTINE GetEvapInput
     cCurrentModuleObject = 'EvaporativeCooler:Direct:CelDekPad'
 
     DO EvapCoolNum = 1,  NumDirectEvapCool
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),EvapCoolNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,EvapCoolNum,cAlphaArgs,NumAlphas, &
                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -337,11 +337,15 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%EvapCoolerType = iEvapCoolerDirectCELDEKPAD
 
       EvapCond(EvapCoolNum)%Schedule = cAlphaArgs(2)
-      EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-      IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        ErrorsFound=.true.
+      IF (lAlphaFieldBlanks(2)) THEN
+        EvapCond(EvapCoolNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       EvapCond(EvapCoolNum)%InletNode  = &
@@ -362,7 +366,7 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%PadDepth        = rNumericArgs(2)
       EvapCond(EvapCoolNum)%RecircPumpPower = rNumericArgs(3)
 
-      CALL SetupOutputVariable('Direct Evap Saturation Efficiency []',EvapCond(EvapCoolNum)%Sateff, &
+      CALL SetupOutputVariable('Evaporative Cooler Wet Bulb Effectiveness []',EvapCond(EvapCoolNum)%Sateff, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
 
            ! A6 ; \Field Name of Water Supply Storage Tank
@@ -386,7 +390,7 @@ SUBROUTINE GetEvapInput
     DO IndEvapCoolNum = 1,  NumDryInDirectEvapCool
       EvapCoolNum = NumDirectEvapCool + IndEvapCoolNum
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),IndEvapCoolNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,IndEvapCoolNum,cAlphaArgs,NumAlphas, &
                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -400,11 +404,15 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%EvapCoolerType = iEvapCoolerInDirectCELDEKPAD !'EvaporativeCooler:Indirect:CelDekPad'
 
       EvapCond(EvapCoolNum)%Schedule = cAlphaArgs(2)
-      EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-      IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        ErrorsFound=.true.
+      IF (lAlphaFieldBlanks(2)) THEN
+        EvapCond(EvapCoolNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       EvapCond(EvapCoolNum)%InletNode  = &
@@ -429,9 +437,9 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%IndirectFanDeltaPress   = rNumericArgs(6)
       EvapCond(EvapCoolNum)%IndirectHXEffectiveness = rNumericArgs(7)
 
-      CALL SetupOutputVariable('Indirect Dry Evap Saturation Efficiency []',EvapCond(EvapCoolNum)%Sateff, &
+      CALL SetupOutputVariable('Evaporative Cooler Wetbulb Effectiveness []',EvapCond(EvapCoolNum)%Sateff, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
-      CALL SetupOutputVariable('Indirect Dry Evap Total Stage Efficiency []',EvapCond(EvapCoolNum)%StageEff, &
+      CALL SetupOutputVariable('Evaporative Cooler Total Stage Effectiveness []',EvapCond(EvapCoolNum)%StageEff, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
 
       ! A6 ; \Field Name of Water Supply Storage Tank
@@ -471,7 +479,7 @@ SUBROUTINE GetEvapInput
     DO IndEvapCoolNum = 1,  NumWetInDirectEvapCool
       EvapCoolNum = NumDirectEvapCool + NumDryInDirectEvapCool + IndEvapCoolNum
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),IndEvapCoolNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,IndEvapCoolNum,cAlphaArgs,NumAlphas, &
                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -485,11 +493,15 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%EvapCoolerType = iEvapCoolerInDirectWETCOIL !'EvaporativeCooler:Indirect:WetCoil'
 
       EvapCond(EvapCoolNum)%Schedule = cAlphaArgs(2)
-      EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-      IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        ErrorsFound=.true.
+      IF (lAlphaFieldBlanks(2)) THEN
+        EvapCond(EvapCoolNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       EvapCond(EvapCoolNum)%InletNode  = &
@@ -513,7 +525,7 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%IndirectFanEff          = rNumericArgs(5)
       EvapCond(EvapCoolNum)%IndirectFanDeltaPress   = rNumericArgs(6)
 
-      CALL SetupOutputVariable('Indirect Wet Evap Total Stage Efficiency []',EvapCond(EvapCoolNum)%StageEff, &
+      CALL SetupOutputVariable('Evaporative Cooler Total Stage Effectiveness []',EvapCond(EvapCoolNum)%StageEff, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
 
      !  A6 ; \Field Name of Water Supply Storage Tank
@@ -552,7 +564,7 @@ SUBROUTINE GetEvapInput
     DO IndEvapCoolNum = 1,  NumRDDEvapCool
       EvapCoolNum = NumDirectEvapCool + NumDryInDirectEvapCool + &
                     NumWetInDirectEvapCool + IndEvapCoolNum
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),IndEvapCoolNum,cAlphaArgs,NumAlphas, &
+     CALL GetObjectItem(cCurrentModuleObject,IndEvapCoolNum,cAlphaArgs,NumAlphas, &
                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -566,11 +578,15 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%EvapCoolerType = iEvapCoolerInDirectRDDSpecial !'EvaporativeCooler:Indirect:ResearchSpecial'
 
       EvapCond(EvapCoolNum)%Schedule = cAlphaArgs(2)
-      EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-      IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        ErrorsFound=.true.
+      IF (lAlphaFieldBlanks(2)) THEN
+        EvapCond(EvapCoolNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       EvapCond(EvapCoolNum)%InletNode  = &
@@ -635,12 +651,12 @@ SUBROUTINE GetEvapInput
       ENDIF
 
 
-      CALL SetupOutputVariable('Indirect Wet Evap Total Stage Efficiency []',EvapCond(EvapCoolNum)%StageEff, &
+      CALL SetupOutputVariable('Evaporative Cooler Total Stage Effectiveness []',EvapCond(EvapCoolNum)%StageEff, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
-      CALL SetupOutputVariable('Indirect Wet Evap Part Load Fract []',EvapCond(EvapCoolNum)%PartLoadFract, &
+      CALL SetupOutputVariable('Evaporative Cooler Part Load Ratio []',EvapCond(EvapCoolNum)%PartLoadFract, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
 
-      CALL SetupOutputVariable('IEC RDDSpecial Dewpoint Bound []', EvapCond(EvapCoolNum)%DewPointBoundFlag, &
+      CALL SetupOutputVariable('Evaporative Cooler Dewpoint Bound Status []', EvapCond(EvapCoolNum)%DewPointBoundFlag, &
                                'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
 
     END Do  ! end of Indirect Research Special cooler input loop
@@ -649,7 +665,7 @@ SUBROUTINE GetEvapInput
     Do DirectEvapCoolNum =  1, NumDirectResearchSpecialEvapCool
       EvapCoolNum = NumDirectEvapCool + NumDryInDirectEvapCool + &
                     NumWetInDirectEvapCool + NumRDDEvapCool + DirectEvapCoolNum
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),DirectEvapCoolNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,DirectEvapCoolNum,cAlphaArgs,NumAlphas, &
                       rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks,&
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -663,11 +679,15 @@ SUBROUTINE GetEvapInput
       EvapCond(EvapCoolNum)%EvapCoolerType = iEvapCoolerDirectResearchSpecial
 
       EvapCond(EvapCoolNum)%Schedule       = cAlphaArgs(2)
-      EvapCond(EvapCoolNum)%SchedPtr       = GetScheduleIndex(cAlphaArgs(2))
-      IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-        ErrorsFound=.TRUE.
+      IF (lAlphaFieldBlanks(2)) THEN
+        EvapCond(EvapCoolNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        EvapCond(EvapCoolNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (EvapCond(EvapCoolNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
+          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       EvapCond(EvapCoolNum)%InletNode  = &
@@ -721,28 +741,28 @@ SUBROUTINE GetEvapInput
 
     DO EvapCoolNum=1,NumEvapCool
       ! Setup Report variables for the Evap Coolers
-      CALL SetupOutputVariable('Evap Cooler Electric Energy [J]',EvapCond(EvapCoolNum)%EvapCoolerEnergy, &
+      CALL SetupOutputVariable('Evaporative Cooler Electric Energy [J]',EvapCond(EvapCoolNum)%EvapCoolerEnergy, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
-      CALL SetupOutputVariable('Evap Cooler Electric Power [W]',EvapCond(EvapCoolNum)%EvapCoolerPower, &
+      CALL SetupOutputVariable('Evaporative Cooler Electric Power [W]',EvapCond(EvapCoolNum)%EvapCoolerPower, &
                             'System','Average',EvapCond(EvapCoolNum)%EvapCoolerName)
       ! this next report variable is setup differently depending on how the water should be metered here.
       IF (EvapCond(EvapCoolNum)%EvapWaterSupplyMode == WaterSupplyFromMains) Then
-        CALL SetupOutputVariable('Evap Cooler Water Consumption [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
+        CALL SetupOutputVariable('Evaporative Cooler Water Volume [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='Water',EndUseKey='Cooling',GroupKey='System')
-        CALL SetupOutputVariable('Evap Cooler Mains Water Mains Draw [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
+        CALL SetupOutputVariable('Evaporative Cooler Mains Water Volume [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='MainsWater',EndUseKey='Cooling',GroupKey='System')
 
       ELSEIF  (EvapCond(EvapCoolNum)%EvapWaterSupplyMode == WaterSupplyFromTank) THEN
-        CALL SetupOutputVariable('Evap Cooler Tank Water Consumption [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
+        CALL SetupOutputVariable('Evaporative Cooler Storage Tank Water Volume [m3]',EvapCond(EvapCoolNum)%EvapWaterConsump, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='Water',EndUseKey='Cooling' , GroupKey='System')
-        CALL SetupOutputVariable('Evap Cooler Starved Water Consumption [m3]',EvapCond(EvapCoolNum)%EvapWaterStarvMakup, &
+        CALL SetupOutputVariable('Evaporative Cooler Starved Water Volume [m3]',EvapCond(EvapCoolNum)%EvapWaterStarvMakup, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='Water',EndUseKey='Cooling', GroupKey='System')
-        CALL SetupOutputVariable('Evap Cooler Starved Water Mains Draw [m3]',EvapCond(EvapCoolNum)%EvapWaterStarvMakup, &
+        CALL SetupOutputVariable('Evaporative Cooler Starved Mains Water Volume [m3]',EvapCond(EvapCoolNum)%EvapWaterStarvMakup, &
                             'System','Sum',EvapCond(EvapCoolNum)%EvapCoolerName, &
                              ResourceTypeKey='MainsWater',EndUseKey='Cooling', GroupKey='System')
       ENDIF
@@ -1583,19 +1603,19 @@ Subroutine CalcResearchSpecialPartLoad(EvapCoolNum)
           ReqOutput = Node(InletNode)%MassFlowRate *  &
                      (PsyHFnTdbW(EvapCond(EvapCoolNum)%DesiredOutletTemp,Node(InletNode)%HumRat) - &
                       PsyHFnTdbW(Node(InletNode)%Temp,Node(InletNode)%HumRat))
-          
+
           ! now reinit after test call
           CALL InitEvapCooler(EvapCoolNum)
-          
+
         CASE (iEvapCoolerDirectResearchSpecial)
           CALL CalcDirectResearchSpecialEvapCooler(EvapCoolNum)
           CALL UpdateEvapCooler(EvapCoolNum)
           FullOutput = Node(OutletNode)%Temp - Node(InletNode)%Temp
           ReqOutput = EvapCond(EvapCoolNum)%DesiredOutletTemp - Node(InletNode)%Temp
-         
+
           ! now reinit after test call
           CALL InitEvapCooler(EvapCoolNum)
-          
+
         END SELECT
 
         ! Since we are cooling, we expect FullOutput to be < 0 and FullOutput < NoCoolOutput
@@ -2161,7 +2181,7 @@ END Subroutine ReportEvapCooler
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

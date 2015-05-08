@@ -66,14 +66,14 @@ PUBLIC          ! By definition, all variables which are placed in this data
           CHARACTER(len=PathLimit)    :: CurrentWorkingFolder=' '  ! Current working directory for run
           CHARACTER(len=PathLimit+15) :: FullName=' '              ! Full name of file to open, including path
           CHARACTER(len=120) :: IDDVerString=' '                   ! Version information from the IDD (line 1)
-          CHARACTER(len=120) :: VerString='EnergyPlus, Version 7.2'      ! String that represents version information
-          CHARACTER(len=5)   :: MatchVersion='7.2.0' ! String to be matched by Version object
+          CHARACTER(len=120) :: VerString='EnergyPlus, Version 8.0'      ! String that represents version information
+          CHARACTER(len=5)   :: MatchVersion='8.0.0' ! String to be matched by Version object
           CHARACTER(len=40)  :: CurrentDateTime=' '       ! For printing current date and time at start of run
 
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

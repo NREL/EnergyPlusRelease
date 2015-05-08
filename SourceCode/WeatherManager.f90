@@ -444,7 +444,7 @@ REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayHorizIRSky       ! Horizontal IR
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayBeamSolarRad     ! Direct normal solar irradiance
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayDifSolarRad      ! Sky diffuse horizontal solar irradiance
 REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayAlbedo           ! Albedo
-REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayLiquidPrecip     ! Liquid Precipitation Depth
+REAL(r64), ALLOCATABLE, DIMENSION (:,:) :: TodayLiquidPrecip     ! Liquid Precipitation Depth (mm)
 
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TomorrowIsRain         ! Rain indicator, true=rain
 LOGICAL,   ALLOCATABLE, DIMENSION (:,:) :: TomorrowIsSnow         ! Snow indicator, true=snow
@@ -786,41 +786,42 @@ SUBROUTINE GetNextEnvironment(Available,ErrorsFound)
 
     ! SetupOutputVariables, CurrentModuleObject='All Simulations'
 
-    CALL SetupOutputVariable('Outdoor Dry Bulb [C]',OutDryBulbTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Dew Point [C]',OutDewPointTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Wet Bulb [C]',OutWetBulbTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Humidity Ratio [kgWater/kgDryAir]',OutHumRat,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Relative Humidity [%]',OutRelHum,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Barometric Pressure [Pa]',OutBaroPress,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Wind Speed [m/s]',WindSpeed,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Wind Direction [deg]',WindDir,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Sky Temperature [C]',SkyTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Horizontal Infrared Radiation Intensity [W/m2]',HorizIRSky,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Diffuse Solar [W/m2]',DifSolarRad,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Direct Solar [W/m2]',BeamSolarRad,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Liquid Precipitation [mm]',LiquidPrecipitation,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Ground Reflected Solar [W/m2]',GndSolarRad,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Ground Temperature [C]',GroundTemp,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Surface Ground Temperature [C]',GroundTemp_Surface,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Deep Ground Temperature [C]',GroundTemp_Deep,'Zone','Average','Environment')
-    CALL SetupOutputVariable('FCFactor Ground Temperature [C]',GroundTempFC,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Enthalpy [J/kg]',OutEnthalpy,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Outdoor Air Density [kg/m3]',OutAirDensity,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Solar Azimuth Angle [deg]',SolarAzimuthAngle,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Solar Altitude Angle [deg]',SolarAltitudeAngle,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Solar Hour Angle [deg]',HrAngle,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Fraction of Time Raining[]',RptIsRain,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Fraction of Time Snow On Ground[]',RptIsSnow,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Exterior Horizontal Illuminance From Sky [lux]',HISKF,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Exterior Horizontal Beam Illuminance [lux]',HISUNF,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Exterior Beam Normal Illuminance [lux]',HISUNFnorm,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Luminous Efficacy of Sky Diffuse Solar Radiation [lum/W]',PDIFLW,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Luminous Efficacy of Beam Solar Radiation [lum/W]',PDIRLW,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Sky Clearness for Daylighting Calculation []',SkyClearness,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Sky Brightness for Daylighting Calculation []',SkyBrightness,'Zone','Average','Environment')
-    CALL SetupOutputVariable('Daylight Saving Time Indicator []',DSTIndicator,'Zone','State','Environment')
-    CALL SetupOutputVariable('DayType Index []',RptDayType,'Zone','State','Environment')
-    CALL SetupOutputVariable('Water Mains Temperature [C]',WaterMainsTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Drybulb Temperature [C]',OutDryBulbTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Dewpoint Temperature [C]',OutDewPointTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Wetbulb Temperature [C]',OutWetBulbTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Humidity Ratio [kgWater/kgDryAir]',OutHumRat,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Relative Humidity [%]',OutRelHum,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Barometric Pressure [Pa]',OutBaroPress,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Wind Speed [m/s]',WindSpeed,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Wind Direction [deg]',WindDir,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Sky Temperature [C]',SkyTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Horizontal Infrared Radiation Rate per Area [W/m2]',HorizIRSky,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Diffuse Solar Radiation Rate per Area [W/m2]',DifSolarRad,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Direct Solar Radiation Rate per Area [W/m2]',BeamSolarRad,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Precipitation Depth [m]',LiquidPrecipitation,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Ground Reflected Solar Radiation Rate per Area [W/m2]', &
+                                 GndSolarRad,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Ground Temperature [C]',GroundTemp,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Surface Ground Temperature [C]',GroundTemp_Surface,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Deep Ground Temperature [C]',GroundTemp_Deep,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Simple Factor Model Ground Temperature [C]',GroundTempFC,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Enthalpy [J/kg]',OutEnthalpy,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Outdoor Air Density [kg/m3]',OutAirDensity,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Solar Azimuth Angle [deg]',SolarAzimuthAngle,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Solar Altitude Angle [deg]',SolarAltitudeAngle,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Solar Hour Angle [deg]',HrAngle,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Rain Status []',RptIsRain,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Snow on Ground Status []',RptIsSnow,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Exterior Horizontal Sky Illuminance [lux]',HISKF,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Exterior Horizontal Beam Illuminance [lux]',HISUNF,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Exterior Beam Normal Illuminance [lux]',HISUNFnorm,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Sky Diffuse Solar Radiation Luminous Efficacy [lum/W]',PDIFLW,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Beam Solar Radiation Luminous Efficacy [lum/W]',PDIRLW,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Daylighting Model Sky Clearness []',SkyClearness,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Daylighting Model Sky Brightness []',SkyBrightness,'Zone','Average','Environment')
+    CALL SetupOutputVariable('Site Daylight Saving Time Status []',DSTIndicator,'Zone','State','Environment')
+    CALL SetupOutputVariable('Site Day Type Index []',RptDayType,'Zone','State','Environment')
+    CALL SetupOutputVariable('Site Mains Water Temperature [C]',WaterMainsTemp,'Zone','Average','Environment')
 
     IF (AnyEnergyManagementSystemInModel) THEN
       CALL SetupEMSActuator('Weather Data', 'Environment', 'Outdoor Dry Bulb', '[C]',  &
@@ -2295,7 +2296,7 @@ SUBROUTINE SetCurrentWeather
   ! Determine if Sun is up or down, set Solar Cosine values for time step.
   CALL DetermineSunUpDown(SOLCOS)
   IF (SunIsUp .and. SolarAltitudeAngle < 0.0) THEN
-    CALL ShowFatalError('At '//TRIM(CurMnDyHr)//' Sun is Up but Solar Altitude Angle is < 0.0')
+    CALL ShowFatalError('SetCurrentWeather: At '//TRIM(CurMnDyHr)//' Sun is Up but Solar Altitude Angle is < 0.0')
   ENDIF
 
   OutDryBulbTemp = TodayOutDryBulbTemp(HourOfDay,TimeStep)
@@ -2335,7 +2336,7 @@ SUBROUTINE SetCurrentWeather
   IF (EMSDifSolarRadOverrideOn) DifSolarRad = EMSDifSolarRadOverrideValue
   BeamSolarRad   = TodayBeamSolarRad(HourOfDay,TimeStep)
   IF (EMSBeamSolarRadOverrideOn)  BeamSolarRad = EMSBeamSolarRadOverrideValue
-  LiquidPrecipitation = TodayLiquidPrecip(HourOfDay,TimeStep)
+  LiquidPrecipitation = TodayLiquidPrecip(HourOfDay,TimeStep)/1000.d0 ! convert from mm to m
 
   IF (UseRainValues) THEN
     IsRain=TodayIsRain(HourOfDay,TimeStep) !.or. LiquidPrecipitation >= .8d0)  ! > .8 mm
@@ -2625,26 +2626,28 @@ SUBROUTINE ReadEPlusWeatherForDay(DayToRead,Environ,BackSpaceAfterRead)
         ErrorsFound=.false.
         IF (DryBulb >= 99.9d0) &
           CALL RangeCheck(ErrorsFound,'DryBulb Temperature','WeatherFile','Severe','>= -70',(Drybulb>=-70.), &
-                        '<= 70',(DryBulb <=70.),RoundSigDigits(DryBulb,2))
+                        '<= 70',(DryBulb <=70.),RoundSigDigits(DryBulb,2),WhatObjectName=WeatherFileLocationTitle)
         IF (Dewpoint < 99.9d0) &
           CALL RangeCheck(ErrorsFound,'DewPoint Temperature','WeatherFile','Severe','>= -70',(Dewpoint>=-70.), &
-                        '<= 70',(Dewpoint <=70.),RoundSigDigits(Dewpoint,2))
+                        '<= 70',(Dewpoint <=70.),RoundSigDigits(Dewpoint,2),WhatObjectName=WeatherFileLocationTitle)
         IF (RelHum < 999.d0) &
           CALL RangeCheck(ErrorsFound,'Relative Humidity','WeatherFile','Severe','> 0',(RelHum>=0.), &
-                        '<= 110',(RelHum<=110.),RoundSigDigits(RelHum,0))
+                        '<= 110',(RelHum<=110.),RoundSigDigits(RelHum,0),WhatObjectName=WeatherFileLocationTitle)
         IF (AtmPress < 999999.d0) &
           CALL RangeCheck(ErrorsFound,'Atmospheric Pressure','WeatherFile','Severe','> 31000',(AtmPress>31000.), &
-                          '<=120000',(AtmPress<=120000.),RoundSigDigits(AtmPress,0))
+                          '<=120000',(AtmPress<=120000.),RoundSigDigits(AtmPress,0),WhatObjectName=WeatherFileLocationTitle)
         IF (DirectRad < 9999.d0) &
-          CALL RangeCheck(ErrorsFound,'Direct Radiation','WeatherFile','Severe','>= 0',(DirectRad>=0.))
+          CALL RangeCheck(ErrorsFound,'Direct Radiation','WeatherFile','Severe','>= 0',(DirectRad>=0.),  &
+             WhatObjectName=WeatherFileLocationTitle)
         IF (DiffuseRad < 9999.d0) &
-          CALL RangeCheck(ErrorsFound,'Diffuse Radiation','WeatherFile','Severe','>= 0',(DiffuseRad>=0.))
+          CALL RangeCheck(ErrorsFound,'Diffuse Radiation','WeatherFile','Severe','>= 0',(DiffuseRad>=0.),  &
+             WhatObjectName=WeatherFileLocationTitle)
         IF (WindDir < 999.d0) &
           CALL RangeCheck(ErrorsFound,'Wind Direction','WeatherFile','Severe','>=0',(WindDir>=0.), &
-                        '<=360',(WindDir<=360.),RoundSigDigits(WindDir,0))
+                        '<=360',(WindDir<=360.),RoundSigDigits(WindDir,0),WhatObjectName=WeatherFileLocationTitle)
         IF (WindSpeed < 999.d0) &
           CALL RangeCheck(ErrorsFound,'Wind Speed','WeatherFile','Severe','>=0',(WindSpeed>=0.), &
-                        '<=40',(WindSpeed<=40.),RoundSigDigits(WindSpeed,2))
+                        '<=40',(WindSpeed<=40.),RoundSigDigits(WindSpeed,2),WhatObjectName=WeatherFileLocationTitle)
         IF (ErrorsFound) THEN
           CALL ShowSevereError('Out of Range errors found with initial day of WeatherFile')
         ENDIF
@@ -3972,65 +3975,70 @@ SUBROUTINE SetUpDesignDay(EnvrnNum)
        ELSE
 
        ! calc time = fractional hour of day
-       CurTime = REAL(Hour-1,r64) + REAL(TS,r64)*TimeStepFraction
-       CALL CalculateSunDirectionCosines(CurTime,DesignDay(EnvrnNum)%EquationOfTime,DesignDay(EnvrnNum)%SinSolarDeclinAngle,  &
+         IF (NumOfTimeStepInHour /= 1) THEN
+           CurTime = REAL(Hour-1,r64) + REAL(TS,r64)*TimeStepFraction
+         ELSE
+           CurTime = REAL(Hour,r64)+TS1TimeOffset
+         ENDIF
+
+         CALL CalculateSunDirectionCosines(CurTime,DesignDay(EnvrnNum)%EquationOfTime,DesignDay(EnvrnNum)%SinSolarDeclinAngle,  &
                                          DesignDay(EnvrnNum)%CosSolarDeclinAngle,SUNCOS)
-       CosZenith=SUNCOS(3)
-       IF (CosZenith < SunIsUpValue) THEN
-         BeamRad = 0.d0
-         DiffRad = 0.d0
-       ELSE
-         SinSolarAltitude=SUNCOS(3)
+         CosZenith=SUNCOS(3)
+         IF (CosZenith < SunIsUpValue) THEN
+           BeamRad = 0.d0
+           DiffRad = 0.d0
+         ELSE
+           SinSolarAltitude=SUNCOS(3)
 
-         SELECT CASE (DesDayInput(EnvrnNum)%SolarModel)
+           SELECT CASE (DesDayInput(EnvrnNum)%SolarModel)
 
-         CASE (Ashrae_ClearSky)
-           TotHoriz = DesDayInput(EnvrnNum)%SkyClear * A * (C + CosZenith) * EXP( -B / CosZenith)
-           HO=GlobalSolarConstant*AVSC*CosZenith
-           KT=TotHoriz/HO
-           KT=MIN(KT,.75d0)
-           DiffRad = TotHoriz * (1.0045d0 + KT * (.04349d0 + KT * (-3.5227d0 + 2.6313d0 * KT)))
-           IF (DesDayInput(EnvrnNum)%SkyClear .GT. 0.70d0) DiffRad = TotHoriz*C/(C+CosZenith)
-           BeamRad = (TotHoriz-DiffRad)/CosZenith
-           DiffRad = MAX(0.0d0,DiffRad)
-           BeamRad = MAX(0.0d0,BeamRad)
+           CASE (Ashrae_ClearSky)
+             TotHoriz = DesDayInput(EnvrnNum)%SkyClear * A * (C + CosZenith) * EXP( -B / CosZenith)
+             HO=GlobalSolarConstant*AVSC*CosZenith
+             KT=TotHoriz/HO
+             KT=MIN(KT,.75d0)
+             DiffRad = TotHoriz * (1.0045d0 + KT * (.04349d0 + KT * (-3.5227d0 + 2.6313d0 * KT)))
+             IF (DesDayInput(EnvrnNum)%SkyClear .GT. 0.70d0) DiffRad = TotHoriz*C/(C+CosZenith)
+             BeamRad = (TotHoriz-DiffRad)/CosZenith
+             DiffRad = MAX(0.0d0,DiffRad)
+             BeamRad = MAX(0.0d0,BeamRad)
 
-         CASE (ASHRAE_Tau)
-           ETR = GlobalSolarConstant*AVSC      ! extraterrestrial normal irrad, W/m2
-           CALL ASHRAETauModel( ETR, CosZenith, DesDayInput(EnvrnNum)%TauB, DesDayInput(EnvrnNum)%TauD, &
-                BeamRad, DiffRad, GloHorzRad)
+           CASE (ASHRAE_Tau)
+             ETR = GlobalSolarConstant*AVSC      ! extraterrestrial normal irrad, W/m2
+             CALL ASHRAETauModel( ETR, CosZenith, DesDayInput(EnvrnNum)%TauB, DesDayInput(EnvrnNum)%TauD, &
+                  BeamRad, DiffRad, GloHorzRad)
 
-         CASE (Zhang_Huang)
-           Hour3Ago = MOD( Hour+20, 24)+1       ! hour 3 hours before
-           TotSkyCover=MAX( 1.0d0-DesDayInput(EnvrnNum)%SkyClear, 0.0d0)
-           GloHorzRad = ( ZHGlobalSolarConstant * SinSolarAltitude * (ZhangHuangModCoeff_C0 &
-               + ZhangHuangModCoeff_C1 * TotSkyCover &
-               + ZhangHuangModCoeff_C2 * (TotSkyCover)**2 &
-               + ZhangHuangModCoeff_C3 * (TomorrowOutDryBulbTemp(Hour,TS) - TomorrowOutDryBulbTemp(Hour3Ago,TS)) &
-               + ZhangHuangModCoeff_C4 * TomorrowOutRelHum(Hour,TS) &
-               + ZhangHuangModCoeff_C5 * TomorrowWindSpeed(Hour,TS)) + ZhangHuangModCoeff_D ) &
-               / ZhangHuangModCoeff_K
-           GloHorzRad = MAX( GloHorzRad,0.0d0)
-           ClearnessIndex_kt=GloHorzRad/(GlobalSolarConstant * SinSolarAltitude)
-!          ClearnessIndex_kt=DesDayInput(EnvrnNum)%SkyClear
-           ClearnessIndex_Ktc = 0.4268d0 + 0.1934d0 * SinSolarAltitude
-           IF (ClearnessIndex_Kt < ClearnessIndex_Ktc) THEN
-             ClearnessIndex_Kds = (3.996d0 -3.862d0*SinSolarAltitude +1.54d0*SinSolarAltitude**2)* &
-                   ClearnessIndex_Kt**3
-           ELSE
-             ClearnessIndex_Kds = ClearnessIndex_Kt - (1.107d0 + 0.03569d0 * SinSolarAltitude + 1.681d0 * &
-                   SinSolarAltitude**2) * (1.d0-ClearnessIndex_Kt)**3
-           ENDIF
-           ! Calculate direct normal radiation, W/m2
-           BeamRad = ZHGlobalSolarConstant * SinSolarAltitude * ClearnessIndex_Kds * &
-                ((1.d0 - ClearnessIndex_Kt) / (1.d0 - ClearnessIndex_Kds))
-           ! Calculation diffuse horizontal radiation, W/m2
-           DiffRad = ZHGlobalSolarConstant * SinSolarAltitude * &
-                ((ClearnessIndex_Kt - ClearnessIndex_Kds) / (1.d0 - ClearnessIndex_Kds))
+           CASE (Zhang_Huang)
+             Hour3Ago = MOD( Hour+20, 24)+1       ! hour 3 hours before
+             TotSkyCover=MAX( 1.0d0-DesDayInput(EnvrnNum)%SkyClear, 0.0d0)
+             GloHorzRad = ( ZHGlobalSolarConstant * SinSolarAltitude * (ZhangHuangModCoeff_C0 &
+                 + ZhangHuangModCoeff_C1 * TotSkyCover &
+                 + ZhangHuangModCoeff_C2 * (TotSkyCover)**2 &
+                 + ZhangHuangModCoeff_C3 * (TomorrowOutDryBulbTemp(Hour,TS) - TomorrowOutDryBulbTemp(Hour3Ago,TS)) &
+                 + ZhangHuangModCoeff_C4 * TomorrowOutRelHum(Hour,TS) &
+                 + ZhangHuangModCoeff_C5 * TomorrowWindSpeed(Hour,TS)) + ZhangHuangModCoeff_D ) &
+                 / ZhangHuangModCoeff_K
+             GloHorzRad = MAX( GloHorzRad,0.0d0)
+             ClearnessIndex_kt=GloHorzRad/(GlobalSolarConstant * SinSolarAltitude)
+  !          ClearnessIndex_kt=DesDayInput(EnvrnNum)%SkyClear
+             ClearnessIndex_Ktc = 0.4268d0 + 0.1934d0 * SinSolarAltitude
+             IF (ClearnessIndex_Kt < ClearnessIndex_Ktc) THEN
+               ClearnessIndex_Kds = (3.996d0 -3.862d0*SinSolarAltitude +1.54d0*SinSolarAltitude**2)* &
+                     ClearnessIndex_Kt**3
+             ELSE
+               ClearnessIndex_Kds = ClearnessIndex_Kt - (1.107d0 + 0.03569d0 * SinSolarAltitude + 1.681d0 * &
+                     SinSolarAltitude**2) * (1.d0-ClearnessIndex_Kt)**3
+             ENDIF
+             ! Calculate direct normal radiation, W/m2
+             BeamRad = ZHGlobalSolarConstant * SinSolarAltitude * ClearnessIndex_Kds * &
+                  ((1.d0 - ClearnessIndex_Kt) / (1.d0 - ClearnessIndex_Kds))
+             ! Calculation diffuse horizontal radiation, W/m2
+             DiffRad = ZHGlobalSolarConstant * SinSolarAltitude * &
+                  ((ClearnessIndex_Kt - ClearnessIndex_Kds) / (1.d0 - ClearnessIndex_Kds))
 
-         CASE DEFAULT
-       END SELECT
-     END IF
+           CASE DEFAULT
+         END SELECT
+       END IF
      END IF
 
      ! override result to 0 per environment var (for testing)
@@ -4569,7 +4577,11 @@ SUBROUTINE DetermineSunUpDown(SunDirectionCosines)
 
           ! COMPUTE THE HOUR ANGLE
 
-  HrAngle = (15.d0*(12.d0-(CurrentTime+TodayVariables%EquationOfTime))+(TimeZoneMeridian-Longitude))
+  IF (NumOfTimeStepInHour /= 1) THEN
+    HrAngle = (15.d0*(12.d0-(CurrentTime+TodayVariables%EquationOfTime))+(TimeZoneMeridian-Longitude))
+  ELSE
+    HrAngle = (15.d0*(12.d0-((CurrentTime+TS1TimeOffset)+TodayVariables%EquationOfTime))+(TimeZoneMeridian-Longitude))
+  ENDIF
   H=HrAngle*DegToRadians
 
           ! Compute the Cosine of the Solar Zenith (Altitude) Angle.
@@ -4860,7 +4872,7 @@ SUBROUTINE ResolveLocationInformation(ErrorsFound)
           ABS(Longitude-WeatherFileLongitude)    > 1.d0 .or.  &
           ABS(TimeZoneNumber-WeatherFileTimeZone) > 0.0d0 .or.  &
           ABS(Elevation-WeatherFileElevation)/Max(Elevation,1.d0) > .10d0) THEN
-        CALL ShowWarningError('Weather file location will be used rather than entered Location object.')
+        CALL ShowWarningError('Weather file location will be used rather than entered (IDF) Location object.')
         CALL ShowContinueError('..Location object='//TRIM(LocationTitle))
         CALL ShowContinueError('..Weather File Location='//TRIM(WeatherFileLocationTitle))
         CALL ShowContinueError('..due to location differences, Latitude difference=['//  &
@@ -5130,8 +5142,8 @@ SUBROUTINE ReportOutputFileHeaders
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
                                        ! Format descriptor for the environment title
-  CHARACTER(len=*), PARAMETER :: EnvironmentFormat = "(a,',5,Environment Title[],Latitude[degrees],"//  &
-                                 "Longitude[degrees],Time Zone[],Elevation[m]')"
+  CHARACTER(len=*), PARAMETER :: EnvironmentFormat = "(a,',5,Environment Title[],Latitude[deg],"//  &
+                                 "Longitude[deg],Time Zone[],Elevation[m]')"
   CHARACTER(len=*),  PARAMETER :: TimeStepFormat        = "(a,',6,Day of Simulation[],Month[],Day of Month[],"// &
                                  "DST Indicator[1=yes 0=no],Hour[],StartMinute[],EndMinute[],DayType')"
   CHARACTER(len=*),  PARAMETER :: DailyFormat        = "(a,',3,Cumulative Day of Simulation[],Month[],Day of Month[]," // &
@@ -5464,7 +5476,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
     LocalLeapYearAdd=1
   ENDIF
   DO Loop=1,RP
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -5671,7 +5683,7 @@ SUBROUTINE GetRunPeriodData(TotRunPers,ErrorsFound)
   cCurrentModuleObject='RunPeriod:CustomRange'
   count=0
   DO Ptr=1,RPAW
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Ptr,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Ptr,cAlphaArgs,NumAlpha,rNumericArgs,NumNumeric,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -5952,7 +5964,7 @@ SUBROUTINE GetRunPeriodDesignData(ErrorsFound)
   Count=0
   cCurrentModuleObject='SizingPeriod:WeatherFileDays'
   DO Loop=1,RPD1
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumerics,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumerics,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6059,7 +6071,7 @@ SUBROUTINE GetRunPeriodDesignData(ErrorsFound)
 
   cCurrentModuleObject='SizingPeriod:WeatherFileConditionType'
   DO Loop=1,RPD2
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumerics,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumerics,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6251,7 +6263,7 @@ SUBROUTINE GetSpecialDayPeriodData(ErrorsFound)
   LOGICAL :: IsBlank=.false.               ! Flag for blank name
 
   cCurrentModuleObject='RunPeriodControl:SpecialDays'
-  NumSpecDays=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSpecDays=GetNumObjectsFound(cCurrentModuleObject)
   IF (ALLOCATED(SpecialDays)) THEN   ! EPW already allocated the array
     Count=NumSpecialDays-NumSpecDays+1
   ELSE
@@ -6262,7 +6274,7 @@ SUBROUTINE GetSpecialDayPeriodData(ErrorsFound)
 
   DO Loop=1,NumSpecDays
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,AlphArray,NumAlphas,Duration,NumNumbers,IOSTAT)
+    CALL GetObjectItem(cCurrentModuleObject,Loop,AlphArray,NumAlphas,Duration,NumNumbers,IOSTAT)
 
     CALL VerifyName(AlphArray(1),SpecialDays%Name,Count-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
@@ -6453,10 +6465,10 @@ SUBROUTINE GetDSTData(ErrorsFound)
   INTEGER NumNumbers
 
   cCurrentModuleObject='RunPeriodControl:DaylightSavingTime'
-  NumFound=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumFound=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumFound == 1 ) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (NumAlphas /= 2) THEN
@@ -6594,7 +6606,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
 
 
   !Call Input Get routine to retrieve design day data
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),DDLoop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumerics,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,DDLoop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumerics,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6620,7 +6632,6 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     DesDayInput(EnvrnNum)%TauD=rNumericArgs(13)              ! diffuse tau >= 0
     DesDayInput(EnvrnNum)%DailyWBRange=rNumericArgs(8)      ! Daily wet-bulb temperature range (deltaC)
 
-
     DesDayInput(EnvrnNum)%SkyClear = rNumericArgs(14)         ! Sky Clearness (0 to 1)
 
     IF (SameString(cAlphaArgs(7),'Yes') .or. SameString(cAlphaArgs(7),'1') ) THEN
@@ -6629,7 +6640,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%RainInd=0
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         '", invalid '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+         '", invalid field: '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
       CALL ShowContinueError('"No" will be used.')
       DesDayInput(EnvrnNum)%RainInd=0
     ENDIF
@@ -6640,7 +6651,7 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%SnowInd=0
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         '", invalid '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'".')
+         '", invalid field: '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'".')
       CALL ShowContinueError('"No" will be used.')
       DesDayInput(EnvrnNum)%SnowInd=0
     ENDIF
@@ -6650,16 +6661,18 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(5))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Wetbulb
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Wet-Bulb',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0))
+      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Wet-Bulb',cCurrentModuleObject,'Severe','>= -70',  &
+                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
+                     WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'DewPoint')) THEN
@@ -6667,16 +6680,18 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(5))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Dewpoint
       CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Dew-Point',TRIM(cCurrentModuleObject),'Severe','>= -70',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0))
+                     (DesDayInput(EnvrnNum)%HumIndValue>=-70.d0),'<= 70',(DesDayInput(EnvrnNum)%HumIndValue <=70.d0),  &
+                      WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'HumidityRatio')) THEN
@@ -6684,16 +6699,18 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(6)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(6)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(6))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(6))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_HumRatio
       CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Humidity-Ratio',TRIM(cCurrentModuleObject),'Severe','>= 0',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= .03',(DesDayInput(EnvrnNum)%HumIndValue <=.03d0))
+                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= .03',(DesDayInput(EnvrnNum)%HumIndValue <=.03d0),  &
+                     WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'Enthalpy')) THEN
@@ -6701,16 +6718,18 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(7)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(7)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(7))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(7))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
       errflag=.false.
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Enthalpy
       CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(5))//' - Enthalpy','SizingPeriod:DesignDay','Severe','>= 0.0',  &
-                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= 130000',(DesDayInput(EnvrnNum)%HumIndValue <=130000.d0))
+                     (DesDayInput(EnvrnNum)%HumIndValue>=0.d0),'<= 130000',(DesDayInput(EnvrnNum)%HumIndValue <=130000.d0),  &
+                      WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
         ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'RelativeHumiditySchedule')) THEN
@@ -6722,9 +6741,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(5))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileDifferenceSchedule')) THEN
       cAlphaArgs(5)='WetBulbProfileDifferenceSchedule'
@@ -6732,9 +6752,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(5))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
     ELSEIF (SameString(cAlphaArgs(5),'WetBulbProfileDefaultMultipliers')) THEN
       cAlphaArgs(5)='WetBulbProfileDefaultMultipliers'
@@ -6742,16 +6763,18 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lNumericFieldBlanks(5)) THEN
         DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(5)       ! Humidity Indicating Conditions at Max Dry-Bulb
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('..invalid '//TRIM(cNumericFieldNames(5))//' is blank.')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(5))//' is blank.')
         CALL ShowContinueError('..field is required when '//trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'".')
+        ErrorsFound=.true.
       ENDIF
     ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         ' Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
-      CALL ShowContinueError('WetBulb will be used.')
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+      CALL ShowContinueError('WetBulb will be used. Maximum Dry Bulb will be used as WetBulb at Maximum Dry Bulb.')
       cAlphaArgs(5)='WetBulb'
       DesDayInput(EnvrnNum)%HumIndType=DDHumIndType_Wetbulb
+      DesDayInput(EnvrnNum)%HumIndValue = rNumericArgs(3)
     ENDIF
 
     ! resolve humidity schedule if needed
@@ -6759,15 +6782,15 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfMul .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
       IF (lAlphaFieldBlanks(6)) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' Blank '//TRIM(cAlphaFieldNames(6))//' was specified.')
-        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(3))//'="'// TRIM(cAlphaArgs(3)) // '".')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//' is blank.')
+        CALL ShowContinueError('..field is required when '//TRIM(cAlphaFieldNames(3))//'="'// TRIM(cAlphaArgs(3)) // '".')
         ErrorsFound=.true.
       ELSE
         DesDayInput(EnvrnNum)%HumIndSchPtr=GetDayScheduleIndex( cAlphaArgs(6))
         IF (DesDayInput(EnvrnNum)%HumIndSchPtr == 0) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' Invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
+          CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
           CALL ShowContinueError('Default Humidity will be used (constant for day using Humidity Indicator Temp).')
           ! reset HumIndType ?
         ELSE
@@ -6778,29 +6801,28 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
 
            CASE (DDHumIndType_RelHumSch)
              IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0,'>=',100.0,'<=')) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' Invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
-            CALL ShowSevereError('Specified Relative Humidity Values are not within [0.0, 100.0]')
-            ErrorsFound=.true.
-          ENDIF
-
+               CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+               CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+               CALL ShowContinueError('Specified [Scheduled] Relative Humidity Values are not within [0.0, 100.0]')
+               ErrorsFound=.true.
+             ENDIF
 
            CASE (DDHumIndType_WBProfMul)
              ! multiplier: use schedule value, check 0 <= v <= 1
              IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
-               CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-               CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
-               CALL ShowContinueError('..Specified Wet-bulb Profile Range Multiplier Values are not within [0.0, 1.0]')
+               CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+               CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+               CALL ShowContinueError('..Specified [Schedule] Wet-bulb Profile Range Multiplier Values are not within [0.0, 1.0]')
                ErrorsFound=.true.
-        ENDIF
+             ENDIF
 
            CASE (DDHumIndType_WBProfDif)
-            IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0d0,'>=')) THEN
-              CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
-              CALL ShowSevereError('Some Wet-bulb Profile Difference Values are < 0.0 [would make max larger].')
-        ErrorsFound=.true.
-      ENDIF
+             IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%HumIndSchPtr,0.0d0,'>=')) THEN
+               CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+               CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
+               CALL ShowSevereError('Some [Schedule] Wet-bulb Profile Difference Values are < 0.0 [would make max larger].')
+               ErrorsFound=.true.
+             ENDIF
           END SELECT
         END IF
      END IF
@@ -6827,12 +6849,12 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDef .or. &
         DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_WBProfDif) THEN
       IF (DesDayInput(EnvrnNum)%HumIndValue > DesDayInput(EnvrnNum)%MaxDryBulb) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-        CALL ShowContinueError('  Humidity Indicator Temperature at Max Temperature='//  &
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", range check data.')
+        CALL ShowContinueError('..Humidity Indicator Temperature at Max Temperature='//  &
                    TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%HumIndValue,1))//  &
                    ' > Max DryBulb='//TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%MaxDryBulb,1)))
-        CALL ShowContinueError('  '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
-        CALL ShowContinueError('  Conditions for day will be set to Relative Humidity = 100%')
+        CALL ShowContinueError('..'//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+        CALL ShowContinueError('..Conditions for day will be set to Relative Humidity = 100%')
         IF (DesDayInput(EnvrnNum)%HumIndType == DDHumIndType_Dewpoint) THEN
           ! dew-point
           testval=PsyWFnTdbRhPb(DesDayInput(EnvrnNum)%MaxDryBulb,1.0d0,DesDayInput(EnvrnNum)%PressBarom)
@@ -6860,8 +6882,8 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
       ! Validate Temperature - Daily range
     ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
       CALL ShowContinueError('..Default Dry-bulb Range modifiers will be used.')
       cAlphaArgs(3)='DefaultMultipliers'
       DesDayInput(EnvrnNum)%DBTempRangeType = DDDBRangeType_Default
@@ -6871,10 +6893,10 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     IF (DesDayInput(EnvrnNum)%DBTempRangeType /= DDDBRangeType_Difference) THEN
       testval=DesDayInput(EnvrnNum)%MaxDryBulb-DesDayInput(EnvrnNum)%DailyDBRange
       errflag=.false.
-      CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(3)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
-                        '<= 70',(testval <=70.d0))
+      CALL RangeCheck(errflag,cAlphaFieldNames(3),cCurrentModuleObject,'Severe','>= -70',(testval>=-70.d0), &
+                        '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
       IF (errflag) THEN
-        CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!        CALL ShowContinueError('Occured in '//TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'".')
         ErrorsFound=.true.
       ENDIF
     ENDIF
@@ -6883,23 +6905,23 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lAlphaFieldBlanks(4)) THEN
         DesDayInput(EnvrnNum)%TempRangeSchPtr=GetDayScheduleIndex(cAlphaArgs(4))
         IF (DesDayInput(EnvrnNum)%TempRangeSchPtr == 0) THEN
-          CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-          CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-          CALL ShowContinueError('..Default Dry-bulb Range will be used.')
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+          ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%TempRangeSchPtr,DDDBRngModifier(EnvrnNum,:,:))
           IF (cAlphaArgs(3) == 'MultiplierSchedule') THEN
             IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=',1.0d0,'<=')) THEN
-              CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-              CALL ShowContinueError('..Specified Dry-bulb Range Multiplier Values are not within [0.0, 1.0]')
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+              CALL ShowContinueError('..Specified [Schedule] Dry-bulb Range Multiplier Values are not within [0.0, 1.0]')
               ErrorsFound=.true.
             ENDIF
           ELSE  ! delta, must be > 0.0
             IF (.not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%TempRangeSchPtr,0.0d0,'>=')) THEN
-              CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-              CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-              CALL ShowSevereError('Some Dry-bulb Range Difference Values are < 0.0 [would make max larger].')
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+              CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+              CALL ShowSevereError('Some [Schedule] Dry-bulb Range Difference Values are < 0.0 [would make max larger].')
               ErrorsFound=.true.
             ENDIF
           ENDIF
@@ -6907,16 +6929,16 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
           testval=DesDayInput(EnvrnNum)%MaxDryBulb-testval
           errflag=.false.
           CALL RangeCheck(errflag,TRIM(cAlphaFieldNames(4)),TRIM(cCurrentModuleObject),'Severe','>= -70',(testval>=-70.d0), &
-                           '<= 70',(testval <=70.d0))
+                           '<= 70',(testval <=70.d0),WhatObjectName=DesDayInput(EnvrnNum)%Title)
           IF (errflag) THEN
-            CALL ShowContinueError(TRIM(cCurrentModuleObject)//': Occured in '//TRIM(DesDayInput(EnvrnNum)%Title))
+!            CALL ShowContinueError('Occured in '//TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'".')
             ErrorsFound=.true.
           ENDIF
         ENDIF
       ELSE
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' Blank '//TRIM(cAlphaFieldNames(4))//' was specified.')
-        CALL ShowContinueError('..must be input when '//TRIM(cAlphaFieldNames(3))//' indicates "SCHEDULE".')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(4))//' is blank.')
+        CALL ShowContinueError('..required when '//TRIM(cAlphaFieldNames(3))//' indicates "SCHEDULE".')
         ErrorsFound=.true.
       ENDIF
     ELSE
@@ -6943,8 +6965,8 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ELSEIF (SameString(cAlphaArgs(10),'Schedule')) THEN
       DesDayInput(EnvrnNum)%SolarModel = SolarModel_Schedule
     ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title))
-      CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(10))//'="'//TRIM(cAlphaArgs(10))//'".')
       CALL ShowContinueError('Model used will be ASHRAE ClearSky')
       DesDayInput(EnvrnNum)%SolarModel = ASHRAE_ClearSky
     ENDIF
@@ -6953,44 +6975,52 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
       IF (.not. lAlphaFieldBlanks(11)) THEN
         DesDayInput(EnvrnNum)%BeamSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(11))
         IF (DesDayInput(EnvrnNum)%BeamSolarSchPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(11))//'="'//TRIM(cAlphaArgs(11))//'".')
           CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(10))//' indicates "Schedule".')
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%BeamSolarSchPtr,DDBeamSolarValues(EnvrnNum,:,:))
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%BeamSolarSchPtr,0.0,'>=')) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-               ' invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
-            CALL ShowContinueError('..Specified Values are not >= 0.0')
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+            CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(11))//'="'//TRIM(cAlphaArgs(11))//'".')
+            CALL ShowContinueError('..Specified [Schedule] Values are not >= 0.0')
             ErrorsFound=.true.
           ENDIF
         ENDIF
       ELSE  ! should have entered beam schedule
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' blank '//TRIM(cAlphaFieldNames(11)))
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(11))//' is blank.')
         CALL ShowContinueError('..All zeroes will be used. (no solar)')
       ENDIF
       IF (.not. lAlphaFieldBlanks(12)) THEN
         DesDayInput(EnvrnNum)%DiffuseSolarSchPtr=GetDayScheduleIndex(cAlphaArgs(12))
         IF (DesDayInput(EnvrnNum)%DiffuseSolarSchPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-             ' invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+          CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(12))//'="'//TRIM(cAlphaArgs(12))//'".')
           CALL ShowContinueError('..Required when '//TRIM(cAlphaFieldNames(10))//' indicates "Schedule".')
           ErrorsFound=.true.
         ELSE
           CALL GetSingleDayScheduleValues(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,DDDiffuseSolarValues(EnvrnNum,:,:))
           IF ( .not. CheckDayScheduleValueMinMax(DesDayInput(EnvrnNum)%DiffuseSolarSchPtr,0.0,'>=')) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-               ' invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
-            CALL ShowContinueError('..Specified Values are not >= 0.0')
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+            CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(12))//'="'//TRIM(cAlphaArgs(12))//'".')
+            CALL ShowContinueError('..Specified [Schedule] Values are not >= 0.0')
             ErrorsFound=.true.
           ENDIF
         ENDIF
       ELSE  ! should have entered diffuse schedule
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' blank '//TRIM(cAlphaFieldNames(12)))
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(12))//' is blank.')
         CALL ShowContinueError('..All zeroes will be used. (no solar)')
+      ENDIF
+    ENDIF
+
+    IF (DesDayInput(EnvrnNum)%SolarModel == ASHRAE_ClearSky) THEN
+      IF (lNumericFieldBlanks(14)) THEN
+        CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('..invalid field: '//TRIM(cNumericFieldNames(14))//' is blank.')
+        CALL ShowContinueError('..Zero clear sky (no solar) will be used.')
       ENDIF
     ENDIF
 
@@ -7000,29 +7030,32 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
 
     CASE (1,3,5,7,8,10,12)
       IF (DesDayInput(EnvrnNum)%DayOfMonth > 31) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object='//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' '//TRIM(cNumericFieldNames(10))//' invalid (Day of Month) ['//  &
-           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//']')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('.. invalid field: '//TRIM(cNumericFieldNames(2))//'=['//  &
+           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//  &
+           '], Month=['//trim(RoundSigDigits(DesDayInput(EnvrnNum)%Month))//'].')
         ErrorsFound=.true.
       ENDIF
     CASE (4,6,9,11)
       IF (DesDayInput(EnvrnNum)%DayOfMonth > 30) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object='//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' '//TRIM(cNumericFieldNames(10))//' invalid (Day of Month) ['//  &
-           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//']')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('.. invalid '//TRIM(cNumericFieldNames(2))//'=['//  &
+           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//  &
+           '], Month=['//trim(RoundSigDigits(DesDayInput(EnvrnNum)%Month))//'].')
         ErrorsFound=.true.
       ENDIF
     CASE (2)
       IF (DesDayInput(EnvrnNum)%DayOfMonth > 28) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object='//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-           ' '//TRIM(cNumericFieldNames(10))//' invalid (Day of Month) ['//  &
-           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//']')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+        CALL ShowContinueError('.. invalid '//TRIM(cNumericFieldNames(2))//'=['//  &
+           TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%DayOfMonth))//  &
+           '], Month=['//trim(RoundSigDigits(DesDayInput(EnvrnNum)%Month))//'].')
         ErrorsFound=.true.
       ENDIF
     CASE DEFAULT
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': object='//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         ' '//TRIM(cNumericFieldNames(11))//' invalid (Month) ['//  &
-         TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%Month))//']')
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('.. invalid '//TRIM(cNumericFieldNames(1))//' invalid (Month) ['//  &
+         TRIM(RoundSigDigits(DesDayInput(EnvrnNum)%Month))//'].')
       ErrorsFound=.true.
     END SELECT
 
@@ -7031,16 +7064,15 @@ SUBROUTINE GetDesignDayData(TotDesDays,ErrorsFound)
     ELSEIF (SameString(cAlphaArgs(9),'No') .or. SameString(cAlphaArgs(9),'0') .or. lAlphaFieldBlanks(9)) THEN
       DesDayInput(EnvrnNum)%DSTIndicator=0
     ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         '", invalid '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'".')
-      CALL ShowContinueError('"No" will be used.')
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'". "No" will be used.')
       DesDayInput(EnvrnNum)%DSTIndicator=0
     ENDIF
 
     DesDayInput(EnvrnNum)%DayType=FindItemInList(cAlphaArgs(2),ValidNames,12)
     IF (DesDayInput(EnvrnNum)%DayType == 0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//  &
-         '", invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(DesDayInput(EnvrnNum)%Title)//'", invalid data.')
+      CALL ShowContinueError('..invalid field: '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
       CALL ShowContinueError('Valid values are Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,'//  &
           'Holiday,SummerDesignDay,WinterDesignDay,CustomDay1,CustomDay2.')
       ErrorsFound=.true.
@@ -7123,7 +7155,7 @@ SUBROUTINE GetLocationInfo(ErrorsFound)
 
          ! FLOW:
   cCurrentModuleObject='Site:Location'
-  NumLocations=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumLocations=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumLocations > 1) THEN
     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Too many objects entered. Only one allowed.')
@@ -7132,7 +7164,7 @@ SUBROUTINE GetLocationInfo(ErrorsFound)
 
   IF (NumLocations == 1) THEN
       !Call Input Get routine to retrieve Location information
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,LocNames,LocNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject,1,LocNames,LocNumAlpha, &
                        LocProps,LocNumProp,IOSTAT)
 
    !set latitude, longitude, and time zone number variables
@@ -7213,13 +7245,13 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
   LOGICAL :: MultipleEnvironments
 
   cCurrentModuleObject='WeatherProperty:SkyTemperature'
-  NumWPSkyTemperatures=GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumWPSkyTemperatures=GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(WPSkyTemperature(NumWPSkyTemperatures))  ! by default, not used.
 
   DO Item=1,NumWPSkyTemperatures
     MultipleEnvironments=.false.
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumerics,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumerics,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -7247,8 +7279,7 @@ SUBROUTINE GetWeatherProperties(ErrorsFound)
         ENDDO
         MultipleEnvironments=.true.
         IF (Found == 0) THEN
-          CALL ShowWarningError('GetWeatherProperties="'//  &
-             trim(WPSkyTemperature(Environment(Count)%WP_Type1)%Name)//'", no run periods found.')
+          CALL ShowWarningError('GetWeatherProperties: WeatherProperty:SkyTemperature=blank, no run periods found.')
           CALL ShowContinueError('...SkyTemperature will not be applied.')
           CYCLE
         ENDIF
@@ -7387,10 +7418,10 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
 
      ! FLOW:
   cCurrentModuleObject='Site:GroundTemperature:BuildingSurface'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I == 1) THEN
      !Get the object names for each construction from the input processor
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha, &
+     CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha, &
                       GndProps,GndNumProp,IOSTAT)
 
     IF (GndNumProp < 12) THEN
@@ -7419,16 +7450,16 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
   ENDIF
 
   ! Write Final Ground Temp Information to the initialization output file
-  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:BuildingSurface>, Months From Jan to Dec {Deg C}'
+  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:BuildingSurface>, Months From Jan to Dec {C}'
   Write(OutputFileInits,720) 'Site:GroundTemperature:BuildingSurface',(GroundTemps(I),I=1,12)
   720 Format(' ',A,12(', ',F6.2))
 
 
   !Added for ground temperatures for F and C factor defined surfaces
   cCurrentModuleObject='Site:GroundTemperature:FCfactorMethod'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I == 1) THEN
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha,GndProps,GndNumProp,IOSTAT)
+     CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha,GndProps,GndNumProp,IOSTAT)
 
     IF (GndNumProp < 12) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Less than 12 values entered.')
@@ -7450,17 +7481,17 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
   ENDIF
 
   IF (FCGroundTemps) THEN  ! Write Ground Temp Information to the initialization output file
-    Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:FCfactorMethod>, Months From Jan to Dec {Deg C}'
+    Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:FCfactorMethod>, Months From Jan to Dec {C}'
     Write(OutputFileInits,720) 'Site:GroundTemperature:FCfactorMethod',(GroundTempsFC(I),I=1,12)
   ENDIF
 
 
   PubGroundTempSurfFlag=.FALSE.
   cCurrentModuleObject='Site:GroundTemperature:Shallow'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I == 1) THEN
      !Get the object names for each construction from the input processor
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha, &
+     CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha, &
                       GndProps,GndNumProp,IOSTAT)
 
     IF (GndNumProp < 12) THEN
@@ -7483,14 +7514,14 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
   ENDIF
 
   ! Write Final Ground Temp Information to the initialization output file
-  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:Shallow>, Months From Jan to Dec {Deg C}'
+  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:Shallow>, Months From Jan to Dec {C}'
   Write(OutputFileInits,720) 'Site:GroundTemperature:Shallow',(SurfaceGroundTemps(I),I=1,12)
 
   cCurrentModuleObject='Site:GroundTemperature:Deep'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I == 1) THEN
      !Get the object names for each construction from the input processor
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha, &
+     CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha, &
                       GndProps,GndNumProp,IOSTAT)
 
     IF (GndNumProp < 12) THEN
@@ -7513,7 +7544,7 @@ SUBROUTINE GetGroundTemps(ErrorsFound)
   ENDIF
 
   ! Write Final Ground Temp Information to the initialization output file
-  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:Deep>, Months From Jan to Dec {Deg C}'
+  Write(OutputFileInits,'(A)') '! <Site:GroundTemperature:Deep>, Months From Jan to Dec {C}'
   Write(OutputFileInits,720) 'Site:GroundTemperature:Deep',(DeepGroundTemps(I),I=1,12)
 
   !Assigning the ground temperature array to a public array for use in other subroutines
@@ -7577,13 +7608,13 @@ SUBROUTINE GetGroundReflectances(ErrorsFound)
 
      ! FLOW:
   cCurrentModuleObject='Site:GroundReflectance'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I /=0) THEN
     ALLOCATE(GndProps(12))
     ALLOCATE(GndAlphas(1))
     IF (I == 1) THEN
        !Get the object names for each construction from the input processor
-       CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha, &
+       CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha, &
                         GndProps,GndNumProp,IOSTAT)
 
       IF (GndNumProp < 12) THEN
@@ -7658,13 +7689,13 @@ SUBROUTINE GetSnowGroundRefModifiers(ErrorsFound)
 
      ! FLOW:
   cCurrentModuleObject='Site:GroundReflectance:SnowModifier'
-  I=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  I=GetNumObjectsFound(cCurrentModuleObject)
   IF (I /=0) THEN
     ALLOCATE(GndProps(2))
     ALLOCATE(GndAlphas(1))
     IF (I == 1) THEN
        !Get the object names for each construction from the input processor
-       CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GndAlphas,GndNumAlpha, &
+       CALL GetObjectItem(cCurrentModuleObject,1,GndAlphas,GndNumAlpha, &
                         GndProps,GndNumProp,IOSTAT)
 
       !Assign the ground reflectances to the variable
@@ -7729,10 +7760,10 @@ SUBROUTINE GetWaterMainsTemperatures(ErrorsFound)
 
      ! FLOW:
   cCurrentModuleObject='Site:WaterMainsTemperature'
-  NumObjects = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumObjects = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumObjects == 1) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,AlphArray,NumAlphas,NumArray,NumNums,IOStat,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,AlphArray,NumAlphas,NumArray,NumNums,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -7883,7 +7914,7 @@ SUBROUTINE GetWeatherStation(ErrorsFound)
 
      ! FLOW:
   cCurrentModuleObject='Site:WeatherStation'
-  NumObjects = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumObjects = GetNumObjectsFound(cCurrentModuleObject)
 
   ! Default conditions for a weather station in an open field at a height of 10 m. (These should match the IDD defaults.)
   WeatherFileWindSensorHeight = 10.0d0
@@ -7892,7 +7923,7 @@ SUBROUTINE GetWeatherStation(ErrorsFound)
   WeatherFileTempSensorHeight = 1.5d0
 
   IF (NumObjects == 1) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,AlphArray,NumAlphas,NumArray,NumNums,IOStat)
+    CALL GetObjectItem(cCurrentModuleObject,1,AlphArray,NumAlphas,NumArray,NumNums,IOStat)
 
     IF (NumNums > 0) WeatherFileWindSensorHeight = NumArray(1)
     IF (NumNums > 1) WeatherFileWindExp = NumArray(2)
@@ -8261,6 +8292,7 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
   INTEGER endcol
   INTEGER TropExtremeCount  ! because these can show up as "no dry" need to count and separate.
   INTEGER actcount
+  LOGICAL errflag1
 
 
   ! Strip off Header value from Line
@@ -8672,6 +8704,8 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
             ENDIF
 
           CASE(2)
+            errflag1=ErrorsFound
+            ErrorsFound=.false.
             CALL ProcessDateString(Line(1:Pos-1),PMonth,PDay,PWeekDay,DateType,ErrorsFound)
             IF (DateType /= InvalidDate) THEN
               IF (PMonth == 0 .and. PDay == 0) THEN
@@ -8684,9 +8718,12 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
                 EPWDST%STWeekDay=PWeekDay
               ENDIF
             ELSE
-              CALL ShowSevereError('ProcessEPWHeader: Invalid Daylight Saving Period Start Date Field(WeatherFile)='//  &
+              ErrorsFound=errflag1
+              CALL ShowContinueError('ProcessEPWHeader: Invalid Daylight Saving Period Start Date Field(WeatherFile)='//  &
                                      TRIM(Line(1:Pos-1)))
-              ErrorsFound=.true.
+              CALL ShowContinueError('...invalid header='//trim(HeaderString))
+              CALL ShowContinueError('...Setting Weather File DST to false.')
+              EPWDaylightSaving=.false.
             ENDIF
 
           CASE(3)
@@ -8698,9 +8735,10 @@ SUBROUTINE ProcessEPWHeader(HeaderString,Line,ErrorsFound)
                 EPWDST%EnDay=PDay
                 EPWDST%EnWeekDay=PWeekDay
               ELSE
-                CALL ShowSevereError('ProcessEPWHeader: Invalid Daylight Saving Period End Date Field(WeatherFile)='//  &
+                CALL ShowWarningError('ProcessEPWHeader: Invalid Daylight Saving Period End Date Field(WeatherFile)='//  &
                                         TRIM(Line(1:Pos-1)))
-                ErrorsFound=.true.
+                CALL ShowContinueError('...Setting Weather File DST to false.')
+                EPWDaylightSaving=.false.
               ENDIF
               DST=EPWDST
             ENDIF
@@ -9811,7 +9849,7 @@ END FUNCTION CalculateDayOfWeek
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

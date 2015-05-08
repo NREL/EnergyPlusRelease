@@ -575,7 +575,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
   DO ZoneEquipType = 1, NumValidSysAvailZoneComponents
     IF (.not. ALLOCATED(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs)) THEN
-      TotalNumComp = GetNumObjectsFound(TRIM(cValidSysAvailManagerCompTypes(ZoneEquipType)))
+      TotalNumComp = GetNumObjectsFound(cValidSysAvailManagerCompTypes(ZoneEquipType))
       ZoneComp(ZoneEquipType)%TotalNumComp = TotalNumComp
       IF (TotalNumComp .GT. 0) THEN
         ALLOCATE(ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs(TotalNumComp))
@@ -584,7 +584,7 @@ SUBROUTINE GetSysAvailManagerInputs
   ENDDO
 
   cCurrentModuleObject = 'AvailabilityManager:Scheduled'
-  NumSchedSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSchedSysAvailMgrs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumSchedSysAvailMgrs > 0)THEN
 
@@ -592,7 +592,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumSchedSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -614,7 +614,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      CALL SetupOutputVariable('Availability Manager Scheduled Control Status', &
+      CALL SetupOutputVariable('Availability Manager Scheduled Control Status []', &
                                 SchedSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',SchedSysAvailMgrData(SysAvailNum)%Name)
 
@@ -623,7 +623,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:ScheduledOn'
-  NumSchedOnSysAvailMgrs   = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSchedOnSysAvailMgrs   = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumSchedOnSysAvailMgrs > 0)THEN
 
@@ -631,7 +631,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumSchedOnSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -653,7 +653,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      CALL SetupOutputVariable('Availability Manager ScheduledOn Control Status', &
+      CALL SetupOutputVariable('Availability Manager Scheduled On Control Status []', &
                                 SchedOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',SchedOnSysAvailMgrData(SysAvailNum)%Name)
 
@@ -662,7 +662,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:ScheduledOff'
-  NumSchedOffSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSchedOffSysAvailMgrs  = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumSchedOffSysAvailMgrs > 0)THEN
 
@@ -670,7 +670,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumSchedOffSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -692,7 +692,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      CALL SetupOutputVariable('Availability Manager ScheduledOff Control Status', &
+      CALL SetupOutputVariable('Availability Manager Scheduled Off Control Status []', &
                                 SchedOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',SchedOffSysAvailMgrData(SysAvailNum)%Name)
 
@@ -701,7 +701,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:NightCycle'
-  NumNCycSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumNCycSysAvailMgrs  = GetNumObjectsFound(cCurrentModuleObject)
   CyclingTimeSteps     = 0
 
   IF(NumNCycSysAvailMgrs > 0)THEN
@@ -710,7 +710,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumNCycSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -743,7 +743,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+      SELECT CASE(MakeUPPERCase(cAlphaArgs(4)))
         CASE('STAYOFF')
           NCycSysAvailMgrData(SysAvailNum)%CtrlType = StayOff
         CASE('CYCLEONANY')
@@ -767,7 +767,7 @@ SUBROUTINE GetSysAvailManagerInputs
         END IF
       END IF
 
-      CALL SetupOutputVariable('Availability Manager Night Cycle Control Status', &
+      CALL SetupOutputVariable('Availability Manager Night Cycle Control Status []', &
                                 NCycSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',NCycSysAvailMgrData(SysAvailNum)%Name)
 
@@ -776,7 +776,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:DifferentialThermostat'
-  NumDiffTSysAvailMgrs     = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumDiffTSysAvailMgrs     = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumDiffTSysAvailMgrs > 0)THEN
 
@@ -784,7 +784,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumDiffTSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -824,7 +824,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      CALL SetupOutputVariable('Availability Manager Differential Thermostat Control Status', &
+      CALL SetupOutputVariable('Availability Manager Differential Thermostat Control Status []', &
                                 DiffTSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',DiffTSysAvailMgrData(SysAvailNum)%Name)
 
@@ -833,14 +833,14 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOff'
-  NumHiTurnOffSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumHiTurnOffSysAvailMgrs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumHiTurnOffSysAvailMgrs > 0)THEN
     ALLOCATE(HiTurnOffSysAvailMgrData(NumHiTurnOffSysAvailMgrs))
 
     DO SysAvailNum = 1,NumHiTurnOffSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -863,7 +863,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
       HiTurnOffSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
 
-      CALL SetupOutputVariable('Availability Manager High Temp Turn Off Control Status', &
+      CALL SetupOutputVariable('Availability Manager High Temperature Turn Off Control Status []', &
                                 HiTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',HiTurnOffSysAvailMgrData(SysAvailNum)%Name)
 
@@ -873,7 +873,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
 
   cCurrentModuleObject = 'AvailabilityManager:HighTemperatureTurnOn'
-  NumHiTurnOnSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumHiTurnOnSysAvailMgrs  = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumHiTurnOnSysAvailMgrs > 0)THEN
 
@@ -881,7 +881,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumHiTurnOnSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -904,7 +904,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
       HiTurnOnSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
 
-      CALL SetupOutputVariable('Availability Manager High Temp Turn On Control Status', &
+      CALL SetupOutputVariable('Availability Manager High Temperature Turn On Control Status []', &
                                 HiTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',HiTurnOnSysAvailMgrData(SysAvailNum)%Name)
 
@@ -913,7 +913,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOff'
-  NumLoTurnOffSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumLoTurnOffSysAvailMgrs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumLoTurnOffSysAvailMgrs > 0)THEN
 
@@ -921,7 +921,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumLoTurnOffSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -955,7 +955,7 @@ SUBROUTINE GetSysAvailManagerInputs
         LoTurnOffSysAvailMgrData(SysAvailNum)%SchedPtr = 0
       END IF
 
-      CALL SetupOutputVariable('Availability Manager Low Temp Turn Off Control Status', &
+      CALL SetupOutputVariable('Availability Manager Low Temperature Turn Off Control Status []', &
                                 LoTurnOffSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',LoTurnOffSysAvailMgrData(SysAvailNum)%Name)
 
@@ -964,7 +964,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:LowTemperatureTurnOn'
-  NumLoTurnOnSysAvailMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumLoTurnOnSysAvailMgrs  = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumLoTurnOnSysAvailMgrs > 0)THEN
 
@@ -972,7 +972,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumLoTurnOnSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -995,7 +995,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
       LoTurnOnSysAvailMgrData(SysAvailNum)%Temp = rNumericArgs(1)
 
-      CALL SetupOutputVariable('Availability Manager Low Temp Turn On Control Status', &
+      CALL SetupOutputVariable('Availability Manager Low Temperature Turn On Control Status []', &
                                 LoTurnOnSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',LoTurnOnSysAvailMgrData(SysAvailNum)%Name)
 
@@ -1004,7 +1004,7 @@ SUBROUTINE GetSysAvailManagerInputs
   END IF
 
   cCurrentModuleObject = 'AvailabilityManager:NightVentilation'
-  NumNVentSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumNVentSysAvailMgrs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF(NumNVentSysAvailMgrs > 0)THEN
 
@@ -1012,7 +1012,7 @@ SUBROUTINE GetSysAvailManagerInputs
 
     DO SysAvailNum = 1,NumNVentSysAvailMgrs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1058,7 +1058,7 @@ SUBROUTINE GetSysAvailManagerInputs
         ErrorsFound = .TRUE.
       END IF
 
-      CALL SetupOutputVariable('Availability Manager Night Ventilation Control Status', &
+      CALL SetupOutputVariable('Availability Manager Night Ventilation Control Status []', &
                                 NVentSysAvailMgrData(SysAvailNum)%AvailStatus, &
                                'System','Average',NVentSysAvailMgrData(SysAvailNum)%Name)
 
@@ -1159,14 +1159,14 @@ SUBROUTINE GetSysAvailManagerListInputs
 
 
   cCurrentModuleObject ='AvailabilityManagerAssignmentList'
-  NumAvailManagerLists = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumAvailManagerLists = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumAvailManagerLists > 0) THEN
 
     ALLOCATE(SysAvailMgrListData(NumAvailManagerLists))
 
     DO Item=1,NumAvailManagerLists
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1628,7 +1628,7 @@ SUBROUTINE InitSysAvailManagers
 !  HybridVentSysAvailMgrData%AvailStatus= NoAction
   DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types
     IF(ALLOCATED(ZoneComp))THEN
-      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) & 
+      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) &
         ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs%AvailStatus = NoAction
     ENDIF
   ENDDO
@@ -2735,7 +2735,7 @@ SUBROUTINE GetHybridVentilationInputs
 
   ! Get the number of occurences of each type of System Availability Manager
   cCurrentModuleObject ='AvailabilityManager:HybridVentilation'
-  NumHybridVentSysAvailMgrs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumHybridVentSysAvailMgrs = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumHybridVentSysAvailMgrs == 0) RETURN
 
@@ -2752,7 +2752,7 @@ SUBROUTINE GetHybridVentilationInputs
 
   DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,SysAvailNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3133,14 +3133,18 @@ SUBROUTINE GetHybridVentilationInputs
   ! Set up output variables
   DO SysAvailNum = 1,NumHybridVentSysAvailMgrs
     IF (HybridVentSysAvailMgrData(SysAvailNum)%HybridVentMgrConnectedToAirLoop) THEN
-      CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
+      CALL SetupOutputVariable('Availability Manager Hybrid Ventilation Control Status []', &
+                                 HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
                                 'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
-      CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
+      CALL SetupOutputVariable('Availability Manager Hybrid Ventilation Control Mode []', &
+                                 HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
                                 'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)
     ELSE
-      CALL SetupOutputVariable('Hybrid Ventilation Control Status',HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
+      CALL SetupOutputVariable('Availability Manager Hybrid Ventilation Control Status []', &
+                                 HybridVentSysAvailMgrData(SysAvailNum)%VentilationCtrl, &
                                 'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)
-      CALL SetupOutputVariable('Hybrid Ventilation Control Mode',HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
+      CALL SetupOutputVariable('Availability Manager Hybrid Ventilation Control Mode []', &
+                                 HybridVentSysAvailMgrData(SysAvailNum)%ControlMode, &
                                 'System','Average',HybridVentSysAvailMgrData(SysAvailNum)%ControlZoneName)
     ENDIF
   END DO
@@ -3256,7 +3260,7 @@ SUBROUTINE InitHybridVentSysAvailMgr
                   CALL ShowWarningError(TRIM('AvailabilityManager:HybridVentilation')//' = "' // &
                           TRIM(HybridVentSysAvailMgrData(HybridVentNum)%Name)//'" has the controlled zone name = "' // &
                           TRIM(HybridVentSysAvailMgrData(HybridVentNum)%ControlZoneName)//'".')
-                  CALL ShowContinueError('This controlled zone already has hybrid ventilation control through this ' //& 
+                  CALL ShowContinueError('This controlled zone already has hybrid ventilation control through this ' //&
                           'air loop = "'//TRIM(HybridVentSysAvailMgrData(SysAvailNum)%AirLoopName)//'".')
                   CALL ShowContinueError('Only ' // TRIM('AvailabilityManager:HybridVentilation')//' = "' // &
                           TRIM(HybridVentSysAvailMgrData(SysAvailNum)%Name)// &
@@ -3319,7 +3323,7 @@ SUBROUTINE InitHybridVentSysAvailMgr
 
   DO ZoneEquipType = 1,NumValidSysAvailZoneComponents  ! loop over the zone equipment types
     IF(ALLOCATED(ZoneComp))THEN
-      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) & 
+      IF(ZoneComp(ZoneEquipType)%TotalNumComp .GT. 0) &
         ZoneComp(ZoneEquipType)%ZoneCompAvailMgrs%AvailStatus = NoAction
     ENDIF
   ENDDO
@@ -3744,7 +3748,7 @@ END FUNCTION GetHybridVentilationControlStatus
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

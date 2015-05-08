@@ -40,6 +40,10 @@ INTEGER, PARAMETER :: NotInOrAdjZoneExtWin = 0 ! Exterior window is not in a Day
 INTEGER, PARAMETER :: InZoneExtWin         = 1 ! Exterior window is in a Daylighting:Detailed zone
 INTEGER, PARAMETER :: AdjZoneExtWin        = 2 ! Exterior window is in a zone adjacent to a Daylighting:
                                                ! Detailed zone with which it shares an interior window
+
+INTEGER, PARAMETER :: CalledForRefPoint    = 101
+INTEGER, PARAMETER :: CalledForMapPoint    = 102
+
 ! Parameters for "DaylightType"
 INTEGER, PARAMETER :: NoDaylighting       = 0
 INTEGER, PARAMETER :: DetailedDaylighting = 1
@@ -218,7 +222,7 @@ LOGICAL :: DFSReportAllShadowCalculationDays = .false.
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -55,11 +55,38 @@ INTEGER, parameter  ::  conversionKBTU            = 5
 INTEGER, parameter  ::  conversionMCF             = 6  !thousand cubic feet
 INTEGER, parameter  ::  conversionCCF             = 7  !hundred cubic feet
 
+CHARACTER(len=*), PARAMETER, DIMENSION(0:7) :: convEneStrings= &
+        (/'     ',   &
+          'kWh  ',  &
+          'Therm',  &
+          'MMBtu',  &
+          'MJ   ',  &
+          'kBtu ',  &
+          'MCF  ',  &
+          'CCF  '/)
+CHARACTER(len=*), PARAMETER, DIMENSION(0:7) :: convDemStrings= &
+        (/'     ',  &
+          'kW   ',  &
+          'Therm',  &
+          'MMBtu',  &
+          'MJ   ',  &
+          'kBtu ',  &
+          'MCF  ',  &
+          'CCF  '/)
+
 INTEGER, parameter  ::  demandWindowQuarter       = 1
 INTEGER, parameter  ::  demandWindowHalf          = 2
 INTEGER, parameter  ::  demandWindowHour          = 3
 INTEGER, parameter  ::  demandWindowDay           = 4
 INTEGER, parameter  ::  demandWindowWeek          = 5
+
+CHARACTER(len=*), PARAMETER, DIMENSION(0:5) :: demWindowStrings= &
+        (/'    ',  &
+          '/Hr ',  &
+          '/Hr ',  &
+          '/Hr ',  &
+          '/Day',  &
+          '/Wk '/)
 
 INTEGER, parameter  ::  buyFromUtility            = 1
 INTEGER, parameter  ::  sellToUtility             = 2
@@ -332,6 +359,7 @@ TYPE TariffType
   !overall selection and annual cost
   LOGICAL                        :: isSelected                = .FALSE.
   REAL(r64)                      :: totalAnnualCost           = 0
+  REAL(r64)                      :: totalAnnualEnergy         = 0
 END TYPE
 TYPE (TariffType), ALLOCATABLE, DIMENSION(:)     :: tariff
 INTEGER                                          :: numTariff = 0
@@ -606,10 +634,10 @@ INTEGER          :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Tariff'
-NumTariff = GetNumObjectsFound(TRIM(CurrentModuleObject))
+NumTariff = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(tariff(NumTariff))
 DO iInObj = 1 , NumTariff
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -901,10 +929,10 @@ INTEGER          :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Qualify'
-NumQualify = GetNumObjectsFound(TRIM(CurrentModuleObject))
+NumQualify = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(qualify(NumQualify))
 DO iInObj = 1 , NumQualify
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -992,10 +1020,10 @@ INTEGER          :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Charge:Simple'
-numChargeSimple = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numChargeSimple = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(chargeSimple(numChargeSimple))
 DO iInObj = 1 , numChargeSimple
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -1082,10 +1110,10 @@ CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Charge:Block'
 hugeNumber = HUGE(hugeNumber)
-numChargeBlock = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numChargeBlock = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(chargeBlock(numChargeBlock))
 DO iInObj = 1 , numChargeBlock
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -1195,10 +1223,10 @@ INTEGER                     :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Ratchet'
-numRatchet = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numRatchet = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(ratchet(numRatchet))
 DO iInObj = 1 , numRatchet
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -1279,9 +1307,9 @@ INTEGER                     :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Variable'
-numEconVarObj = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numEconVarObj = GetNumObjectsFound(CurrentModuleObject)
 DO iInObj = 1 , numEconVarObj
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -1367,7 +1395,7 @@ INTEGER                     :: jFld
 CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 CurrentModuleObject = 'UtilityCost:Computation'
-numComputation = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numComputation = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(computation(numTariff))  !not the number of Computations but the number of tariffs
 !set default values for computation
 computation%computeName = ''
@@ -1375,7 +1403,7 @@ computation%firstStep = 0
 computation%lastStep = -1
 computation%isUserDef = .FALSE.
 DO iInObj = 1 , numComputation
-  CALL GetObjectItem(TRIM(CurrentModuleObject),iInObj,AlphaArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
                     NumArray,NumNums,IOSTAT)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
@@ -3838,6 +3866,8 @@ IF (numTariff .GE. 1) THEN
     END DO
     CALL checkMinimumMonthlyCharge(iTariff)
   END DO
+  CALL selectTariff
+  CALL LEEDtariffReporting
 END IF
 END SUBROUTINE ComputeTariff
 
@@ -4857,6 +4887,129 @@ DO iTariff = 1, numTariff
 END DO
 END SUBROUTINE setNativeVariables
 
+SUBROUTINE LEEDtariffReporting
+          ! SUBROUTINE INFORMATION:
+          !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
+          !    DATE WRITTEN   October 2012
+          !    MODIFIED
+          !    RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !    Write the economic results for LEED reporting
+
+          ! METHODOLOGY EMPLOYED:
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+USE OutputReportPredefined
+
+IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+INTEGER, EXTERNAL                      :: GetMeterIndex  !an exteral subroutine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: elecFacilMeter
+INTEGER :: gasFacilMeter
+REAL(r64)    :: elecTotalEne
+REAL(r64)    :: gasTotalEne
+REAL(r64)    :: otherTotalEne
+REAL(r64)    :: elecTotalCost
+REAL(r64)    :: gasTotalCost
+REAL(r64)    :: otherTotalCost
+REAL(r64)    :: allTotalCost
+CHARACTER(len=MaxNameLength) :: elecTariffNames
+CHARACTER(len=MaxNameLength) :: gasTariffNames
+CHARACTER(len=MaxNameLength) :: othrTariffNames
+INTEGER :: elecUnits
+INTEGER :: gasUnits
+INTEGER :: othrUnits
+INTEGER :: gasDemWindowUnits
+INTEGER :: othrDemWindowUnits
+INTEGER :: iTariff
+
+IF (numTariff .GT. 0) THEN
+  elecFacilMeter = GetMeterIndex('ELECTRICITY:FACILITY')
+  gasFacilMeter = GetMeterIndex('GAS:FACILITY')
+  elecTotalEne = 0
+  gasTotalEne = 0
+  otherTotalEne = 0
+  elecTotalCost = 0
+  gasTotalCost = 0
+  otherTotalCost = 0
+  allTotalCost = 0
+  elecUnits = 0
+  gasUnits = 0
+  othrUnits = 0
+  gasDemWindowUnits = 0
+  othrDemWindowUnits = 0
+  elecTariffNames = ''
+  gasTariffNames = ''
+  othrTariffNames = ''
+  DO iTariff = 1, numTariff
+    IF (tariff(iTariff)%isSelected) THEN
+      allTotalCost = allTotalCost + tariff(iTariff)%totalAnnualCost
+      IF (tariff(iTariff)%kindElectricMtr .GE. kindMeterElecSimple) THEN
+        IF (tariff(iTariff)%totalAnnualEnergy .GT. elecTotalEne) elecTotalEne = tariff(iTariff)%totalAnnualEnergy
+        elecTotalCost = elecTotalCost + tariff(iTariff)%totalAnnualCost
+        elecTariffNames = TRIM(elecTariffNames) // ' ' // tariff(iTariff)%tariffName
+        elecUnits = tariff(iTariff)%convChoice
+      ELSE IF (tariff(iTariff)%reportMeterIndx .EQ. gasFacilMeter) THEN
+        IF (tariff(iTariff)%totalAnnualEnergy .GT. gasTotalEne) gasTotalEne = tariff(iTariff)%totalAnnualEnergy
+        gasTotalCost = gasTotalCost + tariff(iTariff)%totalAnnualCost
+        gasTariffNames = TRIM(gasTariffNames) // ' ' // tariff(iTariff)%tariffName
+        gasUnits = tariff(iTariff)%convChoice
+        gasDemWindowUnits = tariff(iTariff)%demandWindow
+      ELSE
+        IF (tariff(iTariff)%totalAnnualEnergy .GT. otherTotalEne) otherTotalEne = tariff(iTariff)%totalAnnualEnergy
+        otherTotalCost = otherTotalCost + tariff(iTariff)%totalAnnualCost
+        othrTariffNames = TRIM(othrTariffNames) // ' ' // tariff(iTariff)%tariffName
+        othrUnits = tariff(iTariff)%convChoice
+        othrDemWindowUnits = tariff(iTariff)%demandWindow
+      END IF
+    END IF
+  END DO
+  !names of the rates
+  CALL PreDefTableEntry(pdchLeedEtsRtNm,'Electricity',elecTariffNames)
+  CALL PreDefTableEntry(pdchLeedEtsRtNm,'Natural Gas',gasTariffNames)
+  CALL PreDefTableEntry(pdchLeedEtsRtNm,'Other',othrTariffNames)
+  !virtual rate
+  IF (elecTotalEne .NE. 0) CALL PreDefTableEntry(pdchLeedEtsVirt,'Electricity',elecTotalCost/elecTotalEne,3)
+  IF (gasTotalEne .NE. 0) CALL PreDefTableEntry(pdchLeedEtsVirt,'Natural Gas',gasTotalCost/gasTotalEne,3)
+  IF (otherTotalEne .NE. 0) CALL PreDefTableEntry(pdchLeedEtsVirt,'Other',otherTotalCost/otherTotalEne,3)
+  !units
+  CALL PreDefTableEntry(pdchLeedEtsEneUnt,'Electricity',convEneStrings(elecUnits))
+  CALL PreDefTableEntry(pdchLeedEtsEneUnt,'Natural Gas',convEneStrings(gasUnits))
+  CALL PreDefTableEntry(pdchLeedEtsEneUnt,'Other',convEneStrings(othrUnits))
+  CALL PreDefTableEntry(pdchLeedEtsDemUnt,'Electricity',convDemStrings(elecUnits))
+  CALL PreDefTableEntry(pdchLeedEtsDemUnt,'Natural Gas',TRIM(convDemStrings(gasUnits)) // TRIM(demWindowStrings(gasDemWindowUnits)))
+  CALL PreDefTableEntry(pdchLeedEtsDemUnt,'Other',TRIM(convDemStrings(othrUnits)) // TRIM(demWindowStrings(othrDemWindowUnits)))
+  ! total cost
+  CALL PreDefTableEntry(pdchLeedEcsTotal,'Electricity',elecTotalCost,2)
+  CALL PreDefTableEntry(pdchLeedEcsTotal,'Natural Gas',gasTotalCost,2)
+  CALL PreDefTableEntry(pdchLeedEcsTotal,'Other',otherTotalCost,2)
+  ! save the total costs for later to compute process fraction
+  LEEDelecCostTotal = elecTotalCost
+  LEEDgasCostTotal = gasTotalCost
+  LEEDothrCostTotal = otherTotalCost
+  CALL PreDefTableEntry(pdchLeedEcsTotal,'Total',elecTotalCost + gasTotalCost + otherTotalCost,2)
+END IF
+END SUBROUTINE LEEDtariffReporting
+
+
 SUBROUTINE WriteTabularTariffReports
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
@@ -4938,7 +5091,7 @@ CHARACTER(len=MaxNameLength) :: perAreaUnitName = ''
 
 IF (numTariff .GT. 0) THEN
   econVar%isReported = .FALSE.
-  CALL selectTariff
+  !CALL selectTariff moved to the end of computeTariff.
   CALL showWarningsBasedOnTotal
   !---------------------------------
   ! Economics Results Summary Report
@@ -5628,7 +5781,9 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 INTEGER :: totalVarPt
+INTEGER :: totEneVarPt
 REAL(r64)    :: annualTotal
+REAL(r64)    :: annEneTotal
 INTEGER :: iTariff
 INTEGER :: jMonth
 INTEGER :: kTariff
@@ -5673,11 +5828,15 @@ DO iTariff = 1, numTariff
   END IF
   ! compute the total annual cost of each tariff
   totalVarPt = tariff(iTariff)%ptTotal
+  totEneVarPt = tariff(iTariff)%nativeTotalEnergy
   annualTotal = 0
+  annEneTotal = 0
   DO jMonth = 1,MaxNumMonths
     annualTotal = annualTotal + econVar(totalVarPt)%values(jMonth)
+    annEneTotal = annEneTotal + econVar(totEneVarPt)%values(jMonth)
   END DO
   tariff(iTariff)%totalAnnualCost = annualTotal
+  tariff(iTariff)%totalAnnualEnergy = annEneTotal
   ! Set the groupIndex
   IF (groupIndex(iTariff) .EQ. 0) THEN
     !set the current item to the tariff index
@@ -5876,7 +6035,7 @@ END SUBROUTINE GetMonthlyCostForResource
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

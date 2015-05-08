@@ -4,7 +4,7 @@ MODULE OutsideEnergySources
   !       AUTHOR         Dan Fisher
   !       DATE WRITTEN   Unknown
   !       MODIFIED       na
-  !       RE-ENGINEERED  Brent Griffith, Sept 2010, revised plant interactions. 
+  !       RE-ENGINEERED  Brent Griffith, Sept 2010, revised plant interactions.
 
   ! PURPOSE OF THIS MODULE:
   ! Module containing the routines dealing with the OutsideEnergySources
@@ -164,13 +164,14 @@ SUBROUTINE SimOutsideEnergy(EnergyType,EquipName,EquipFlowCtrl,CompIndex,RunFlag
 
           !CALCULATE
   IF (InitLoopEquip) THEN
+    CALL InitSimVars(EqNum,MassFlowRate,InletTemp,OutletTemp, MyLoad)
     MinCap = 0.0
     MaxCap = EnergySource(EqNum)%NomCap
     OptCap = EnergySource(EqNum)%NomCap
     RETURN
   END IF
 
-  CALL InitSimVars(EqNum,MassFlowRate,InletTemp,OutletTemp, FirstHVACIteration, MyLoad)
+  CALL InitSimVars(EqNum,MassFlowRate,InletTemp,OutletTemp, MyLoad)
   CALL SimDistrictEnergy(RunFlag,EqNum,MyLoad,MassFlowRate,InletTemp,OutletTemp)
   CALL UpdateRecords(MyLoad,EqNum,MassFlowRate,OutletTemp)
 
@@ -233,9 +234,9 @@ SUBROUTINE GetOutsideEnergySourcesInput
 
           !GET NUMBER OF ALL EQUIPMENT TYPES
   cCurrentModuleObject    = 'DistrictHeating'
-  NumDistrictUnitsHeat    = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumDistrictUnitsHeat    = GetNumObjectsFound(cCurrentModuleObject)
   cCurrentModuleObject    = 'DistrictCooling'
-  NumDistrictUnitsCool    = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumDistrictUnitsCool    = GetNumObjectsFound(cCurrentModuleObject)
   NumDistrictUnits = NumDistrictUnitsHeat + NumDistrictUnitsCool
 
   IF(ALLOCATED(EnergySource))RETURN
@@ -248,7 +249,7 @@ SUBROUTINE GetOutsideEnergySourcesInput
   EnergySourceNum = 0
   DO IndexCounter = 1 , NumDistrictUnitsHeat
     EnergySourceNum = EnergySourceNum + 1
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),EnergySourceNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,EnergySourceNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT)
 
     IF (EnergySourceNum > 1) THEN
@@ -285,17 +286,17 @@ SUBROUTINE GetOutsideEnergySourcesInput
   EnergySourceNum = 0
   DO IndexCounter = 1 , NumDistrictUnitsHeat
     EnergySourceNum = EnergySourceNum + 1
-    CALL SetupOutputVariable('District Hot Water Energy [J]',EnergySource(EnergySourceNum)%EnergyTransfer, &
+    CALL SetupOutputVariable('District Heating Hot Water Energy [J]',EnergySource(EnergySourceNum)%EnergyTransfer, &
                              'System','Sum',EnergySource(EnergySourceNum)%Name,  &
                               ResourceTypeKey='DistrictHeating',EndUseKey='Heating',GroupKey='Plant')
-    CALL SetupOutputVariable('District Hot Water Rate [W]',EnergySource(EnergySourceNum)%EnergyRate, &
+    CALL SetupOutputVariable('District Heating Hot Water Rate [W]',EnergySource(EnergySourceNum)%EnergyRate, &
                              'System','Average',EnergySource(EnergySourceNum)%Name)
 
     CALL SetupOutputVariable('District Heating Rate [W]', &
           EnergySource(EnergySourceNum)%EnergyRate,'System','Average',EnergySource(EnergySourceNum)%Name)
-    CALL SetupOutputVariable('District Heating Inlet Temp [C]', &
+    CALL SetupOutputVariable('District Heating Inlet Temperature [C]', &
           EnergySourceReport(EnergySourceNum)%InletTemp,'System','Average',EnergySource(EnergySourceNum)%Name)
-    CALL SetupOutputVariable('District Heating Outlet Temp [C]', &
+    CALL SetupOutputVariable('District Heating Outlet Temperature [C]', &
           EnergySourceReport(EnergySourceNum)%OutletTemp,'System','Average',EnergySource(EnergySourceNum)%Name)
     CALL SetupOutputVariable('District Heating Mass Flow Rate [kg/s]', &
           EnergySourceReport(EnergySourceNum)%MassFlowRate,'System','Average',EnergySource(EnergySourceNum)%Name)
@@ -306,7 +307,7 @@ SUBROUTINE GetOutsideEnergySourcesInput
   EnergySourceNum = NumDistrictUnitsHeat !To initialize counter
   DO IndexCounter = 1 , NumDistrictUnitsCool
     EnergySourceNum = EnergySourceNum + 1
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),IndexCounter,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,IndexCounter,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT)
 
     IF (EnergySourceNum > 1) THEN
@@ -343,17 +344,17 @@ SUBROUTINE GetOutsideEnergySourcesInput
   EnergySourceNum = NumDistrictUnitsHeat !To initialize counter
   DO IndexCounter = 1 , NumDistrictUnitsCool
     EnergySourceNum = EnergySourceNum + 1
-    CALL SetupOutputVariable('District Chilled Water Energy [J]',EnergySource(EnergySourceNum)%EnergyTransfer, &
+    CALL SetupOutputVariable('District Cooling Chilled Water Energy [J]',EnergySource(EnergySourceNum)%EnergyTransfer, &
                              'System','Sum',EnergySource(EnergySourceNum)%Name,  &
                               ResourceTypeKey='DistrictCooling',EndUseKey='Cooling',GroupKey='Plant')
-    CALL SetupOutputVariable('District Chilled Water Rate [W]',EnergySource(EnergySourceNum)%EnergyRate, &
+    CALL SetupOutputVariable('District Cooling Chilled Water Rate [W]',EnergySource(EnergySourceNum)%EnergyRate, &
                              'System','Average',EnergySource(EnergySourceNum)%Name)
 
     CALL SetupOutputVariable('District Cooling Rate [W]', &
           EnergySource(EnergySourceNum)%EnergyRate,'System','Average',EnergySource(EnergySourceNum)%Name)
-    CALL SetupOutputVariable('District Cooling Inlet Temp [C]', &
+    CALL SetupOutputVariable('District Cooling Inlet Temperature [C]', &
           EnergySourceReport(EnergySourceNum)%InletTemp,'System','Average',EnergySource(EnergySourceNum)%Name)
-    CALL SetupOutputVariable('District Cooling Outlet Temp [C]', &
+    CALL SetupOutputVariable('District Cooling Outlet Temperature [C]', &
           EnergySourceReport(EnergySourceNum)%OutletTemp,'System','Average',EnergySource(EnergySourceNum)%Name)
     CALL SetupOutputVariable('District Cooling Mass Flow Rate [kg/s]', &
           EnergySourceReport(EnergySourceNum)%MassFlowRate,'System','Average',EnergySource(EnergySourceNum)%Name)
@@ -369,7 +370,7 @@ END SUBROUTINE GetOutsideEnergySourcesInput
 ! Beginning Initialization Section of the OutsideEnergySources Module
 !******************************************************************************
 
-SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstHVACIteration, MyLoad)
+SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, MyLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR:          Dan Fisher
@@ -383,13 +384,13 @@ SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstH
           ! METHODOLOGY EMPLOYED:
           ! One time inits include validating source type (should happen in getinput?) and locating this
           !  component on the PlantLoop topology.
-          ! The mass flow rate is determined based on component load, and making use of 
+          ! The mass flow rate is determined based on component load, and making use of
           !  the SetComponentFlowRate routine.
           ! The mass flow rate could be an inter-connected-loop side trigger. This is not really the type of
           !  interconnect that that routine was written for, but it is the clearest example of using it.
 
           ! USE STATEMENTS:
-  USE PlantUtilities, ONLY: SetComponentFlowRate, InitComponentNodes
+  USE PlantUtilities, ONLY: SetComponentFlowRate, InitComponentNodes, RegisterPlantCompDesignFlow
   USE DataGlobals,    ONLY: BeginEnvrnFlag
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -399,7 +400,6 @@ SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstH
   REAL(r64), INTENT(INOUT) :: MassFlowRate
   REAL(r64), INTENT(INOUT) :: InletTemp
   REAL(r64), INTENT(INOUT) :: OutletTemp
-  LOGICAL,   INTENT(IN)    :: FirstHVACIteration
   REAL(r64), INTENT(IN)    :: MyLoad
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -444,10 +444,13 @@ SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstH
     PlantLoop(EnergySource(EnergySourceNum)%LoopNum)%LoopSide(EnergySource(EnergySourceNum)%LoopSideNum)%&
       Branch(EnergySource(EnergySourceNum)%BranchNum)%Comp(EnergySource(EnergySourceNum)%CompNum)%&
         MaxOutletTemp = PlantLoop(EnergySource(EnergySourceNum)%LoopNum)%MaxTemp
+    ! Register design flow rate for inlet node (helps to autosize comp setpoint op scheme flows
+    CALL RegisterPlantCompDesignFlow(EnergySource(EnergySourceNum)%InletNodeNum, &
+                                 PlantLoop(EnergySource(EnergySourceNum)%LoopNum)%MaxVolFlowRate)
 
     EnergySource(EnergySourceNum)%OneTimeInitFlag=.FALSE.
   ENDIF
-  
+
   !begin environment inits
   IF (BeginEnvrnFlag .AND. EnergySource(EnergySourceNum)%BeginEnvrnInitFlag) THEN
     ! component model has not design flow rates, using data for overall plant loop
@@ -459,10 +462,10 @@ SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstH
                              EnergySource(EnergySourceNum)%LoopSideNum, &
                              EnergySource(EnergySourceNum)%BranchNum, &
                              EnergySource(EnergySourceNum)%CompNum)
-    EnergySource(EnergySourceNum)%BeginEnvrnInitFlag = .FALSE. 
+    EnergySource(EnergySourceNum)%BeginEnvrnInitFlag = .FALSE.
   ENDIF
-  IF (.NOT. BeginEnvrnFlag) EnergySource(EnergySourceNum)%BeginEnvrnInitFlag = .TRUE. 
-  
+  IF (.NOT. BeginEnvrnFlag) EnergySource(EnergySourceNum)%BeginEnvrnInitFlag = .TRUE.
+
   ! now do everytime inits
   InletNode   = EnergySource(EnergySourceNum)%InletNodeNum
   OutletNode  = EnergySource(EnergySourceNum)%OutletNodeNum
@@ -473,15 +476,10 @@ SUBROUTINE InitSimVars(EnergySourceNum,MassFlowRate,InletTemp,OutletTemp, FirstH
   BranchIndex = EnergySource(EnergySourceNum)%BranchNum
   CompIndex   = EnergySource(EnergySourceNum)%CompNum
 
-  ! determine the flow to request, hold in temporary variable
-  IF (FirstHVACIteration) THEN
-    IF (ABS(MyLoad) > 0.d0) THEN 
-      TempPlantMdot = PlantLoop(LoopNum)%MaxMassFlowRate
-    ELSE
-      TempPlantMdot = 0.d0 ! expect no flow needed
-    ENDIF
+  IF (ABS(MyLoad) > 0.d0) THEN
+    TempPlantMdot = PlantLoop(LoopNum)%MaxMassFlowRate
   ELSE
-   TempPlantMdot = EnergySourceReport(EnergySourceNum)%MassFlowRate ! last value 
+    TempPlantMdot = 0.d0 ! expect no flow needed
   ENDIF
 
   ! get actual mass flow to use, hold in MassFlowRate variable
@@ -559,13 +557,13 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
   CompIndex   = EnergySource(DistrictEqNum)%CompNum
   LoopMinTemp = PlantLoop(loopNum)%MinTemp
   LoopMaxTemp = PlantLoop(loopNum)%MaxTemp
-  
+
   Cp = GetSpecificHeatGlycol(PlantLoop(loopNum)%FluidName,InletTemp,PlantLoop(loopNum)%FluidIndex,'SimDistrictEnergy')
 
 !  apply power limit from input
   IF ( ABS(MyLoad)  > EnergySource(DistrictEqNum)%NomCap) THEN
     MyLoad = SIGN(EnergySource(DistrictEqNum)%NomCap, MyLoad)
-  ENDIF 
+  ENDIF
 
   IF (EnergySource(DistrictEqNum)%EnergyType == EnergyType_DistrictCooling) THEN
     IF ( MyLoad > 0.d0 ) MyLoad = 0.d0
@@ -579,11 +577,11 @@ SUBROUTINE  SimDistrictEnergy(RunFlag,DistrictEqNum,MyLoad,MassFlowRate, InletTe
     !apply loop limits on temperature result to keep in check
     OutletTemp = MAX(OutletTemp, LoopMinTemp)
     OutletTemp = MIN(OutletTemp, LoopMaxTemp)
-    
+
   ELSE
     OutletTemp = InletTemp
     MyLoad = 0.d0
-  ENDIF 
+  ENDIF
 
   RETURN
 END SUBROUTINE SimDistrictEnergy
@@ -638,7 +636,7 @@ SUBROUTINE UpdateRecords(MyLoad,EqNum,MassFlowRate,OutletTemp)
           !set inlet and outlet nodes
   InletNode                              = EnergySource(EqNum)%InletNodeNum
   OutletNode                             = EnergySource(EqNum)%OutletNodeNum
-  Node(OutletNode)%Temp                  = OutletTemp 
+  Node(OutletNode)%Temp                  = OutletTemp
   EnergySourceReport(EqNum)%MassFlowRate = MassFlowRate
   EnergySourceReport(EqNum)%InletTemp    = Node(InletNode)%Temp
   EnergySourceReport(EqNum)%OutletTemp   = OutletTemp
@@ -653,7 +651,7 @@ END SUBROUTINE UpdateRecords
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

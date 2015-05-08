@@ -297,7 +297,7 @@ CONTAINS
 
     cCurrentModuleObject = cCMO_BBRadiator_Water
 
-    NumConvHWBaseboards = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumConvHWBaseboards = GetNumObjectsFound(cCurrentModuleObject)
 
     ! Calculate total number of baseboard units
     NumBaseboards = NumConvHWBaseboards
@@ -310,7 +310,7 @@ CONTAINS
       BaseBoardNum=0
       DO ConvHWBaseboardNum = 1,  NumConvHWBaseboards
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),ConvHWBaseboardNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+        CALL GetObjectItem(cCurrentModuleObject,ConvHWBaseboardNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -329,17 +329,16 @@ CONTAINS
         Baseboard(BaseboardNum)%EquipID   = cAlphaArgs(1) ! name of this baseboard
         Baseboard(BaseboardNum)%EquipType = TypeOf_Baseboard_Conv_Water
         Baseboard(BaseboardNum)%Schedule  = cAlphaArgs(2)
-        Baseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-        IF (Baseboard(BaseboardNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                  ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
+        IF (lAlphaFieldBlanks(2)) THEN
+          Baseboard(BaseboardNum)%SchedPtr  = ScheduleAlwaysOn
+        ELSE
+          Baseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+          IF (Baseboard(BaseboardNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                                   ' entered ='//TRIM(cAlphaArgs(2))// &
                                   ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
         ENDIF
         ! get inlet node number
         Baseboard(BaseboardNum)%WaterInletNode  = &
@@ -372,33 +371,33 @@ CONTAINS
 
       ! Setup Report variables for the unit
       ! CurrentModuleObject='ZoneHVAC:Baseboard:Convective:Water'
-      CALL SetupOutputVariable('Baseboard Heating Energy[J]', Baseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Total Heating Energy [J]', Baseboard(BaseboardNum)%Energy, &
                                'System','Sum',Baseboard(BaseboardNum)%EquipID, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BASEBOARD',GroupKey='System')
 
-      CALL SetupOutputVariable('Baseboard Hot Water Consumption[J]', Baseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Hot Water Energy [J]', Baseboard(BaseboardNum)%Energy, &
                                'System','Sum',Baseboard(BaseboardNum)%EquipID, &
                                ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='BASEBOARD',GroupKey='System')
 
-      CALL SetupOutputVariable('Baseboard Heating Rate[W]', Baseboard(BaseboardNum)%Power, &
+      CALL SetupOutputVariable('Baseboard Total Heating Rate [W]', Baseboard(BaseboardNum)%Power, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Water Mass Flow Rate[kg/s]', Baseboard(BaseboardNum)%WaterMassFlowRate, &
+      CALL SetupOutputVariable('Baseboard Hot Water Mass Flow Rate [kg/s]', Baseboard(BaseboardNum)%WaterMassFlowRate, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Air Mass Flow Rate[kg/s]', Baseboard(BaseboardNum)%AirMassFlowRate, &
+      CALL SetupOutputVariable('Baseboard Air Mass Flow Rate [kg/s]', Baseboard(BaseboardNum)%AirMassFlowRate, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Air Inlet Temperature[C]', Baseboard(BaseboardNum)%AirInletTemp, &
+      CALL SetupOutputVariable('Baseboard Air Inlet Temperature [C]', Baseboard(BaseboardNum)%AirInletTemp, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Air Outlet Temperature[C]', Baseboard(BaseboardNum)%AirOutletTemp, &
+      CALL SetupOutputVariable('Baseboard Air Outlet Temperature [C]', Baseboard(BaseboardNum)%AirOutletTemp, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Water Inlet Temperature[C]', Baseboard(BaseboardNum)%WaterInletTemp, &
+      CALL SetupOutputVariable('Baseboard Water Inlet Temperature [C]', Baseboard(BaseboardNum)%WaterInletTemp, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
 
-      CALL SetupOutputVariable('Baseboard Water Outlet Temperature[C]', Baseboard(BaseboardNum)%WaterOutletTemp, &
+      CALL SetupOutputVariable('Baseboard Water Outlet Temperature [C]', Baseboard(BaseboardNum)%WaterOutletTemp, &
                                'System','Average',Baseboard(BaseboardNum)%EquipID)
     END DO
 
@@ -1372,7 +1371,7 @@ CONTAINS
 
     cCurrentModuleObject = cCMO_BBRadiator_Electric
 
-    NumConvElecBaseboards = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumConvElecBaseboards = GetNumObjectsFound(cCurrentModuleObject)
 
     ! Calculate total number of baseboard units
     NumBaseboards = NumConvElecBaseboards
@@ -1385,7 +1384,7 @@ CONTAINS
       BaseBoardNum=0
       DO ConvElecBBNum = 1,  NumConvElecBaseboards
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),ConvElecBBNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+        CALL GetObjectItem(cCurrentModuleObject,ConvElecBBNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1402,19 +1401,18 @@ CONTAINS
         ENDIF
         BaseboardNum = BaseboardNum + 1
         Baseboard(BaseboardNum)%EquipName = cAlphaArgs(1) ! name of this baseboard
-        Baseboard(BaseboardNum)%EquipType = MakeUPPERCase(TRIM(cCurrentModuleObject)) ! the type of baseboard-rename change
+        Baseboard(BaseboardNum)%EquipType = MakeUPPERCase(cCurrentModuleObject) ! the type of baseboard-rename change
         Baseboard(BaseboardNum)%Schedule = cAlphaArgs(2)
-        Baseboard(BaseboardNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        IF (Baseboard(BaseboardNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                  ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
+        IF (lAlphaFieldBlanks(2)) THEN
+          Baseboard(BaseboardNum)%SchedPtr = ScheduleAlwaysOn
+        ELSE
+          Baseboard(BaseboardNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          IF (Baseboard(BaseboardNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                                   ' entered ='//TRIM(cAlphaArgs(2))// &
                                   ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
         ENDIF
         ! get inlet node number
         Baseboard(BaseboardNum)%NominalCapacity      = rNumericArgs(1)
@@ -1430,18 +1428,18 @@ CONTAINS
 
       ! Setup Report variables for the Electric BaseBoards
       ! CurrentModuleObject='ZoneHVAC:Baseboard:Convective:Electric'
-      CALL SetupOutputVariable('Baseboard Heating Energy[J]', Baseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Total Heating Energy [J]', Baseboard(BaseboardNum)%Energy, &
                                'System','Sum',Baseboard(BaseboardNum)%EquipName, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BASEBOARD',GroupKey='System')
 
-      CALL SetupOutputVariable('Baseboard Heating Rate[W]', Baseboard(BaseboardNum)%Power, &
+      CALL SetupOutputVariable('Baseboard Total Heating Rate [W]', Baseboard(BaseboardNum)%Power, &
                                'System','Average',Baseboard(BaseboardNum)%EquipName)
 
-      CALL SetupOutputVariable('BaseBoard Electric Consumption [J]',Baseboard(BaseboardNum)%ElecUseLoad, &
+      CALL SetupOutputVariable('Baseboard Electric Energy [J]',Baseboard(BaseboardNum)%ElecUseLoad, &
                               'System','Sum',Baseboard(BaseboardNum)%EquipName,  &
                                ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
 
-      CALL SetupOutputVariable('BaseBoard Electric Power [W]',Baseboard(BaseboardNum)%ElecUseRate, &
+      CALL SetupOutputVariable('Baseboard Electric Power [W]',Baseboard(BaseboardNum)%ElecUseRate, &
                               'System','Average',Baseboard(BaseboardNum)%EquipName)
 
     END DO
@@ -1616,6 +1614,7 @@ SUBROUTINE SimElectricConvective(BaseboardNum, LoadMet)
 !unused0909    USE DataEnvironment, ONLY: OutBaroPress
     USE DataLoopNode,   ONLY: Node
     USE Psychrometrics, ONLY: PsyCpAirFnWTdb
+    USE DataHVACGlobals, ONLY: SmallLoad
 
     IMPLICIT NONE
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1652,7 +1651,7 @@ SUBROUTINE SimElectricConvective(BaseboardNum, LoadMet)
 
 
     IF (GetCurrentScheduleValue(Baseboard(BaseboardNum)%SchedPtr) .GT. 0.0 .and.  &
-        LoadMet >= 0.0) THEN
+        LoadMet >= SmallLoad) THEN
 
       ! if the load exceeds the capacity than the capacity is set to the BB limit.
       IF(LoadMet > Baseboard(BaseboardNum)%NominalCapacity) Then
@@ -1727,7 +1726,7 @@ END MODULE BaseboardElectric
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

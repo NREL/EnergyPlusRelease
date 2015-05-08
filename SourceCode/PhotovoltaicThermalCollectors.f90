@@ -309,11 +309,11 @@ SUBROUTINE GetPVTcollectorsInput
 
   ! first load the performance object info into temporary structure
   cCurrentModuleObject = 'SolarCollectorPerformance:PhotovoltaicThermal:Simple'
-  NumSimplePVTPerform = GetNumObjectsFound( TRIM(cCurrentModuleObject) )
+  NumSimplePVTPerform = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumSimplePVTPerform > 0) Then
     Allocate(tmpSimplePVTperf(NumSimplePVTPerform))
     DO Item=1, NumSimplePVTPerform
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNumbers,IOStatus, AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK=.false.
@@ -353,13 +353,13 @@ SUBROUTINE GetPVTcollectorsInput
 
   ! now get main PVT objects
   cCurrentModuleObject = 'SolarCollector:FlatPlate:PhotovoltaicThermal'
-  NumPVT              = GetNumObjectsFound( TRIM(cCurrentModuleObject) )
+  NumPVT              = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(PVT(NumPVT))
   ALLOCATE(CheckEquipName(NumPVT))
   CheckEquipName=.true.
 
   DO Item=1, NumPVT
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNumbers,IOStatus, AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     !check name
@@ -509,25 +509,25 @@ SUBROUTINE GetPVTcollectorsInput
    ! electrical production reporting under generator:photovoltaic....
    !    only thermal side reported here,
 
-    CALL SetupOutputVariable('Generator Thermal Power Produced [W]', &
+    CALL SetupOutputVariable('Generator Produced Thermal Rate [W]', &
          PVT(Item)%Report%ThermPower, 'System', 'Average', PVT(Item)%name )
     IF (PVT(Item)%WorkingFluidType == LiquidWorkingFluid) THEN
-      CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+      CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
            PVT(Item)%Report%ThermEnergy, 'System', 'Sum', PVT(Item)%name , &
            ResourceTypeKey='SolarWater', EndUseKey='HeatProduced', GroupKey='Plant')
     ELSEIF (PVT(Item)%WorkingFluidType == AirWorkingFluid) THEN
-      CALL SetupOutputVariable('Generator Thermal Energy Produced [J]', &
+      CALL SetupOutputVariable('Generator Produced Thermal Energy [J]', &
            PVT(Item)%Report%ThermEnergy, 'System', 'Sum', PVT(Item)%name , &
            ResourceTypeKey='SolarAir', EndUseKey='HeatProduced', GroupKey='System')
-      CALL SetupOutputVariable('PVT Bypass Status []', &
+      CALL SetupOutputVariable('Generator PVT Fluid Bypass Status []', &
            PVT(Item)%Report%BypassStatus, 'System', 'Average', PVT(Item)%name )
     ENDIF
 
-    CALL SetupOutputVariable('PVT Working Fluid Inlet Temperature [C]', &
+    CALL SetupOutputVariable('Generator PVT Fluid Inlet Temperature [C]', &
            PVT(Item)%Report%TinletWorkFluid, 'System', 'Average', PVT(Item)%name )
-    CALL SetupOutputVariable('PVT Working Fluid Outlet Temperature [C]', &
+    CALL SetupOutputVariable('Generator PVT Fluid Outlet Temperature [C]', &
            PVT(Item)%Report%ToutletWorkFluid, 'System', 'Average', PVT(Item)%name )
-    CALL SetupOutputVariable('PVT Working Fluid Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Generator PVT Fluid Mass Flow Rate [kg/s]', &
            PVT(Item)%Report%MdotWorkFluid, 'System', 'Average', PVT(Item)%name )
   ENDDO
 
@@ -700,8 +700,8 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
     PVT(PVTnum)%Report%TinletWorkFluid       = 0.d0
     PVT(PVTnum)%Report%ToutletWorkFluid      = 0.d0
     PVT(PVTnum)%Report%BypassStatus          = 0.d0
-    
-    
+
+
     SELECT CASE (PVT(PVTnum)% WorkingFluidType)
 
     CASE (LiquidWorkingFluid)
@@ -737,13 +737,13 @@ SUBROUTINE InitPVTcollectors(PVTnum, FirstHVACIteration)
     ! heating only right now, so control flow requests based on incident solar
     SurfNum  = PVT(PVTnum)%SurfNum
     IF (QRadSWOutIncident(SurfNum) > MinIrradiance) THEN
-      IF (FirstHVACIteration) THEN
+      !IF (FirstHVACIteration) THEN
         PVT(PVTnum)%MassFlowRate        = PVT(PVTnum)%MaxMassFlowRate  !DSU
-      ENDIF
+      !ENDIF
     ELSE
-      IF (FirstHVACIteration) THEN
+      !IF (FirstHVACIteration) THEN
         PVT(PVTnum)%MassFlowRate        = 0.0D0  !DSU
-      ENDIF
+      !ENDIF
     ENDIF
     ! Should we declare a mass flow rate variable in the data structure instead of using node(outlet)%massflowrate ?  DSU
     CALL SetComponentFlowRate( PVT(PVTnum)%MassFlowRate,InletNode,OutletNode, &     !DSU
@@ -1216,7 +1216,7 @@ SUBROUTINE CalcPVTcollectors(PVTnum)
       PVT(PVTnum)%Report%BypassStatus     = 1.0D0
       PVT(PVTnum)%Report%MdotWorkFluid    = mdot
 
-    ELSE 
+    ELSE
       PVT(PVTnum)%Report%TinletWorkFluid  = Tinlet
       PVT(PVTnum)%Report%ToutletWorkFluid = Tinlet
       PVT(PVTnum)%Report%ThermHeatLoss    = 0.0D0
@@ -1369,7 +1369,7 @@ END SUBROUTINE GetPVTThermalPowerProduction
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

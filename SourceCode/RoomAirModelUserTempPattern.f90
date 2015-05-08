@@ -572,7 +572,7 @@ SUBROUTINE FigureTwoGradInterpPattern(PattrnID, ZoneNum)
   ENDIF
 
   IF (SetupOutputFlag(ZoneNum)) THEN
-    CALL SetupOutputVariable('Room Air Vertical Temperature Gradient [C/m]', &
+    CALL SetupOutputVariable('Room Air Zone Vertical Temperature Gradient [K/m]', &
                               AirPatternZoneInfo(ZoneNum)%Gradient,'HVAC','State',&
                               AirPatternZoneInfo(ZoneNum)%ZoneName)
 
@@ -1113,7 +1113,7 @@ END SUBROUTINE FigureConstGradPattern
        IF (MassFlowRA > 0) THEN
          CALL SumAllReturnAirLatentGains(ZoneNum, SumRetAirLatentGainRate)
          Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat + (SumRetAirLatentGainRate / &
-                                 (H2OHtOfVap * MassFlowRA * RhoAir))
+                                 (H2OHtOfVap * MassFlowRA))
        ELSE
        ! If no mass flow rate exists, include the latent HVAC case credit with the latent Zone case credit
          Node(ReturnNode)%HumRat = Node(ZoneNode)%HumRat
@@ -1163,7 +1163,7 @@ END SUBROUTINE SetSurfHBDataForTempDistModel
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

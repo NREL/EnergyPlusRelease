@@ -148,11 +148,11 @@ SUBROUTINE SimPipes(CompType,PipeName,CompIndex, MaxVolFlowRate,InitLoopEquip,Fi
   IF(LocalPipe(PipeNum)%OneTimeInit) THEN
     FoundOnLoop = 0
     errFlag=.false.
-    CALL ScanPlantLoopsForObject(LocalPipe(PipeNum)%Name, &  
-                                 CompType, &  
-                                 LocalPipe(PipeNum)%LoopNum, &  
-                                 LocalPipe(PipeNum)%LoopSide, &   
-                                 LocalPipe(PipeNum)%BranchIndex, &   
+    CALL ScanPlantLoopsForObject(LocalPipe(PipeNum)%Name, &
+                                 CompType, &
+                                 LocalPipe(PipeNum)%LoopNum, &
+                                 LocalPipe(PipeNum)%LoopSide, &
+                                 LocalPipe(PipeNum)%BranchIndex, &
                                  LocalPipe(PipeNum)%CompIndex, &
                                  CountMatchPlantLoops = FoundOnLoop,  &
                                  errFlag=errFlag)
@@ -169,15 +169,15 @@ SUBROUTINE SimPipes(CompType,PipeName,CompIndex, MaxVolFlowRate,InitLoopEquip,Fi
     CALL InitComponentNodes( 0.d0, PlantLoop(LocalPipe(PipeNum)%LoopNum)%MaxMassFlowRate, &
                                  LocalPipe(PipeNum)%InletNodeNum, &
                                  LocalPipe(PipeNum)%OutletNodeNum, &
-                                 LocalPipe(PipeNum)%LoopNum, & 
-                                 LocalPipe(PipeNum)%LoopSide, &   
+                                 LocalPipe(PipeNum)%LoopNum, &
+                                 LocalPipe(PipeNum)%LoopSide, &
                                  LocalPipe(PipeNum)%BranchIndex, &
                                  LocalPipe(PipeNum)%CompIndex)
     LocalPipe(PipeNum)%EnvrnFlag = .FALSE.
   ENDIF
-  
+
   IF (.NOT. BeginEnvrnFlag) LocalPipe(PipeNum)%EnvrnFlag = .TRUE.
-  
+
   CALL SafeCopyPlantNode(LocalPipe(PipeNum)%InletNodeNum, &
                          LocalPipe(PipeNum)%OutletNodeNum, LocalPipe(PipeNum)%LoopNum )
 !  Node(LocalPipe(PipeNum)%OutletNodeNum)%FluidType            = Node(LocalPipe(PipeNum)%InletNodeNum)%FluidType
@@ -270,7 +270,7 @@ SUBROUTINE GetPipeInput
   cCurrentModuleObject = 'Pipe:Adiabatic'
   DO PipeWaterNum = 1 , NumWaterPipes
      PipeNum=PipeWaterNum
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeWaterNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,PipeWaterNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT)
 
     IsNotOK=.false.
@@ -297,7 +297,7 @@ SUBROUTINE GetPipeInput
 
   DO PipeSteamNum = 1 , NumSteamPipes
     PipeNum=PipeNum+1
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeSteamNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,PipeSteamNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT)
 
     IsNotOK=.false.
@@ -418,7 +418,7 @@ END SUBROUTINE InitializePipes
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

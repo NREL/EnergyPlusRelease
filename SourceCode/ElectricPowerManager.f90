@@ -28,7 +28,7 @@ MODULE ManageElectricPower
           ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals,         ONLY : MaxNameLength, NumOfTimeStepInHour, TimeStepZone, SecInHour
+USE DataGlobals,         ONLY : MaxNameLength, NumOfTimeStepInHour, TimeStepZone, SecInHour, ScheduleAlwaysOn
 USE DataInterfaces,      ONLY : ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, &
                                 ShowRecurringSevereErrorAtEnd
 USE DataHVACGlobals,     ONLY : TimeStepSys
@@ -71,7 +71,8 @@ PRIVATE
  INTEGER, PARAMETER :: LossesMethod          = 521 ! Transformer performance input methos: RatedLosses
  INTEGER, PARAMETER :: EfficiencyMethod      = 522 ! Transformer performance input methos: NominalEfficiency
 
- LOGICAL            :: GetInput = .TRUE.   ! When TRUE, calls subroutine to read input file.
+ INTEGER, PARAMETER :: Battery_LifeCalculation_Yes = 1
+ INTEGER, PARAMETER :: Battery_LifeCalculation_No  = 2
 
           ! DERIVED TYPE DEFINITIONS:
 TYPE GenData
@@ -223,7 +224,15 @@ TYPE, PUBLIC :: ElecStorageDataStruct
   REAL(r64)                    :: ThisTimeStepAvailable     = 0.0D0 ! [Ah] available charge at the current timestep
   REAL(r64)                    :: ThisTimeStepBound         = 0.0D0 ! [Ah] bound charge at the current timestep
   REAL(r64)                    :: LastTimeStepAvailable     = 0.0D0 ! [Ah] available charge at the previous timestep
-  REAL(r64)                    :: LastTimeStepBound         = 0.0D0 ! [Ah] bound charge at the current timestep
+  REAL(r64)                    :: LastTimeStepBound         = 0.0D0 ! [Ah] bound charge at the previous timestep
+  REAL(r64)                    :: LastTwoTimeStepAvailable  = 0.0D0 ! [Ah] available charge at the previous two timesteps
+  REAL(r64)                    :: LastTwoTimeStepBound      = 0.0D0 ! [Ah] bound charge at the previous two timesteps
+  !battery life calculation variables
+  INTEGER                      :: count0                    = 0
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: B10
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: X0
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: Nmb0
+  REAL(r64), DIMENSION(:), ALLOCATABLE :: OneNmb0
   !report
   REAL(r64)                    :: ElectEnergyinStorage      = 0.0D0 ! [J] state of charge
   REAL(r64)                    :: StoredPower               = 0.0D0 ! [W]
@@ -313,6 +322,7 @@ end type WholeBuildingElectricPowerSummary
 
 
           ! MODULE VARIABLE DECLARATIONS:
+LOGICAL,SAVE    :: GetInput = .TRUE.   ! When TRUE, calls subroutine to read input file.
 INTEGER :: NumLoadCenters         =0
 INTEGER :: NumInverters           =0
 INTEGER, PUBLIC :: NumElecStorageDevices  =0
@@ -1163,10 +1173,10 @@ SUBROUTINE GetPowerManagerInput
                              IntGainTypeOf_ElectricLoadCenterStorageSimple, &
                              IntGainTypeOf_ElectricLoadCenterStorageBattery, &
                              IntGainTypeOf_ElectricLoadCenterTransformer
-  USE DataGlobals    , ONLY: NumOfZones, AnyEnergyManagementSystemInModel
+  USE DataGlobals    , ONLY: NumOfZones, AnyEnergyManagementSystemInModel, ScheduleAlwaysOn
   USE DataInterfaces
   USE General,         ONLY: RoundSigDigits
-
+  USE OutputReportPredefined
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1223,6 +1233,8 @@ SUBROUTINE GetPowerManagerInput
   INTEGER  :: NumWiredMeters      !Number of electric meters wired to a transformer
   INTEGER  :: LCofTransformer     !Index of load center served by a transformer
   INTEGER  :: LoopCount           !loop counter
+  REAL(r64) :: pvTotalCapacity = 0    ! for LEED report
+  REAL(r64) :: windTotalCapacity = 0   ! for LEED report
 
   NumAlphaBeforeMeter   = 7       !Hard coded. Changes might be needed if the transformer input structure gets changed
   LCofTransformer       = 0
@@ -1243,7 +1255,7 @@ SUBROUTINE GetPowerManagerInput
     If (NumofCECinverters > 0) Then
       cCurrentModuleObject = 'ElectricLoadCenter:Inverter:LookUpTable'
       Do InvertNum = 1, NumofCECinverters
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),InvertNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,InvertNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
@@ -1257,11 +1269,15 @@ SUBROUTINE GetPowerManagerInput
         Inverter(InvertNum)%name = cAlphaArgs(1)
         Inverter(InvertNum)%ModelType = CECLookUpTableModel
 
-        Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          ErrorsFound=.true.
+        IF (lAlphaFieldBlanks(2)) THEN
+          Inverter(InvertNum)%AvailSchedPtr = ScheduleAlwaysOn
+        ELSE
+          Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
         Inverter(InvertNum)%ZoneNum = FindItemInList(cAlphaArgs(3), Zone%Name, NumOfZones)
@@ -1296,7 +1312,7 @@ SUBROUTINE GetPowerManagerInput
     IF (NumofCurveInverters >0) THEN
       cCurrentModuleObject = 'ElectricLoadCenter:Inverter:FunctionOfPower'
       Do InvertNum = NumofCECinverters + 1, NumofCECinverters + NumofCurveInverters
-        Call GetObjectItem(TRIM(cCurrentModuleObject),InvertNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,InvertNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
@@ -1310,11 +1326,15 @@ SUBROUTINE GetPowerManagerInput
         Inverter(InvertNum)%ModelType = CurveFuncOfPower
         Inverter(InvertNum)%Name = cAlphaArgs(1)
 
-        Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          ErrorsFound=.true.
+        IF (lAlphaFieldBlanks(2)) THEN
+          Inverter(InvertNum)%AvailSchedPtr = ScheduleAlwaysOn
+        ELSE
+          Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
         Inverter(InvertNum)%ZoneNum = FindItemInList(cAlphaArgs(3), Zone%Name, NumOfZones)
@@ -1351,7 +1371,7 @@ SUBROUTINE GetPowerManagerInput
     IF (NumofSimpleInverters > 0) THEN
       cCurrentModuleObject = 'ElectricLoadCenter:Inverter:Simple'
       DO InvertNum = NumofCECinverters + NumofCurveInverters +1, NumInverters
-        Call GetObjectItem(TRIM(cCurrentModuleObject),InvertNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,InvertNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK = .false.
@@ -1365,11 +1385,15 @@ SUBROUTINE GetPowerManagerInput
         Inverter(InvertNum)%Name = Trim(cAlphaArgs(1))
         Inverter(InvertNum)%ModelType = SimpleConstantEff
 
-        Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          ErrorsFound=.true.
+        IF (lAlphaFieldBlanks(2)) THEN
+          Inverter(InvertNum)%AvailSchedPtr = ScheduleAlwaysOn
+        ELSE
+          Inverter(InvertNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          If ( Inverter(InvertNum)%AvailSchedPtr == 0 ) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
         Inverter(InvertNum)%ZoneNum = FindItemInList(cAlphaArgs(3), Zone%Name, NumOfZones)
@@ -1391,24 +1415,24 @@ SUBROUTINE GetPowerManagerInput
 
     !setup reports for all inverters
     Do InvertNum = 1, NumInverters
-      Call SetupOutputVariable('Inverter DC to AC Efficiency [ ]', &
+      Call SetupOutputVariable('Inverter DC to AC Efficiency []', &
            Inverter(InvertNum)%Efficiency, 'System', 'Average', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter DC Power Input [W]', &
+      Call SetupOutputVariable('Inverter DC Input Electric Power [W]', &
            Inverter(InvertNum)%DCPowerIn, 'System', 'Average', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter DC Energy Input [J]', &
+      Call SetupOutputVariable('Inverter DC Input Electric Energy [J]', &
            Inverter(InvertNum)%DCEnergyIn, 'System', 'Sum', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter AC Power Output [W]', &
+      Call SetupOutputVariable('Inverter AC Output Electric Power [W]', &
            Inverter(InvertNum)%ACPowerOut, 'System', 'Average', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter AC Energy Output [J]', &
+      Call SetupOutputVariable('Inverter AC Output Electric Energy [J]', &
            Inverter(InvertNum)%ACEnergyOut, 'System', 'Sum', Inverter(InvertNum)%Name , &
            ResourceTypeKey='ElectricityProduced',EndUseKey='Photovoltaics',GroupKey='Plant') ! right now PV is the only DC source
       Call SetupOutputVariable('Inverter Thermal Loss Rate [W]', &
            Inverter(InvertNum)%ThermLossRate, 'System', 'Average', Inverter(InvertNum)%Name )
       Call SetupOutputVariable('Inverter Thermal Loss Energy [J]', &
            Inverter(InvertNum)%ThermLossEnergy, 'System', 'Sum', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter Ancillary AC Consumed Rate [W]', &
+      Call SetupOutputVariable('Inverter Ancillary AC Electric Power [W]', &
            Inverter(InvertNum)%AncillACuseRate , 'System', 'Average', Inverter(InvertNum)%Name )
-      Call SetupOutputVariable('Inverter Ancillary AC Consumed Energy [J]', &
+      Call SetupOutputVariable('Inverter Ancillary AC Electric Energy [J]', &
            Inverter(InvertNum)%AncillACuseEnergy , 'System', 'Sum', Inverter(InvertNum)%Name , &
            ResourceTypeKey='Electricity',EndUseKey='Cogeneration',GroupKey='Plant') ! called cogeneration for end use table
       IF (Inverter(InvertNum)%ZoneNum > 0) THEN
@@ -1452,7 +1476,7 @@ SUBROUTINE GetPowerManagerInput
     IF (NumofSimpleElecStorage > 0) THEN
       cCurrentModuleObject = 'ElectricLoadCenter:Storage:Simple'
       DO StorNum = 1, NumofSimpleElecStorage
-        CALL GetObjectItem(TRIM(cCurrentModuleObject), StorNum, cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject, StorNum, cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
@@ -1465,11 +1489,15 @@ SUBROUTINE GetPowerManagerInput
         StorageNames(StorNum)=trim(cAlphaArgs(1))
         ElecStorage(StorNum)%Name =  cAlphaArgs(1)
 
-        ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          ErrorsFound=.true.
+        IF (lAlphaFieldBlanks(2)) THEN
+          ElecStorage(StorNum)%AvailSchedPtr = ScheduleAlwaysOn
+        ELSE
+          ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
         ElecStorage(StorNum)%ZoneNum = FindItemInList(cAlphaArgs(3), Zone%Name, NumOfZones)
@@ -1495,7 +1523,7 @@ SUBROUTINE GetPowerManagerInput
         ElecStorage(StorNum)%MaxPowerStore           = rNumericArgs(6)
         ElecStorage(StorNum)%StartingEnergyStored    = rNumericArgs(7)
 
-        CALL SetupOutputVariable('Electrical Storage State of Charge [J]', &
+        CALL SetupOutputVariable('Electric Storage Charge State [J]', &
              ElecStorage(StorNum)%ElectEnergyinStorage, 'System', 'Average', ElecStorage(StorNum)%Name ) !? 'Sum'
 
       ENDDO
@@ -1506,7 +1534,7 @@ SUBROUTINE GetPowerManagerInput
     IF (NumofKiBaMElecStorage > 0) THEN
       cCurrentModuleObject = 'ElectricLoadCenter:Storage:Battery'
       DO StorNum = 1+NumofSimpleElecStorage, NumofKiBaMElecStorage
-        CALL GetObjectItem(TRIM(cCurrentModuleObject), StorNum, cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject, StorNum, cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
@@ -1519,11 +1547,15 @@ SUBROUTINE GetPowerManagerInput
         StorageNames(StorNum)=trim(cAlphaArgs(1))
         ElecStorage(StorNum)%Name =  cAlphaArgs(1)
 
-        ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-          ErrorsFound=.true.
+        IF (lAlphaFieldBlanks(2)) THEN
+          ElecStorage(StorNum)%AvailSchedPtr = ScheduleAlwaysOn
+        ELSE
+          ElecStorage(StorNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+          If ( ElecStorage(StorNum)%AvailSchedPtr == 0 ) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
         ElecStorage(StorNum)%ZoneNum = FindItemInList(cAlphaArgs(3), Zone%Name, NumOfZones)
@@ -1549,6 +1581,7 @@ SUBROUTINE GetPowerManagerInput
           ELSEIF (lAlphaFieldBlanks(4)) THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//' cannot be blank. But no entry found.')
+              ErrorsFound=.true.
           ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%ChargeCurveNum),'RectangularHyperbola2')) THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
@@ -1560,9 +1593,11 @@ SUBROUTINE GetPowerManagerInput
           IF(ElecStorage(StorNum)%DischargeCurveNum.EQ. 0 .and. .not. lAlphaFieldBlanks(5))THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
+              ErrorsFound=.true.
           ELSEIF (lAlphaFieldBlanks(5)) THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//' cannot be blank. But no entry found.')
+              ErrorsFound=.true.
           ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%DischargeCurveNum),'RectangularHyperbola2')) THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
@@ -1572,31 +1607,47 @@ SUBROUTINE GetPowerManagerInput
           ENDIF
 
         IF (SameString(cAlphaArgs(6),'Yes')) THEN
-            ElecStorage(StorNum)%LifeCalculation = 1
+            ElecStorage(StorNum)%LifeCalculation = Battery_LifeCalculation_Yes
         ELSEIF(SameString(cAlphaArgs(6),'No')) THEN
-            ElecStorage(StorNum)%LifeCalculation = 2
+            ElecStorage(StorNum)%LifeCalculation = Battery_LifeCalculation_No
         ELSE
             CALL ShowWarningError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
             CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
             CAll ShowContinueError('Yes or No should be selected. Default value No is used to continue simulation')
-            ElecStorage(StorNum)%LifeCalculation = 2
+            ElecStorage(StorNum)%LifeCalculation = Battery_LifeCalculation_No
         ENDIF
 
-        IF(ElecStorage(StorNum)%LifeCalculation == 1) THEN
+        IF(ElecStorage(StorNum)%LifeCalculation == Battery_LifeCalculation_Yes) THEN
             ElecStorage(StorNum)%LifeCurveNum = GetCurveIndex(cAlphaArgs(7)) !Battery life calculation
             IF(ElecStorage(StorNum)%LifeCurveNum.EQ. 0 .and. .not. lAlphaFieldBlanks(7))THEN
                CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
                CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+               ErrorsFound=.true.
             ELSEIF (lAlphaFieldBlanks(7)) THEN
                CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
                CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' cannot be blank when '//  &
                   trim(cAlphaArgs(6))//' = Yes. But no entry found.')
+               ErrorsFound=.true.
             ELSEIF (.not. SameString(GetCurveType(ElecStorage(StorNum)%LifeCurveNum),'DoubleExponentialDecay')) THEN
               CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
               CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
               CALL ShowContinueError('Curve Type must be DoubleExponentialDecay but was '//  &
                  trim(GetCurveType(ElecStorage(StorNum)%LifeCurveNum)))
               ErrorsFound=.true.
+            ENDIF
+            IF (.not. ErrorsFound) THEN  ! life cycle calculation for this battery, allocate arrays for degradation calculation
+!              ALLOCATE(ElecStorage(StorNum)%B10(0:NumOfTimeStepInHour+1))
+!              ALLOCATE(ElecStorage(StorNum)%X0(0:NumOfTimeStepInHour+1))
+!              ALLOCATE(ElecStorage(StorNum)%Nmb0(0:NumOfTimeStepInHour+1))
+!              ALLOCATE(ElecStorage(StorNum)%OneNmb0(0:NumOfTimeStepInHour+1))
+              ALLOCATE(ElecStorage(StorNum)%B10(0:101))
+              ALLOCATE(ElecStorage(StorNum)%X0(0:101))
+              ALLOCATE(ElecStorage(StorNum)%Nmb0(0:101))
+              ALLOCATE(ElecStorage(StorNum)%OneNmb0(0:101))
+              ElecStorage(StorNum)%B10=0.0d0
+              ElecStorage(StorNum)%X0=0.0d0
+              ElecStorage(StorNum)%Nmb0=0.0d0
+              ElecStorage(StorNum)%OneNmb0=0.0d0
             ENDIF
         ENDIF
 
@@ -1616,24 +1667,24 @@ SUBROUTINE GetPowerManagerInput
         ElecStorage(StorNum)%CutoffV                     = rNumericArgs(12)
         ElecStorage(StorNum)%MaxChargeRate               = rNumericArgs(13)
 
-        IF(ElecStorage(StorNum)%LifeCalculation == 1)THEN
+        IF(ElecStorage(StorNum)%LifeCalculation == Battery_LifeCalculation_Yes) THEN
            ElecStorage(StorNum)%CycleBinNum              = rNumericArgs(14)
         ENDIF
 
 
-        CALL SetupOutputVariable('Electric storage Mode of Operation []', &
+        CALL SetupOutputVariable('Electric Storage Operating Mode Index []', &
              ElecStorage(StorNum)%StorageMode, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage State of Charge [Ah]', &
+        CALL SetupOutputVariable('Electric Storage Charge State [Ah]', &
              ElecStorage(StorNum)%AbsoluteSOC, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Fractional State of Storage []', &
+        CALL SetupOutputVariable('Electric Storage Charge Fraction []', &
              ElecStorage(StorNum)%FractionSOC, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Total Current [A]', &
+        CALL SetupOutputVariable('Electric Storage Total Current [A]', &
              ElecStorage(StorNum)%BatteryCurrent, 'System', 'Average', ElecStorage(StorNum)%Name)
-        CALL SetupOutputVariable('Electrical Total Voltage [V]', &
+        CALL SetupOutputVariable('Electric Storage Total Voltage [V]', &
              ElecStorage(StorNum)%BatteryVoltage, 'System', 'Average', ElecStorage(StorNum)%Name)
 
-        IF(ElecStorage(StorNum)%LifeCalculation .EQ. 1)THEN
-            CALL SetupOutputVariable('Fractional Battery Damage []', &
+        IF(ElecStorage(StorNum)%LifeCalculation == Battery_LifeCalculation_Yes) THEN
+            CALL SetupOutputVariable('Electric Storage Degradation Fraction []', &
                  ElecStorage(StorNum)%BatteryDamage, 'System', 'Average', ElecStorage(StorNum)%Name)
         ENDIF
 
@@ -1643,21 +1694,21 @@ SUBROUTINE GetPowerManagerInput
 
     !For any battery
     DO StorNum = 1, NumofSimpleElecStorage+NumofKiBaMElecStorage
-        CALL SetupOutputVariable('Electrical Storage Power Into Storage [W]', &
+        CALL SetupOutputVariable('Electric Storage Charge Power [W]', &
              ElecStorage(StorNum)%StoredPower, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Energy Into Storage [J]', &
+        CALL SetupOutputVariable('Electric Storage Charge Energy [J]', &
              ElecStorage(StorNum)%StoredEnergy, 'System', 'Sum', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Energy Into Storage Decrement from Production [J]', &
+        CALL SetupOutputVariable('Electric Storage Production Decrement Energy [J]', &
              ElecStorage(StorNum)%DecrementedEnergyStored, 'System', 'Sum', ElecStorage(StorNum)%Name ,&
              ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
-        CALL SetupOutputVariable('Electrical Storage Power From Storage [W]', &
+        CALL SetupOutputVariable('Electric Storage Discharge Power [W]', &
              ElecStorage(StorNum)%DrawnPower, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Energy From Storage [J]', &
+        CALL SetupOutputVariable('Electric Storage Discharge Energy [J]', &
              ElecStorage(StorNum)%DrawnEnergy, 'System', 'Sum', ElecStorage(StorNum)%Name ,&
               ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='Plant')
-        CALL SetupOutputVariable('Electrical Storage Thermal Loss Rate [W]', &
+        CALL SetupOutputVariable('Electric Storage Thermal Loss Rate [W]', &
              ElecStorage(StorNum)%ThermLossRate, 'System', 'Average', ElecStorage(StorNum)%Name )
-        CALL SetupOutputVariable('Electrical Storage Thermal Loss Energy [J]', &
+        CALL SetupOutputVariable('Electric Storage Thermal Loss Energy [J]', &
              ElecStorage(StorNum)%ThermLossEnergy, 'System', 'Sum', ElecStorage(StorNum)%Name )
         IF ( AnyEnergyManagementSystemInModel) THEN
           IF(ElecStorage(StorNum)%StorageModelMode == SimpleBucketStorage) THEN
@@ -1707,7 +1758,7 @@ SUBROUTINE GetPowerManagerInput
 
     cCurrentModuleObject = 'ElectricLoadCenter:Transformer'
     DO TransfNum = 1, NumTransformers
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), TransfNum, cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject, TransfNum, cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          NumBlank=lNumericFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1721,11 +1772,15 @@ SUBROUTINE GetPowerManagerInput
       TransformerNames(TransfNum) = TRIM(cAlphaArgs(1))
       Transformer(TransfNum)%Name =  cAlphaArgs(1)
 
-      Transformer(TransfNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-      IF ( Transformer(TransfNum)%AvailSchedPtr == 0 ) THEN
-        CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-        ErrorsFound=.true.
+      IF (lAlphaFieldBlanks(2)) THEN
+        Transformer(TransfNum)%AvailSchedPtr = ScheduleAlwaysOn
+      ELSE
+        Transformer(TransfNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF ( Transformer(TransfNum)%AvailSchedPtr == 0 ) THEN
+          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       IF (SameString(cAlphaArgs(3) ,    'PowerInFromGrid') )    THEN
@@ -1827,8 +1882,7 @@ SUBROUTINE GetPowerManagerInput
 
         !Meter check deferred because they may have not been "loaded" yet,
         DO LoopCount = 1, NumWiredMeters
-          Transformer(TransfNum)%WiredMeterNames(LoopCount) = &
-                    MakeUPPERCase(TRIM(cAlphaArgs(LoopCount+NumAlphaBeforeMeter)))
+          Transformer(TransfNum)%WiredMeterNames(LoopCount) = MakeUPPERCase(cAlphaArgs(LoopCount+NumAlphaBeforeMeter))
           !Assign SpecialMeter as TRUE if the meter name is Electricity:Facility or Electricity:HVAC
           IF(SameString(Transformer(TransfNum)%WiredMeterNames(LoopCount), 'Electricity:Facility') .OR.  &
              SameString(Transformer(TransfNum)%WiredMeterNames(LoopCount), 'Electricity:HVAC') ) THEN
@@ -1842,13 +1896,13 @@ SUBROUTINE GetPowerManagerInput
 
       CALL SetupOutputVariable('Transformer Efficiency []', &
            Transformer(TransfNum)%Efficiency, 'System', 'Average', Transformer(TransfNum)%Name )
-      CALL SetupOutputVariable('Transformer Power Input [W]', &
+      CALL SetupOutputVariable('Transformer Input Electric Power [W]', &
            Transformer(TransfNum)%PowerIn, 'System', 'Average', Transformer(TransfNum)%Name )
-      CALL SetupOutputVariable('Transformer Energy Input [J]', &
+      CALL SetupOutputVariable('Transformer Input Electric Energy [J]', &
            Transformer(TransfNum)%EnergyIn, 'System', 'Sum', Transformer(TransfNum)%Name )
-      CALL SetupOutputVariable('Transformer Power Output [W]', &
+      CALL SetupOutputVariable('Transformer Output Electric Power [W]', &
            Transformer(TransfNum)%PowerOut, 'System', 'Average', Transformer(TransfNum)%Name )
-      CALL SetupOutputVariable('Transformer Energy Output [J]', &
+      CALL SetupOutputVariable('Transformer Output Electric Energy [J]', &
            Transformer(TransfNum)%EnergyOut, 'System', 'Sum', Transformer(TransfNum)%Name )
       CALL SetupOutputVariable('Transformer No Load Loss Rate [W]', &
            Transformer(TransfNum)%NoLoadLossRate, 'System', 'Average', Transformer(TransfNum)%Name )
@@ -1862,10 +1916,10 @@ SUBROUTINE GetPowerManagerInput
            Transformer(TransfNum)%ThermalLossRate, 'System', 'Average', Transformer(TransfNum)%Name )
       CALL SetupOutputVariable('Transformer Thermal Loss Energy [J]', &
            Transformer(TransfNum)%ThermalLossEnergy, 'System', 'Sum', Transformer(TransfNum)%Name )
-      CALL SetupOutputVariable('Energy Consumption for Distribution Transformer [J]', &
+      CALL SetupOutputVariable('Transformer Distribution Electric Loss Energy [J]', &
            Transformer(TransfNum)%ElecUseUtility, 'System', 'Sum', Transformer(TransfNum)%Name, &
            ResourceTypeKey='Electricity', GroupKey='System')
-      CALL SetupOutputVariable('Energy Produced for Cogeneration Transformer [J]', &
+      CALL SetupOutputVariable('Transformer Cogeneration Electric Loss Energy [J]', &
            Transformer(TransfNum)%ElecProducedCoGen, 'System', 'Sum', Transformer(TransfNum)%Name ,&
            ResourceTypeKey='ElectricityProduced',EndUseKey='COGENERATION',GroupKey='System')
 
@@ -1902,10 +1956,10 @@ SUBROUTINE GetPowerManagerInput
 
 !First get the number of electric load center generator and make a list of names
   cCurrentModuleObject = 'ElectricLoadCenter:Generators'
-  NumGenLists = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumGenLists = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(ListName(NumGenLists))
   DO Count = 1, NumGenLists
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Count,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Count,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT)
     IsNotOK=.false.
     IsBlank=.false.
@@ -1921,7 +1975,7 @@ SUBROUTINE GetPowerManagerInput
 
     !Get the data for electric load centers
     cCurrentModuleObject = 'ElectricLoadCenter:Distribution'
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Count,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Count,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -1976,7 +2030,7 @@ SUBROUTINE GetPowerManagerInput
        errorsFound = .TRUE.
     ENDIF
 
-    ElecLoadCenter(Count)%DemandMeterName = MakeUPPERCase(trim(cAlphaArgs(5)))
+    ElecLoadCenter(Count)%DemandMeterName = MakeUPPERCase(cAlphaArgs(5))
 
     ! meters may not be "loaded" yet, defered check to later subroutine
     IF (SameString(cAlphaArgs(6) , 'AlternatingCurrent')) THEN
@@ -2088,16 +2142,16 @@ SUBROUTINE GetPowerManagerInput
     !Setup general output variables for reporting in the electric load center
     SetupWholeBldgReports = .TRUE.
 
-    CALL SetupOutputVariable('Load Center Electric Power Produced [W]', &
+    CALL SetupOutputVariable('Electric Load Center Produced Electric Power [W]', &
          ElecLoadCenter(Count)%ElectProdRate,'System','Average',ElecLoadCenter(Count)%Name)
 
-    CALL SetupOutputVariable('Load Center Electric Energy Produced [J]', &
+    CALL SetupOutputVariable('Electric Load Center Produced Electric Energy [J]', &
            ElecLoadCenter(Count)%ElectricityProd,'System','Sum',ElecLoadCenter(Count)%Name)
 
-    CALL SetupOutputVariable('Load Center Thermal Power Produced [W]', &
+    CALL SetupOutputVariable('Electric Load Center Produced Thermal Rate [W]', &
          ElecLoadCenter(Count)%ThermalProdRate,'System','Average',ElecLoadCenter(Count)%Name)
 
-    CALL SetupOutputVariable('Load Center Thermal Energy Produced [J]', &
+    CALL SetupOutputVariable('Electric Load Center Produced Thermal Energy [J]', &
            ElecLoadCenter(Count)%ThermalProd,'System','Sum',ElecLoadCenter(Count)%Name)
 
     If(Trim(ElecLoadCenter(Count)%GeneratorList) .ne. '')Then
@@ -2111,7 +2165,7 @@ SUBROUTINE GetPowerManagerInput
       ENDIF
 
       cCurrentModuleObject = 'ElectricLoadCenter:Generators'
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),ListNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,ListNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2122,6 +2176,8 @@ SUBROUTINE GetPowerManagerInput
   !Allocate the pointer array
       ALLOCATE(ElecLoadCenter(Count)%ElecGen(NumGenerators))
       ElecLoadCenter(Count)%NumGenerators = NumGenerators
+      pvTotalCapacity = 0    ! for LEED report
+      windTotalCapacity = 0   ! for LEED report
       DO GenCount = 1, ElecLoadCenter(Count)%NumGenerators
   !Load the Power Center Generator List Name
         ElecLoadCenter(Count)%ElecGen(GenCount)%Name            = cAlphaArgs(alphacount)
@@ -2169,17 +2225,21 @@ SUBROUTINE GetPowerManagerInput
 
   !Load the Power CenterElectric Generation Meter Name
         ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSched      = cAlphaArgs(alphacount)
-        ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr   = GetScheduleIndex(cAlphaArgs(alphacount))
-        IF (ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr <= 0) THEN
-          CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
-          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
-          CAll ShowContinueError('Schedule was not found ')
-          errorsFound = .true.
+        IF (lAlphaFieldBlanks(alphacount)) THEN
+          ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr   = ScheduleAlwaysOn
+        ELSE
+          ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr   = GetScheduleIndex(cAlphaArgs(alphacount))
+          IF (ElecLoadCenter(Count)%ElecGen(GenCount)%AvailSchedPtr <= 0) THEN
+            CALL ShowSevereError(RoutineName//trim(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(alphacount))//' = '//TRIM(cAlphaArgs(alphacount)) )
+            CAll ShowContinueError('Schedule was not found ')
+            errorsFound = .true.
+          ENDIF
         ENDIF
         alphacount =alphacount+1
 
 
-        CALL SetupOutputVariable('Generator Power Supply Request [W]', &
+        CALL SetupOutputVariable('Generator Requested Electric Power [W]', &
                ElecLoadCenter(Count)%ElecGen(GenCount)%PowerRequestThisTimestep, &
                 'System','Average',ElecLoadCenter(Count)%ElecGen(GenCount)%Name)
         IF (AnyEnergyManagementSystemInModel) THEN
@@ -2193,13 +2253,34 @@ SUBROUTINE GetPowerManagerInput
 
 
       ENDDO !End of the NumGenerators Loop
+
+
     End If
 
-    CALL SetupOutputVariable('Load Center Electric Power Request [W]', &
+    CALL SetupOutputVariable('Electric Load Center Requested Electric Power [W]', &
                   ElecLoadCenter(Count)%TotalPowerRequest,'System','Average', &
                   ElecLoadCenter(Count)%Name)
 
   ENDDO  ! loop over number of load centers
+
+  ! LEED report
+  pvTotalCapacity = 0
+  windTotalCapacity = 0
+  DO Count = 1, NumLoadCenters
+    IF(Trim(ElecLoadCenter(Count)%GeneratorList) .NE. '')Then
+      DO GenCount = 1, ElecLoadCenter(Count)%NumGenerators
+        IF (ElecLoadCenter(Count)%ElecGen(GenCount)%CompType_Num  .EQ. iGeneratorPV) THEN
+          pvTotalCapacity = pvTotalCapacity + ElecLoadCenter(Count)%ElecGen(GenCount)%MaxPowerOut
+        ENDIF
+        IF (ElecLoadCenter(Count)%ElecGen(GenCount)%CompType_Num  .EQ. iGeneratorWindTurbine) THEN
+          windTotalCapacity = windTotalCapacity + ElecLoadCenter(Count)%ElecGen(GenCount)%MaxPowerOut
+        ENDIF
+      END DO
+    END IF
+  END DO
+  !put in total capacity for PV and Wind for LEED report
+  CALL PreDefTableEntry(pdchLeedRenRatCap,'Photovoltaic',pvTotalCapacity/1000,2)
+  CALL PreDefTableEntry(pdchLeedRenRatCap,'Wind',windTotalCapacity/1000,2)
 
 
   IF (NumLoadCenters == 0) THEN
@@ -2220,32 +2301,32 @@ SUBROUTINE GetPowerManagerInput
 
   If (SetupWholeBldgReports) then
 
-    CALL SetupOutputVariable('Total Electric Power Purchased [W]', &
+    CALL SetupOutputVariable('Facility Total Purchased Electric Power [W]', &
          WholeBldgElectSummary%ElectPurchRate,'System','Average',WholeBldgElectSummary%Name)
-    CALL SetupOutputVariable('Total Electric Energy Purchased [J]', &
+    CALL SetupOutputVariable('Facility Total Purchased Electric Energy [J]', &
          WholeBldgElectSummary%ElectricityPurch,'System','Sum',WholeBldgElectSummary%Name, &
                            ResourceTypeKey='ElectricityPurchased',EndUseKey='COGENERATION',GroupKey='Plant')
 
-    CALL SetupOutputVariable('Total Electric Energy Surplus [J]', &
+    CALL SetupOutputVariable('Facility Total Surplus Electric Energy [J]', &
          WholeBldgElectSummary%ElectricitySurplus,'System','Sum',WholeBldgElectSummary%Name , &
                            ResourceTypeKey='ElectricitySurplusSold',EndUseKey='COGENERATION',GroupKey='Plant')
 
-    CALL SetupOutputVariable('Net Electric Power Purchased [W]', &
+    CALL SetupOutputVariable('Facility Net Purchased Electric Power [W]', &
          WholeBldgElectSummary%ElectricityNetRate,'System','Average',WholeBldgElectSummary%Name)
-    CALL SetupOutputVariable('Net Electric Energy Purchased [J]', &
+    CALL SetupOutputVariable('Facility Net Purchased Electric Energy [J]', &
          WholeBldgElectSummary%ElectricityNet,'System','Sum',WholeBldgElectSummary%Name, &
                            ResourceTypeKey='ElectricityNet',EndUseKey='COGENERATION',GroupKey='Plant')
 
-    CALL SetupOutputVariable('Total Building Electric Demand [W]', &
+    CALL SetupOutputVariable('Facility Total Building Electric Demand Power [W]', &
          WholeBldgElectSummary%TotalBldgElecDemand,'System','Average',WholeBldgElectSummary%Name)
-    CALL SetupOutputVariable('Total HVAC Electric Demand [W]', &
+    CALL SetupOutputVariable('Facility Total HVAC Electric Demand Power [W]', &
          WholeBldgElectSummary%TotalHVACElecDemand,'System','Average',WholeBldgElectSummary%Name)
-    CALL SetupOutputVariable('Total Electric Demand [W]', &
+    CALL SetupOutputVariable('Facility Total Electric Demand Power [W]', &
          WholeBldgElectSummary%TotalElectricDemand,'System','Average',WholeBldgElectSummary%Name)
 
-    CALL SetupOutputVariable('Total Electric Power Produced [W]', &
+    CALL SetupOutputVariable('Facility Total Produced Electric Power [W]', &
          WholeBldgElectSummary%ElectProdRate,'System','Average',WholeBldgElectSummary%Name)
-    CALL SetupOutputVariable('Total Electric Energy Produced [J]', &
+    CALL SetupOutputVariable('Facility Total Produced Electric Energy [J]', &
          WholeBldgElectSummary%ElectricityProd,'System','Sum',WholeBldgElectSummary%Name)
   ENDIF
 
@@ -3046,15 +3127,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
   LOGICAL,SAVE        :: MyOneTimeFlag = .true.
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyWarmupFlag ! flag for init after warmup complete
   REAL(r64)    :: TimeElapsed         ! Fraction of the current hour that has elapsed (h)
-  INTEGER, SAVE   :: count0                      = 1
-  INTEGER         :: Numbin0                    = 0
   INTEGER         :: BinNum                     = 0
   REAL(r64)       :: Input0                     = 0.0D0
-!  REAL(r64)       :: RealType                   = 1.0D0
-  REAL(r64) ,SAVE, DIMENSION(0:20)   :: B10     = 0.0D0
-  REAL(r64) ,SAVE, DIMENSION(0:20)   :: X0      = 0.0D0
-  REAL(r64) ,SAVE, DIMENSION(0:20)   :: OneNmb0 = 0.0D0
-  REAL(r64) ,SAVE, DIMENSION(0:20)   :: Nmb0    = 0.0D0
   REAL(r64)    I0     ! initial guess of current
   REAL(r64)    T0     ! initial guess of T(I)
   REAL(r64)    q0     ! initial charge
@@ -3086,6 +3160,8 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
   REAL(r64)    ::Pactual=0.0D0 ! actual Power output
   REAL(r64)    ::RHS=0.0D0     ! right hand side of a equation
   REAL(r64)    ::I=0.0D0       ! current
+  REAL(r64)    ::DeltaSOC1     ! difference of fractional SOC between this time step and last time step
+  REAL(r64)    ::DeltaSOC2     ! difference of fractional SOC between last time step and last two time step
 
   If ( .NOT. (ElecLoadCenter(LoadCenterNum)%StoragePresent)) RETURN
 
@@ -3125,16 +3201,19 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
 
     ELSEIF(ElecStorage(ElecStorNum)%StorageModelMode == KiBaMBattery) THEN
        initialCharge = Elecstorage(ElecStorNum)%MaxAhCapacity * Elecstorage(ElecStorNum)%StartingSOC
+       Elecstorage(ElecStorNum)%LastTwoTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
+       Elecstorage(ElecStorNum)%LastTwoTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        Elecstorage(ElecStorNum)%LastTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%LastTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        Elecstorage(ElecStorNum)%ThisTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%ThisTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
-       IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. 1) THEN
-          count0  = 1
-          B10     = 0.0D0
-          X0      = 0.0D0
-          OneNmb0 = 0.0D0
-          Nmb0    = 0.0D0
+       IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. Battery_LifeCalculation_Yes) THEN
+          ElecStorage(ElecStorNum)%count0  = 1
+          ElecStorage(ElecStorNum)%B10(0)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
+          ElecStorage(ElecStorNum)%X0      = 0.0D0
+          ElecStorage(ElecStorNum)%OneNmb0 = 0.0D0
+          ElecStorage(ElecStorNum)%Nmb0    = 0.0D0
+          ElecStorage(ElecStorNum)%BatteryDamage = 0.0D0
        ENDIF
     ENDIF
     MyEnvrnFlag(ElecStorNum)  = .FALSE.
@@ -3149,16 +3228,19 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
        ElecStorage(ElecStorNum)%ThisTimeStepStateOfCharge = ElecStorage(ElecStorNum)%StartingEnergyStored
     ELSEIF(ElecStorage(ElecStorNum)%StorageModelMode == KiBaMBattery) THEN
        initialCharge = Elecstorage(ElecStorNum)%MaxAhCapacity * Elecstorage(ElecStorNum)%StartingSOC
+       Elecstorage(ElecStorNum)%LastTwoTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
+       Elecstorage(ElecStorNum)%LastTwoTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        Elecstorage(ElecStorNum)%LastTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%LastTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
        Elecstorage(ElecStorNum)%ThisTimeStepAvailable = initialCharge * Elecstorage(ElecStorNum)%AvailableFrac
        Elecstorage(ElecStorNum)%ThisTimeStepBound = initialCharge * (1.0d0-Elecstorage(ElecStorNum)%AvailableFrac)
-       IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. 1) THEN
-          count0  = 1
-          B10     = 0.0D0
-          X0      = 0.0D0
-          OneNmb0 = 0.0D0
-          Nmb0    = 0.0D0
+       IF (ElecStorage(ElecStorNum)%LifeCalculation .eq. Battery_LifeCalculation_Yes) THEN
+          ElecStorage(ElecStorNum)%count0  = 1
+          ElecStorage(ElecStorNum)%B10(0)  = Elecstorage(ElecStorNum)%StartingSOC  ! the initial fractional SOC is stored as the reference
+          ElecStorage(ElecStorNum)%X0      = 0.0D0
+          ElecStorage(ElecStorNum)%OneNmb0 = 0.0D0
+          ElecStorage(ElecStorNum)%Nmb0    = 0.0D0
+          ElecStorage(ElecStorNum)%BatteryDamage = 0.0D0
        ENDIF
     ENDIF
     MyWarmupFlag(ElecStorNum) = .FALSE.
@@ -3166,7 +3248,60 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
 
   TimeElapsed = HourOfDay + TimeStep * TimeStepZone + SysTimeElapsed
   If (ElecStorage(ElecStorNum)%TimeElapsed /= TimeElapsed) Then !time changed, update last with "current" result from previous time
+!   When program comes here, this means the first iteration of a new system time step. Battery life calculation needs to be considered
+!   for the Kinetic battery model.
+    IF (ElecStorage(ElecStorNum)%StorageModelMode == KiBaMBattery .AND. &
+        ElecStorage(ElecStorNum)%LifeCalculation.eq.Battery_LifeCalculation_Yes) THEN
+!    At this point, the current values, last time step values and last two time step values have not been updated, hence:
+!    "ThisTimeStep*" actually points to the previous one time step
+!    "LastTimeStep*" actually points to the previous two time steps
+!    "LastTwoTimeStep" actually points to the previous three time steps
+
+!      Calculate the fractional SOC change between the "current" time step and the "previous one" time step
+       DeltaSOC1 = ElecStorage(ElecStorNum)%ThisTimeStepAvailable + ElecStorage(ElecStorNum)%ThisTimeStepBound &
+                   - ElecStorage(ElecStorNum)%LastTimeStepAvailable - ElecStorage(ElecStorNum)%LastTimeStepBound
+       DeltaSOC1 = DeltaSOC1/Elecstorage(ElecStorNum)%MaxAhCapacity
+
+!      Calculate the fractional SOC change between the "previous one" time step and the "previous two" time steps
+       DeltaSOC2 = ElecStorage(ElecStorNum)%LastTimeStepAvailable + ElecStorage(ElecStorNum)%LastTimeStepBound &
+                   - ElecStorage(ElecStorNum)%LastTwoTimeStepAvailable - ElecStorage(ElecStorNum)%LastTwoTimeStepBound
+       DeltaSOC2 = DeltaSOC2/Elecstorage(ElecStorNum)%MaxAhCapacity
+
+!     DeltaSOC2 = 0 may occur at the begining of each simulation environment.
+!     DeltaSOC1 * DeltaSOC2 means that the SOC from "LastTimeStep" is a peak or valley. Only peak or valley needs
+!     to call the rain flow algorithm
+       IF ( (DeltaSOC2 == 0) .OR.  ((DeltaSOC1 * DeltaSOC2) .lt. 0) ) THEN
+!     Because we cannot determine whehter "ThisTimeStep" is a peak or valley (next time step is unknown yet), we
+!     use the "LastTimeStep" value for battery life calculation.
+         Input0 = (ElecStorage(ElecStorNum)%LastTimeStepAvailable + ElecStorage(ElecStorNum)%LastTimeStepBound)/  &
+                  Elecstorage(ElecStorNum)%MaxAhCapacity
+         ElecStorage(ElecStorNum)%B10(ElecStorage(ElecStorNum)%count0)   = input0
+
+!         Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
+!            ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
+!            ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,NumOfTimeStepInHour+1)
+         Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
+            ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
+            ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,101)
+
+         ElecStorage(ElecStorNum)%BatteryDamage=0
+
+         DO BinNum = 1, ElecStorage(ElecStorNum)%CycleBinNum
+!       Battery damage is calculated by accumulating the impact from each cycle.
+          ElecStorage(ElecStorNum)%BatteryDamage = ElecStorage(ElecStorNum)%OneNmb0(BinNum)/  &
+              Curvevalue(ElecStorage(ElecStorNum)%LifeCurveNum,   &
+               (Real(BinNum,r64)/Real(ElecStorage(ElecStorNum)%CycleBinNum,r64))) &
+               + ElecStorage(ElecStorNum)%BatteryDamage
+         ENDDO
+       ENDIF
+    ENDIF
+
+!   Updating "LastTimeStep" and "LastTwoTimeStep" should be done after calling the rain flow algorithm.
+!   Otherwise, it is not possible to determine whehter "LastTimeStep" is a peak or valley value.
+
     ElecStorage(ElecStorNum)%LastTimeStepStateOfCharge = ElecStorage(ElecStorNum)%ThisTimeStepStateOfCharge
+    Elecstorage(ElecStorNum)%LastTwoTimeStepAvailable = Elecstorage(ElecStorNum)%LastTimeStepAvailable
+    Elecstorage(ElecStorNum)%LastTwoTimeStepBound = Elecstorage(ElecStorNum)%LastTimeStepBound
     Elecstorage(ElecStorNum)%LastTimeStepAvailable=Elecstorage(ElecStorNum)%ThisTimeStepAvailable
     Elecstorage(ElecStorNum)%LastTimeStepBound=Elecstorage(ElecStorNum)%ThisTimeStepBound
     ElecStorage(ElecStorNum)%TimeElapsed = TimeElapsed
@@ -3574,20 +3709,25 @@ SUBROUTINE ManageElectCenterStorageInteractions(LoadCenterNum,StorageDrawnPower,
     ElecStorage(ElecStorNum)%ThermLossRate        = InternalR*I0**2*Numbattery
     ElecStorage(ElecStorNum)%ThermLossEnergy      = InternalR*I0**2*TimeStepSys*SecInHour*Numbattery
 
-    IF (ElecStorage(ElecStorNum)%LifeCalculation.eq.1) then
+    IF (ElecStorage(ElecStorNum)%LifeCalculation.eq.Battery_LifeCalculation_Yes) then
   !First time step starting point should be notified in input subroutine
-      numbin0       = ElecStorage(ElecStorNum)%CycleBinNum
+!      numbin0       = ElecStorage(ElecStorNum)%CycleBinNum
       Input0        = TotalSOC/qmax
-      B10(count0)   = input0
+      ElecStorage(ElecStorNum)%B10(ElecStorage(ElecStorNum)%count0)   = input0
 
-      Call Rainflow(numbin0,input0,B10,X0,count0,Nmb0,OneNmb0)
+!      Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
+!         ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
+!         ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,NumOfTimeStepInHour+1)
+      Call Rainflow(ElecStorage(ElecStorNum)%CycleBinNum,input0,ElecStorage(ElecStorNum)%B10,  &
+         ElecStorage(ElecStorNum)%X0,ElecStorage(ElecStorNum)%count0,  &
+         ElecStorage(ElecStorNum)%Nmb0,ElecStorage(ElecStorNum)%OneNmb0,101)
 
       ElecStorage(ElecStorNum)%BatteryDamage=0
 
-      DO BinNum = 1, numbin0
+      DO BinNum = 1, ElecStorage(ElecStorNum)%CycleBinNum
 
-        ElecStorage(ElecStorNum)%BatteryDamage = OneNmb0(BinNum)/  &
-           Curvevalue(ElecStorage(ElecStorNum)%LifeCurveNum, (Real(BinNum,r64)/Real(numbin0,r64))) &
+        ElecStorage(ElecStorNum)%BatteryDamage = ElecStorage(ElecStorNum)%OneNmb0(BinNum)/  &
+           Curvevalue(ElecStorage(ElecStorNum)%LifeCurveNum, (Real(BinNum,r64)/Real(ElecStorage(ElecStorNum)%CycleBinNum,r64))) &
            + ElecStorage(ElecStorNum)%BatteryDamage
       ENDDO
 
@@ -3696,8 +3836,9 @@ SUBROUTINE ManageTransformers()
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
           ! na
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  REAL(r64),PARAMETER   :: AmbTempRef=20.0d0       !reference ambient temperature (C)
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -3724,7 +3865,6 @@ SUBROUTINE ManageTransformers()
   REAL(r64)   :: ResRatio         !ratio of winding resistance = ResSpecified/ResRef
   REAL(r64)   :: TempChange       !winding temperature rise (C)
   REAL(r64)   :: AmbTemp          !ambient temperature (C)
-  REAL(r64)   :: AmbTempRef       !reference ambient temperature (C)
   REAL(r64)   :: Capacity         !transformer nameplate capacity(VA)
   REAL(r64)   :: PUL              !per unit load
   REAL(r64)   :: SurplusPower     !surplus power for an electric load center
@@ -3736,11 +3876,6 @@ SUBROUTINE ManageTransformers()
   REAL(r64)   :: Denominator      !intermediate variable for denominator
 
   LOGICAL, SAVE :: MyOneTimeFlag = .TRUE.
-
-
-
-
-  AmbTempRef = 20.0D0               ![C]
 
 
   IF(NumTransformers <= 0) RETURN
@@ -3973,11 +4108,7 @@ SUBROUTINE FigureTransformerZoneGains
 
 END SUBROUTINE FigureTransformerZoneGains
 
-
-
-
-
-SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb) ! this variable should be stored for the next timestep
+SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb,dim)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Y. KyungTae & W. Wang
@@ -3995,48 +4126,82 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb) ! this variable should b
           ! Ariduru S. 2004. Fatigue life calculation by rainflow cycle counting method.
           !                  Master Thesis, Middle East Technical University.
 
-! numbin = constant value
-! input = input value from other object (battery model)
-! These variables (X,B1,count,Nmb) should be stored for the next timestep in main loop
- REAL(r64) B1(0:20),X(0:20),input,Nmb(0:20),var1,var2,OneNmb(0:20)
- INTEGER count,numbin,num
- INTEGER i,k
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER :: dim               ! end dimension of array
+  INTEGER :: numbin  ! numbin = constant value
+  REAL(r64) :: input  ! input = input value from other object (battery model)
  !Array B1 stores the value of points
  !Array X stores the value of two data points' difference.
+  REAL(r64), DIMENSION(0:dim) :: B1  ! stores values of points, calculated here - stored for next timestep
+  REAL(r64), DIMENSION(0:dim) :: X   ! stores values of two data point difference, calculated here - stored for next timestep
+  INTEGER :: count   ! calculated here - stored for next timestep in main loop
+  REAL(r64), DIMENSION(0:dim) :: Nmb  ! calculated here - stored for next timestep in main loop
+  REAL(r64), DIMENSION(0:dim) :: OneNmb  ! calculated here - stored for next timestep in main loop
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+ REAL(r64) var1,var2
+ INTEGER num
+ INTEGER i,k
 
  X(count)=input-B1(count-1) ! calculate the difference between two data (current and previous)
 
 ! Get rid of the data if it is not peak nor valley
+! The value of count means the number of peak or valley points added to the arrary B10/B1, not including the
+! first point B10(0)/B1(0). Therefore, even if count =2, B1(count-2) is still valid.
  IF(count .ge. 2) THEN
+!  The following check on peak or valley may be not necessary in most times because the same check is made in the
+!  upper-level subroutine. However, it does not hurt to leave it here.
    IF (X(count)*X(count-1) .ge. 0) THEN
      X(count-1) = B1(count)-B1(count-2)
-     CALL shift(B1,count-1,count,B1)  ! Get rid of (count-1) row in B1
-     CALL shift(X,count,count,X)
+!     CALL shift(B1,count-1,count,B1,NumOfTimeStepInHour+1)  ! Get rid of (count-1) row in B1
+!     CALL shift(X,count,count,X,NumOfTimeStepInHour+1)
+     CALL shift(B1,count-1,count,B1,101)  ! Get rid of (count-1) row in B1
+     CALL shift(X,count,count,X,101)
      count=count-1  ! If the value keep increasing or decreasing, get rid of the middle point.
    ENDIF            ! Only valley and peak will be stored in the matrix, B1
 
-   DO WHILE (abs(X(1)).le.abs(X(2)))  !Start counting a half cycle here.
-     num = Int((abs(X(1))*numbin*10+5)/10) ! Count half cycle
+   IF ((count == 2) .AND. (abs(X(1)).le.abs(X(2))) ) THEN
+!  This means the starting point is included in X(2), a half cycle is counted according to the rain flow
+!  algorithm specified in the reference (Ariduru S. 2004)
+     num = NINT((abs(X(1))*numbin*10+5)/10) ! Count half cycle
      Nmb(num) = Nmb(num)+0.5d0
      B1 = EOSHIft(B1,shift=1)              ! Once counting a half cycle, get rid of the value.
      X = EOSHIft(X,shift=1)
      count=count-1                      ! The number of matrix, B1 and X1 decrease.
-   ENDDO
+   ENDIF
  ENDIF ! Counting cyle end
  !*** Note: The value of "count" changes in the upper "IF LOOP"
 
  IF (count .ge. 3) THEN !count 1 cycle
    DO WHILE (abs(X(count)) .gt. abs(X(count-1)))
-     num = Int((abs(X(count-1))*numbin*10+5)/10)
+!  This means that the starting point is not included in X(count-1). a cycle is counted according to the rain flow
+!  algorithm specified in the reference (Ariduru S. 2004)
+     num = NINT((abs(X(count-1))*numbin*10+5)/10)
      Nmb(num)=Nmb(num)+1.0d0
 
-     CALL shift(B1,count-1,count,B1)   ! Get rid of two data points one by one
-     CALL shift(B1,count-2,count,B1)   ! Delete one point
+!     X(count-2) = abs(X(count))-abs(X(count-1))+abs(X(count-2))
+     X(count-2) = B1(count)-B1(count-3) ! Updating X needs to be done before shift operation below
 
-     X(count-2) = abs(X(count))-abs(X(count-1))+abs(X(count-2))
+!     CALL shift(B1,count-1,count,B1,NumOfTimeStepInHour+1)   ! Get rid of two data points one by one
+!     CALL shift(B1,count-2,count,B1,NumOfTimeStepInHour+1)   ! Delete one point
+     CALL shift(B1,count-1,count,B1,101)   ! Get rid of two data points one by one
+     CALL shift(B1,count-2,count,B1,101)   ! Delete one point
 
-     CALL shift(X,count,count,X)       ! Get rid of two data points one by one
-     CALL shift(X,count-1,count,X)     ! Delete one point
+!     CALL shift(X,count,count,X,NumOfTimeStepInHour+1)       ! Get rid of two data points one by one
+!     CALL shift(X,count-1,count,X,NumOfTimeStepInHour+1)     ! Delete one point
+     CALL shift(X,count,count,X,101)       ! Get rid of two data points one by one
+     CALL shift(X,count-1,count,X,101)     ! Delete one point
 
      count = count-2       ! If one cycle is counted, two data points are deleted.
      IF (count .lt. 3) Exit  ! When only three data points exists, one cycle cannot be counted.
@@ -4048,15 +4213,17 @@ SUBROUTINE Rainflow(numbin,input,B1,X,count,Nmb,OneNmb) ! this variable should b
 ! Check the rest of the half cycles every time step
  OneNmb = Nmb     ! Array Nmb (Bins) will be used for the next time step later.
                      ! OneNmb is used to show the current output only.
- DO k = 1, count
-    num = Int((abs(X(k))*numbin*10+5)/10) !Bin number
-    OneNmb(num) = OneNmb(num)+0.5d0
- ENDDO
+! Ideally, the following clean-up counting is needed at the last system time step in each simulation environemnt.
+! Because of the difficulty in knowing the above information, the clean-up counting is skipped. Skipping this has
+! little impact on the simulation results.
+!   DO k = 1, count-1
+!     num = NINT((abs(X(k))*numbin*10+5)/10) !Bin number
+!     OneNmb(num) = OneNmb(num)+0.5d0
+!   ENDDO
 END SUBROUTINE
 
+SUBROUTINE shift(A,m,n,B,dim)
 
-
-SUBROUTINE shift(A,m,n,B)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Y. KyungTae & W. Wang
           !       DATE WRITTEN   July-August, 2011
@@ -4066,9 +4233,34 @@ SUBROUTINE shift(A,m,n,B)
           ! PURPOSE OF THIS SUBROUTINE:
           ! Utility subroutine for rainflow cycle counting
 
-  REAL(r64) A(0:20)
-  REAL(r64) B(0:20)
-  INTEGER m,n,ShiftNum
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: dim ! end dimension of arrays
+  REAL(r64), DIMENSION(0:dim) :: A
+  REAL(r64), DIMENSION(0:dim) :: B
+  INTEGER m,n
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ShiftNum  ! Loop variable
 
   DO ShiftNum=1,m-1
     B(ShiftNum)=A(ShiftNum)
@@ -4079,14 +4271,12 @@ SUBROUTINE shift(A,m,n,B)
   ENDDO
 END SUBROUTINE
 
-
-
 !******************************************************************************************************
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

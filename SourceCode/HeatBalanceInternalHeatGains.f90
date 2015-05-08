@@ -121,6 +121,8 @@ SUBROUTINE ManageInternalHeatGains(InitOnly)
 
   CALL ReportInternalHeatGains
 
+  !for the load component report, gather the load components for each timestep but not when doing pulse
+  IF (ZoneSizingCalc) CALL GatherComponentLoadsIntGain
   RETURN
 
 END SUBROUTINE ManageInternalHeatGains
@@ -145,20 +147,20 @@ SUBROUTINE GetInternalHeatGainsInput
 
           ! REFERENCES:
           ! IDD Objects:
-          ! PEOPLE
-          ! LIGHTS
-          ! ELECTRIC EQUIPMENT
-          ! GAS EQUIPMENT
-          ! STEAM EQUIPMENT
-          ! OTHER EQUIPMENT
-          ! MIXING
-          ! BASEBOARD HEAT
+          ! People
+          ! Lights
+          ! ElectricEquipment
+          ! GasEquipment
+          ! SteamEquipment
+          ! HotWaterEquipment
+          ! OtherEquipment
+          ! ZoneBaseboard:OutdoorTemperatureControlled
 
           ! USE STATEMENTS:
   USE DataIPShortCuts
   USE InputProcessor
   USE ScheduleManager
-  USE General, ONLY: RoundSigDigits
+  USE General, ONLY: RoundSigDigits, CheckCreatedZoneItemName
   USE OutputReportPredefined
   USE DataInterfaces, ONLY: SetupOutputVariable, SetupEMSInternalVariable
 
@@ -219,6 +221,7 @@ SUBROUTINE GetInternalHeatGainsInput
   INTEGER :: Item
   INTEGER :: ZLItem
   INTEGER :: Item1
+  INTEGER :: MaxZoneNameLengthInZoneList
 
           ! FLOW:
   ALLOCATE(ZoneIntGain(NumOfZones))
@@ -233,39 +236,39 @@ SUBROUTINE GetInternalHeatGainsInput
   MaxAlpha=-100
   MaxNumber=-100
   CurrentModuleObject='People'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='Lights'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ElectricEquipment'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='GasEquipment'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='HotWaterEquipment'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='SteamEquipment'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='OtherEquipment'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ZoneBaseboard:OutdoorTemperatureControlled'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
   CurrentModuleObject='ZoneContaminantSourceAndSink:CarbonDioxide'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Loop,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Loop,NumAlpha,NumNumber)
   MaxAlpha=MAX(MaxAlpha,NumAlpha)
   MaxNumber=MAX(MaxNumber,NumNumber)
 
@@ -277,38 +280,38 @@ SUBROUTINE GetInternalHeatGainsInput
   !CurrentModuleObject='Zone'
   DO Loop=1,NumOfZones
   ! Overall Zone Variables
-    CALL SetupOutputVariable('Zone Total Internal Radiant Heat Gain [J]',ZnRpt(Loop)%TotRadiantGain,  &
+    CALL SetupOutputVariable('Zone Total Internal Radiant Heating Energy [J]',ZnRpt(Loop)%TotRadiantGain,  &
                     'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Radiant Heat Gain Rate [W]',ZnRpt(Loop)%TotRadiantGainRate,  &
+    CALL SetupOutputVariable('Zone Total Internal Radiant Heating Rate [W]',ZnRpt(Loop)%TotRadiantGainRate,  &
                     'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Visible Heat Gain [J]',ZnRpt(Loop)%TotVisHeatGain,  &
+    CALL SetupOutputVariable('Zone Total Internal Visible Radiation Heating Energy [J]',ZnRpt(Loop)%TotVisHeatGain,  &
                     'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Visible Heat Gain Rate [W]',ZnRpt(Loop)%TotVisHeatGainRate,  &
+    CALL SetupOutputVariable('Zone Total Internal Visible Radiation Heating Rate [W]',ZnRpt(Loop)%TotVisHeatGainRate,  &
                     'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Convective Heat Gain [J]',ZnRpt(Loop)%TotConvectiveGain,  &
+    CALL SetupOutputVariable('Zone Total Internal Convective Heating Energy [J]',ZnRpt(Loop)%TotConvectiveGain,  &
                     'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Convective Heat Gain Rate [W]',ZnRpt(Loop)%TotConvectiveGainRate,  &
+    CALL SetupOutputVariable('Zone Total Internal Convective Heating Rate [W]',ZnRpt(Loop)%TotConvectiveGainRate,  &
                     'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Latent Gain [J]',ZnRpt(Loop)%TotLatentGain,  &
+    CALL SetupOutputVariable('Zone Total Internal Latent Gain Energy [J]',ZnRpt(Loop)%TotLatentGain,  &
                     'Zone','Sum',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Total Internal Latent Gain Rate [W]',ZnRpt(Loop)%TotLatentGainRate,  &
                     'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Total Heat Gain [J]',ZnRpt(Loop)%TotTotalHeatGain,  &
+    CALL SetupOutputVariable('Zone Total Internal Total Heating Energy [J]',ZnRpt(Loop)%TotTotalHeatGain,  &
                     'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Total Internal Total Heat Gain Rate [W]',ZnRpt(Loop)%TotTotalHeatGainRate,  &
+    CALL SetupOutputVariable('Zone Total Internal Total Heating Rate [W]',ZnRpt(Loop)%TotTotalHeatGainRate,  &
                     'Zone','Average',Zone(Loop)%Name)
   END DO
 
   ! PEOPLE: Includes both information related to the heat balance and thermal comfort
   ! First, allocate and initialize the People derived type
   CurrentModuleObject='People'
-  NumPeopleStatements=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumPeopleStatements=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(PeopleObjects(NumPeopleStatements))
 
   TotPeople=0
   ErrFlag=.false.
   DO Item=1,NumPeopleStatements
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -360,7 +363,7 @@ SUBROUTINE GetInternalHeatGainsInput
       AlphaName  = Blank
       IHGNumbers = 0.0
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -370,12 +373,21 @@ SUBROUTINE GetInternalHeatGainsInput
           People(Loop)%Name = AlphaName(1)
           People(Loop)%ZonePtr = PeopleObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          People(Loop)%Name =   &
-             trim(Zone(ZoneList(PeopleObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//' '//trim(PeopleObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(PeopleObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(PeopleObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        PeopleObjects(Item)%Name,     &
+                                        People%Name,           &
+                                        Loop-1,                       &
+                                        People(Loop)%Name,            &
+                                        ErrFlag)
           People(Loop)%ZonePtr = ZoneList(PeopleObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         People(Loop)%NumberOfPeoplePtr  = GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
         IF (People(Loop)%NumberOfPeoplePtr == 0) THEN
           IF (Item1 == 1) THEN  ! only show error on first one
             IF (lAlphaFieldBlanks(3)) THEN
@@ -471,6 +483,10 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
         END SELECT
 
+        ! Calculate nominal min/max people
+        People(Loop)%NomMinNumberPeople=People(Loop)%NumberOfPeople*SchMin
+        People(Loop)%NomMaxNumberPeople=People(Loop)%NumberOfPeople*SchMax
+
         IF (People(Loop)%ZonePtr > 0) THEN
           Zone(People(Loop)%ZonePtr)%TotOccupants = Zone(People(Loop)%ZonePtr)%TotOccupants + People(Loop)%NumberOfPeople
         ENDIF
@@ -540,10 +556,10 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
           ELSEIF (SchMin < 70.0d0 .or. SchMax > 1000.0d0) THEN
             IF (Item1 == 1) THEN
-              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'='//TRIM(AlphaName(1))//  &
+              CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                    '", '//TRIM(cAlphaFieldNames(5))//' values')
               CALL ShowContinueError('fall outside typical range [70,1000] W/person for Thermal Comfort Reporting.')
-              CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//'; Odd comfort values may result. '//  &
+              CALL ShowContinueError('Schedule="'//TRIM(AlphaName(5))//'"; Odd comfort values may result. '//  &
                                'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] W/person.')
             ENDIF
@@ -692,7 +708,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 IF (Item1 == 1) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                      '", '//TRIM(cAlphaFieldNames(9))//', maximum is > 1.0')
-                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//'; '//  &
+                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(9))//'"; '//  &
                                   'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] Work Efficiency.')
                 ENDIF
@@ -741,7 +757,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 IF (Item1 == 1) THEN
                   CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
                                      '", '//TRIM(cAlphaFieldNames(10))//', maximum is > 2.0')
-                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(10))//'; '//  &
+                  CALL ShowContinueError('Schedule="'//TRIM(AlphaName(10))//'"; '//  &
                                   'Entered min/max range=['//trim(RoundSigDigits(SchMin,1))//','//  &
                                    trim(RoundSigDigits(SchMax,1))//'] Clothing.')
                 ENDIF
@@ -800,29 +816,29 @@ SUBROUTINE GetInternalHeatGainsInput
         IF (People(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
         ! Object report variables
-        CALL SetupOutputVariable('People Number Of Occupants []',People(Loop)%NumOcc, &
+        CALL SetupOutputVariable('People Occupant Count []',People(Loop)%NumOcc, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Radiant Heat Gain [J]',People(Loop)%RadGainEnergy, &
+        CALL SetupOutputVariable('People Radiant Heating Energy [J]',People(Loop)%RadGainEnergy, &
                                  'Zone','Sum',People(Loop)%Name)
-        CALL SetupOutputVariable('People Radiant Heat Gain Rate [W]',People(Loop)%RadGainRate, &
+        CALL SetupOutputVariable('People Radiant Heating Rate [W]',People(Loop)%RadGainRate, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Convective Heat Gain [J]',People(Loop)%ConGainEnergy, &
+        CALL SetupOutputVariable('People Convective Heating Energy [J]',People(Loop)%ConGainEnergy, &
                                  'Zone','Sum',People(Loop)%Name)
-        CALL SetupOutputVariable('People Convective Heat Gain Rate [W]',People(Loop)%ConGainRate, &
+        CALL SetupOutputVariable('People Convective Heating Rate [W]',People(Loop)%ConGainRate, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Sensible Heat Gain [J]',People(Loop)%SenGainEnergy, &
+        CALL SetupOutputVariable('People Sensible Heating Energy [J]',People(Loop)%SenGainEnergy, &
                                  'Zone','Sum',People(Loop)%Name)
-        CALL SetupOutputVariable('People Sensible Heat Gain Rate [W]',People(Loop)%SenGainRate, &
+        CALL SetupOutputVariable('People Sensible Heating Rate [W]',People(Loop)%SenGainRate, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Latent Heat Gain [J]',People(Loop)%LatGainEnergy, &
+        CALL SetupOutputVariable('People Latent Gain Energy [J]',People(Loop)%LatGainEnergy, &
                                  'Zone','Sum',People(Loop)%Name)
-        CALL SetupOutputVariable('People Latent Heat Gain Rate [W]',People(Loop)%LatGainRate, &
+        CALL SetupOutputVariable('People Latent Gain Rate [W]',People(Loop)%LatGainRate, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Total Heat Gain [J]',People(Loop)%TotGainEnergy, &
+        CALL SetupOutputVariable('People Total Heating Energy [J]',People(Loop)%TotGainEnergy, &
                                  'Zone','Sum',People(Loop)%Name)
-        CALL SetupOutputVariable('People Total Heat Gain Rate [W]',People(Loop)%TotGainRate, &
+        CALL SetupOutputVariable('People Total Heating Rate [W]',People(Loop)%TotGainRate, &
                                  'Zone','Average',People(Loop)%Name)
-        CALL SetupOutputVariable('People Air Temperatures  [C]',People(Loop)%TemperatureInZone, &
+        CALL SetupOutputVariable('People Air Temperature [C]',People(Loop)%TemperatureInZone, &
                                  'Zone','Average',People(Loop)%Name)
         CALL SetupOutputVariable('People Air Relative Humidity [%]',People(Loop)%RelativeHumidityInZone, &
                                  'Zone','Average',People(Loop)%Name)
@@ -830,27 +846,27 @@ SUBROUTINE GetInternalHeatGainsInput
         ! Zone total report variables
         IF (RepVarSet(People(Loop)%ZonePtr)) THEN
           RepVarSet(People(Loop)%ZonePtr)=.false.
-          CALL SetupOutputVariable('Zone People Number Of Occupants []',ZnRpt(People(Loop)%ZonePtr)%PeopleNumOcc, &
+          CALL SetupOutputVariable('Zone People Occupant Count []',ZnRpt(People(Loop)%ZonePtr)%PeopleNumOcc, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Radiant Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleRadGain, &
+          CALL SetupOutputVariable('Zone People Radiant Heating Energy [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleRadGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Radiant Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleRadGainRate, &
+          CALL SetupOutputVariable('Zone People Radiant Heating Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleRadGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Convective Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleConGain, &
+          CALL SetupOutputVariable('Zone People Convective Heating Energy [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleConGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Convective Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleConGainRate, &
+          CALL SetupOutputVariable('Zone People Convective Heating Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleConGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Sensible Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleSenGain, &
+          CALL SetupOutputVariable('Zone People Sensible Heating Energy [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleSenGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Sensible Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleSenGainRate, &
+          CALL SetupOutputVariable('Zone People Sensible Heating Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleSenGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Latent Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleLatGain, &
+          CALL SetupOutputVariable('Zone People Latent Gain Energy [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleLatGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Latent Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleLatGainRate, &
+          CALL SetupOutputVariable('Zone People Latent Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleLatGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Total Heat Gain [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGain, &
+          CALL SetupOutputVariable('Zone People Total Heating Energy [J]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGain, &
                                    'Zone','Sum',Zone(People(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone People Total Heat Gain Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGainRate, &
+          CALL SetupOutputVariable('Zone People Total Heating Rate [W]',ZnRpt(People(Loop)%ZonePtr)%PeopleTotGainRate, &
                                    'Zone','Average',Zone(People(Loop)%ZonePtr)%Name)
         ENDIF
 
@@ -862,7 +878,8 @@ SUBROUTINE GetInternalHeatGainsInput
         ENDIF
 
         !setup internal gains
-        CALL SetupZoneInternalGain(People(Loop)%ZonePtr, &
+        IF (.not. ErrorsFound)   &
+           CALL SetupZoneInternalGain(People(Loop)%ZonePtr, &
                            'People', &
                            People(Loop)%Name, &
                            IntGainTypeOf_People, &
@@ -924,13 +941,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='Lights'
-  NumLightsStatements=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumLightsStatements=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(LightsObjects(NumLightsStatements))
 
   TotLights=0
   ErrFlag=.false.
   DO Item=1,NumLightsStatements
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -982,7 +999,7 @@ SUBROUTINE GetInternalHeatGainsInput
       AlphaName  = Blank
       IHGNumbers = 0.0
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -992,12 +1009,21 @@ SUBROUTINE GetInternalHeatGainsInput
           Lights(Loop)%Name = AlphaName(1)
           Lights(Loop)%ZonePtr = LightsObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          Lights(Loop)%Name =   &
-             trim(Zone(ZoneList(LightsObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//' '//trim(LightsObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(LightsObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(LightsObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        LightsObjects(Item)%Name,     &
+                                        Lights%Name,           &
+                                        Loop-1,                       &
+                                        Lights(Loop)%Name,            &
+                                        ErrFlag)
           Lights(Loop)%ZonePtr = ZoneList(LightsObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         Lights(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
         IF (Lights(Loop)%SchedPtr == 0) THEN
           IF (Item1 == 1) THEN
             IF (lAlphaFieldBlanks(3)) THEN
@@ -1093,6 +1119,10 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
         END SELECT
 
+        ! Calculate nominal min/max lighting level
+        Lights(Loop)%NomMinDesignLevel=Lights(Loop)%DesignLevel*SchMin
+        Lights(Loop)%NomMaxDesignLevel=Lights(Loop)%DesignLevel*SchMax
+
         Lights(Loop)%FractionReturnAir=IHGNumbers(4)
         Lights(Loop)%FractionRadiant=IHGNumbers(5)
         Lights(Loop)%FractionShortWave=IHGNumbers(6)
@@ -1148,27 +1178,27 @@ SUBROUTINE GetInternalHeatGainsInput
         CALL SetupOutputVariable('Lights Electric Power [W]',Lights(Loop)%Power, &
                                   'Zone','Average',Lights(Loop)%Name)
 
-        CALL SetupOutputVariable('Lights Radiant Heat Gain [J]',Lights(Loop)%RadGainEnergy, &
+        CALL SetupOutputVariable('Lights Radiant Heating Energy [J]',Lights(Loop)%RadGainEnergy, &
                                   'Zone','Sum',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Radiant Heat Gain Rate [W]',Lights(Loop)%RadGainRate, &
+        CALL SetupOutputVariable('Lights Radiant Heating Rate [W]',Lights(Loop)%RadGainRate, &
                                   'Zone','Average',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Visible Heat Gain [J]',Lights(Loop)%VisGainEnergy, &
+        CALL SetupOutputVariable('Lights Visible Radiation Heating Energy [J]',Lights(Loop)%VisGainEnergy, &
                                   'Zone','Sum',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Visible Heat Gain Rate [W]',Lights(Loop)%VisGainRate, &
+        CALL SetupOutputVariable('Lights Visible Radiation Heating Rate [W]',Lights(Loop)%VisGainRate, &
                                   'Zone','Average',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Convective Heat Gain [J]',Lights(Loop)%ConGainEnergy, &
+        CALL SetupOutputVariable('Lights Convective Heating Energy [J]',Lights(Loop)%ConGainEnergy, &
                                   'Zone','Sum',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Convective Heat Gain Rate [W]',Lights(Loop)%ConGainRate, &
+        CALL SetupOutputVariable('Lights Convective Heating Rate [W]',Lights(Loop)%ConGainRate, &
                                   'Zone','Average',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Return Air Heat Gain [J]',Lights(Loop)%RetAirGainEnergy, &
+        CALL SetupOutputVariable('Lights Return Air Heating Energy [J]',Lights(Loop)%RetAirGainEnergy, &
                                   'Zone','Sum',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Return Air Heat Gain Rate [W]',Lights(Loop)%RetAirGainRate, &
+        CALL SetupOutputVariable('Lights Return Air Heating Rate [W]',Lights(Loop)%RetAirGainRate, &
                                   'Zone','Average',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Total Heat Gain [J]',Lights(Loop)%TotGainEnergy, &
+        CALL SetupOutputVariable('Lights Total Heating Energy [J]',Lights(Loop)%TotGainEnergy, &
                                   'Zone','Sum',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Total Heat Gain Rate [W]',Lights(Loop)%TotGainRate, &
+        CALL SetupOutputVariable('Lights Total Heating Rate [W]',Lights(Loop)%TotGainRate, &
                                   'Zone','Average',Lights(Loop)%Name)
-        CALL SetupOutputVariable('Lights Electric Consumption [J]',Lights(Loop)%Consumption, &
+        CALL SetupOutputVariable('Lights Electric Energy [J]',Lights(Loop)%Consumption, &
                                   'Zone','Sum',Lights(Loop)%Name,ResourceTypeKey='Electricity', &
                                   GroupKey='Building',ZoneKey=Zone(Lights(Loop)%ZonePtr)%Name, &
                                   EndUseKey='InteriorLights',EndUseSubKey=Lights(Loop)%EndUseSubcategory, &
@@ -1180,27 +1210,27 @@ SUBROUTINE GetInternalHeatGainsInput
           RepVarSet(Lights(Loop)%ZonePtr)=.false.
           CALL SetupOutputVariable('Zone Lights Electric Power [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsPower, &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Electric Consumption [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsElecConsump,  &
+          CALL SetupOutputVariable('Zone Lights Electric Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsElecConsump,  &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Radiant Heat Gain [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRadGain, &
+          CALL SetupOutputVariable('Zone Lights Radiant Heating Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRadGain, &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Radiant Heat Gain Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRadGainRate, &
+          CALL SetupOutputVariable('Zone Lights Radiant Heating Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRadGainRate, &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Visible Heat Gain [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsVisGain,  &
+          CALL SetupOutputVariable('Zone Lights Visible Radiation Heating Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsVisGain,  &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Visible Heat Gain Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsVisGainRate,  &
+          CALL SetupOutputVariable('Zone Lights Visible Radiation Heating Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsVisGainRate,  &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Convective Heat Gain [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsConGain,  &
+          CALL SetupOutputVariable('Zone Lights Convective Heating Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsConGain,  &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Convective Heat Gain Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsConGainRate,  &
+          CALL SetupOutputVariable('Zone Lights Convective Heating Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsConGainRate,  &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Return Air Heat Gain [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRetAirGain,  &
+          CALL SetupOutputVariable('Zone Lights Return Air Heating Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRetAirGain,  &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Return Air Heat Gain Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRetAirGainRate,  &
+          CALL SetupOutputVariable('Zone Lights Return Air Heating Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsRetAirGainRate,  &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Total Heat Gain [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsTotGain,  &
+          CALL SetupOutputVariable('Zone Lights Total Heating Energy [J]',ZnRpt(Lights(Loop)%ZonePtr)%LtsTotGain,  &
                                     'Zone','Sum',Zone(Lights(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Lights Total Heat Gain Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsTotGainRate,  &
+          CALL SetupOutputVariable('Zone Lights Total Heating Rate [W]',ZnRpt(Lights(Loop)%ZonePtr)%LtsTotGainRate,  &
                                     'Zone','Average',Zone(Lights(Loop)%ZonePtr)%Name)
         END IF
 
@@ -1211,7 +1241,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                            Lights(Loop)%DesignLevel )
         ENDIF ! EMS
                 !setup internal gains
-        CALL SetupZoneInternalGain(Lights(Loop)%ZonePtr, &
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(Lights(Loop)%ZonePtr, &
                            'Lights', &
                            Lights(Loop)%Name, &
                            IntGainTypeOf_Lights, &
@@ -1251,13 +1282,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='ElectricEquipment'
-  NumZoneElectricStatements=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumZoneElectricStatements=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneElectricObjects(NumZoneElectricStatements))
 
   TotElecEquip=0
   ErrFlag=.false.
   DO Item=1,NumZoneElectricStatements
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1309,7 +1340,7 @@ SUBROUTINE GetInternalHeatGainsInput
       AlphaName  = Blank
       IHGNumbers = 0.0
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1319,13 +1350,21 @@ SUBROUTINE GetInternalHeatGainsInput
           ZoneElectric(Loop)%Name = AlphaName(1)
           ZoneElectric(Loop)%ZonePtr = ZoneElectricObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          ZoneElectric(Loop)%Name =   &
-             trim(Zone(ZoneList(ZoneElectricObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//  &
-                ' '//trim(ZoneElectricObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(ZoneElectricObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(ZoneElectricObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        ZoneElectricObjects(Item)%Name,     &
+                                        ZoneElectric%Name,           &
+                                        Loop-1,                       &
+                                        ZoneElectric(Loop)%Name,            &
+                                        ErrFlag)
           ZoneElectric(Loop)%ZonePtr = ZoneList(ZoneElectricObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         ZoneElectric(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
         IF (ZoneElectric(Loop)%SchedPtr == 0) THEN
           IF (lAlphaFieldBlanks(3)) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
@@ -1415,6 +1454,10 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
         END SELECT
 
+        ! Calculate nominal min/max equipment level
+        ZoneElectric(Loop)%NomMinDesignLevel=ZoneElectric(Loop)%DesignLevel*SchMin
+        ZoneElectric(Loop)%NomMaxDesignLevel=ZoneElectric(Loop)%DesignLevel*SchMax
+
         ZoneElectric(Loop)%FractionLatent=IHGNumbers(4)
         ZoneElectric(Loop)%FractionRadiant=IHGNumbers(5)
         ZoneElectric(Loop)%FractionLost=IHGNumbers(6)
@@ -1440,32 +1483,32 @@ SUBROUTINE GetInternalHeatGainsInput
         ! Object report variables
         CALL SetupOutputVariable('Electric Equipment Electric Power [W]',ZoneElectric(Loop)%Power, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Electric Consumption [J]',ZoneElectric(Loop)%Consumption, &
+        CALL SetupOutputVariable('Electric Equipment Electric Energy [J]',ZoneElectric(Loop)%Consumption, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name,ResourceTypeKey='Electricity', &
                                  GroupKey='Building',ZoneKey=Zone(ZoneElectric(Loop)%ZonePtr)%Name, &
                                  EndUseKey='InteriorEquipment',EndUseSubKey=ZoneElectric(Loop)%EndUseSubcategory, &
                                  ZoneMult=Zone(ZoneElectric(Loop)%ZonePtr)%Multiplier, &
                                  ZoneListMult=Zone(ZoneElectric(Loop)%ZonePtr)%ListMultiplier)
 
-        CALL SetupOutputVariable('Electric Equipment Radiant Heat Gain [J]',ZoneElectric(Loop)%RadGainEnergy, &
+        CALL SetupOutputVariable('Electric Equipment Radiant Heating Energy [J]',ZoneElectric(Loop)%RadGainEnergy, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Radiant Heat Gain Rate [W]',ZoneElectric(Loop)%RadGainRate, &
+        CALL SetupOutputVariable('Electric Equipment Radiant Heating Rate [W]',ZoneElectric(Loop)%RadGainRate, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Convective Heat Gain [J]',ZoneElectric(Loop)%ConGainEnergy, &
+        CALL SetupOutputVariable('Electric Equipment Convective Heating Energy [J]',ZoneElectric(Loop)%ConGainEnergy, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Convective Heat Gain Rate [W]',ZoneElectric(Loop)%ConGainRate, &
+        CALL SetupOutputVariable('Electric Equipment Convective Heating Rate [W]',ZoneElectric(Loop)%ConGainRate, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Latent Heat Gain [J]',ZoneElectric(Loop)%LatGainEnergy, &
+        CALL SetupOutputVariable('Electric Equipment Latent Gain Energy [J]',ZoneElectric(Loop)%LatGainEnergy, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Latent Heat Gain Rate [W]',ZoneElectric(Loop)%LatGainRate, &
+        CALL SetupOutputVariable('Electric Equipment Latent Gain Rate [W]',ZoneElectric(Loop)%LatGainRate, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Lost Heat Gain [J]',ZoneElectric(Loop)%LostEnergy, &
+        CALL SetupOutputVariable('Electric Equipment Lost Heat Energy [J]',ZoneElectric(Loop)%LostEnergy, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Lost Heat Gain Rate [W]',ZoneElectric(Loop)%LostRate, &
+        CALL SetupOutputVariable('Electric Equipment Lost Heat Rate [W]',ZoneElectric(Loop)%LostRate, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Total Heat Gain [J]',ZoneElectric(Loop)%TotGainEnergy, &
+        CALL SetupOutputVariable('Electric Equipment Total Heating Energy [J]',ZoneElectric(Loop)%TotGainEnergy, &
                                  'Zone','Sum',ZoneElectric(Loop)%Name)
-        CALL SetupOutputVariable('Electric Equipment Total Heat Gain Rate [W]',ZoneElectric(Loop)%TotGainRate, &
+        CALL SetupOutputVariable('Electric Equipment Total Heating Rate [W]',ZoneElectric(Loop)%TotGainRate, &
                                  'Zone','Average',ZoneElectric(Loop)%Name)
 
         ! Zone total report variables
@@ -1474,38 +1517,38 @@ SUBROUTINE GetInternalHeatGainsInput
           CALL SetupOutputVariable('Zone Electric Equipment Electric Power [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecPower, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Electric Consumption [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Electric Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecConsump, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
 
-          CALL SetupOutputVariable('Zone Electric Equipment Radiant Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Radiant Heating Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecRadGain, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Radiant Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Radiant Heating Rate [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecRadGainRate, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Convective Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Convective Heating Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecConGain, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Convective Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Convective Heating Rate [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecConGainRate, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Latent Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Latent Gain Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecLatGain, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Latent Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Latent Gain Rate [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecLatGainRate, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Lost Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Lost Heat Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecLost, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Lost Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Lost Heat Rate [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecLostRate, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Total Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Total Heating Energy [J]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecTotGain, &
                                    'Zone','Sum',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Electric Equipment Total Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Electric Equipment Total Heating Rate [W]',  &
              ZnRpt(ZoneElectric(Loop)%ZonePtr)%ElecTotGainRate, &
                                    'Zone','Average',Zone(ZoneElectric(Loop)%ZonePtr)%Name)
         ENDIF
@@ -1517,7 +1560,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                            ZoneElectric(Loop)%DesignLevel )
         ENDIF ! EMS
 
-        CALL SetupZoneInternalGain(ZoneElectric(Loop)%ZonePtr, &
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(ZoneElectric(Loop)%ZonePtr, &
                    'ElectricEquipment', &
                    ZoneElectric(Loop)%Name, &
                    IntGainTypeOf_ElectricEquipment, &
@@ -1532,13 +1576,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='GasEquipment'
-  NumZoneGasStatements=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumZoneGasStatements=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneGasObjects(NumZoneGasStatements))
 
   TotGasEquip=0
   ErrFlag=.false.
   DO Item=1,NumZoneGasStatements
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1590,7 +1634,7 @@ SUBROUTINE GetInternalHeatGainsInput
       AlphaName  = Blank
       IHGNumbers = 0.0
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1600,13 +1644,21 @@ SUBROUTINE GetInternalHeatGainsInput
           ZoneGas(Loop)%Name = AlphaName(1)
           ZoneGas(Loop)%ZonePtr = ZoneGasObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          ZoneGas(Loop)%Name =   &
-             trim(Zone(ZoneList(ZoneGasObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//  &
-                ' '//trim(ZoneGasObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(ZoneGasObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(ZoneGasObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        ZoneGasObjects(Item)%Name,     &
+                                        ZoneGas%Name,           &
+                                        Loop-1,                       &
+                                        ZoneGas(Loop)%Name,            &
+                                        ErrFlag)
           ZoneGas(Loop)%ZonePtr = ZoneList(ZoneGasObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         ZoneGas(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
         IF (ZoneGas(Loop)%SchedPtr == 0) THEN
           IF (Item1 == 1) THEN
             IF (lAlphaFieldBlanks(3)) THEN
@@ -1652,7 +1704,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Gas Equipment will result.')
             ENDIF
 
-          CASE('WATTS/AREA')
+          CASE('WATTS/AREA','POWER/AREA')
             IF (ZoneGas(Loop)%ZonePtr /= 0) THEN
               IF (IHGNumbers(2) >= 0.0) THEN
                 ZoneGas(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneGas(Loop)%ZonePtr)%FloorArea
@@ -1672,7 +1724,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Gas Equipment will result.')
             ENDIF
 
-          CASE('WATTS/PERSON')
+          CASE('WATTS/PERSON','POWER/PERSON')
             IF (ZoneGas(Loop)%ZonePtr /= 0) THEN
               IF (IHGNumbers(3) >= 0.0) THEN
                 ZoneGas(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneGas(Loop)%ZonePtr)%TotOccupants
@@ -1701,6 +1753,10 @@ SUBROUTINE GetInternalHeatGainsInput
               ErrorsFound=.true.
             ENDIF
         END SELECT
+
+        ! Calculate nominal min/max equipment level
+        ZoneGas(Loop)%NomMinDesignLevel=ZoneGas(Loop)%DesignLevel*SchMin
+        ZoneGas(Loop)%NomMaxDesignLevel=ZoneGas(Loop)%DesignLevel*SchMax
 
         ZoneGas(Loop)%FractionLatent=IHGNumbers(4)
         ZoneGas(Loop)%FractionRadiant=IHGNumbers(5)
@@ -1743,64 +1799,64 @@ SUBROUTINE GetInternalHeatGainsInput
         IF (ZoneGas(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
         ! Object report variables
-        CALL SetupOutputVariable('Gas Equipment Gas Consumption Rate [W]',ZoneGas(Loop)%Power, &
+        CALL SetupOutputVariable('Gas Equipment Gas Rate [W]',ZoneGas(Loop)%Power, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Gas Consumption [J]',ZoneGas(Loop)%Consumption, &
+        CALL SetupOutputVariable('Gas Equipment Gas Energy [J]',ZoneGas(Loop)%Consumption, &
                                  'Zone','Sum',ZoneGas(Loop)%Name,ResourceTypeKey='Gas', &
                                  GroupKey='Building',ZoneKey=Zone(ZoneGas(Loop)%ZonePtr)%Name, &
                                  EndUseKey='InteriorEquipment',EndUseSubKey=ZoneGas(Loop)%EndUseSubcategory, &
                                  ZoneMult=Zone(ZoneGas(Loop)%ZonePtr)%Multiplier, &
                                  ZoneListMult=Zone(ZoneGas(Loop)%ZonePtr)%ListMultiplier)
 
-        CALL SetupOutputVariable('Gas Equipment Radiant Heat Gain [J]',ZoneGas(Loop)%RadGainEnergy, &
+        CALL SetupOutputVariable('Gas Equipment Radiant Heating Energy [J]',ZoneGas(Loop)%RadGainEnergy, &
                                  'Zone','Sum',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Convective Heat Gain [J]',ZoneGas(Loop)%ConGainEnergy, &
+        CALL SetupOutputVariable('Gas Equipment Convective Heating Energy [J]',ZoneGas(Loop)%ConGainEnergy, &
                                  'Zone','Sum',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Latent Heat Gain [J]',ZoneGas(Loop)%LatGainEnergy, &
+        CALL SetupOutputVariable('Gas Equipment Latent Gain Energy [J]',ZoneGas(Loop)%LatGainEnergy, &
                                  'Zone','Sum',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Lost Heat Gain [J]',ZoneGas(Loop)%LostEnergy, &
+        CALL SetupOutputVariable('Gas Equipment Lost Heat Energy [J]',ZoneGas(Loop)%LostEnergy, &
                                  'Zone','Sum',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Total Heat Gain [J]',ZoneGas(Loop)%TotGainEnergy, &
+        CALL SetupOutputVariable('Gas Equipment Total Heating Energy [J]',ZoneGas(Loop)%TotGainEnergy, &
                                  'Zone','Sum',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Radiant Heat Gain Rate [W]',ZoneGas(Loop)%RadGainRate, &
+        CALL SetupOutputVariable('Gas Equipment Radiant Heating Rate [W]',ZoneGas(Loop)%RadGainRate, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Convective Heat Gain Rate [W]',ZoneGas(Loop)%ConGainRate, &
+        CALL SetupOutputVariable('Gas Equipment Convective Heating Rate [W]',ZoneGas(Loop)%ConGainRate, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Latent Heat Gain Rate [W]',ZoneGas(Loop)%LatGainRate, &
+        CALL SetupOutputVariable('Gas Equipment Latent Gain Rate [W]',ZoneGas(Loop)%LatGainRate, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Lost Heat Gain Rate [W]',ZoneGas(Loop)%LostRate, &
+        CALL SetupOutputVariable('Gas Equipment Lost Heat Rate [W]',ZoneGas(Loop)%LostRate, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
-        CALL SetupOutputVariable('Gas Equipment Total Heat Gain Rate [W]',ZoneGas(Loop)%TotGainRate, &
+        CALL SetupOutputVariable('Gas Equipment Total Heating Rate [W]',ZoneGas(Loop)%TotGainRate, &
                                  'Zone','Average',ZoneGas(Loop)%Name)
 
         ! Zone total report variables
         IF (RepVarSet(ZoneGas(Loop)%ZonePtr)) THEN
           RepVarSet(ZoneGas(Loop)%ZonePtr)=.false.
 
-          CALL SetupOutputVariable('Zone Gas Equipment Gas Consumption Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasPower, &
+          CALL SetupOutputVariable('Zone Gas Equipment Gas Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasPower, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Gas Consumption [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConsump, &
+          CALL SetupOutputVariable('Zone Gas Equipment Gas Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConsump, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
 
-          CALL SetupOutputVariable('Zone Gas Equipment Radiant Heat Gain [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasRadGain, &
+          CALL SetupOutputVariable('Zone Gas Equipment Radiant Heating Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasRadGain, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Radiant Heat Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasRadGainRate, &
+          CALL SetupOutputVariable('Zone Gas Equipment Radiant Heating Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasRadGainRate, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Convective Heat Gain [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConGain, &
+          CALL SetupOutputVariable('Zone Gas Equipment Convective Heating Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConGain, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Convective Heat Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConGainRate, &
+          CALL SetupOutputVariable('Zone Gas Equipment Convective Heating Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasConGainRate, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Latent Heat Gain [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLatGain, &
+          CALL SetupOutputVariable('Zone Gas Equipment Latent Gain Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLatGain, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Latent Heat Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLatGainRate, &
+          CALL SetupOutputVariable('Zone Gas Equipment Latent Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLatGainRate, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Lost Heat Gain [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLost, &
+          CALL SetupOutputVariable('Zone Gas Equipment Lost Heat Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLost, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Lost Heat Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLostRate, &
+          CALL SetupOutputVariable('Zone Gas Equipment Lost Heat Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasLostRate, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Total Heat Gain [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasTotGain, &
+          CALL SetupOutputVariable('Zone Gas Equipment Total Heating Energy [J]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasTotGain, &
                                    'Zone','Sum',Zone(ZoneGas(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Gas Equipment Total Heat Gain Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasTotGainRate, &
+          CALL SetupOutputVariable('Zone Gas Equipment Total Heating Rate [W]',ZnRpt(ZoneGas(Loop)%ZonePtr)%GasTotGainRate, &
                                    'Zone','Average',Zone(ZoneGas(Loop)%ZonePtr)%Name)
         ENDIF
 
@@ -1811,7 +1867,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                            ZoneGas(Loop)%DesignLevel )
         ENDIF ! EMS
 
-        CALL SetupZoneInternalGain(ZoneGas(Loop)%ZonePtr, &
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(ZoneGas(Loop)%ZonePtr, &
                    'GasEquipment', &
                    ZoneGas(Loop)%Name, &
                    IntGainTypeOf_GasEquipment, &
@@ -1827,13 +1884,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='HotWaterEquipment'
-  NumHotWaterEqStatements=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumHotWaterEqStatements=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(HotWaterEqObjects(NumHotWaterEqStatements))
 
   TotHWEquip=0
   ErrFlag=.false.
   DO Item=1,NumHotWaterEqStatements
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1885,7 +1942,7 @@ SUBROUTINE GetInternalHeatGainsInput
       AlphaName  = Blank
       IHGNumbers = 0.0
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1895,13 +1952,21 @@ SUBROUTINE GetInternalHeatGainsInput
           ZoneHWEq(Loop)%Name = AlphaName(1)
           ZoneHWEq(Loop)%ZonePtr = HotWaterEqObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          ZoneHWEq(Loop)%Name =   &
-             trim(Zone(ZoneList(HotWaterEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//' '//  &
-                trim(HotWaterEqObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,CurrentModuleObject,  &
+                                        Zone(ZoneList(HotWaterEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(HotWaterEqObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        HotWaterEqObjects(Item)%Name,     &
+                                        ZoneHWEq%Name,           &
+                                        Loop-1,                       &
+                                        ZoneHWEq(Loop)%Name,            &
+                                        ErrFlag)
           ZoneHWEq(Loop)%ZonePtr = ZoneList(HotWaterEqObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         ZoneHWEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+        SchMin=0.0d0
+        SchMax=0.0d0
         IF (ZoneHWEq(Loop)%SchedPtr == 0) THEN
           IF (lAlphaFieldBlanks(3)) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
@@ -1941,7 +2006,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Hot Water Equipment will result.')
             ENDIF
 
-          CASE('WATTS/AREA')
+          CASE('WATTS/AREA','POWER/AREA')
             IF (ZoneHWEq(Loop)%ZonePtr /= 0) THEN
               IF (IHGNumbers(2) >= 0.0) THEN
                 ZoneHWEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneHWEq(Loop)%ZonePtr)%FloorArea
@@ -1961,7 +2026,7 @@ SUBROUTINE GetInternalHeatGainsInput
                 '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Hot Water Equipment will result.')
             ENDIF
 
-          CASE('WATTS/PERSON')
+          CASE('WATTS/PERSON','POWER/PERSON')
             IF (ZoneHWEq(Loop)%ZonePtr /= 0) THEN
               IF (IHGNumbers(3) >= 0.0) THEN
                 ZoneHWEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneHWEq(Loop)%ZonePtr)%TotOccupants
@@ -1991,6 +2056,10 @@ SUBROUTINE GetInternalHeatGainsInput
             ENDIF
         END SELECT
 
+        ! Calculate nominal min/max equipment level
+        ZoneHWEq(Loop)%NomMinDesignLevel=ZoneHWEq(Loop)%DesignLevel*SchMin
+        ZoneHWEq(Loop)%NomMaxDesignLevel=ZoneHWEq(Loop)%DesignLevel*SchMax
+
         ZoneHWEq(Loop)%FractionLatent=IHGNumbers(4)
         ZoneHWEq(Loop)%FractionRadiant=IHGNumbers(5)
         ZoneHWEq(Loop)%FractionLost=IHGNumbers(6)
@@ -2014,74 +2083,74 @@ SUBROUTINE GetInternalHeatGainsInput
         IF (ZoneHWEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
         ! Object report variables
-        CALL SetupOutputVariable('Hot Water Equipment District Heating Consumption Rate [W]', ZoneHWEq(Loop)%Power, &
+        CALL SetupOutputVariable('Hot Water Equipment District Heating Rate [W]', ZoneHWEq(Loop)%Power, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment District Heating Consumption [J]',ZoneHWEq(Loop)%Consumption, &
+        CALL SetupOutputVariable('Hot Water Equipment District Heating Energy [J]',ZoneHWEq(Loop)%Consumption, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name,ResourceTypeKey='DistrictHeating', &
                                  GroupKey='Building',ZoneKey=Zone(ZoneHWEq(Loop)%ZonePtr)%Name, &
                                  EndUseKey='InteriorEquipment',EndUseSubKey=ZoneHWEq(Loop)%EndUseSubcategory, &
                                  ZoneMult=Zone(ZoneHWEq(Loop)%ZonePtr)%Multiplier, &
                                  ZoneListMult=Zone(ZoneHWEq(Loop)%ZonePtr)%ListMultiplier)
 
-        CALL SetupOutputVariable('Hot Water Equipment Radiant Heat Gain [J]',ZoneHWEq(Loop)%RadGainEnergy, &
+        CALL SetupOutputVariable('Hot Water Equipment Radiant Heating Energy [J]',ZoneHWEq(Loop)%RadGainEnergy, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Radiant Heat Gain Rate [W]',ZoneHWEq(Loop)%RadGainRate, &
+        CALL SetupOutputVariable('Hot Water Equipment Radiant Heating Rate [W]',ZoneHWEq(Loop)%RadGainRate, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Convective Heat Gain [J]',ZoneHWEq(Loop)%ConGainEnergy, &
+        CALL SetupOutputVariable('Hot Water Equipment Convective Heating Energy [J]',ZoneHWEq(Loop)%ConGainEnergy, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Convective Heat Gain Rate [W]',ZoneHWEq(Loop)%ConGainRate, &
+        CALL SetupOutputVariable('Hot Water Equipment Convective Heating Rate [W]',ZoneHWEq(Loop)%ConGainRate, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Latent Heat Gain [J]',ZoneHWEq(Loop)%LatGainEnergy, &
+        CALL SetupOutputVariable('Hot Water Equipment Latent Gain Energy [J]',ZoneHWEq(Loop)%LatGainEnergy, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Latent Heat Gain Rate [W]',ZoneHWEq(Loop)%LatGainRate, &
+        CALL SetupOutputVariable('Hot Water Equipment Latent Gain Rate [W]',ZoneHWEq(Loop)%LatGainRate, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Lost Heat Gain [J]',ZoneHWEq(Loop)%LostEnergy, &
+        CALL SetupOutputVariable('Hot Water Equipment Lost Heat Energy [J]',ZoneHWEq(Loop)%LostEnergy, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Lost Heat Gain Rate [W]',ZoneHWEq(Loop)%LostRate, &
+        CALL SetupOutputVariable('Hot Water Equipment Lost Heat Rate [W]',ZoneHWEq(Loop)%LostRate, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Total Heat Gain [J]',ZoneHWEq(Loop)%TotGainEnergy, &
+        CALL SetupOutputVariable('Hot Water Equipment Total Heating Energy [J]',ZoneHWEq(Loop)%TotGainEnergy, &
                                  'Zone','Sum',ZoneHWEq(Loop)%Name)
-        CALL SetupOutputVariable('Hot Water Equipment Total Heat Gain Rate [W]',ZoneHWEq(Loop)%TotGainRate, &
+        CALL SetupOutputVariable('Hot Water Equipment Total Heating Rate [W]',ZoneHWEq(Loop)%TotGainRate, &
                                  'Zone','Average',ZoneHWEq(Loop)%Name)
 
         ! Zone total report variables
         IF (RepVarSet(ZoneHWEq(Loop)%ZonePtr)) THEN
           RepVarSet(ZoneHWEq(Loop)%ZonePtr)=.false.
-          CALL SetupOutputVariable('Zone Hot Water Equipment District Heating Consumption Rate [W]', &
+          CALL SetupOutputVariable('Zone Hot Water Equipment District Heating Rate [W]', &
                                    ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWPower, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment District Heating Consumption [J]', &
+          CALL SetupOutputVariable('Zone Hot Water Equipment District Heating Energy [J]', &
                                    ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWConsump, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
 
-          CALL SetupOutputVariable('Zone Hot Water Equipment Radiant Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Radiant Heating Energy [J]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWRadGain, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Radiant Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Radiant Heating Rate [W]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWRadGainRate, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Convective Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Convective Heating Energy [J]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWConGain, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Convective Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Convective Heating Rate [W]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWConGainRate, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Latent Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Latent Gain Energy [J]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWLatGain, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Latent Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Latent Gain Rate [W]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWLatGainRate, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Lost Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Lost Heat Energy [J]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWLost, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Lost Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Lost Heat Rate [W]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWLostRate, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Total Heat Gain [J]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Total Heating Energy [J]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWTotGain, &
                                    'Zone','Sum',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
-          CALL SetupOutputVariable('Zone Hot Water Equipment Total Heat Gain Rate [W]',  &
+          CALL SetupOutputVariable('Zone Hot Water Equipment Total Heating Rate [W]',  &
              ZnRpt(ZoneHWEq(Loop)%ZonePtr)%HWTotGainRate, &
                                    'Zone','Average',Zone(ZoneHWEq(Loop)%ZonePtr)%Name)
         ENDIF
@@ -2093,7 +2162,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                            ZoneHWEq(Loop)%DesignLevel )
         ENDIF ! EMS
 
-        CALL SetupZoneInternalGain(ZoneHWEq(Loop)%ZonePtr, &
+        IF (.not. ErrorsFound)   &
+          CALL SetupZoneInternalGain(ZoneHWEq(Loop)%ZonePtr, &
                    'HotWaterEquipment', &
                    ZoneHWEq(Loop)%Name, &
                    IntGainTypeOf_HotWaterEquipment, &
@@ -2107,13 +2177,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='SteamEquipment'
-  TotStmEquip=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotStmEquip=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneSteamEq(TotStmEquip))
 
   DO Loop=1,TotStmEquip
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2135,6 +2205,8 @@ SUBROUTINE GetInternalHeatGainsInput
     ENDIF
 
     ZoneSteamEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+    SchMin=0.0d0
+    SchMax=0.0d0
     IF (ZoneSteamEq(Loop)%SchedPtr == 0) THEN
       IF (lAlphaFieldBlanks(3)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
@@ -2174,7 +2246,7 @@ SUBROUTINE GetInternalHeatGainsInput
             '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Steam Equipment will result.')
         ENDIF
 
-      CASE('WATTS/AREA')
+      CASE('WATTS/AREA','POWER/AREA')
         IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
           IF (IHGNumbers(2) >= 0.0) THEN
             ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneSteamEq(Loop)%ZonePtr)%FloorArea
@@ -2194,7 +2266,7 @@ SUBROUTINE GetInternalHeatGainsInput
             '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Steam Equipment will result.')
         ENDIF
 
-      CASE('WATTS/PERSON')
+      CASE('WATTS/PERSON','POWER/PERSON')
         IF (ZoneSteamEq(Loop)%ZonePtr /= 0) THEN
           IF (IHGNumbers(3) >= 0.0) THEN
             ZoneSteamEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneSteamEq(Loop)%ZonePtr)%TotOccupants
@@ -2222,6 +2294,10 @@ SUBROUTINE GetInternalHeatGainsInput
         ErrorsFound=.true.
     END SELECT
 
+    ! Calculate nominal min/max equipment level
+    ZoneSteamEq(Loop)%NomMinDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMin
+    ZoneSteamEq(Loop)%NomMaxDesignLevel=ZoneSteamEq(Loop)%DesignLevel*SchMax
+
     ZoneSteamEq(Loop)%FractionLatent=IHGNumbers(4)
     ZoneSteamEq(Loop)%FractionRadiant=IHGNumbers(5)
     ZoneSteamEq(Loop)%FractionLost=IHGNumbers(6)
@@ -2245,74 +2321,74 @@ SUBROUTINE GetInternalHeatGainsInput
     IF (ZoneSteamEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('Steam Equipment District Heating Consumption Rate [W]', ZoneSteamEq(Loop)%Power, &
+    CALL SetupOutputVariable('Steam Equipment District Heating Rate [W]', ZoneSteamEq(Loop)%Power, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment District Heating Consumption [J]', ZoneSteamEq(Loop)%Consumption, &
+    CALL SetupOutputVariable('Steam Equipment District Heating Energy [J]', ZoneSteamEq(Loop)%Consumption, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name,ResourceTypeKey='DistrictHeating', &
                              GroupKey='Building',ZoneKey=Zone(ZoneSteamEq(Loop)%ZonePtr)%Name, &
                              EndUseKey='InteriorEquipment',EndUseSubKey=ZoneSteamEq(Loop)%EndUseSubcategory, &
                              ZoneMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%Multiplier, &
                              ZoneListMult=Zone(ZoneSteamEq(Loop)%ZonePtr)%ListMultiplier)
 
-    CALL SetupOutputVariable('Steam Equipment Radiant Heat Gain [J]',ZoneSteamEq(Loop)%RadGainEnergy, &
+    CALL SetupOutputVariable('Steam Equipment Radiant Heating Energy [J]',ZoneSteamEq(Loop)%RadGainEnergy, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Radiant Heat Gain Rate [W]',ZoneSteamEq(Loop)%RadGainRate, &
+    CALL SetupOutputVariable('Steam Equipment Radiant Heating Rate [W]',ZoneSteamEq(Loop)%RadGainRate, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Convective Heat Gain [J]',ZoneSteamEq(Loop)%ConGainEnergy, &
+    CALL SetupOutputVariable('Steam Equipment Convective Heating Energy [J]',ZoneSteamEq(Loop)%ConGainEnergy, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Convective Heat Gain Rate [W]',ZoneSteamEq(Loop)%ConGainRate, &
+    CALL SetupOutputVariable('Steam Equipment Convective Heating Rate [W]',ZoneSteamEq(Loop)%ConGainRate, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Latent Heat Gain [J]',ZoneSteamEq(Loop)%LatGainEnergy, &
+    CALL SetupOutputVariable('Steam Equipment Latent Gain Energy [J]',ZoneSteamEq(Loop)%LatGainEnergy, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Latent Heat Gain Rate [W]',ZoneSteamEq(Loop)%LatGainRate, &
+    CALL SetupOutputVariable('Steam Equipment Latent Gain Rate [W]',ZoneSteamEq(Loop)%LatGainRate, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Lost Heat Gain [J]',ZoneSteamEq(Loop)%LostEnergy, &
+    CALL SetupOutputVariable('Steam Equipment Lost Heat Energy [J]',ZoneSteamEq(Loop)%LostEnergy, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Lost Heat Gain Rate [W]',ZoneSteamEq(Loop)%LostRate, &
+    CALL SetupOutputVariable('Steam Equipment Lost Heat Rate [W]',ZoneSteamEq(Loop)%LostRate, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Total Heat Gain [J]',ZoneSteamEq(Loop)%TotGainEnergy, &
+    CALL SetupOutputVariable('Steam Equipment Total Heating Energy [J]',ZoneSteamEq(Loop)%TotGainEnergy, &
                              'Zone','Sum',ZoneSteamEq(Loop)%Name)
-    CALL SetupOutputVariable('Steam Equipment Total Heat Gain Rate [W]',ZoneSteamEq(Loop)%TotGainRate, &
+    CALL SetupOutputVariable('Steam Equipment Total Heating Rate [W]',ZoneSteamEq(Loop)%TotGainRate, &
                              'Zone','Average',ZoneSteamEq(Loop)%Name)
 
     ! Zone total report variables
     IF (RepVarSet(ZoneSteamEq(Loop)%ZonePtr)) THEN
       RepVarSet(ZoneSteamEq(Loop)%ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Steam Equipment District Heating Consumption Rate [W]', &
+      CALL SetupOutputVariable('Zone Steam Equipment District Heating Rate [W]', &
                                ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamPower, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment District Heating Consumption [J]', &
+      CALL SetupOutputVariable('Zone Steam Equipment District Heating Energy [J]', &
                                ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConsump, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
 
-      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Energy [J]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGain, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Radiant Heating Rate [W]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamRadGainRate, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Convective Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Energy [J]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGain, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Convective Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Convective Heating Rate [W]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamConGainRate, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Latent Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Energy [J]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGain, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Latent Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Latent Gain Rate [W]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLatGainRate, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Energy [J]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLost, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Lost Heat Rate [W]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamLostRate, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Total Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Total Heating Energy [J]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGain, &
                                'Zone','Sum',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Steam Equipment Total Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Steam Equipment Total Heating Rate [W]',  &
          ZnRpt(ZoneSteamEq(Loop)%ZonePtr)%SteamTotGainRate, &
                                'Zone','Average',Zone(ZoneSteamEq(Loop)%ZonePtr)%Name)
     ENDIF
@@ -2324,7 +2400,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                        ZoneSteamEq(Loop)%DesignLevel )
     ENDIF ! EMS
 
-    CALL SetupZoneInternalGain(ZoneSteamEq(Loop)%ZonePtr, &
+    IF (.not. ErrorsFound)   &
+      CALL SetupZoneInternalGain(ZoneSteamEq(Loop)%ZonePtr, &
                    'SteamEquipment', &
                    ZoneSteamEq(Loop)%Name, &
                    IntGainTypeOf_SteamEquipment, &
@@ -2337,13 +2414,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='OtherEquipment'
-  TotOthEquip=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotOthEquip=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneOtherEq(TotOthEquip))
 
   DO Loop=1,TotOthEquip
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2365,6 +2442,8 @@ SUBROUTINE GetInternalHeatGainsInput
     ENDIF
 
     ZoneOtherEq(Loop)%SchedPtr=GetScheduleIndex(AlphaName(3))
+    SchMin=0.0d0
+    SchMax=0.0d0
     IF (ZoneOtherEq(Loop)%SchedPtr == 0) THEN
       IF (lAlphaFieldBlanks(3)) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphaName(1))//  &
@@ -2374,6 +2453,9 @@ SUBROUTINE GetInternalHeatGainsInput
                              '", invalid '//TRIM(cAlphaFieldNames(3))//' entered='//TRIM(AlphaName(3)))
       ENDIF
       ErrorsFound=.true.
+    ELSE
+      SchMin=GetScheduleMinValue(ZoneOtherEq(Loop)%SchedPtr)
+      SchMax=GetScheduleMaxValue(ZoneOtherEq(Loop)%SchedPtr)
     ENDIF
 
     ! Other equipment design level calculation method.
@@ -2385,7 +2467,7 @@ SUBROUTINE GetInternalHeatGainsInput
             '", specifies '//TRIM(cNumericFieldNames(1))//', but that field is blank.  0 Other Equipment will result.')
         ENDIF
 
-      CASE('WATTS/AREA')
+      CASE('WATTS/AREA','POWER/AREA')
         IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
           ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(2)*Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea
           IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%FloorArea <= 0.0) THEN
@@ -2398,7 +2480,7 @@ SUBROUTINE GetInternalHeatGainsInput
             '", specifies '//TRIM(cNumericFieldNames(2))//', but that field is blank.  0 Other Equipment will result.')
         ENDIF
 
-      CASE('WATTS/PERSON')
+      CASE('WATTS/PERSON','POWER/PERSON')
         IF (ZoneOtherEq(Loop)%ZonePtr /= 0) THEN
           ZoneOtherEq(Loop)%DesignLevel=IHGNumbers(3)*Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants
           IF (Zone(ZoneOtherEq(Loop)%ZonePtr)%TotOccupants <= 0.0) THEN
@@ -2419,6 +2501,10 @@ SUBROUTINE GetInternalHeatGainsInput
         ErrorsFound=.true.
     END SELECT
 
+    ! Calculate nominal min/max equipment level
+    ZoneOtherEq(Loop)%NomMinDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMin
+    ZoneOtherEq(Loop)%NomMaxDesignLevel=ZoneOtherEq(Loop)%DesignLevel*SchMax
+
     ZoneOtherEq(Loop)%FractionLatent=IHGNumbers(4)
     ZoneOtherEq(Loop)%FractionRadiant=IHGNumbers(5)
     ZoneOtherEq(Loop)%FractionLost=IHGNumbers(6)
@@ -2435,59 +2521,59 @@ SUBROUTINE GetInternalHeatGainsInput
     IF (ZoneOtherEq(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('Other Equipment Radiant Heat Gain [J]',ZoneOtherEq(Loop)%RadGainEnergy, &
+    CALL SetupOutputVariable('Other Equipment Radiant Heating Energy [J]',ZoneOtherEq(Loop)%RadGainEnergy, &
                              'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Radiant Heat Gain Rate [W]',ZoneOtherEq(Loop)%RadGainRate, &
+    CALL SetupOutputVariable('Other Equipment Radiant Heating Rate [W]',ZoneOtherEq(Loop)%RadGainRate, &
                              'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Convective Heat Gain [J]',ZoneOtherEq(Loop)%ConGainEnergy, &
+    CALL SetupOutputVariable('Other Equipment Convective Heating Energy [J]',ZoneOtherEq(Loop)%ConGainEnergy, &
                              'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Convective Heat Gain Rate [W]',ZoneOtherEq(Loop)%ConGainRate, &
+    CALL SetupOutputVariable('Other Equipment Convective Heating Rate [W]',ZoneOtherEq(Loop)%ConGainRate, &
                              'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Latent Heat Gain [J]',ZoneOtherEq(Loop)%LatGainEnergy, &
+    CALL SetupOutputVariable('Other Equipment Latent Gain Energy [J]',ZoneOtherEq(Loop)%LatGainEnergy, &
                              'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Latent Heat Gain Rate [W]',ZoneOtherEq(Loop)%LatGainRate, &
+    CALL SetupOutputVariable('Other Equipment Latent Gain Rate [W]',ZoneOtherEq(Loop)%LatGainRate, &
                              'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Lost Heat Gain [J]',ZoneOtherEq(Loop)%LostEnergy, &
+    CALL SetupOutputVariable('Other Equipment Lost Heat Energy [J]',ZoneOtherEq(Loop)%LostEnergy, &
                              'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Lost Heat Gain Rate [W]',ZoneOtherEq(Loop)%LostRate, &
+    CALL SetupOutputVariable('Other Equipment Lost Heat Rate [W]',ZoneOtherEq(Loop)%LostRate, &
                              'Zone','Average',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Total Heat Gain [J]',ZoneOtherEq(Loop)%TotGainEnergy, &
+    CALL SetupOutputVariable('Other Equipment Total Heating Energy [J]',ZoneOtherEq(Loop)%TotGainEnergy, &
                              'Zone','Sum',ZoneOtherEq(Loop)%Name)
-    CALL SetupOutputVariable('Other Equipment Total Heat Gain Rate [W]',ZoneOtherEq(Loop)%TotGainRate, &
+    CALL SetupOutputVariable('Other Equipment Total Heating Rate [W]',ZoneOtherEq(Loop)%TotGainRate, &
                              'Zone','Average',ZoneOtherEq(Loop)%Name)
 
     ! Zone total report variables
     IF (RepVarSet(ZoneOtherEq(Loop)%ZonePtr)) THEN
       RepVarSet(ZoneOtherEq(Loop)%ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Other Equipment Radiant Heat Gain [J]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGain, &
+      CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Energy [J]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGain, &
                                'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Radiant Heat Gain Rate [W]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGainRate, &
+      CALL SetupOutputVariable('Zone Other Equipment Radiant Heating Rate [W]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherRadGainRate, &
                                'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Convective Heat Gain [J]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGain, &
+      CALL SetupOutputVariable('Zone Other Equipment Convective Heating Energy [J]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGain, &
                                'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Convective Heat Gain Rate [W]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGainRate, &
+      CALL SetupOutputVariable('Zone Other Equipment Convective Heating Rate [W]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherConGainRate, &
                                'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Latent Heat Gain [J]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGain, &
+      CALL SetupOutputVariable('Zone Other Equipment Latent Gain Energy [J]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGain, &
                                'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Latent Heat Gain Rate [W]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGainRate, &
+      CALL SetupOutputVariable('Zone Other Equipment Latent Gain Rate [W]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLatGainRate, &
                                'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Gain [J]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLost, &
+      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Energy [J]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLost, &
                                'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Gain Rate [W]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLostRate, &
+      CALL SetupOutputVariable('Zone Other Equipment Lost Heat Rate [W]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherLostRate, &
                                'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Total Heat Gain [J]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGain, &
+      CALL SetupOutputVariable('Zone Other Equipment Total Heating Energy [J]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGain, &
                                'Zone','Sum',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Other Equipment Total Heat Gain Rate [W]',  &
-         ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGainRate, &
+      CALL SetupOutputVariable('Zone Other Equipment Total Heating Rate [W]',  &
+                                ZnRpt(ZoneOtherEq(Loop)%ZonePtr)%OtherTotGainRate, &
                                'Zone','Average',Zone(ZoneOtherEq(Loop)%ZonePtr)%Name)
     ENDIF
     IF (AnyEnergyManagementSystemInModel) Then
@@ -2497,7 +2583,8 @@ SUBROUTINE GetInternalHeatGainsInput
                                        ZoneOtherEq(Loop)%DesignLevel )
     ENDIF ! EMS
 
-    CALL SetupZoneInternalGain(ZoneOtherEq(Loop)%ZonePtr, &
+    IF (.not. ErrorsFound)   &
+      CALL SetupZoneInternalGain(ZoneOtherEq(Loop)%ZonePtr, &
                    'OtherEquipment', &
                    ZoneOtherEq(Loop)%Name, &
                    IntGainTypeOf_OtherEquipment, &
@@ -2510,13 +2597,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='ZoneBaseboard:OutdoorTemperatureControlled'
-  TotBBHeat=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotBBHeat=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneBBHeat(TotBBHeat))
 
   DO Loop=1,TotBBHeat
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2589,52 +2676,52 @@ SUBROUTINE GetInternalHeatGainsInput
     IF (ZoneBBHeat(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('Baseboard Heat Electric Power [W]',ZoneBBHeat(Loop)%Power, &
+    CALL SetupOutputVariable('Baseboard Electric Power [W]',ZoneBBHeat(Loop)%Power, &
                              'Zone','Average',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Electric Consumption [J]',ZoneBBHeat(Loop)%Consumption, &
+    CALL SetupOutputVariable('Baseboard Electric Energy [J]',ZoneBBHeat(Loop)%Consumption, &
                              'Zone','Sum',ZoneBBHeat(Loop)%Name, ResourceTypeKey='Electricity', &
                              GroupKey='Building',ZoneKey=Zone(ZoneBBHeat(Loop)%ZonePtr)%Name, &
                              EndUseKey='InteriorEquipment',EndUseSubKey=ZoneBBHeat(Loop)%EndUseSubcategory, &
                              ZoneMult=Zone(ZoneBBHeat(Loop)%ZonePtr)%Multiplier, &
                              ZoneListMult=Zone(ZoneBBHeat(Loop)%ZonePtr)%ListMultiplier)
 
-    CALL SetupOutputVariable('Baseboard Heat Radiant Heat Gain [J]',ZoneBBHeat(Loop)%RadGainEnergy, &
+    CALL SetupOutputVariable('Baseboard Radiant Heating Energy [J]',ZoneBBHeat(Loop)%RadGainEnergy, &
                              'Zone','Sum',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Radiant Heat Gain Rate [W]',ZoneBBHeat(Loop)%RadGainRate, &
+    CALL SetupOutputVariable('Baseboard Radiant Heating Rate [W]',ZoneBBHeat(Loop)%RadGainRate, &
                              'Zone','Average',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Convective Heat Gain [J]',ZoneBBHeat(Loop)%ConGainEnergy, &
+    CALL SetupOutputVariable('Baseboard Convective Heating Energy [J]',ZoneBBHeat(Loop)%ConGainEnergy, &
                              'Zone','Sum',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Convective Heat Gain Rate [W]',ZoneBBHeat(Loop)%ConGainRate, &
+    CALL SetupOutputVariable('Baseboard Convective Heating Rate [W]',ZoneBBHeat(Loop)%ConGainRate, &
                              'Zone','Average',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Total Heat Gain [J]',ZoneBBHeat(Loop)%TotGainEnergy, &
+    CALL SetupOutputVariable('Baseboard Total Heating Energy [J]',ZoneBBHeat(Loop)%TotGainEnergy, &
                              'Zone','Sum',ZoneBBHeat(Loop)%Name)
-    CALL SetupOutputVariable('Baseboard Heat Total Heat Gain Rate [W]',ZoneBBHeat(Loop)%TotGainRate, &
+    CALL SetupOutputVariable('Baseboard Total Heating Rate [W]',ZoneBBHeat(Loop)%TotGainRate, &
                              'Zone','Average',ZoneBBHeat(Loop)%Name)
 
     ! Zone total report variables
     IF (RepVarSet(ZoneBBHeat(Loop)%ZonePtr)) THEN
       RepVarSet(ZoneBBHeat(Loop)%ZonePtr)=.false.
-      CALL SetupOutputVariable('Zone Baseboard Heat Electric Power [W]',ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatPower, &
+      CALL SetupOutputVariable('Zone Baseboard Electric Power [W]',ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatPower, &
                                'Zone','Average',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Electric Consumption [J]',ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatElecCons, &
+      CALL SetupOutputVariable('Zone Baseboard Electric Energy [J]',ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatElecCons, &
                                'Zone','Sum',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
 
-      CALL SetupOutputVariable('Zone Baseboard Heat Radiant Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Baseboard Radiant Heating Energy [J]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatRadGain, &
                                'Zone','Sum',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Radiant Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Baseboard Radiant Heating Rate [W]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatRadGainRate, &
                                'Zone','Average',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Convective Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Baseboard Convective Heating Energy [J]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatConGain, &
                                'Zone','Sum',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Convective Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Baseboard Convective Heating Rate [W]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatConGainRate, &
                                'Zone','Average',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Total Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Baseboard Total Heating Energy [J]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatTotGain, &
                                'Zone','Sum',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('Zone Baseboard Heat Total Heat Gain Rate [W]',  &
+      CALL SetupOutputVariable('Zone Baseboard Total Heating Rate [W]',  &
          ZnRpt(ZoneBBHeat(Loop)%ZonePtr)%BaseHeatTotGainRate, &
                                'Zone','Average',Zone(ZoneBBHeat(Loop)%ZonePtr)%Name)
     ENDIF
@@ -2659,13 +2746,13 @@ SUBROUTINE GetInternalHeatGainsInput
 
   RepVarSet=.true.
   CurrentModuleObject='ZoneContaminantSourceAndSink:CarbonDioxide'
-  TotCO2Gen=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotCO2Gen=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ZoneCO2Gen(TotCO2Gen))
 
   DO Loop=1,TotCO2Gen
     AlphaName='  '
     IHGNumbers=0.0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,AlphaName,NumAlpha,IHGNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2722,14 +2809,15 @@ SUBROUTINE GetInternalHeatGainsInput
     IF (ZoneCO2Gen(Loop)%ZonePtr <=0) CYCLE   ! Error, will be caught and terminated later
 
     ! Object report variables
-    CALL SetupOutputVariable('CO2 source and sink rate [m3/s]',ZoneCO2Gen(Loop)%CO2GainRate, &
+    CALL SetupOutputVariable('Contaminant Source or Sink CO2 Gain Volume Flow Rate [m3/s]',ZoneCO2Gen(Loop)%CO2GainRate, &
                              'Zone','Average',ZoneCO2Gen(Loop)%Name)
 
     ! Zone total report variables
     IF (RepVarSet(ZoneCO2Gen(Loop)%ZonePtr)) THEN
       RepVarSet(ZoneCO2Gen(Loop)%ZonePtr)=.false.
 
-      CALL SetupOutputVariable('Zone CO2 Source and Sink Rate [m3/s]',ZnRpt(ZoneCO2Gen(Loop)%ZonePtr)%CO2Rate, &
+      CALL SetupOutputVariable('Zone Contaminant Source or Sink CO2 Gain Volume Flow Rate [m3/s]',&
+                                ZnRpt(ZoneCO2Gen(Loop)%ZonePtr)%CO2Rate, &
                                'Zone','Average',Zone(ZoneCO2Gen(Loop)%ZonePtr)%Name)
 
     ENDIF
@@ -2824,7 +2912,7 @@ SUBROUTINE GetInternalHeatGainsInput
     IF (Loop == 1) WRITE(OutputFileInits,723,advance='No') 'People','Number of People {},'//  &
        'People/Floor Area {person/m2},Floor Area per person {m2/person},'//  &
        'Fraction Radiant,Fraction Convected,Sensible Fraction Calculation,Activity level,'//  &
-       'ASHRAE 55 Warnings,Carbon Dioxide Generation Rate'
+       'ASHRAE 55 Warnings,Carbon Dioxide Generation Rate,Nominal Minimum Number of People,Nominal Maximum Number of People'
     IF (Loop == 1) THEN
       IF (People(Loop)%Fanger .or. People(Loop)%Pierce .or. People(Loop)%KSU) THEN
         WRITE(OutputFileInits,fmta) ',MRT Calculation Type,Work Efficiency,Clothing,Air Velocity,Fanger Calculation,'//  &
@@ -2881,6 +2969,10 @@ SUBROUTINE GetInternalHeatGainsInput
     ENDIF
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(People(Loop)%CO2RateFactor,4)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(People(Loop)%NomMinNumberPeople,0)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(People(Loop)%NomMaxNumberPeople,0)
     IF (People(Loop)%Fanger .or. People(Loop)%Pierce .or. People(Loop)%KSU) THEN
       WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
       IF (People(Loop)%MRTCalcType == ZoneAveraged) THEN
@@ -2921,7 +3013,8 @@ SUBROUTINE GetInternalHeatGainsInput
   DO Loop=1,TotLights
     IF (Loop == 1) WRITE(OutputFileInits,723) 'Lights','Lighting Level {W},'//  &
        'Lights/Floor Area {W/m2},Lights per person {W/person},'//  &
-       'Fraction Return Air,Fraction Radiant,Fraction Short Wave,Fraction Convected,Fraction Replaceable,EndUse Category'
+       'Fraction Return Air,Fraction Radiant,Fraction Short Wave,Fraction Convected,Fraction Replaceable,End-Use Category,'//   &
+       'Nominal Minimum Lighting Level {W},Nominal Maximum Lighting Level {W}'
 
     ZoneNum=Lights(Loop)%ZonePtr
 
@@ -2957,12 +3050,18 @@ SUBROUTINE GetInternalHeatGainsInput
     StringOut=RoundSigDigits(Lights(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(Lights(Loop)%FractionReplaceable,3)
-    WRITE(OutputFileInits,fmta) TRIM(StringOut)//','//TRIM(Lights(Loop)%EndUseSubcategory)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(Lights(Loop)%EndUseSubcategory)//','
+    StringOut=RoundSigDigits(Lights(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(Lights(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
   DO Loop=1,TotElecEquip
     IF (Loop == 1) WRITE(OutputFileInits,723) 'ElectricEquipment','Equipment Level {W},'//  &
        'Equipment/Floor Area {W/m2},Equipment per person {W/person},'//  &
-       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,EndUse SubCategory'
+       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,End-Use SubCategory,'//  &
+       'Nominal Minimum Equipment Level {W},Nominal Maximum Equipment Level {W}'
 
     ZoneNum=ZoneElectric(Loop)%ZonePtr
 
@@ -2997,12 +3096,17 @@ SUBROUTINE GetInternalHeatGainsInput
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(ZoneElectric(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    WRITE(OutputFileInits,fmta) TRIM(ZoneElectric(Loop)%EndUseSubcategory)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(ZoneElectric(Loop)%EndUseSubcategory)//','
+    StringOut=RoundSigDigits(ZoneElectric(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(ZoneElectric(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
   DO Loop=1,TotGasEquip
     IF (Loop == 1) WRITE(OutputFileInits,723) 'GasEquipment','Equipment Level {W},'//  &
        'Equipment/Floor Area {W/m2},Equipment per person {W/person},'//  &
-       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,EndUse SubCategory'
+       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,End-Use SubCategory,'//  &
+       'Nominal Minimum Equipment Level {W},Nominal Maximum Equipment Level {W}'
 
     ZoneNum=ZoneGas(Loop)%ZonePtr
 
@@ -3038,13 +3142,18 @@ SUBROUTINE GetInternalHeatGainsInput
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(ZoneGas(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    WRITE(OutputFileInits,fmta) TRIM(ZoneGas(Loop)%EndUseSubcategory)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(ZoneGas(Loop)%EndUseSubcategory)//','
+    StringOut=RoundSigDigits(ZoneGas(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(ZoneGas(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
 
   DO Loop=1,TotHWEquip
     IF (Loop == 1) WRITE(OutputFileInits,723) 'HotWaterEquipment','Equipment Level {W},'//  &
        'Equipment/Floor Area {W/m2},Equipment per person {W/person},'//  &
-       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,EndUse SubCategory'
+       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,End-Use SubCategory,'//  &
+       'Nominal Minimum Equipment Level {W},Nominal Maximum Equipment Level {W}'
 
     ZoneNum=ZoneHWEq(Loop)%ZonePtr
 
@@ -3080,13 +3189,18 @@ SUBROUTINE GetInternalHeatGainsInput
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(ZoneHWEq(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    WRITE(OutputFileInits,fmta) TRIM(ZoneHWEq(Loop)%EndUseSubcategory)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(ZoneHWEq(Loop)%EndUseSubcategory)//','
+    StringOut=RoundSigDigits(ZoneHWEq(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(ZoneHWEq(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
 
   DO Loop=1,TotStmEquip
     IF (Loop == 1) WRITE(OutputFileInits,723) 'SteamEquipment','Equipment Level {W},'//  &
        'Equipment/Floor Area {W/m2},Equipment per person {W/person},'//  &
-       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,EndUse SubCategory'
+       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,End-Use SubCategory,'//  &
+       'Nominal Minimum Equipment Level {W},Nominal Maximum Equipment Level {W}'
 
     ZoneNum=ZoneSteamEq(Loop)%ZonePtr
 
@@ -3122,14 +3236,18 @@ SUBROUTINE GetInternalHeatGainsInput
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(ZoneSteamEq(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    WRITE(OutputFileInits,fmta) TRIM(ZoneSteamEq(Loop)%EndUseSubcategory)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(ZoneSteamEq(Loop)%EndUseSubcategory)//','
+    StringOut=RoundSigDigits(ZoneSteamEq(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(ZoneSteamEq(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
 
   DO Loop=1,TotOthEquip
     IF (Loop == 1) WRITE(OutputFileInits,723) 'OtherEquipment','Equipment Level {W},'//  &
        'Equipment/Floor Area {W/m2},Equipment per person {W/person},'//  &
-       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected'
-
+       'Fraction Latent,Fraction Radiant,Fraction Lost,Fraction Convected,'//  &
+       'Nominal Minimum Equipment Level {W},Nominal Maximum Equipment Level {W}'
     ZoneNum=ZoneOtherEq(Loop)%ZonePtr
 
     IF (ZoneNum == 0) THEN
@@ -3164,13 +3282,16 @@ SUBROUTINE GetInternalHeatGainsInput
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
     StringOut=RoundSigDigits(ZoneOtherEq(Loop)%FractionConvected,3)
     WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
-    WRITE(OutputFileInits,fmta) TRIM(ZoneOtherEq(Loop)%EndUseSubcategory)
+    StringOut=RoundSigDigits(ZoneOtherEq(Loop)%NomMinDesignLevel,3)
+    WRITE(OutputFileInits,fmta,advance='No') TRIM(StringOut)//','
+    StringOut=RoundSigDigits(ZoneOtherEq(Loop)%NomMaxDesignLevel,3)
+    WRITE(OutputFileInits,fmta) TRIM(StringOut)
   ENDDO
 
   DO Loop=1,TotBBHeat
     IF (Loop == 1) WRITE(OutputFileInits,723) 'Outdoor Controlled Baseboard Heat','Capacity at Low Temperature {W},'//  &
        'Low Temperature {C},Capacity at High Temperature {W},High Temperature {C},'//  &
-       'Fraction Radiant,Fraction Convected,EndUse Subcategory'
+       'Fraction Radiant,Fraction Convected,End-Use Subcategory'
 
     ZoneNum=ZoneBBHeat(Loop)%ZonePtr
 
@@ -3251,6 +3372,11 @@ SUBROUTINE InitInternalHeatGains
                                        FigureTransformerZoneGains
   USE DaylightingDevices,        ONLY: FigureTDDZoneGains
   USE RefrigeratedCase,          ONLY: FigureRefrigerationZoneGains
+  USE OutputReportTabular, ONLY: radiantPulseUsed,radiantPulseTimestep,radiantPulseReceived
+  USE DataGlobals, ONLY: CompLoadReportIsReq
+  USE DataGlobalConstants, ONLY: endUseHeating,endUseCooling
+  USE OutputReportTabular, ONLY: AllocateLoadComponentArrays
+  USE DataSizing, ONLY: CurOverallSimDay
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3281,6 +3407,9 @@ SUBROUTINE InitInternalHeatGains
   REAL(r64) :: FractionRadiant    ! For general lighting, fraction of heat from lights to zone that is long wave
   INTEGER :: ReturnZonePlenumCondNum ! Number of ZoneRetPlenCond for a zone's return air plenum, if it exists
   REAL(r64) :: ReturnPlenumTemp   ! Air temperature of a zone's return air plenum (C)
+  REAL(r64) :: pulseMultipler     ! use to create a pulse for the load component report computations
+  REAL(r64) :: curQL = 0.0        ! radiant value prior to adjustment for pulse for load component report
+  REAL(r64) :: adjQL = 0.0        ! radiant value including adjustment for pulse for load component report
 
 !  REAL(r64), ALLOCATABLE, SAVE, DIMENSION(:) :: QSA
 
@@ -3626,11 +3755,29 @@ SUBROUTINE InitInternalHeatGains
 
   SumConvHTRadSys = 0.0
 
+  pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
+  IF (CompLoadReportIsReq) THEN
+    CALL AllocateLoadComponentArrays
+  END IF
   DO SurfNum = 1, TotSurfaces
     NZ = Surface(SurfNum)%Zone
     IF (.NOT. Surface(SurfNum)%HeatTransSurf .OR. NZ == 0) CYCLE ! Skip non-heat transfer surfaces
-
-    QRadThermInAbs(SurfNum) = QL(NZ) * TMULT(NZ) * ITABSF(SurfNum)
+    IF (.NOT. doLoadComponentPulseNow) THEN
+      QRadThermInAbs(SurfNum) = QL(NZ) * TMULT(NZ) * ITABSF(SurfNum)
+    ELSE
+      curQL = QL(NZ)
+      ! for the loads component report during the special sizing run increase the radiant portion
+      ! a small amount to create a "pulse" of heat that is used for the
+      adjQL = curQL + Zone(NZ)%FloorArea * pulseMultipler
+      ! ITABSF is the Inside Thermal Absorptance
+      ! TMULT is a mulipliter for each zone
+      ! QRadThermInAbs is the thermal radiation absorbed on inside surfaces
+      QRadThermInAbs(SurfNum) = adjQL * TMULT(NZ) * ITABSF(SurfNum)
+      ! store the magnitude and time of the pulse
+      radiantPulseUsed(NZ,CurOverallSimDay) = adjQL - curQL
+      radiantPulseTimestep(NZ,CurOverallSimDay) = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+      radiantPulseReceived(SurfNum,CurOverallSimDay) = (adjQL - curQL) * TMULT(NZ) * ITABSF(SurfNum) * Surface(SurfNum)%area
+    END IF
   END DO
 
   RETURN
@@ -4858,9 +5005,126 @@ SUBROUTINE SumAllInternalGenericContamGains(ZoneNum, SumGCGainRate)
 
 END SUBROUTINE SumAllInternalGenericContamGains
 
+SUBROUTINE GatherComponentLoadsIntGain
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Gather values during sizing used for loads component report.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Save sequence of values for report during sizing.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataHeatBalance
+USE DataGlobals, ONLY: NumOfTimeStepInHour, CompLoadReportIsReq, isPulseZoneSizing
+USE DataSizing, ONLY: CurOverallSimDay
+USE OutputReportTabular, ONLY: peopleInstantSeq, peopleLatentSeq, peopleRadSeq, &
+                               lightInstantSeq, lightRetAirSeq, lightLWRadSeq, &
+                               equipInstantSeq, equipLatentSeq, equipRadSeq, &
+                               refrigInstantSeq, refrigRetAirSeq, refrigLatentSeq, &
+                               waterUseInstantSeq, waterUseLatentSeq, &
+                               hvacLossInstantSeq, hvacLossRadSeq, &
+                               powerGenInstantSeq, powerGenRadSeq
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iZone = 0
+INTEGER :: TimeStepInDay = 0
+INTEGER, DIMENSION(1) :: IntGainTypesPeople = (/    IntGainTypeOf_People/)
+INTEGER, DIMENSION(1) :: IntGainTypesLight =  (/    IntGainTypeOf_Lights/)
+INTEGER, DIMENSION(5) :: IntGainTypesEquip = (/     IntGainTypeOf_ElectricEquipment, &
+                                                    IntGainTypeOf_GasEquipment, &
+                                                    IntGainTypeOf_HotWaterEquipment ,&
+                                                    IntGainTypeOf_SteamEquipment, &
+                                                    IntGainTypeOf_OtherEquipment/)
+INTEGER, DIMENSION(7) :: IntGainTypesRefrig = (/    IntGainTypeOf_RefrigerationCase, &
+                                                    IntGainTypeOf_RefrigerationCompressorRack, &
+                                                    IntGainTypeOf_RefrigerationSystemAirCooledCondenser ,&
+                                                    IntGainTypeOf_RefrigerationSystemSuctionPipe, &
+                                                    IntGainTypeOf_RefrigerationSecondaryReceiver, &
+                                                    IntGainTypeOf_RefrigerationSecondaryPipe, &
+                                                    IntGainTypeOf_RefrigerationWalkIn/)
+INTEGER, DIMENSION(3) :: IntGainTypesWaterUse = (/  IntGainTypeOf_WaterUseEquipment, &
+                                                    IntGainTypeOf_WaterHeaterMixed, &
+                                                    IntGainTypeOf_WaterHeaterStratified/)
+INTEGER, DIMENSION(13) :: IntGainTypesHvacLoss = (/ IntGainTypeOf_ZoneBaseboardOutdoorTemperatureControlled, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterMixed, &
+                                                    IntGainTypeOf_ThermalStorageChilledWaterStratified, &
+                                                    IntGainTypeOf_PipeIndoor, &
+                                                    IntGainTypeOf_Pump_VarSpeed, &
+                                                    IntGainTypeOf_Pump_ConSpeed, &
+                                                    IntGainTypeOf_Pump_Cond, &
+                                                    IntGainTypeOf_PumpBank_VarSpeed, &
+                                                    IntGainTypeOf_PumpBank_ConSpeed, &
+                                                    IntGainTypeOf_PlantComponentUserDefined, &
+                                                    IntGainTypeOf_CoilUserDefined, &
+                                                    IntGainTypeOf_ZoneHVACForcedAirUserDefined, &
+                                                    IntGainTypeOf_AirTerminalUserDefined/)
+INTEGER, DIMENSION(8) :: IntGainTypesPowerGen = (/  IntGainTypeOf_GeneratorFuelCell, &
+                                                    IntGainTypeOf_GeneratorMicroCHP, &
+                                                    IntGainTypeOf_ElectricLoadCenterTransformer ,&
+                                                    IntGainTypeOf_ElectricLoadCenterInverterSimple, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterFunctionOfPower, &
+                                                    IntGainTypeOf_ElectricLoadCenterInverterLookUpTable, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageBattery, &
+                                                    IntGainTypeOf_ElectricLoadCenterStorageSimple/)
+
+IF (CompLoadReportIsReq .AND. .NOT. isPulseZoneSizing) THEN
+  TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+  DO iZone = 1, NumOfZones
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesPeople, peopleInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalLatentGainsByTypes(iZone, IntGainTypesPeople, peopleLatentSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalRadiationGainsByTypes(iZone, IntGainTypesPeople, peopleRadSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesLight, lightInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumReturnAirConvectionGainsByTypes(iZone, IntGainTypesLight, lightRetAirSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalRadiationGainsByTypes(iZone, IntGainTypesLight, lightLWRadSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesEquip, equipInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalLatentGainsByTypes(iZone, IntGainTypesEquip, equipLatentSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalRadiationGainsByTypes(iZone, IntGainTypesEquip, equipRadSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesRefrig, refrigInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumReturnAirConvectionGainsByTypes(iZone, IntGainTypesRefrig, refrigRetAirSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalLatentGainsByTypes(iZone, IntGainTypesRefrig, refrigLatentSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesWaterUse, waterUseInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalLatentGainsByTypes(iZone, IntGainTypesWaterUse, waterUseLatentSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesHvacLoss, hvacLossInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalRadiationGainsByTypes(iZone, IntGainTypesHvacLoss, hvacLossRadSeq(iZone,TimeStepInDay,CurOverallSimDay))
+
+    CALL SumInternalConvectionGainsByTypes(iZone, IntGainTypesPowerGen, powerGenInstantSeq(iZone,TimeStepInDay,CurOverallSimDay))
+    CALL SumInternalRadiationGainsByTypes(iZone, IntGainTypesPowerGen, powerGenRadSeq(iZone,TimeStepInDay,CurOverallSimDay))
+  END DO
+END IF
+END SUBROUTINE GatherComponentLoadsIntGain
+
+
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -4929,7 +5193,7 @@ SUBROUTINE SetupZoneInternalGain(ZoneNum, cComponentObject , cComponentName, Int
   REAL(r64), TARGET, OPTIONAL, INTENT(IN) :: GenericContamGainRate
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  INTEGER, PARAMETER :: DeviceAllocInc = 4
+  INTEGER, PARAMETER :: DeviceAllocInc = 100
 
 
           ! INTERFACE BLOCK SPECIFICATIONS:
@@ -4975,6 +5239,9 @@ SUBROUTINE SetupZoneInternalGain(ZoneNum, cComponentObject , cComponentName, Int
 
   IF (FoundDuplicate) THEN
     CALL ShowSevereError('SetupZoneInternalGain: developer error, trapped duplicate internal gains sent to SetupZoneInternalGain')
+    CALL ShowContinueError('The duplicate object user name ='//TRIM(cComponentName) )
+    CALL ShowContinueError('The duplicate object type = '//TRIM(cComponentObject) )
+    CALL ShowContinueError('This internal gain will not be modeled, and the simulation continues')
     RETURN
   ENDIF
 

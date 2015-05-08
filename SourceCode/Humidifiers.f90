@@ -25,7 +25,7 @@ MODULE Humidifiers
   ! USE STATEMENTS:
   ! Use statements for data only modules
   USE DataPrecisionGlobals
-  USE DataGlobals, ONLY: MaxNameLength, BeginEnvrnFlag, InitConvTemp, SysSizingCalc, SecInHour
+  USE DataGlobals, ONLY: MaxNameLength, BeginEnvrnFlag, InitConvTemp, SysSizingCalc, SecInHour, ScheduleAlwaysOn
   USE DataInterfaces, ONLY: SetupOutputVariable, ShowWarningError, ShowSevereError, ShowFatalError, &
                        ShowContinueError
   USE DataLoopNode
@@ -265,14 +265,14 @@ SUBROUTINE GetHumidifierInput
                                                             !  certain object in the input file
 
   CurrentModuleObject='Humidifier:Steam:Electric'
-  NumElecSteamHums = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumElecSteamHums = GetNumObjectsFound(CurrentModuleObject)
   NumHumidifiers = NumElecSteamHums
   ! allocate the data array
   ALLOCATE(Humidifier(NumHumidifiers))
   ALLOCATE(CheckEquipName(NumHumidifiers))
   CheckEquipName=.true.
 
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(cAlphaFields(NumAlphas))
@@ -288,7 +288,7 @@ SUBROUTINE GetHumidifierInput
 
   ! loop over electric steam humidifiers and load the input data
   DO HumidifierIndex = 1,NumElecSteamHums
-    CALL GetObjectItem(TRIM(CurrentModuleObject),HumidifierIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,HumidifierIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
     HumNum = HumidifierIndex
@@ -303,17 +303,16 @@ SUBROUTINE GetHumidifierInput
 !    Humidifier(HumNum)%HumType  = TRIM(CurrentModuleObject)
     Humidifier(HumNum)%HumType_Code = Humidifier_Steam_Electric
     Humidifier(HumNum)%Sched    = Alphas(2)
-    Humidifier(HumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-    IF (Humidifier(HumNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      Humidifier(HumNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      Humidifier(HumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (Humidifier(HumNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
            ' entered ='//TRIM(Alphas(2))// &
            ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     Humidifier(HumNum)%NomCapVol    = Numbers(1)
     Humidifier(HumNum)%NomPower     = Numbers(2)
@@ -343,38 +342,39 @@ SUBROUTINE GetHumidifierInput
   DO HumNum=1,NumHumidifiers
     ! Setup Report variables for the Humidifiers
     IF (Humidifier(HumNum)%SuppliedByWaterSystem) THEN
-      CALL SetupOutputVariable('Humidifier Water Consumption Rate[m3/s]',Humidifier(HumNum)%WaterConsRate, &
+      CALL SetupOutputVariable('Humidifier Water Volume Flow Rate [m3/s]',Humidifier(HumNum)%WaterConsRate, &
                              'System','Average',Humidifier(HumNum)%Name)
-      CALL SetupOutputVariable('Humidifier Water Consumption [m3]',Humidifier(HumNum)%WaterCons, &
+      CALL SetupOutputVariable('Humidifier Water Volume [m3]',Humidifier(HumNum)%WaterCons, &
                              'System','Sum',Humidifier(HumNum)%Name)
-      CALL SetupOutputVariable('Humidifier Water From Storage Tank Rate [m3/s]',Humidifier(HumNum)%TankSupplyVdot , &
+      CALL SetupOutputVariable('Humidifier Storage Tank Water Volume Flow Rate [m3/s]',Humidifier(HumNum)%TankSupplyVdot , &
                              'System','Average',Humidifier(HumNum)%Name)
-      CALL SetupOutputVariable('Humidifier Water From Storage Tank [m3]',Humidifier(HumNum)%TankSupplyVol , &
+      CALL SetupOutputVariable('Humidifier Storage Tank Water Volume [m3]',Humidifier(HumNum)%TankSupplyVol , &
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypekey='Water', EndUseKey='HUMIDIFIER', GroupKey = 'SYSTEM')
-      CALL SetupOutputVariable('Humidifier Water Starved By Storage Tank Rate [m3/s]',Humidifier(HumNum)%StarvedSupplyVdot , &
+      CALL SetupOutputVariable('Humidifier Starved Storage Tank Water Volume Flow Rate [m3/s]',  &
+                             Humidifier(HumNum)%StarvedSupplyVdot , &
                              'System','Average',Humidifier(HumNum)%Name)
-      CALL SetupOutputVariable('Humidifier Water Starved By Storage Tank [m3]',Humidifier(HumNum)%StarvedSupplyVol , &
+      CALL SetupOutputVariable('Humidifier Starved Storage Tank Water Volume [m3]',Humidifier(HumNum)%StarvedSupplyVol , &
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypeKey='Water', EndUseKey='HUMIDIFIER', GroupKey = 'SYSTEM')
-      CALL SetupOutputVariable('Humidifier Water Mains Draw [m3]',Humidifier(HumNum)%StarvedSupplyVol , &
+      CALL SetupOutputVariable('Humidifier Mains Water Volume [m3]',Humidifier(HumNum)%StarvedSupplyVol , &
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypeKey='MainsWater', EndUseKey='HUMIDIFIER', GroupKey = 'SYSTEM')
 
     ELSE
-      CALL SetupOutputVariable('Humidifier Water Consumption Rate[m3/s]',Humidifier(HumNum)%WaterConsRate, &
+      CALL SetupOutputVariable('Humidifier Water Volume Flow Rate [m3/s]',Humidifier(HumNum)%WaterConsRate, &
                              'System','Average',Humidifier(HumNum)%Name)
-      CALL SetupOutputVariable('Humidifier Water Consumption[m3]',Humidifier(HumNum)%WaterCons, &
+      CALL SetupOutputVariable('Humidifier Water Volume [m3]',Humidifier(HumNum)%WaterCons, &
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypeKey='WATER',EndUseKey = 'HUMIDIFIER',GroupKey = 'System')
-      CALL SetupOutputVariable('Humidifier Water Mains Draw [m3]',Humidifier(HumNum)%WaterCons, &
+      CALL SetupOutputVariable('Humidifier Mains Water Volume [m3]',Humidifier(HumNum)%WaterCons, &
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypeKey='MAINSWATER',EndUseKey = 'HUMIDIFIER',GroupKey = 'System')
 
     ENDIF
-    CALL SetupOutputVariable('Humidifier Electric Power[W]',Humidifier(HumNum)%ElecUseRate,&
+    CALL SetupOutputVariable('Humidifier Electric Power [W]',Humidifier(HumNum)%ElecUseRate,&
                              'System','Average',Humidifier(HumNum)%Name)
-    CALL SetupOutputVariable('Humidifier Electric Consumption[J]',Humidifier(HumNum)%ElecUseEnergy,&
+    CALL SetupOutputVariable('Humidifier Electric Energy [J]',Humidifier(HumNum)%ElecUseEnergy,&
                              'System','Sum',Humidifier(HumNum)%Name, &
                              ResourceTypeKey='ELECTRICITY',EndUseKey = 'HUMIDIFIER',GroupKey = 'System')
 
@@ -420,7 +420,7 @@ SUBROUTINE InitHumidifier(HumNum)
   USE DataGlobals,    ONLY: AnyEnergyManagementSystemInModel
   USE EMSManager,     ONLY: iHumidityRatioMinSetpoint, CheckIfNodeSetpointManagedByEMS
   USE FluidProperties, ONLY: GetSatEnthalpyRefrig, GetSpecificHeatGlycol, FindGlycol, FindRefrigerant
-  USE General,         ONLY: RoundSigDigits  
+  USE General,         ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -441,11 +441,11 @@ SUBROUTINE InitHumidifier(HumNum)
   INTEGER             :: OutNode ! outlet node number
   INTEGER             :: NumHum
   INTEGER             :: RefrigerantIndex ! refiferant index
-  INTEGER             :: WaterIndex       ! fluid type index  
+  INTEGER             :: WaterIndex       ! fluid type index
   REAL(r64)           :: NominalPower     ! Nominal power input to humidifier, W
   REAL(r64)           :: WaterSpecHeat    ! specific heat of water , J/kgK
   REAL(r64)           :: SteamSatEnthalpy ! enthalpy of saturated steam at 100C, J/kg
-  REAL(r64)           :: WaterSatEnthalpy ! enthalpy of saturated water at 100C, J/kg    
+  REAL(r64)           :: WaterSatEnthalpy ! enthalpy of saturated water at 100C, J/kg
 
   LOGICAL,SAVE        :: MyOneTimeFlag = .TRUE.
   LOGICAL, ALLOCATABLE,Save, DIMENSION(:) :: MyEnvrnFlag
@@ -463,17 +463,17 @@ SUBROUTINE InitHumidifier(HumNum)
     MySizeFlag    = .TRUE.
 
   END IF
-  
+
   ! do sizing calculation
-  IF ( MySizeFlag(HumNum) ) THEN  
-    Call SizeHumidifier(HumNum)     
-    MySizeFlag(HumNum) =.FALSE.    
-  ENDIF  
+  IF ( MySizeFlag(HumNum) ) THEN
+    Call SizeHumidifier(HumNum)
+    MySizeFlag(HumNum) =.FALSE.
+  ENDIF
 
   IF ( .NOT. SysSizingCalc .AND. MySetPointCheckFlag .AND. DoSetPointTest) THEN
     DO NumHum = 1, NumHumidifiers
       OutNode = Humidifier(NumHum)%AirOutNode
-        
+
       IF (OutNode > 0) THEN
         IF (Node(OutNode)%HumRatMin == SensedNodeFlagValue) THEN
           IF (.NOT. AnyEnergyManagementSystemInModel) THEN
@@ -500,7 +500,7 @@ SUBROUTINE InitHumidifier(HumNum)
     END DO
     MySetPointCheckFlag = .FALSE.
   END IF
-      
+
   IF (.not. BeginEnvrnFlag) THEN
     MyEnvrnFlag(HumNum)=.TRUE.
   ENDIF
@@ -526,7 +526,7 @@ END SUBROUTINE InitHumidifier
 SUBROUTINE SizeHumidifier(HumNum)
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Bereket Nigusse, UCF/FSEC, 
+          !       AUTHOR         Bereket Nigusse, UCF/FSEC,
           !       DATE WRITTEN   March, 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
@@ -535,10 +535,10 @@ SUBROUTINE SizeHumidifier(HumNum)
           ! This subroutine is for for sizing electric steam humidifier nominal electric power.
 
           ! METHODOLOGY EMPLOYED:
-          ! Uses user sepecified nominal capacity in m3/s and water enthalpy change required to 
+          ! Uses user sepecified nominal capacity in m3/s and water enthalpy change required to
           ! vaporize water from a reference temperature of 20.0C. to steam at 100.0C.
           !  m_dot = Nominal Capacity [m3/s] * Density of water at 5.05 [kg/m3]
-          !  Nominal Capacity =  m_dot [kg/s] * delta_enthalpy [J/kg] 
+          !  Nominal Capacity =  m_dot [kg/s] * delta_enthalpy [J/kg]
 
           ! REFERENCES:
           ! na
@@ -549,7 +549,7 @@ SUBROUTINE SizeHumidifier(HumNum)
   USE General,             ONLY: RoundSigDigits
   USE ReportSizingManager, ONLY: ReportSizingOutput
   USE DataSizing,          ONLY: Autosize
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -569,41 +569,41 @@ SUBROUTINE SizeHumidifier(HumNum)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER             :: NumHum
   INTEGER             :: RefrigerantIndex ! refiferant index
-  INTEGER             :: WaterIndex       ! fluid type index  
+  INTEGER             :: WaterIndex       ! fluid type index
   REAL(r64)           :: NominalPower     ! Nominal power input to humidifier, W
   REAL(r64)           :: WaterSpecHeatAvg ! specific heat of water, J/kgK
   REAL(r64)           :: SteamSatEnthalpy ! enthalpy of saturated steam at 100C, J/kg
   REAL(r64)           :: WaterSatEnthalpy ! enthalpy of saturated water at 100C, J/kg
-       
-    
-  IF (Humidifier(HumNum)%HumType_Code == Humidifier_Steam_Electric) THEN         
+
+
+  IF (Humidifier(HumNum)%HumType_Code == Humidifier_Steam_Electric) THEN
       Humidifier(HumNum)%NomCap = RhoH2O(InitConvTemp)*Humidifier(HumNum)%NomCapVol
-        
+
       RefrigerantIndex = FindRefrigerant('STEAM')
-      WaterIndex = FindGlycol('WATER')          
+      WaterIndex = FindGlycol('WATER')
       SteamSatEnthalpy = GetSatEnthalpyRefrig('STEAM',TSteam,1.0d0,RefrigerantIndex,CalledFrom)
       WaterSatEnthalpy = GetSatEnthalpyRefrig('STEAM',TSteam,0.0d0,RefrigerantIndex,CalledFrom)
       WaterSpecHeatAvg = 0.5d0*(GetSpecificHeatGlycol('WATER',TSteam,WaterIndex,CalledFrom) + &
                                 GetSpecificHeatGlycol('WATER',Tref,WaterIndex,CalledFrom))
-        
+
       NominalPower = Humidifier(HumNum)%NomCap &
                    * ((SteamSatEnthalpy-WaterSatEnthalpy) + WaterSpecHeatAvg*(TSteam-Tref))
 
       IF (Humidifier(HumNum)%NomPower == AutoSize) THEN
         Humidifier(HumNum)%NomPower = NominalPower
         CALL ReportSizingOutput('Humidifier:Steam:Electric',Humidifier(HumNum)%Name, &
-                                'Rated Power [W]', Humidifier(HumNum)%NomPower)                      
-      ELSEIF (Humidifier(HumNum)%NomPower >= 0.0d0 .and. Humidifier(HumNum)%NomCap > 0.0d0) THEN 
+                                'Rated Power [W]', Humidifier(HumNum)%NomPower)
+      ELSEIF (Humidifier(HumNum)%NomPower >= 0.0d0 .and. Humidifier(HumNum)%NomCap > 0.0d0) THEN
         IF (Humidifier(HumNum)%NomPower <  NominalPower) THEN
           CALL ShowWarningError('Humidifier:Steam:Electric: specified Rated Power is less than nominal Rated '// &
                                 ' Power for electric steam humidifier = '//TRIM(Humidifier(HumNum)%Name)//'. ')
           CALL ShowContinueError(' specified Rated Power = '//TRIM(RoundSigDigits(Humidifier(HumNum)%NomPower,2)))
           CALL ShowContinueError(' while expecting a minimum Rated Power = '//TRIM(RoundSigDigits(NominalPower,2)))
-        ENDIF       
+        ENDIF
       ELSE
         CALL ShowWarningError('Humidifier:Steam:Electric: specified nominal capacity is zero '// &
                               ' for electric steam humidifier = '//TRIM(Humidifier(HumNum)%Name)//'. ')
-        CALL ShowContinueError(' For zero rated capacity humidifier the rated power is zero.')           
+        CALL ShowContinueError(' For zero rated capacity humidifier the rated power is zero.')
       ENDIF
   END IF
 
@@ -982,7 +982,7 @@ END SUBROUTINE ReportHumidifier
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

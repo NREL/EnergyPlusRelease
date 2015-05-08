@@ -68,7 +68,7 @@ TYPE PondGroundHeatExchangerData
   CHARACTER(len=MaxNameLength) :: InletNode           =' ' ! pond inlet fluid node
   CHARACTER(len=MaxNameLength) :: OutletNode          =' ' ! pond outlet fluid node
   REAL(r64)                    :: DesignMassFlowRate  =0.d0 ! design flow rate of circulating fluid
-  REAL(r64)                    :: DesignCapacity      =0.d0 ! design cooling capacity of pond at 
+  REAL(r64)                    :: DesignCapacity      =0.d0 ! design cooling capacity of pond at
   REAL(r64)                    :: Depth               =0.0 ! depth of pond
   REAL(r64)                    :: Area                =0.0 ! area of pond
   REAL(r64)                    :: TubeInDiameter      =0.0 ! hydronic tube inside diameter
@@ -310,7 +310,7 @@ SUBROUTINE GetPondGroundHeatExchanger
 
           ! Initializations and allocations
   cCurrentModuleObject = 'GroundHeatExchanger:Pond'
-  NumOfPondGHEs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfPondGHEs = GetNumObjectsFound(cCurrentModuleObject)
   ! allocate data structures
   IF(ALLOCATED(PondGHE)) DEALLOCATE(PondGHE)
   IF(ALLOCATED(PondGHEReport)) DEALLOCATE(PondGHEReport)
@@ -328,7 +328,7 @@ SUBROUTINE GetPondGroundHeatExchanger
   DO Item = 1, NumOfPondGHEs
 
     ! get the input data
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
     ! General user input data
@@ -439,21 +439,21 @@ SUBROUTINE GetPondGroundHeatExchanger
 
   ! Set up the output variables
   DO Item = 1, NumOfPondGHEs
-    CALL SetupOutputVariable('Pond ground heat exchanger heat transfer rate[W]',    &
+    CALL SetupOutputVariable('Pond Heat Exchanger Heat Transfer Rate [W]',    &
                               PondGHEReport(Item)%HeatTransferRate,'Plant','Average', &
                               PondGHE(Item)%Name)
-    CALL SetupOutputVariable('Pond ground heat exchanger energy[J]', &
+    CALL SetupOutputVariable('Pond Heat Exchanger Heat Transfer Energy [J]', &
                               PondGHEReport(Item)%Energy,'Plant','Sum',PondGHE(Item)%Name)
-    CALL SetupOutputVariable('Pond ground heat exchanger mass flow rate[kg/s]',      &
+    CALL SetupOutputVariable('Pond Heat Exchanger Mass Flow Rate [kg/s]',      &
                               PondGHEReport(Item)%MassFlowRate,'Plant','Average', &
                               PondGHE(Item)%Name)
-    CALL SetupOutputVariable('Pond ground heat exchanger inlet temp[C]',     &
+    CALL SetupOutputVariable('Pond Heat Exchanger Inlet Temperature [C]',     &
                               PondGHEReport(Item)%InletTemp,'Plant','Average', &
                               PondGHE(Item)%Name)
-    CALL SetupOutputVariable('Pond ground heat exchanger outlet temp[C]',     &
+    CALL SetupOutputVariable('Pond Heat Exchanger Outlet Temperature [C]',     &
                               PondGHEReport(Item)%OutletTemp,'Plant','Average', &
                               PondGHE(Item)%Name)
-    CALL SetupOutputVariable('Pond ground heat exchanger bulk temp[C]',     &
+    CALL SetupOutputVariable('Pond Heat Exchanger Bulk Temperature [C]',     &
                               PondGHEReport(Item)%PondTemp,'Plant','Average', &
                               PondGHE(Item)%Name)
   END DO
@@ -586,7 +586,7 @@ SUBROUTINE InitPondGroundHeatExchanger(PondGHENum,FirstHVACIteration,RunFlag)
                                  PondGHE(PondGHENum)%BranchNum, &
                                  PondGHE(PondGHENum)%CompNum)
     CALL RegisterPlantCompDesignFlow(PondGHE(PondGHENum)%InletNodeNum, PondGHE(PondGHENum)%DesignMassFlowRate /rho)
-                                 
+
     MyFlag(PondGHENum)=.FALSE.
   ENDIF
 
@@ -701,7 +701,7 @@ SUBROUTINE CalcPondGroundHeatExchanger(PondGHENum)
   PondMass = PondDepth*PondArea* &
              GetDensityGlycol('WATER',MAX(PondTemp, constant_zero),  &
                                WaterIndex,'CalcPondGroundHeatExchanger')
-     
+
   SpecificHeat = GetSpecificHeatGlycol('WATER',MAX(PondTemp, constant_zero),  &
                  WaterIndex,'CalcPondGroundHeatExchanger')  !DSU bug fix here, was using working fluid index
 
@@ -1187,9 +1187,9 @@ SUBROUTINE UpdatePondGroundHeatExchanger(PondGHENum)
   CpFluid = GetSpecificHeatGlycol(PlantLoop(PondGHE(PondGHENum)%LoopNum)%FluidName,InletTemp,  &
      PlantLoop(PondGHE(PondGHENum)%LoopNum)%FluidIndex,'PondGroundHeatExchanger:Update')
   ! check for flow
-    
+
   CALL SafeCopyPlantNode(InletNodeNum, OutletNodeNum)
-    
+
   IF ( (CpFluid > 0.0) .AND. (FlowRate > 0.0) ) THEN
 
     Node(OutletNodeNum)%Temp         = InletTemp - HeatTransRate / (FlowRate*CpFluid)
@@ -1263,7 +1263,7 @@ END SUBROUTINE ReportPondGroundHeatExchanger
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

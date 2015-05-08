@@ -370,7 +370,7 @@ SUBROUTINE GetZonePlenumInput
     CALL GetObjectDefMaxArgs('NodeList',NumArgs,NumAlphas,NumNums)
     ALLOCATE(NodeNums(NumArgs))
     NodeNums=0
-    
+
     InducedNodeListName = ' '
 
 
@@ -394,7 +394,7 @@ SUBROUTINE GetZonePlenumInput
 
       CurrentModuleObject='AirLoopHVAC:ReturnPlenum'
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),ZonePlenumNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,ZonePlenumNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
       IsNotOK=.FALSE.
@@ -448,7 +448,8 @@ SUBROUTINE GetZonePlenumInput
       InducedNodeListName = AlphArray(5)
       NodeListError=.false.
       CALL GetNodeNums(InducedNodeListName,NumNodes,NodeNums,NodeListError,NodeType_Air,'AirLoopHVAC:ReturnPlenum', &
-                       ZoneRetPlenCond(ZonePlenumNum)%ZonePlenumName,NodeConnectionType_InducedAir,1,ObjectIsNotParent)
+                       ZoneRetPlenCond(ZonePlenumNum)%ZonePlenumName,NodeConnectionType_InducedAir,1,ObjectIsNotParent,  &
+                       InputFieldName=cAlphaFields(5))
 
       IF (.not. NodeListError) THEN
         ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes = NumNodes
@@ -534,7 +535,7 @@ SUBROUTINE GetZonePlenumInput
 
       CurrentModuleObject='AirLoopHVAC:SupplyPlenum'
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),ZonePlenumNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,ZonePlenumNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -815,7 +816,7 @@ SUBROUTINE InitAirZoneReturnPlenum(ZonePlenumNum)
     ZoneRetPlenCond(ZonePlenumNum)%InletPressure(NodeNum)     = Node(InletNode)%Press
 
   END DO
-  
+
   ! Set the induced air flow rates
   DO NodeNum = 1, ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes
     InducedNode = ZoneRetPlenCond(ZonePlenumNum)%InducedNode(NodeNum)
@@ -1081,7 +1082,7 @@ SUBROUTINE CalcAirZoneReturnPlenum(ZonePlenumNum)
   DO IndNum=1,ZoneRetPlenCond(ZonePlenumNum)%NumInducedNodes
     TotIndMassFlowRate = TotIndMassFlowRate + ZoneRetPlenCond(ZonePlenumNum)%InducedMassFlowRate(IndNum)
   END DO
-  
+
   ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate = ZoneRetPlenCond(ZonePlenumNum)%OutletMassFlowRate - TotIndMassFlowRate
 
   ! Set the Plenum Outlet to the Zone Node conditions
@@ -1483,7 +1484,7 @@ END SUBROUTINE ReportZoneSupplyPlenum
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -83,6 +83,9 @@ Private UpdateSplitter
           ! Reporting routines for module
 Private ReportSplitter
 
+Public GetSplitterNodeNumbers
+
+Public GetSplitterOutletNumber
 
 CONTAINS
 
@@ -248,13 +251,13 @@ SUBROUTINE GetSplitterInput
 
           ! Flow
     CurrentModuleObject = 'AirLoopHVAC:ZoneSplitter'
-    NumSplitters = GetNumObjectsFound(TRIM(CurrentModuleObject))
+    NumSplitters = GetNumObjectsFound(CurrentModuleObject)
 
     IF (NumSplitters.GT.0) ALLOCATE(SplitterCond(NumSplitters))
     ALLOCATE(CheckEquipName(NumSplitters))
     CheckEquipName=.true.
 
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     ALLOCATE(AlphArray(NumAlphas))
     AlphArray=' '
     ALLOCATE(cAlphaFields(NumAlphas))
@@ -269,7 +272,7 @@ SUBROUTINE GetSplitterInput
     NumArray=0.0
 
     DO SplitterNum = 1,  NumSplitters
-      CALL GetObjectItem(TRIM(CurrentModuleObject),SplitterNum,AlphArray,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,SplitterNum,AlphArray,NumAlphas, &
                          NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -748,12 +751,152 @@ SUBROUTINE ReportSplitter(SplitterNum)
   RETURN
 END Subroutine ReportSplitter
 
+FUNCTION GetSplitterOutletNumber(SplitterName,SplitterNum,ErrorsFound) RESULT(SplitterOutletNumber)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   Feb 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given AirLoopHVAC:ZoneSplitter and returns the number of outlet nodes.  If
+          ! incorrect AirLoopHVAC:ZoneSplitter name is given, errorsfound is returned as true
+          ! as zero.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: SplitterName     ! must match Splitter names for the Splitter type
+  INTEGER, INTENT(IN) :: SplitterNum     ! Index of Splitters
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound     ! set to true if problem
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichSplitter, SplitterOutletNumber
+
+  ! Obtains and Allocates AirLoopHVAC:ZoneSplitter related parameters from input file
+  IF (GetSplitterInputFlag) THEN  !First time subroutine has been entered
+    CALL GetSplitterInput
+    GetSplitterInputFlag=.false.
+  End If
+
+  If (SplitterNum .EQ. 0) Then
+    WhichSplitter = FindItemInList(SplitterName,SplitterCond%SplitterName,NumSplitters)
+  Else
+    WhichSplitter = SplitterNum
+  End If
+  
+  IF (WhichSplitter /= 0) THEN
+    SplitterOutletNumber = SplitterCond(WhichSplitter)%NumOutletNodes  
+  ENDIF
+
+  IF (WhichSplitter == 0) THEN
+    CALL ShowSevereError('GetSplitterOuletNumber: Could not find Splitter = "'//TRIM(SplitterName)//'"')
+    ErrorsFound=.true.
+    SplitterOutletNumber = 0  
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetSplitterOutletNumber
+
+FUNCTION GetSplitterNodeNumbers(SplitterName,SplitterNum,ErrorsFound) RESULT(SplitterNodeNumbers)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Lixing Gu
+          !       DATE WRITTEN   Feb 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function looks up the given AirLoopHVAC:ZoneSplitter and returns the node numbers.  If
+          ! incorrect AirLoopHVAC:ZoneSplitter name is given, errorsfound is returned as true
+          ! as zero.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE InputProcessor,  ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: SplitterName     ! must match Splitter names for the Splitter type
+  INTEGER, INTENT(IN) :: SplitterNum     ! Index of Splitters
+  LOGICAL, INTENT(INOUT)       :: ErrorsFound     ! set to true if problem
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichSplitter
+  INTEGER :: I
+  INTEGER, DIMENSION(:), ALLOCATABLE :: SplitterNodeNumbers
+
+  ! Obtains and Allocates AirLoopHVAC:ZoneSplitter related parameters from input file
+  IF (GetSplitterInputFlag) THEN  !First time subroutine has been entered
+    CALL GetSplitterInput
+    GetSplitterInputFlag=.false.
+  End If
+
+  If (SplitterNum .EQ. 0) Then
+    WhichSplitter = FindItemInList(SplitterName,SplitterCond%SplitterName,NumSplitters)
+  Else
+    WhichSplitter = SplitterNum
+  End If
+  
+  IF (WhichSplitter /= 0) THEN
+    ALLOCATE(SplitterNodeNumbers(SplitterCond(WhichSplitter)%NumOutletNodes+2))
+    SplitterNodeNumbers(1) = SplitterCond(WhichSplitter)%InletNode  
+    SplitterNodeNumbers(2) = SplitterCond(WhichSplitter)%NumOutletNodes  
+    Do I=1,SplitterNodeNumbers(2)
+      SplitterNodeNumbers(i+2) = SplitterCond(WhichSplitter)%OutletNode(I)
+    End Do
+  ENDIF
+
+  IF (WhichSplitter == 0) THEN
+    CALL ShowSevereError('GetSplitterNodeNumbers: Could not find Splitter = "'//TRIM(SplitterName)//'"')
+    ErrorsFound=.true.
+  ENDIF
+
+  RETURN
+
+END FUNCTION GetSplitterNodeNumbers
+
 !        End of Reporting subroutines for the Splitter Module
 ! *****************************************************************************
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

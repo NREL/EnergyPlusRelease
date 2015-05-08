@@ -68,6 +68,7 @@ USE BranchNodeConnections
   INTEGER         :: NumCheckNodes=0                    ! Num of Unique nodes in check
   INTEGER         :: MaxCheckNodes=0                    ! Current "max" unique nodes in check
   LOGICAL         :: NodeVarsSetup=.false.  ! Setup indicator of node vars for reporting (also that all nodes have been entered)
+  LOGICAL, PUBLIC, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeWetbulbRepReq
 
 
 PUBLIC   GetNodeNums
@@ -88,7 +89,7 @@ CONTAINS
 !*************************************************************************
 
 SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeObjectType,NodeObjectName,  &
-                            NodeConnectionType,NodeFluidStream,ObjectIsParent,IncrementFluidStream)
+                            NodeConnectionType,NodeFluidStream,ObjectIsParent,IncrementFluidStream,InputFieldName)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda K. Lawrie
@@ -119,7 +120,6 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
   INTEGER, INTENT(OUT)               :: NumNodes           ! Number of nodes accompanying this Name
   INTEGER, INTENT(OUT), DIMENSION(:) :: NodeNumbers        ! Node Numbers accompanying this Name
   LOGICAL, INTENT(INOUT)             :: ErrorsFound        ! True when errors are found...
-!  CHARACTER(len=*), INTENT(IN)       :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   INTEGER, INTENT(IN)                :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   CHARACTER(len=*), INTENT(IN)       :: NodeObjectType     ! Node Object Type (i.e. "Chiller:Electric")
   CHARACTER(len=*), INTENT(IN)       :: NodeObjectName     ! Node Object Name (i.e. "MyChiller")
@@ -127,9 +127,10 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
   INTEGER, INTENT(IN)                :: NodeFluidStream    ! Which Fluid Stream (1,2,3,...)
   LOGICAL, INTENT(IN)                :: ObjectIsParent     ! True/False
   LOGICAL, INTENT(IN), OPTIONAL      :: IncrementFluidStream  ! True/False
+  CHARACTER(len=*), INTENT(IN), OPTIONAL      :: InputFieldName  ! Input Field Name
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetNodeNums: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -155,9 +156,10 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
       NodeFluidType /= NodeType_Unknown) THEN
     WRITE(cNodeFluidType,*) NodeFluidType
     cNodeFluidType=ADJUSTL(cNodeFluidType)
-    CALL ShowSevereError('GetNodeNums: Invalid FluidType='//TRIM(cNodeFluidType))
+    CALL ShowSevereError(RoutineName//trim(NodeObjectType)//'="'//trim(NodeObjectName)//'", invalid fluid type.')
+    CALL ShowContinueError('..Invalid FluidType='//TRIM(cNodeFluidType))
     ErrorsFound=.true.
-    CALL ShowFatalError('GetNodeNums: Preceding issue causes termination.')
+    CALL ShowFatalError('Preceding issue causes termination.')
   ENDIF
 
   IF (Name /= '  ') THEN
@@ -167,8 +169,10 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
       NodeNumbers(1:NumNodes)=NodeLists(ThisOne)%NodeNumbers(1:NumNodes)
       DO Loop=1,NumNodes
         IF (NodeFluidType /= NodeType_Unknown .and. Node(NodeNumbers(Loop))%FluidType /= NodeType_Unknown) THEN
-          IF (Node(NodeNumbers(Loop))%FluidType /= NodeFluidType) THEN
-            CALL ShowSevereError('Existing Fluid type for node, incorrect for request. Node='//TRIM(NodeID(NodeNumbers(Loop))))
+         IF (Node(NodeNumbers(Loop))%FluidType /= NodeFluidType) THEN
+            CALL ShowSevereError(RoutineName//trim(NodeObjectType)//'="'//trim(NodeObjectName)//'", invalid data.')
+            IF (PRESENT(InputFieldName)) CALL ShowContinueError('...Ref field='//trim(InputFieldName))
+            CALL ShowContinueError('Existing Fluid type for node, incorrect for request. Node='//TRIM(NodeID(NodeNumbers(Loop))))
             CALL ShowContinueError('Existing Fluid type='//TRIM(ValidNodeFluidTypes(Node(NodeNumbers(Loop))%FluidType))//  &
                                    ', Requested Fluid Type='//TRIM(ValidNodeFluidTypes(NodeFluidType)))
             ErrorsFound=.true.
@@ -203,7 +207,7 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
       IF (IncrementFluidStream) FluidStreamNum = NodeFluidStream + (Loop - 1)
     ENDIF
     CALL RegisterNodeConnection(NodeNumbers(Loop),NodeID(NodeNumbers(Loop)),NodeObjectType,NodeObjectName,  &
-                                ConnectionType,FluidStreamNum,ObjectIsParent,ErrorsFound)
+                                ConnectionType,FluidStreamNum,ObjectIsParent,ErrorsFound,InputFieldName=InputFieldName)
   ENDDO
 
   RETURN
@@ -211,7 +215,7 @@ SUBROUTINE GetNodeNums(Name,NumNodes,NodeNumbers,ErrorsFound,NodeFluidType,NodeO
 END SUBROUTINE GetNodeNums
 
 SUBROUTINE GetNodeList(Name,NumNodes,NodeNumbers,ErrFlag,NodeFluidType,NodeObjectType,NodeObjectName,  &
-                                                         NodeConnectionType,NodeFluidStream,ObjectIsParent)
+                                                         NodeConnectionType,NodeFluidStream,ObjectIsParent,InputFieldName)
 
 
           ! SUBROUTINE INFORMATION:
@@ -241,16 +245,16 @@ SUBROUTINE GetNodeList(Name,NumNodes,NodeNumbers,ErrFlag,NodeFluidType,NodeObjec
   INTEGER, INTENT(OUT)               :: NumNodes           ! Number of nodes accompanying this Name
   INTEGER, INTENT(OUT), DIMENSION(:) :: NodeNumbers        ! NodeNumbers accompanying this Name
   LOGICAL, INTENT(OUT)               :: ErrFlag            ! Set to true when requested Node List not found
-!  CHARACTER(len=*), INTENT(IN)       :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   INTEGER, INTENT(IN)                :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   CHARACTER(len=*), INTENT(IN)       :: NodeObjectType     ! Node Object Type (i.e. "Chiller:Electric")
   CHARACTER(len=*), INTENT(IN)       :: NodeObjectName     ! Node Object Name (i.e. "MyChiller")
   INTEGER, INTENT(IN)                :: NodeConnectionType ! Node Connection Type (see DataLoopNode)
   INTEGER, INTENT(IN)                :: NodeFluidStream    ! Which Fluid Stream (1,2,3,...)
   LOGICAL, INTENT(IN)                :: ObjectIsParent     ! True/False
+  CHARACTER(len=*), INTENT(IN), OPTIONAL      :: InputFieldName  ! Input Field Name
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetNodeList: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -260,7 +264,6 @@ SUBROUTINE GetNodeList(Name,NumNodes,NodeNumbers,ErrFlag,NodeFluidType,NodeObjec
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER Try       ! Indicator for this Name
-!  CHARACTER(len=20) :: FluidType
 
   IF (GetNodeInputFlag) THEN
     CALL GetNodeListsInput(ErrFlag)
@@ -280,11 +283,13 @@ SUBROUTINE GetNodeList(Name,NumNodes,NodeNumbers,ErrFlag,NodeFluidType,NodeObjec
 
   IF (Try /= 0) THEN
     CALL GetNodeNums(Name,NumNodes,NodeNumbers,ErrFlag,NodeFluidType,NodeObjectType,NodeObjectName,NodeConnectionType,  &
-                                                       NodeFluidStream,ObjectIsParent)
+                                                       NodeFluidStream,ObjectIsParent,InputFieldName=InputFieldName)
   ELSE
     ! only valid "error" here is when the Node List is blank
     IF (Name /= Blank) THEN
-      CALL ShowSevereError('NodeList not found='//TRIM(Name))
+      CALL ShowSevereError(RoutineName//trim(NodeObjectType)//'="'//trim(NodeObjectName)//'", invalid data.')
+      IF (PRESENT(InputFieldName)) CALL ShowContinueError('...Ref field='//trim(InputFieldName))
+      CALL ShowContinueError('NodeList not found="'//TRIM(Name)//'".')
       ErrFlag=.true.
     ENDIF
   ENDIF
@@ -342,30 +347,32 @@ SUBROUTINE SetupNodeVarsForReporting
         ALLOCATE(MoreNodeInfo(NumOfUniqueNodeNames))
         DO NumNode = 1, NumOfUniqueNodeNames
    ! Setup Report variables for the Nodes for HVAC Reporting, CurrentModuleObject='Node Name'
-          CALL SetupOutputVariable('System Node Temp[C]', Node(NumNode)%Temp,'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node MassFlowRate[kg/s]', Node(NumNode)%MassFlowRate,'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Humidity Ratio[kgWater/kgDryAir]', Node(NumNode)%HumRat,'System','Average',  &
+          CALL SetupOutputVariable('System Node Temperature [C]', Node(NumNode)%Temp,'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Mass Flow Rate [kg/s]', &
+                                    Node(NumNode)%MassFlowRate,'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Humidity Ratio [kgWater/kgDryAir]', Node(NumNode)%HumRat,'System','Average',  &
              NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Temp[C]', Node(NumNode)%TempSetPoint,'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Temp Hi[C]', Node(NumNode)%TempSetPointHi,'System','Average',  &
+          CALL SetupOutputVariable('System Node Setpoint Temperature [C]', &
+                                    Node(NumNode)%TempSetPoint,'System','Average',NodeID(NumNode))
+          CALL SetupOutputVariable('System Node Setpoint High Temperature [C]', Node(NumNode)%TempSetPointHi,'System','Average',  &
                                                                       NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Temp Lo[C]', Node(NumNode)%TempSetPointLo,'System','Average',  &
+          CALL SetupOutputVariable('System Node Setpoint Low Temperature [C]', Node(NumNode)%TempSetPointLo,'System','Average',  &
                                                                       NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio[kgWater/kgDryAir]', Node(NumNode)%HumRatSetPoint,  &
+          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio [kgWater/kgDryAir]', Node(NumNode)%HumRatSetPoint,  &
              'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Min[kgWater/kgDryAir]', Node(NumNode)%HumRatMin,  &
+          CALL SetupOutputVariable('System Node Setpoint Minimum Humidity Ratio [kgWater/kgDryAir]', Node(NumNode)%HumRatMin,  &
              'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Setpoint Humidity Ratio Max[kgWater/kgDryAir]', Node(NumNode)%HumRatMax,  &
+          CALL SetupOutputVariable('System Node Setpoint Maximum Humidity Ratio [kgWater/kgDryAir]', Node(NumNode)%HumRatMax,  &
              'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Relative Humidity[%]', MoreNodeInfo(NumNode)%RelHumidity,'System','Average',  &
+          CALL SetupOutputVariable('System Node Relative Humidity [%]', MoreNodeInfo(NumNode)%RelHumidity,'System','Average',  &
                                            NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Pressure[Pa]', Node(NumNode)%Press,'System','Average',  &
+          CALL SetupOutputVariable('System Node Pressure [Pa]', Node(NumNode)%Press,'System','Average',  &
                                            NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Volume Flow Rate Standard Density [m3/s]', &
+          CALL SetupOutputVariable('System Node Standard Density Volume Flow Rate [m3/s]', &
                                     MoreNodeInfo(NumNode)%VolFlowRateStdRho, 'System',     &
                                    'Average', NodeID(NumNode))
           IF (Node(NumNode)%FluidType == NodeType_Air) THEN ! setup volume flow rate report for actual/current density
-            CALL SetupOutputVariable('System Node Volume Flow Rate Current Density [m3/s]', &
+            CALL SetupOutputVariable('System Node Current Density Volume Flow Rate [m3/s]', &
                                     MoreNodeInfo(NumNode)%VolFlowRateCrntRho, 'System',     &
                                    'Average', NodeID(NumNode))
             CALL SetupOutputVariable('System Node Current Density [kg/m3]', &
@@ -373,44 +380,46 @@ SUBROUTINE SetupNodeVarsForReporting
                                    'Average', NodeID(NumNode))
           ENDIF
 
-          CALL SetupOutputVariable('System Node Enthalpy[J/kg]', MoreNodeInfo(NumNode)%ReportEnthalpy, 'System', &
+          CALL SetupOutputVariable('System Node Enthalpy [J/kg]', MoreNodeInfo(NumNode)%ReportEnthalpy, 'System', &
                                    'Average', NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Wetbulb Temp[C]', MoreNodeInfo(NumNode)%WetbulbTemp, 'System', &
+          CALL SetupOutputVariable('System Node Wetbulb Temperature [C]', MoreNodeInfo(NumNode)%WetbulbTemp, 'System', &
                                    'Average', NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Dewpoint Temperature[C]', MoreNodeInfo(NumNode)%AirDewpointTemp, 'System', &
+          CALL SetupOutputVariable('System Node Dewpoint Temperature [C]', MoreNodeInfo(NumNode)%AirDewpointTemp, 'System', &
                                    'Average', NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Quality[]', Node(NumNode)%Quality,  &
+          CALL SetupOutputVariable('System Node Quality []', Node(NumNode)%Quality,  &
                                    'System','Average',NodeID(NumNode))
-          CALL SetupOutputVariable('System Node Height[m]', Node(NumNode)%Height,  &
+          CALL SetupOutputVariable('System Node Height [m]', Node(NumNode)%Height,  &
                                    'System','Average',NodeID(NumNode))
           IF (DisplayAdvancedReportVariables) THEN
-            CALL SetupOutputVariable('System Node TempMin [C]', Node(NumNode)%TempMin,'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node TempMax [C]', Node(NumNode)%TempMax,'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateMin [kg/s]', Node(NumNode)%MassFlowRateMin,  &
+            CALL SetupOutputVariable('System Node Minimum Temperature [C]', &
+                                      Node(NumNode)%TempMin,'System','Average',NodeID(NumNode))
+            CALL SetupOutputVariable('System Node Maximum Temperature [C]', &
+                                      Node(NumNode)%TempMax,'System','Average',NodeID(NumNode))
+            CALL SetupOutputVariable('System Node Minimum Limit Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateMin,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateMax [kg/s]', Node(NumNode)%MassFlowRateMax,  &
+            CALL SetupOutputVariable('System Node Maximum Limit Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateMax,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateMinAvail [kg/s]', Node(NumNode)%MassFlowRateMinAvail,  &
+            CALL SetupOutputVariable('System Node Minimum Available Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateMinAvail,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateMaxAvail [kg/s]', Node(NumNode)%MassFlowRateMaxAvail,  &
+            CALL SetupOutputVariable('System Node Maximum Available Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateMaxAvail,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateSetPoint [kg/s]', Node(NumNode)%MassFlowRateSetPoint,  &
+            CALL SetupOutputVariable('System Node Setpoint Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateSetPoint,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node MassFlowRateRequest [kg/s]', Node(NumNode)%MassFlowRateRequest,  &
+            CALL SetupOutputVariable('System Node Requested Mass Flow Rate [kg/s]', Node(NumNode)%MassFlowRateRequest,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node TempLastTimestep [C]', Node(NumNode)%TempLastTimestep,  &
+            CALL SetupOutputVariable('System Node Last Timestep Temperature [C]', Node(NumNode)%TempLastTimestep,  &
                                      'System','Average',NodeID(NumNode))
-            CALL SetupOutputVariable('System Node EnthalpyLastTimestep [J/kg]', Node(NumNode)%EnthalpyLastTimestep,  &
+            CALL SetupOutputVariable('System Node Last Timestep Enthalpy [J/kg]', Node(NumNode)%EnthalpyLastTimestep,  &
                                      'System','Average',NodeID(NumNode))
 
 
           ENDIF
           IF (Contaminant%CO2Simulation) Then
-            CALL SetupOutputVariable('System Node Carbon Dioxide Concentration [ppm]', Node(NumNode)%CO2,'System', &
+            CALL SetupOutputVariable('System Node CO2 Concentration [ppm]', Node(NumNode)%CO2,'System', &
                                     'Average',NodeID(NumNode))
           End If
           IF (Contaminant%GenericContamSimulation) Then
-            CALL SetupOutputVariable('System Node Generic Contaminant Concentration [ppm]', Node(NumNode)%GenContam,'System', &
+            CALL SetupOutputVariable('System Node Generic Air Contaminant Concentration [ppm]', Node(NumNode)%GenContam,'System', &
                                     'Average',NodeID(NumNode))
           End If
         ENDDO
@@ -498,6 +507,7 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
   LOGICAL, INTENT(OUT) :: ErrorsFound
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetNodeListsInput: '
   CHARACTER(len=*), PARAMETER :: CurrentModuleObject='NodeList'
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -550,9 +560,9 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
     NodeLists(NCount)%NumOfNodesInList=NumAlphas-1
     IF (NumAlphas <= 1) THEN
       IF (NumAlphas == 1) THEN
-        CALL ShowSevereError(CurrentModuleObject//'="'//trim(cAlphas(1))//'" does not have any nodes.')
+        CALL ShowSevereError(RoutineName//CurrentModuleObject//'="'//trim(cAlphas(1))//'" does not have any nodes.')
       ELSE
-        CALL ShowSevereError(CurrentModuleObject//'=<blank> does not have any nodes or nodelist name.')
+        CALL ShowSevereError(RoutineName//CurrentModuleObject//'=<blank> does not have any nodes or nodelist name.')
       ENDIF
       ErrorsFound=.true.
       CYCLE
@@ -568,7 +578,7 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
       DO Loop2=Loop1+1,NodeLists(NCount)%NumOfNodesInList
         IF (NodeLists(NCount)%NodeNumbers(Loop1) /= NodeLists(NCount)%NodeNumbers(Loop2)) CYCLE
         IF (flagError) THEN  ! only list nodelist name once
-          CALL ShowSevereError(CurrentModuleObject//'="'//trim(cAlphas(1))//'" has duplicate nodes:')
+          CALL ShowSevereError(RoutineName//CurrentModuleObject//'="'//trim(cAlphas(1))//'" has duplicate nodes:')
           flagError=.false.
         ENDIF
         CALL ShowContinueError('...list item='//  &
@@ -583,7 +593,7 @@ SUBROUTINE GetNodeListsInput(ErrorsFound)
   DEALLOCATE(rNumbers)
 
   IF (ErrorsFound) THEN
-    CALL ShowSevereError(CurrentModuleObject//': Error getting input.')
+    CALL ShowFatalError(RoutineName//CurrentModuleObject//': Error getting input - causes termination.')
   ENDIF
 
   RETURN
@@ -719,7 +729,7 @@ INTEGER FUNCTION AssignNodeNumber(Name,NodeFluidType,ErrorsFound)
 END FUNCTION AssignNodeNumber
 
 FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFluidType,NodeConnectionType,  &
-                           NodeFluidStream,ObjectIsParent) RESULT (GetSingleNodeResult)
+                           NodeFluidStream,ObjectIsParent,InputFieldName) RESULT (GetSingleNodeResult)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Linda K. Lawrie; adapted from GasAbsorptionChiller;Jason Glazer
@@ -747,15 +757,15 @@ FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFl
   LOGICAL, INTENT(INOUT)         :: errFlag
   CHARACTER(len=*), INTENT(IN)   :: NodeObjectType     ! Node Object Type (i.e. "Chiller:Electric")
   CHARACTER(len=*), INTENT(IN)   :: NodeObjectName     ! Node Object Name (i.e. "MyChiller")
-!  CHARACTER(len=*), INTENT(IN)   :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   INTEGER, INTENT(IN)            :: NodeFluidType      ! Fluidtype for checking/setting node FluidType
   INTEGER, INTENT(IN)            :: NodeConnectionType ! Node Connection Type (see DataLoopNode)
   INTEGER, INTENT(IN)            :: NodeFluidStream    ! Which Fluid Stream (1,2,3,...)
   LOGICAL, INTENT(IN)            :: ObjectIsParent     ! True/False
   INTEGER                        :: GetSingleNodeResult
+  CHARACTER(len=*), INTENT(IN), OPTIONAL   :: InputFieldName     ! Input Field Name
 
           ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetOnlySingleNode: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -783,12 +793,12 @@ FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFl
   FluidType=NodeFluidType
 
   CALL GetNodeNums(NodeName,NumNodes,NodeNums,ErrFlag,FluidType,NodeObjectType,NodeObjectName,NodeConnectionType,  &
-                   NodeFluidStream,ObjectIsParent)
+                   NodeFluidStream,ObjectIsParent,InputFieldName=InputFieldName)
 
   IF (NumNodes > 1) THEN
-    CALL ShowSevereError('GetOnlySingleNode: Only 1st Node used from NodeList="'//  &
-       TRIM(NodeName)//'" for '//TRIM(NodeObjectType)//  &
-       '="'//TRIM(NodeObjectName)//'"')
+    CALL ShowSevereError(RoutineName//trim(NodeObjectType)//'="'//trim(NodeObjectName)//'", invalid data.')
+    IF (PRESENT(InputFieldName)) CALL ShowContinueError('...Ref field='//trim(InputFieldName))
+    CALL ShowContinueError('Only 1st Node used from NodeList="'//TRIM(NodeName)//'".')
     CALL ShowContinueError('...a Nodelist may not be valid in this context.')
     errFlag=.true.
   ELSEIF (NumNodes == 0) THEN
@@ -800,8 +810,8 @@ FUNCTION GetOnlySingleNode(NodeName,errFlag,NodeObjectType,NodeObjectName,NodeFl
     ELSE
       ConnectionType=trim(TrimSigDigits(NodeConnectionType))//'-unknown'
     ENDIF
-    CALL RegisterNodeConnection(NodeNums(1),NodeID(NodeNums(1)),NodeObjectType,NodeObjectName,  &
-                                  ConnectionType,NodeFluidStream,ObjectIsParent,errFlag)
+!    CALL RegisterNodeConnection(NodeNums(1),NodeID(NodeNums(1)),NodeObjectType,NodeObjectName,  &
+!                                  ConnectionType,NodeFluidStream,ObjectIsParent,errFlag)
   ENDIF
 
   GetSingleNodeResult = NodeNums(1)
@@ -1091,7 +1101,6 @@ SUBROUTINE CalcMoreNodeInfo
   LOGICAL, SAVE :: MyOneTimeFlag = .TRUE.     ! one time flag
   REAL(r64), SAVE    :: RhoAirStdInit
   REAL(r64), SAVE    :: RhoWaterStdInit
-  LOGICAL, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeWetbulbRepReq
   INTEGER, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeWetbulbSchedPtr
   LOGICAL, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeRelHumidityRepReq
   INTEGER, SAVE,  ALLOCATABLE, DIMENSION(:) :: NodeRelHumiditySchedPtr
@@ -1125,7 +1134,7 @@ SUBROUTINE CalcMoreNodeInfo
 
     DO iNode=1,NumOfNodes
       DO iReq=1,NumOfReqVariables
-        IF ( SameString(ReqRepVars(iReq)%VarName,'System Node Wetbulb Temp') .AND. &
+        IF ( SameString(ReqRepVars(iReq)%VarName,'System Node Wetbulb Temperature') .AND. &
              ( SameString(ReqRepVars(iReq)%Key,NodeID(iNode)) .OR. SameString(ReqRepVars(iReq)%Key,Blank) ) ) THEN
           NodeWetbulbRepReq(iNode) = .TRUE.
           NodeWetbulbSchedPtr(iNode) = ReqRepVars(iReq)%SchedPtr
@@ -1164,6 +1173,8 @@ SUBROUTINE CalcMoreNodeInfo
       ReportWetbulb = (GetCurrentScheduleValue(NodeWetbulbSchedPtr(iNode)) > 0.0)
     ELSE IF ( NodeWetbulbRepReq(iNode) .AND. NodeWetbulbSchedPtr(iNode) == 0) THEN
       ReportWetbulb = .TRUE.
+    ELSE IF ( Node(iNode)%SPMNodeWetbulbRepReq) THEN
+      ReportWetbulb = .TRUE.      
     END IF
     IF ( NodeRelHumidityRepReq(iNode) .AND. NodeRelHumiditySchedPtr(iNode) > 0) THEN
       ReportRelHumidity = (GetCurrentScheduleValue(NodeRelHumiditySchedPtr(iNode)) > 0.0)
@@ -1357,7 +1368,7 @@ END SUBROUTINE CheckMarkedNodes
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

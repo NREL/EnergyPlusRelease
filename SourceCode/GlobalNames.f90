@@ -45,22 +45,21 @@ PRIVATE ! Everything private unless explicitly made public
   INTEGER :: NumChillers=0
   INTEGER :: NumBoilers=0
   INTEGER :: NumBaseboards=0
-  INTEGER :: NumWaterToAirHPs=0
+  INTEGER :: NumCoils=0
   INTEGER :: CurMaxChillers=0
   INTEGER :: CurMaxBoilers=0
   INTEGER :: CurMaxBaseboards=0
-  INTEGER :: CurMaxWaterToAirHPs=0
+  INTEGER :: CurMaxCoils=0
   TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:)  :: ChillerNames
   TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:)  :: BoilerNames
   TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:)  :: BaseboardNames
-  TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:)  :: WaterToAirHPNames
+  TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:)  :: CoilNames
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE GlobalNames:
 PUBLIC  VerifyUniqueBoilerName
 PUBLIC  VerifyUniqueBaseboardName
 PUBLIC  VerifyUniqueChillerName
-PUBLIC  VerifyUniqueWaterToAirHPName
-PUBLIC  DetermineIfCoilIsOn
+PUBLIC  VerifyUniqueCoilName
 CONTAINS
 
 SUBROUTINE VerifyUniqueChillerName(TypeToVerify,NameToVerify,ErrorFound,StringToDisplay)
@@ -111,7 +110,8 @@ SUBROUTINE VerifyUniqueChillerName(TypeToVerify,NameToVerify,ErrorFound,StringTo
       Found=FindItemInList(NameToVerify,ChillerNames%CompName,NumChillers)
   IF (Found /= 0) THEN
     CALL ShowSevereError(TRIM(StringToDisplay)//', duplicate name='//TRIM(NameToVerify)//  &
-              ', Chiller Type='//TRIM(ChillerNames(Found)%CompType))
+              ', Chiller Type="'//TRIM(ChillerNames(Found)%CompType)//'".')
+    CALL ShowContinueError('...Current entry is Chiller Type="'//trim(TypeToVerify)//'".')
     ErrorFound=.true.
   ELSEIF (NumChillers == 0) THEN
     CurMaxChillers=4
@@ -190,7 +190,8 @@ SUBROUTINE VerifyUniqueBaseboardName(TypeToVerify,NameToVerify,ErrorFound,String
 
   IF (Found /= 0) THEN
     CALL ShowSevereError(TRIM(StringToDisplay)//', duplicate name='//TRIM(NameToVerify)//  &
-              ', Baseboard Type='//TRIM(BaseboardNames(Found)%CompType))
+              ', Baseboard Type="'//TRIM(BaseboardNames(Found)%CompType)//'".')
+    CALL ShowContinueError('...Current entry is Baseboard Type="'//trim(TypeToVerify)//'".')
     ErrorFound=.true.
   ELSEIF (NumBaseboards == 0) THEN
     CurMaxBaseboards=4
@@ -268,7 +269,8 @@ SUBROUTINE VerifyUniqueBoilerName(TypeToVerify,NameToVerify,ErrorFound,StringToD
 
   IF (Found /= 0) THEN
     CALL ShowSevereError(TRIM(StringToDisplay)//', duplicate name='//TRIM(NameToVerify)//  &
-              ', Boiler Type='//TRIM(BoilerNames(Found)%CompType))
+              ', Boiler Type="'//TRIM(BoilerNames(Found)%CompType)//'".')
+    CALL ShowContinueError('...Current entry is Boiler Type="'//trim(TypeToVerify)//'".')
     ErrorFound=.true.
   ELSEIF (NumBoilers == 0) THEN
     CurMaxBoilers=4
@@ -297,7 +299,7 @@ SUBROUTINE VerifyUniqueBoilerName(TypeToVerify,NameToVerify,ErrorFound,StringToD
 
 END SUBROUTINE VerifyUniqueBoilerName
 
-SUBROUTINE VerifyUniqueWaterToAirHPName(TypeToVerify,NameToVerify,ErrorFound,StringToDisplay)
+SUBROUTINE VerifyUniqueCoilName(TypeToVerify,NameToVerify,ErrorFound,StringToDisplay)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda Lawrie
@@ -307,7 +309,7 @@ SUBROUTINE VerifyUniqueWaterToAirHPName(TypeToVerify,NameToVerify,ErrorFound,Str
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! This subroutine verifys that a new name will be unique in the list of
-          ! Boilers.  If not found in the list, it is added before returning.
+          ! Coils.  If not found in the list, it is added before returning.
 
           ! METHODOLOGY EMPLOYED:
           ! na
@@ -337,128 +339,48 @@ SUBROUTINE VerifyUniqueWaterToAirHPName(TypeToVerify,NameToVerify,ErrorFound,Str
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER Found
-  TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:) :: TempWaterToAirHPNames
+  TYPE (ComponentNameData), ALLOCATABLE, DIMENSION(:) :: TempCoilNames
 
   ErrorFound=.false.
   Found=0
-  IF (NumWaterToAirHPs > 0) &
-    Found=FindItemInList(NameToVerify,WaterToAirHPNames%CompName,NumWaterToAirHPs)
-
+  IF (NumCoils > 0)   &
+      Found=FindItemInList(NameToVerify,CoilNames%CompName,NumCoils)
   IF (Found /= 0) THEN
     CALL ShowSevereError(TRIM(StringToDisplay)//', duplicate name='//TRIM(NameToVerify)//  &
-              ', WaterToAirHP Type='//TRIM(WaterToAirHPNames(Found)%CompType))
+              ', Coil Type="'//TRIM(CoilNames(Found)%CompType)//'"')
+    CALL ShowContinueError('...Current entry is Coil Type="'//trim(TypeToVerify)//'".')
     ErrorFound=.true.
-  ELSEIF (NumWaterToAirHPs == 0) THEN
-    CurMaxWaterToAirHPs=4
-    ALLOCATE(WaterToAirHPNames(CurMaxWaterToAirHPs))
-    NumWaterToAirHPs=NumWaterToAirHPs+1
-    WaterToAirHPNames(NumWaterToAirHPs)%CompType=TypeToVerify
-    WaterToAirHPNames(NumWaterToAirHPs)%CompName=NameToVerify
-  ELSEIF (NumWaterToAirHPs == CurMaxWaterToAirHPs) THEN
-    ALLOCATE(TempWaterToAirHPNames(CurMaxWaterToAirHPs+4))
-    TempWaterToAirHPNames(1:CurMaxWaterToAirHPs)=WaterToAirHPNames(1:CurMaxWaterToAirHPs)
-    DEALLOCATE(WaterToAirHPNames)
-    CurMaxWaterToAirHPs=CurMaxWaterToAirHPs+4
-    ALLOCATE(WaterToAirHPNames(CurMaxWaterToAirHPs))
-    WaterToAirHPNames=TempWaterToAirHPNames
-    DEALLOCATE(TempWaterToAirHPNames)
-    NumWaterToAirHPs=NumWaterToAirHPs+1
-    WaterToAirHPNames(NumWaterToAirHPs)%CompType=TypeToVerify
-    WaterToAirHPNames(NumWaterToAirHPs)%CompName=NameToVerify
+  ELSEIF (NumCoils == 0) THEN
+    CurMaxCoils=4
+    ALLOCATE(CoilNames(CurMaxCoils))
+    NumCoils=NumCoils+1
+    CoilNames(NumCoils)%CompType=MakeUPPERCase(TypeToVerify)
+    CoilNames(NumCoils)%CompName=NameToVerify
+  ELSEIF (NumCoils == CurMaxCoils) THEN
+    ALLOCATE(TempCoilNames(CurMaxCoils+4))
+    TempCoilNames(1:CurMaxCoils)=CoilNames(1:CurMaxCoils)
+    DEALLOCATE(CoilNames)
+    CurMaxCoils=CurMaxCoils+4
+    ALLOCATE(CoilNames(CurMaxCoils))
+    CoilNames=TempCoilNames
+    DEALLOCATE(TempCoilNames)
+    NumCoils=NumCoils+1
+    CoilNames(NumCoils)%CompType=MakeUPPERCase(TypeToVerify)
+    CoilNames(NumCoils)%CompName=NameToVerify
   ELSE
-    NumWaterToAirHPs=NumWaterToAirHPs+1
-    WaterToAirHPNames(NumWaterToAirHPs)%CompType=TypeToVerify
-    WaterToAirHPNames(NumWaterToAirHPs)%CompName=NameToVerify
+    NumCoils=NumCoils+1
+    CoilNames(NumCoils)%CompType=MakeUPPERCase(TypeToVerify)
+    CoilNames(NumCoils)%CompName=NameToVerify
   ENDIF
 
   RETURN
 
-END SUBROUTINE VerifyUniqueWaterToAirHPName
+END SUBROUTINE VerifyUniqueCoilName
 
-SUBROUTINE DetermineIfCoilIsOn(CompType,CompName,CompIndex,IsScheduledOn)
-
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Linda Lawrie
-          !       DATE WRITTEN   October 2005
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This routine helps the Ventilation Reporting determine if a coil is
-          ! scheduled to be operating (on).
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  Use HVACHXAssistedCoolingCoil,  Only: CheckHXAssistedCoolingCoilSchedule
-  Use WaterCoils,                 Only: CheckWaterCoilSchedule
-  Use HeatingCoils,               Only: CheckHeatingCoilSchedule
-  Use SteamCoils,                 Only: CheckSteamCoilSchedule
-
-  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN) :: CompType
-  CHARACTER(len=*), INTENT(IN) :: CompName
-  INTEGER, INTENT(INOUT)       :: CompIndex
-  LOGICAL                      :: IsScheduledOn
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) Value
-
-  SELECT CASE(CompType)
-
-    CASE('COILSYSTEM:COOLING:DX:HEATEXCHANGERASSISTED')
-      CALL CheckHXAssistedCoolingCoilSchedule(CompType,CompName,Value,CompIndex)
-
-    CASE('COILSYSTEM:COOLING:WATER:HEATEXCHANGERASSISTED')
-      CALL CheckHXAssistedCoolingCoilSchedule(CompType,CompName,Value,CompIndex)
-
-    CASE('COIL:HEATING:WATER')
-      CALL CheckWaterCoilSchedule(CompType,CompName,Value,CompIndex)
-    CASE('COIL:HEATING:STEAM')
-      CALL CheckSteamCoilSchedule(CompType,CompName,Value,CompIndex)
-    CASE('COIL:COOLING:WATER:DETAILEDGEOMETRY')
-      CALL CheckWaterCoilSchedule(CompType,CompName,Value,CompIndex)
-    CASE('COIL:COOLING:WATER')
-      CALL CheckWaterCoilSchedule(CompType,CompName,Value,CompIndex)
-
-    CASE('COIL:HEATING:ELECTRIC')
-      CALL CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
-    CASE('COIL:HEATING:GAS')
-      CALL CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
-! Heat reclaim
-    CASE('COIL:HEATING:DESUPERHEATER')
-      CALL CheckHeatingCoilSchedule(CompType,CompName,Value,CompIndex)
-
-    CASE DEFAULT
-      CALL ShowFatalError('DetermineIfCoilIsOn: Illegal coil type='//TRIM(CompType))
-
-  END SELECT
-
-  IsScheduledOn=(Value > 0.0)
-
-  RETURN
-
-END SUBROUTINE DetermineIfCoilIsOn
-
+!
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -470,7 +470,7 @@ SUBROUTINE GetEvapFluidCoolerInput
   cCurrentModuleObject = cEvapFluidCooler_SingleSpeed
   DO SingleSpeedEvapFluidCoolerNumber = 1 , NumSingleSpeedEvapFluidCoolers
     EvapFluidCoolerNum = SingleSpeedEvapFluidCoolerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),SingleSpeedEvapFluidCoolerNumber,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,SingleSpeedEvapFluidCoolerNumber,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -540,7 +540,7 @@ SUBROUTINE GetEvapFluidCoolerInput
     IF (lAlphaFieldBlanks(6).or.AlphArray(6) == Blank) THEN
       SimpleEvapFluidCooler(EvapFluidCoolerNum)%CapacityControl = 0     ! FanCycling
     ELSE
-      SELECT CASE (MakeUPPERCase(TRIM(AlphArray(6))))
+      SELECT CASE (MakeUPPERCase(AlphArray(6)))
         CASE ('FANCYCLING')
           SimpleEvapFluidCooler(EvapFluidCoolerNum)%CapacityControl = 0
         CASE ('FLUIDBYPASS')
@@ -726,7 +726,7 @@ SUBROUTINE GetEvapFluidCoolerInput
   cCurrentModuleObject = cEvapFluidCooler_TwoSpeed
   DO TwoSpeedEvapFluidCoolerNumber = 1 , NumTwoSpeedEvapFluidCoolers
     EvapFluidCoolerNum = NumSingleSpeedEvapFluidCoolers + TwoSpeedEvapFluidCoolerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),TwoSpeedEvapFluidCoolerNumber,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,TwoSpeedEvapFluidCoolerNumber,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1078,48 +1078,49 @@ SUBROUTINE GetEvapFluidCoolerInput
 ! Set up output variables
 ! CurrentModuleObject='EvaporativeFluidCooler:SingleSpeed'
   DO EvapFluidCoolerNum = 1, NumSingleSpeedEvapFluidCoolers
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Inlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%InletWaterTemp,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Outlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%OutletWaterTemp,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%WaterMassFlowRate,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%Qactual,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%FanPower,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%FanEnergy,'System','Sum',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Fluid Bypass Fraction [-]', &             ! Added for fluid bypass
+          ! Added for fluid bypass
+    CALL SetupOutputVariable('Cooling Tower Bypass Fraction []', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%BypassFraction,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
   END DO
 
 ! CurrentModuleObject='EvaporativeFluidCooler:TwoSpeed'
   DO EvapFluidCoolerNum = NumSingleSpeedEvapFluidCoolers+1, NumSingleSpeedEvapFluidCoolers+NumTwoSpeedEvapFluidCoolers
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Inlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%InletWaterTemp,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Outlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%OutletWaterTemp,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%WaterMassFlowRate,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%Qactual,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%FanPower,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%FanEnergy,'System','Sum',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
@@ -1130,60 +1131,60 @@ SUBROUTINE GetEvapFluidCoolerInput
   ! CurrentModuleObject='EvaporativeFluidCooler:*'
   DO EvapFluidCoolerNum = 1 , NumSingleSpeedEvapFluidCoolers + NumTwoSpeedEvapFluidCoolers
     IF (SimpleEvapFluidCooler(EvapFluidCoolerNum)%SuppliedByWaterSystem) THEN
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume Flow Rate [m3/s]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%MakeUpVdot,'System','Average',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%MakeUpVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water From Storage Tank Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Storage Tank Water Volume Flow Rate [m3/s]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%TankSupplyVdot,'System','Average',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water From Storage Tank [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Storage Tank Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%TankSupplyVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Starved By Storage Tank Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Starved Storage Tank Water Volume Flow Rate [m3/s]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%StarvedMakeUpVdot,'System','Average',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Starved By Storage Tank [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Starved Storage Tank Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%StarvedMakeUpVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up Mains Draw [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Mains Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%StarvedMakeUpVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
             ResourceTypeKey='MainsWater', EndUseKey='HeatRejection', GroupKey='Plant')
     ELSE ! Evaporative fluid cooler water from mains and gets metered
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume Flow Rate [m3/s]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%MakeUpVdot,'System','Average',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%MakeUpVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Evaporative Fluid Cooler Water Make Up Mains Draw [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Mains Water Volume [m3]', &
             SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%MakeUpVol,'System','Sum',  &
                SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name, &
             ResourceTypeKey='MainsWater', EndUseKey='HeatRejection', GroupKey='Plant')
     ENDIF
 
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Evaporation Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Evaporation Volume Flow Rate [m3/s]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%EvaporationVdot,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Evaporation [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Evaporation Volume [m3]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%EvaporationVol,'System','Sum',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Drift Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Drift Volume Flow Rate [m3/s]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%DriftVdot,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Drift [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Drift Volume [m3]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%DriftVol,'System','Sum',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Blowdown Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Blowdown Volume Flow Rate [m3/s]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%BlowdownVdot,'System','Average',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Evaporative Fluid Cooler Water Blowdown [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Blowdown Volume [m3]', &
           SimpleEvapFluidCoolerReport(EvapFluidCoolerNum)%BlowdownVol,'System','Sum',  &
              SimpleEvapFluidCooler(EvapFluidCoolerNum)%Name)
   ENDDO ! loop all evaporative fluid coolers
@@ -3125,7 +3126,7 @@ END SUBROUTINE ReportEvapFluidCooler
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

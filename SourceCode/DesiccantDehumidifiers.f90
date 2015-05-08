@@ -458,7 +458,7 @@ SUBROUTINE GetDesiccantDehumidifierInput
   DO DesicDehumIndex = 1,NumSolidDesicDehums
     RegenCoilAirInletNode = 0
     RegenCoilAirOutletNode = 0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),DesicDehumIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,DesicDehumIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -474,18 +474,16 @@ SUBROUTINE GetDesiccantDehumidifierInput
     DesicDehum(DesicDehumNum)%DehumType = TRIM(CurrentModuleObject)
     DesicDehum(DesicDehumNum)%DehumTypeCode = Solid
     DesicDehum(DesicDehumNum)%Sched = Alphas(2)
-    DesicDehum(DesicDehumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-
-    IF (DesicDehum(DesicDehumNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-                             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      DesicDehum(DesicDehumNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      DesicDehum(DesicDehumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (DesicDehum(DesicDehumNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
                              ' entered ='//TRIM(Alphas(2))// &
                              ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.true.
       END IF
-      ErrorsFound=.true.
     END IF
           ! For node connections, this object is both a parent and a non-parent, because the
           ! Desiccant wheel is not called out as a separate component, its nodes must be connected
@@ -812,18 +810,16 @@ SUBROUTINE GetDesiccantDehumidifierInput
     ENDIF
 
     DesicDehum(DesicDehumNum)%Sched = Alphas(2)
-    DesicDehum(DesicDehumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-
-    IF (DesicDehum(DesicDehumNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
-        CALL ShowSevereError(TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
-           ' entered ='//TRIM(Alphas(2))// &
-           ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+    IF (lAlphaBlanks(2)) THEN
+      DesicDehum(DesicDehumNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      DesicDehum(DesicDehumNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (DesicDehum(DesicDehumNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
+                             ' entered ='//TRIM(Alphas(2))// &
+                             ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.true.
       END IF
-      ErrorsFoundGeneric=.TRUE.
     END IF
 
     DesicDehum(DesicDehumNum)%HXType = Alphas(3)
@@ -1482,46 +1478,46 @@ SUBROUTINE GetDesiccantDehumidifierInput
 ! SET UP OUTPUTS
   DO DesicDehumNum=1,NumSolidDesicDehums
     ! Setup Report variables for the Desiccant Dehumidifiers
-    CALL SetupOutputVariable('Desiccant Dehumidifier Water Removed [kg]',DesicDehum(DesicDehumNum)%WaterRemove,&
+    CALL SetupOutputVariable('Dehumidifier Removed Water Mass [kg]',DesicDehum(DesicDehumNum)%WaterRemove,&
                              'System','Sum',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Water Removal Rate[kg/s]',DesicDehum(DesicDehumNum)%WaterRemoveRate,&
+    CALL SetupOutputVariable('Dehumidifier Removed Water Mass Flow Rate [kg/s]',DesicDehum(DesicDehumNum)%WaterRemoveRate,&
                              'System','Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Part Load Ratio[]',DesicDehum(DesicDehumNum)%PartLoad,'System',&
+    CALL SetupOutputVariable('Dehumidifier Part Load Ratio []',DesicDehum(DesicDehumNum)%PartLoad,'System',&
                              'Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Electric Power[W]',DesicDehum(DesicDehumNum)%ElecUseRate,'System',&
+    CALL SetupOutputVariable('Dehumidifier Electric Power [W]',DesicDehum(DesicDehumNum)%ElecUseRate,'System',&
                              'Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Electric Consumption[J]',DesicDehum(DesicDehumNum)%ElecUseEnergy,'System',&
+    CALL SetupOutputVariable('Dehumidifier Electric Energy [J]',DesicDehum(DesicDehumNum)%ElecUseEnergy,'System',&
                              'Sum',DesicDehum(DesicDehumNum)%Name, &
                              ResourceTypeKey='Electricity',GroupKey='System',EndUseKey='Cooling')
-    CALL SetupOutputVariable('Desiccant Dehumidifier Specific Regen Energy [J/kgWater]',&
+    CALL SetupOutputVariable('Dehumidifier Regeneration Specific Energy [J/kgWater]',&
                              DesicDehum(DesicDehumNum)%SpecRegenEnergy,&
                              'System','Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Regen Energy Rate[W]',DesicDehum(DesicDehumNum)%QRegen,'System','Average',&
+    CALL SetupOutputVariable('Dehumidifier Regeneration Rate [W]',DesicDehum(DesicDehumNum)%QRegen,'System','Average',&
                              DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Regen Energy[J]',DesicDehum(DesicDehumNum)%RegenEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Dehumidifier Regeneration Energy [J]',DesicDehum(DesicDehumNum)%RegenEnergy,'System','Sum',&
                              DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Regen Air Velocity[m/s]',DesicDehum(DesicDehumNum)%RegenAirVel,&
+    CALL SetupOutputVariable('Dehumidifier Regeneration Air Speed [m/s]',DesicDehum(DesicDehumNum)%RegenAirVel,&
                              'System','Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Regen Air Mass Flow Rate[kg/s]',&
+    CALL SetupOutputVariable('Dehumidifier Regeneration Air Mass Flow Rate [kg/s]',&
                              DesicDehum(DesicDehumNum)%RegenAirInMassFlowRate,'System','Average',&
                              DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Process Air Mass Flow Rate[kg/s]',&
+    CALL SetupOutputVariable('Dehumidifier Process Air Mass Flow Rate [kg/s]',&
                              DesicDehum(DesicDehumNum)%ProcAirInMassFlowRate,'System','Average',&
                              DesicDehum(DesicDehumNum)%Name)
   END DO
 
   DO DesicDehumNum=1,NumGenericDesicDehums
     ! Setup Report variables for the Desiccant Dehumidifiers
-    CALL SetupOutputVariable('Desiccant Dehumidifier Water Removed [kg]',DesicDehum(DesicDehumNum)%WaterRemove,&
+    CALL SetupOutputVariable('Dehumidifier Removed Water Mass [kg]',DesicDehum(DesicDehumNum)%WaterRemove,&
                              'System','Sum',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Water Removal Rate [kg/s]',DesicDehum(DesicDehumNum)%WaterRemoveRate,&
+    CALL SetupOutputVariable('Dehumidifier Removed Water Mass Flow Rate [kg/s]',DesicDehum(DesicDehumNum)%WaterRemoveRate,&
                              'System','Average',DesicDehum(DesicDehumNum)%Name)
-    CALL SetupOutputVariable('Desiccant Dehumidifier Part Load Ratio []',DesicDehum(DesicDehumNum)%PartLoad,'System',&
+    CALL SetupOutputVariable('Dehumidifier Part Load Ratio []',DesicDehum(DesicDehumNum)%PartLoad,'System',&
                              'Average',DesicDehum(DesicDehumNum)%Name)
     IF(DesicDehum(DesicDehumNum)%ExhaustFanMaxVolFlowRate .GT. 0)THEN
-      CALL SetupOutputVariable('Desiccant Dehumidifier Exhaust Fan Electric Power [W]',DesicDehum(DesicDehumNum)%ExhaustFanPower,&
+      CALL SetupOutputVariable('Dehumidifier Exhaust Fan Electric Power [W]',DesicDehum(DesicDehumNum)%ExhaustFanPower,&
                                'System','Average',DesicDehum(DesicDehumNum)%Name)
-      CALL SetupOutputVariable('Desiccant Dehumidifier Exhaust Fan Electric Consumption [J]', &
+      CALL SetupOutputVariable('Dehumidifier Exhaust Fan Electric Energy [J]', &
                                 DesicDehum(DesicDehumNum)%ExhaustFanElecConsumption,'System',&
                                'Sum',DesicDehum(DesicDehumNum)%Name, &
                                 ResourceTypeKey='Electricity',GroupKey='System',EndUseKey='Cooling')
@@ -3280,7 +3276,7 @@ END FUNCTION HotWaterCoilResidual
 !
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

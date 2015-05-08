@@ -121,7 +121,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
 
   ! Load the additional EMPD Material properties
   cCurrentModuleObject='MaterialProperty:MoisturePenetrationDepth:Settings'
-  EMPDMat=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  EMPDMat=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (EMPDMat == 0) THEN
     CALL ShowSevereError('EMPD Solution requested, but no "'//TRIM(cCurrentModuleObject)//'" objects were found.')
@@ -131,7 +131,7 @@ SUBROUTINE GetMoistureBalanceEMPDInput  ! Moisture Balance EMPD Input Reader Man
   DO Loop=1,EMPDMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha, &
                        MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -321,10 +321,12 @@ SUBROUTINE InitMoistureBalanceEMPD
     DO Loop=1,TotSurfaces
        IF (.not. Surface(Loop)%HeatTransSurf) CYCLE
        IF (Surface(Loop)%Class == SurfaceClass_Window) CYCLE
-       CALL SetupOutputVariable('Inside Surface Vapor Density [kg/m3]',RhoVapEMPD(Loop),'Zone','State',Trim(Surface(Loop)%Name))
-       CALL SetupOutputVariable('Inside Surface Humidity Ratio [kgWater/kgDryAir]',WSurfEMPD(Loop),'Zone','State',  &
-          Trim(Surface(Loop)%Name))
-       CALL SetupOutputVariable('Inside Surface Relative Humidity [%]',RHEMPD(Loop),'Zone','State',Trim(Surface(Loop)%Name))
+       CALL SetupOutputVariable('EMPD Surface Inside Face Water Vapor Density [kg/m3]',&
+                                 RhoVapEMPD(Loop),'Zone','State',Surface(Loop)%Name)
+       CALL SetupOutputVariable('EMPD Surface Inside Face Humidity Ratio [kgWater/kgDryAir]',  &
+                                 WSurfEMPD(Loop),'Zone','State',Surface(Loop)%Name)
+       CALL SetupOutputVariable('EMPD Surface Inside Face Relative Humidity [%]', &
+                                 RHEMPD(Loop),'Zone','State',Surface(Loop)%Name)
     ENDDO
 
     if (InitEnvrnFlag) InitEnvrnFlag = .False.
@@ -652,7 +654,7 @@ END SUBROUTINE ReportMoistureBalanceEMPD
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

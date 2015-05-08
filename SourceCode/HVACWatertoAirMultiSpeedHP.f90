@@ -11,6 +11,7 @@ Use DataEnvironment, ONLY: StdBaroPress, EnvironmentName, CurMnDy, OutDryBulbTem
 USE DataInterfaces
 USE DataSizing
 USE DataPlant,       ONLY: TypeOf_CoilVSWAHPHeatingEquationFit, TypeOf_CoilVSWAHPCoolingEquationFit
+USE General,         ONLY: RoundSigDigits
 
   ! Use statements for access to subroutines in other modules
 
@@ -489,7 +490,7 @@ SUBROUTINE GetVarSpeedCoilInput
     USE InputProcessor
     USE NodeInputManager
     USE BranchNodeConnections, ONLY: TestCompSet
-    USE GlobalNames,     ONLY: VerifyUniqueWaterToAirHPName
+    USE GlobalNames,     ONLY: VerifyUniqueCoilName
     USE OutputReportPredefined
     USE General,               ONLY: TrimSigDigits
     USE CurveManager,          ONLY: GetCurveIndex, GetCurveType, CurveValue, SetCurveOutputMinMaxValues
@@ -591,7 +592,7 @@ SUBROUTINE GetVarSpeedCoilInput
         DXCoilNum= DXCoilNum + 1
         AlfaFieldIncre = 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DXCoilNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,DXCoilNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -604,8 +605,7 @@ SUBROUTINE GetVarSpeedCoilInput
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -639,9 +639,10 @@ SUBROUTINE GetVarSpeedCoilInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
 
-        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+     !   If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+      If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 1) Then
           CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
-          CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 2.'//  &
+          CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 1.'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
           ErrorsFound=.TRUE.
         End If
@@ -986,21 +987,21 @@ SUBROUTINE GetVarSpeedCoilInput
                     VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
         END DO
 
-        CALL SetupOutputVariable('VSWatertoAirHP Cooling Electric Consumption [J]', &
+        CALL SetupOutputVariable('Cooling Coil Electric Energy [J]', &
              VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
 
-        CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('VSWatertoAirHP Load Side Sensible Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergySensible,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
-        CALL SetupOutputVariable('VSWatertoAirHP Load Side Latent Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Latent Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergyLatent,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
-        CALL SetupOutputVariable('VSWatertoAirHP Source Side Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,   &
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
@@ -1036,7 +1037,7 @@ SUBROUTINE GetVarSpeedCoilInput
         DXCoilNum= DXCoilNum + 1
         AlfaFieldIncre = 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DXCoilNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,DXCoilNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -1049,8 +1050,7 @@ SUBROUTINE GetVarSpeedCoilInput
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -1403,21 +1403,21 @@ SUBROUTINE GetVarSpeedCoilInput
                     VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
       END DO
 
-      CALL SetupOutputVariable('VSAirtoAirHP Cooling Electric Consumption [J]', &
+      CALL SetupOutputVariable('Cooling Coil Electric Energy [J]', &
              VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
 
-      CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Cooling Energy [J]', &
+      CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
 
-      CALL SetupOutputVariable('VSAirtoAirHP Load Side Sensible Cooling Energy [J]', &
+      CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergySensible,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
-      CALL SetupOutputVariable('VSAirtoAirHP Load Side Latent Cooling Energy [J]', &
+      CALL SetupOutputVariable('Cooling Coil Latent Cooling Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergyLatent,'System','Summed',VarSpeedCoil(DXCoilNum)%Name)
 
-      CALL SetupOutputVariable('VSAirtoAirHP Source Side Cooling Energy [J]', &
+      CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,   &
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
@@ -1446,7 +1446,7 @@ SUBROUTINE GetVarSpeedCoilInput
 
         DXCoilNum= DXCoilNum + 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),WatertoAirHPNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,WatertoAirHPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -1459,8 +1459,7 @@ SUBROUTINE GetVarSpeedCoilInput
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -1491,9 +1490,10 @@ SUBROUTINE GetVarSpeedCoilInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
 
-        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+ !       If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 2) Then
+        If (VarSpeedCoil(DXCoilNum)%NumOfSpeeds .LT. 1) Then
           CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid')
-          CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 2.'//  &
+          CALL ShowContinueError('...'//TRIM(cNumericFields(1))//' must be >= 1.'//  &
                                                  ' entered number is '//TRIM(TrimSigDigits(NumArray(1),0)))
           ErrorsFound=.TRUE.
         End If
@@ -1835,15 +1835,15 @@ SUBROUTINE GetVarSpeedCoilInput
                         VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
         END DO
 
-        CALL SetupOutputVariable('VSWatertoAirHP Heating Electric Consumption [J]', &
+        CALL SetupOutputVariable('Heating Coil Electric Energy [J]', &
              VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
 
-        CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Heating Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('VSWatertoAirHP Source Side Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Energy [J]', &
              VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
              ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
@@ -1863,7 +1863,7 @@ SUBROUTINE GetVarSpeedCoilInput
 
       DXCoilNum= DXCoilNum + 1
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),WatertoAirHPNum,AlphArray,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,WatertoAirHPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -1876,10 +1876,9 @@ SUBROUTINE GetVarSpeedCoilInput
          ErrorsFound=.TRUE.
          IF (IsBlank) AlphArray(1)='xxxxx'
       ENDIF
-      CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+      CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
       IF (errflag) THEN
-         ErrorsFound=.true.
+        ErrorsFound=.true.
       ENDIF
 
       VarSpeedCoil(DXCoilNum)%Name     = TRIM(AlphArray(1))
@@ -2027,6 +2026,13 @@ SUBROUTINE GetVarSpeedCoilInput
         VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) = NumArray(12+(I-1)*3)
         VarSpeedCoil(DXCoilNum)%MSRatedCOP(I)    = NumArray(13+(I-1)*3)
         VarSpeedCoil(DXCoilNum)%MSRatedAirVolFlowRate(I) = NumArray(14+(I-1)*3)
+
+        IF (VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I) < 1.d-10) THEN
+          CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(VarSpeedCoil(DXCoilNum)%Name)//'", invalid value')
+          CALL ShowContinueError('...too small '//trim(cNumericFields(12+(I-1)*3))//'=['//  &
+            trim(RoundSigDigits(VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I),2))//'].')
+          ErrorsFound=.true.
+        ENDIF
 
         AlfaFieldIncre = 8+(I-1)*4
         VarSpeedCoil(DXCoilNum)%MSCCapFTemp(I) = GetCurveIndex(AlphArray(AlfaFieldIncre)) ! convert curve name to number
@@ -2188,6 +2194,8 @@ SUBROUTINE GetVarSpeedCoilInput
         END IF
     END DO
 
+    IF (ErrorsFound) CYCLE
+
     Do I=1,VarSpeedCoil(DXCoilNum)%NumOfSpeeds
         VarSpeedCoil(DXCoilNum)%MSRatedPercentTotCap(I) =VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)/ &
                 VarSpeedCoil(DXCoilNum)%MSRatedTotCap(VarSpeedCoil(DXCoilNum)%NumOfSpeeds)
@@ -2195,15 +2203,15 @@ SUBROUTINE GetVarSpeedCoilInput
                     VarSpeedCoil(DXCoilNum)%MSRatedTotCap(I)
     END DO
 
-    CALL SetupOutputVariable('VSAirtoAirHP Heating Electric Consumption [J]', &
+    CALL SetupOutputVariable('Heating Coil Electric Energy [J]', &
          VarSpeedCoil(DXCoilNum)%Energy,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
          ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
 
-    CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Heating Energy [J]', &
+    CALL SetupOutputVariable('Heating Coil Heating Energy [J]', &
          VarSpeedCoil(DXCoilNum)%EnergyLoadTotal,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
          ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
 
-    CALL SetupOutputVariable('VSAirtoAirHP Source Side Heating Energy [J]', &
+    CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Energy [J]', &
          VarSpeedCoil(DXCoilNum)%EnergySource,'System','Summed',VarSpeedCoil(DXCoilNum)%Name,  &
          ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
@@ -2217,160 +2225,229 @@ SUBROUTINE GetVarSpeedCoilInput
 
    !-------------------------AIR SOURCE HEATING---END
 
-   DEALLOCATE(AlphArray)
-   DEALLOCATE(cAlphaFields)
-   DEALLOCATE(lAlphaBlanks)
-   DEALLOCATE(cNumericFields)
-   DEALLOCATE(lNumericBlanks)
-   DEALLOCATE(NumArray)
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(cAlphaFields)
+  DEALLOCATE(lAlphaBlanks)
+  DEALLOCATE(cNumericFields)
+  DEALLOCATE(lNumericBlanks)
+  DEALLOCATE(NumArray)
 
-   IF (ErrorsFound) THEN
-     CALL ShowFatalError(RoutineName//'Errors found getting input. Program terminates.')
-   ENDIF
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Errors found getting input. Program terminates.')
+  ENDIF
 
-   DO DXCoilNum=1,NumWatertoAirHPs
+  DO DXCoilNum=1,NumWatertoAirHPs
     IF((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) .OR. &
-    (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed)) THEN
+        (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed)) THEN
         ! Setup Report variables for the Heat Pump
-       CALL SetupOutputVariable('VSAirtoAirHP Power [W]', &
-            VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Total Heat Transfer Rate [W]', &
-            VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Sensible Heat Transfer Rate [W]', &
-            VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Latent Heat Transfer Rate [W]', &
-            VarSpeedCoil(DXCoilNum)%QLatent,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Source Side Heat Transfer Rate [W]', &
-            VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Part Load Ratio []', &
-            VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Run Time Fraction []', &
-            VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
-       CALL SetupOutputVariable('VSAirtoAirHP Air Mass Flow Rate [kg/s]', &
-            VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
-            VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
-            VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
-            VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
-            VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+      !cooling and heating coils separately
+      IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
+       ! air source cooling coils
+        CALL SetupOutputVariable('Cooling Coil Air Mass Flow Rate [kg/s]', &
+              VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Air Inlet Temperature [C]', &
+              VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+              VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Latent Cooling Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QLatent,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Air Outlet Temperature [C]', &
+              VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+              VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Part Load Ratio []', &
+              VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Electric Power [W]', &
+              VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Runtime Fraction []', &
+              VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Upper Speed Level []', &
+              VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Cooling Coil Neighboring Speed Levels Ratio []', &
+              VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
-       !starting newly added output variables
-       CALL SetupOutputVariable('VSAirtoAirHP Upper Speed Level []', &
-            VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Speed Ratio between Two Neighboring Speeds []', &
-            VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       !end newly added output variables
-
-       !cooling and heating coils separately
-       IF(VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_CoolingAirToAirVariableSpeed) THEN
-     ! air source cooling coils
         IF (VarSpeedCoil(DXCoilNum)%CondensateCollectMode == CondensateToTank) THEN
-          CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condensate Volumetric Flow Rate [m3/s]', &
-            VarSpeedCoil(DXCoilNum)%CondensateVdot, 'System','Average', VarSpeedCoil(DXCoilNum)%Name)
-          CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condensate Volume [m3]',VarSpeedCoil(DXCoilNum)%CondensateVol,&
-                               'System','Sum', VarSpeedCoil(DXCoilNum)%Name,  &
-                               ResourceTypeKey='OnSiteWater', &
-                               EndUseKey='Condensate', GroupKey='System')
+          CALL SetupOutputVariable('Cooling Coil Condensate Volume Flow Rate [m3/s]', &
+              VarSpeedCoil(DXCoilNum)%CondensateVdot, 'System','Average', VarSpeedCoil(DXCoilNum)%Name)
+          CALL SetupOutputVariable('Cooling Coil Condensate Volume [m3]',VarSpeedCoil(DXCoilNum)%CondensateVol,&
+                                 'System','Sum', VarSpeedCoil(DXCoilNum)%Name,  &
+                                 ResourceTypeKey='OnSiteWater', &
+                                 EndUseKey='Condensate', GroupKey='System')
         ENDIF
 
         IF (VarSpeedCoil(DXCoilNum)%ReportEvapCondVars) THEN
-            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Condenser Inlet Temp [C]', &
+          CALL SetupOutputVariable('Cooling Coil Condenser Inlet Temperature [C]', &
                                       VarSpeedCoil(DXCoilNum)%CondInletTemp,'System','Average', VarSpeedCoil(DXCoilNum)%Name)
-            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Water Consumption [m3]',&
+          CALL SetupOutputVariable('Cooling Coil Evaporative Condenser Water Volume [m3]',&
                             VarSpeedCoil(DXCoilNum)%EvapWaterConsump, &
                                      'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
                                       ResourceTypeKey='Water',EndUseKey='Cooling',GroupKey='System')
-            CALL SetupOutputVariable('Mains Water Supply for VSAirtoAirHP Cooling Coil Evap Condenser [m3]', &
+          CALL SetupOutputVariable('Cooling Coil Evaporative Condenser Mains Water Volume [m3]', &
                                         VarSpeedCoil(DXCoilNum)%EvapWaterConsump, &
                                      'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
                                       ResourceTypeKey='MainsWater',EndUseKey='Cooling',GroupKey='System')
-            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Pump Electric Power [W]',&
+          CALL SetupOutputVariable('Cooling Coil Evaporative Condenser Pump Electric Power [W]',&
                                         VarSpeedCoil(DXCoilNum)%EvapCondPumpElecPower, &
                                      'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-            CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Evap Condenser Pump Electric Consumption [J]', &
+          CALL SetupOutputVariable('Cooling Coil Evaporative Condenser Pump Electric Energy [J]', &
                                       VarSpeedCoil(DXCoilNum)%EvapCondPumpElecConsumption,'System','Sum',&
                                       VarSpeedCoil(DXCoilNum)%Name, &
                                       ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
-            IF(VarSpeedCoil(DXCoilNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
-              CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Basin Heater Electric Power [W]', &
+          IF(VarSpeedCoil(DXCoilNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
+            CALL SetupOutputVariable('Cooling Coil Basin Heater Electric Power [W]', &
                 VarSpeedCoil(DXCoilNum)%BasinHeaterPower,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-              CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Basin Heater Electric Consumption [J]', &
+            CALL SetupOutputVariable('Cooling Coil Basin Heater Electric Energy [J]', &
                 VarSpeedCoil(DXCoilNum)%BasinHeaterConsumption,'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
                 ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
-            END IF
+          END IF
         END IF
 
-        CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Crankcase Heater Power [W]', &
+        CALL SetupOutputVariable('Cooling Coil Crankcase Heater Electric Power [W]', &
                             VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower,'System',&
                            'Average',VarSpeedCoil(DXCoilNum)%Name)
-        CALL SetupOutputVariable('VSAirtoAirHP Cooling Coil Crankcase Heater Consumption [J]', &
+        CALL SetupOutputVariable('Cooling Coil Crankcase Heater Electric Energy [J]', &
                                     VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption,  &
                                     'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
                                     ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
       ELSE
-     ! air source heating coils
-       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Electric Defrost Power [W]', &
-                            VarSpeedCoil(DXCoilNum)%DefrostPower,'System','Average',&
-                            VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Electric Defrost Consumption [J]', &
-                            VarSpeedCoil(DXCoilNum)%DefrostConsumption,'System',&
-                           'Sum',VarSpeedCoil(DXCoilNum)%Name, &
-                           ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
-       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Crankcase Heater Power [W]', &
-                            VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower,'System',&
-                           'Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSAirtoAirHP Heating Coil Crankcase Heater Consumption [J]', &
-                                    VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption,  &
-                                    'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
-                                    ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
+      ! air source heating coils
+        CALL SetupOutputVariable('Heating Coil Air Mass Flow Rate [kg/s]', &
+              VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Inlet Temperature [C]', &
+              VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+              VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Outlet Temperature [C]', &
+              VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+              VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Sensible Heating Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Heating Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Part Load Ratio []', &
+              VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Electric Power [W]', &
+              VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Runtime Fraction []', &
+              VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Rate [W]', &
+              VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Upper Speed Level []', &
+              VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Neighboring Speed Levels Ratio []', &
+              VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+        CALL SetupOutputVariable('Heating Coil Defrost Electric Power [W]', &
+                              VarSpeedCoil(DXCoilNum)%DefrostPower,'System','Average',&
+                              VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Defrost Electric Energy [J]', &
+                              VarSpeedCoil(DXCoilNum)%DefrostConsumption,'System',&
+                             'Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                             ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
+        CALL SetupOutputVariable('Heating Coil Crankcase Heater Electric Power [W]', &
+                              VarSpeedCoil(DXCoilNum)%CrankcaseHeaterPower,'System',&
+                             'Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Crankcase Heater Electric Energy [J]', &
+                                      VarSpeedCoil(DXCoilNum)%CrankcaseHeaterConsumption,  &
+                                      'System','Sum',VarSpeedCoil(DXCoilNum)%Name, &
+                                      ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
 
       END IF
     ELSE
+
+      IF (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum == TypeOf_CoilVSWAHPCoolingEquationFit) THEN
+       ! cooling WAHP coil
             ! Setup Report variables for water source Heat Pump
-       CALL SetupOutputVariable('VSWatertoAirHP Power [W]', &
+        CALL SetupOutputVariable('Cooling Coil Electric Power [W]', &
             VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Total Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', &
             VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Sensible Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', &
             VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Latent Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Cooling Coil Latent Cooling Rate [W]', &
             VarSpeedCoil(DXCoilNum)%QLatent,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Rate [W]', &
             VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Part Load Ratio []', &
+        CALL SetupOutputVariable('Cooling Coil Part Load Ratio []', &
             VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Run Time Fraction []', &
+        CALL SetupOutputVariable('Cooling Coil Runtime Fraction []', &
             VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
-       CALL SetupOutputVariable('VSWatertoAirHP Air Mass Flow Rate [kg/s]', &
+        CALL SetupOutputVariable('Cooling Coil Air Mass Flow Rate [kg/s]', &
             VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
+        CALL SetupOutputVariable('Cooling Coil Air Inlet Temperature [C]', &
             VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
+        CALL SetupOutputVariable('Cooling Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
             VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
+        CALL SetupOutputVariable('Cooling Coil Air Outlet Temperature [C]', &
             VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
+        CALL SetupOutputVariable('Cooling Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
             VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Water Mass Flow Rate [kg/s]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Mass Flow Rate [kg/s]', &
             VarSpeedCoil(DXCoilNum)%WaterMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Inlet Temperature [C]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Inlet Temperature [C]', &
             VarSpeedCoil(DXCoilNum)%InletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Source Side Outlet Temperature [C]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Outlet Temperature [C]', &
             VarSpeedCoil(DXCoilNum)%OutletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
 
-       !starting newly added output variables
-       CALL SetupOutputVariable('VSWatertoAirHP Upper Speed Level []', &
+
+        CALL SetupOutputVariable('Cooling Coil Upper Speed Level []', &
             VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Speed Ratio between Two Neighboring Speeds []', &
+        CALL SetupOutputVariable('Cooling Coil Neighboring Speed Levels Ratio []', &
             VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       CALL SetupOutputVariable('VSWatertoAirHP Recoverable Waste Heat [W]', &
+        CALL SetupOutputVariable('Cooling Coil Recoverable Heat Transfer Rate [W]', &
             VarSpeedCoil(DXCoilNum)%QWasteHeat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
-       !end newly added output variables
+      ELSEIF (VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum == TypeOf_CoilVSWAHPHeatingEquationFit) THEN
+       ! heating WAHP coil
+            ! Setup Report variables for water source Heat Pump
+        CALL SetupOutputVariable('Heating Coil Electric Power [W]', &
+            VarSpeedCoil(DXCoilNum)%Power,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Heating Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QLoadTotal,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Sensible Heating Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSensible,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QSource,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Part Load Ratio []', &
+            VarSpeedCoil(DXCoilNum)%PartLoadRatio,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Runtime Fraction []', &
+            VarSpeedCoil(DXCoilNum)%RunFrac,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+        CALL SetupOutputVariable('Heating Coil Air Mass Flow Rate [kg/s]', &
+            VarSpeedCoil(DXCoilNum)%AirMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Inlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%InletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%InletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Outlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirDBTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+            VarSpeedCoil(DXCoilNum)%OutletAirHumRat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Source Side Mass Flow Rate [kg/s]', &
+            VarSpeedCoil(DXCoilNum)%WaterMassFlowRate,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Source Side Inlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%InletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Source Side Outlet Temperature [C]', &
+            VarSpeedCoil(DXCoilNum)%OutletWaterTemp,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+
+
+        CALL SetupOutputVariable('Heating Coil Upper Speed Level []', &
+            VarSpeedCoil(DXCoilNum)%SpeedNumReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Neighboring Speed Levels Ratio []', &
+            VarSpeedCoil(DXCoilNum)%SpeedRatioReport,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+        CALL SetupOutputVariable('Heating Coil Recoverable Heat Transfer Rate [W]', &
+            VarSpeedCoil(DXCoilNum)%QWasteHeat,'System','Average',VarSpeedCoil(DXCoilNum)%Name)
+      ENDIF
     END IF
    END DO
 
@@ -2666,13 +2743,13 @@ SUBROUTINE InitVarSpeedCoil(DXCoilNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDe
                                       VarSpeedCoil(DXCoilNum)%BranchNum, &
                                       VarSpeedCoil(DXCoilNum)%CompNum )
 
-        Node(WaterInletNode)%Temp          = 5.0
+        Node(WaterInletNode)%Temp          = 5.0d0
         Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
         Node(WaterInletNode)%Quality       = 0.0
         Node(WaterInletNode)%Press         = 0.0
         Node(WaterInletNode)%HumRat        = 0.0
 
-        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Temp          = 5.0
+        Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Temp          = 5.0d0
         Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
         Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Quality       = 0.0
         Node(VarSpeedCoil(DXCoilNum)%WaterOutletNodeNum)%Press         = 0.0
@@ -3878,7 +3955,7 @@ LOOP: DO
         CBFSpeed  = AdjustCBF(VarSpeedCoil(DXCoilNum)%MSRatedCBF(SpeedCal),&
                 VarSpeedCoil(DXCoilNum)%MSRatedAirMassFlowRate(SpeedCal),LoadSideMassFlowRate)
 
-        IF(CBFSpeed > 0.999) CBFSpeed = 0.999
+        IF(CBFSpeed > 0.999d0) CBFSpeed = 0.999d0
 
         CALL CalcTotCapSHR_VSWSHP(LoadSideInletDBTemp,LoadSideInletHumRat,LoadSideInletEnth,LoadSideInletWBTemp, &
                          AirMassFlowRatio, WaterMassFlowRatio, &
@@ -3912,7 +3989,7 @@ LOOP: DO
 
         CBFSpeed  = exp(-AoEff/LoadSideMassFlowRate)
 
-        IF(CBFSpeed > 0.999) CBFSpeed = 0.999
+        IF(CBFSpeed > 0.999d0) CBFSpeed = 0.999d0
 
         CALL CalcTotCapSHR_VSWSHP(LoadSideInletDBTemp,LoadSideInletHumRat,LoadSideInletEnth,LoadSideInletWBTemp, &
                  AirMassFlowRatio, WaterMassFlowRatio, &
@@ -4132,8 +4209,9 @@ LOOP: DO
       ! calculate and report condensation rates  (how much water extracted from the air stream)
       ! water flow of water in m3/s for water system interactions
       rhoWater = RhoH2O(( VarSpeedCoil(DXCoilNum)%InletAirDBTemp + VarSpeedCoil(DXCoilNum)%OutletAirDBTemp)/2.0d0)
-      SpecHumIn = LoadSideInletHumRat / ( 1.d0 + LoadSideInletHumRat) !eq. 9b ASHRAE HOF 2001 page 6.8
-      SpecHumOut = LoadSideOutletHumRat / ( 1.d0 + LoadSideOutletHumRat )
+!     CR9155 Remove specific humidity calculations
+      SpecHumIn = LoadSideInletHumRat 
+      SpecHumOut = LoadSideOutletHumRat
       !  mdot * del HumRat / rho water
       VarSpeedCoil(DXCoilNum)%CondensateVdot = MAX(0.0d0, (LoadSideMassFlowRate *   &
                 (SpecHumIn - SpecHumOut) / rhoWater) )
@@ -4286,12 +4364,18 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
   END IF
 
  !Check for flows, do not perform simulation if no flow in load side or source side.
-  IF (SourceSideMassFlowRate <= 0.0 .OR. LoadSideMassFlowRate <= 0.0)THEN
+  IF ((SourceSideMassFlowRate <= 0.0) .OR. (LoadSideMassFlowRate <= 0.0) )THEN
     VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
     RETURN
   ELSE
     VarSpeedCoil(DXCoilNum)%SimFlag = .TRUE.
   ENDIF
+
+  IF((VarSpeedCoil(DXCoilNum)%VSCoilTypeOfNum .EQ. Coil_HeatingAirToAirVariableSpeed) &
+     .AND. (OutdoorDryBulb < VarSpeedCoil(DXCoilNum)%MinOATCompressor))  THEN
+    VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
+    RETURN
+  END IF
 
   IF (CompOp .EQ. 0) THEN
     VarSpeedCoil(DXCoilNum)%SimFlag = .FALSE.
@@ -4496,7 +4580,7 @@ SUBROUTINE  CalcVarSpeedCoilHeating(DXCoilNum,CyclingScheme,RuntimeFrac, &
     !  ELSE
     !    TotCap = TotCap * HeatingCapacityMultiplier
     !  END IF
-      QLoadTotal = QLoadTotal * HeatingCapacityMultiplier
+      QLoadTotal = QLoadTotal * HeatingCapacityMultiplier - LoadDueToDefrost
       ! count the powr separately
       Winput = Winput * InputPowerMultiplier !+ VarSpeedCoil(DXCoilNum)%DefrostPower
 
@@ -5894,7 +5978,7 @@ END FUNCTION CalcCBF
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

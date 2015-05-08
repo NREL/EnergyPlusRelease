@@ -187,9 +187,10 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                                                       ! -1 if central sys is in cycling fan mode;
                                                                       ! =2 if central sysis in constant fan mode.
     LOGICAL                                :: ZonalSystemOnly=.FALSE. ! TRUE if served by a zonal system (only)
-    LOGICAL                                 :: IsControlled =.false.  ! True when this is a controlled zone.
-    REAL(r64)                              :: ZoneExh          = 0    ! zone exhaust (unbalanced) mass flow rate [kg/s]
-    REAL(r64)                              :: PlenumMassFlow   = 0.0  ! zone air mass flow rate induced from plenum [kg/s]
+    LOGICAL                                :: IsControlled =.false.  ! True when this is a controlled zone.
+    REAL(r64)                              :: ZoneExh          = 0.d0 ! zone exhaust (unbalanced) mass flow rate [kg/s]
+    REAL(r64)                              :: ZoneExhBalanced  = 0.d0 ! balanced zone exhaust mass flow rate [kg/s]
+    REAL(r64)                              :: PlenumMassFlow   = 0.d0  ! zone air mass flow rate induced from plenum [kg/s]
                         ! AirDistUnitCool and AirDistUnitHeat
                         ! do not correspond with the AIR DISTRIBUTION UNIT object in the zone equipment list.
                         ! AirDistUnitCool/AirDistUnitHeat, may represent a DIRECT AIR object,
@@ -291,6 +292,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
   LOGICAL :: ZoneEquipSimulatedOnce = .FALSE.
   INTEGER :: NumofZoneEquipLists  = 0 ! The Number of Zone Equipment List objects
   INTEGER, ALLOCATABLE :: ZoneEquipAvail(:)
+  LOGICAL, ALLOCATABLE :: DeltaTempWarning(:)
 
   TYPE (EquipConfiguration), ALLOCATABLE, DIMENSION(:) :: ZoneEquipConfig
   TYPE (EquipList), ALLOCATABLE, DIMENSION(:)          :: ZoneEquipList
@@ -306,6 +308,7 @@ PUBLIC  CheckZoneEquipmentList
 PUBLIC  GetControlledZoneIndex
 PUBLIC  GetSystemNodeNumberForZone
 PUBLIC  GetReturnAirNodeForZone
+PUBLIC  CalcDesignSpecificationOutdoorAir
 
 CONTAINS
 
@@ -491,6 +494,8 @@ ALLOCATE (ZoneEquipConfig(NumOfZones)) ! Allocate the array containing the confi
                                                  ! be the same as the number of zones in the building
 ALLOCATE (ZoneEquipList(NumOfZones))
 ALLOCATE (ZoneEquipAvail(NumOfZones))
+ALLOCATE (DeltaTempWarning(NumOfZones))
+DeltaTempWarning = .TRUE.
 ZoneEquipAvail = NoAction
 
 IF (NumOfZoneEquipLists /= NumOfControlledZones) THEN
@@ -514,7 +519,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
 
   CurrentModuleObject = 'ZoneHVAC:EquipmentConnections'
 
-  CALL GetObjectItem(TRIM(CurrentModuleObject),ControlledZoneLoop,AlphArray,NumAlphas, &  ! Get Equipment
+  CALL GetObjectItem(CurrentModuleObject,ControlledZoneLoop,AlphArray,NumAlphas, &  ! Get Equipment
                      NumArray,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields) !  data for one zone
 
@@ -595,7 +600,7 @@ DO ControlledZoneLoop = 1,NumOfControlledZones
   ZoneEquipListNum = GetObjectItemNum(TRIM(CurrentModuleObject),ZoneEquipConfig(ControlledZoneNum)%EquipListName)
   IF (ZoneEquipListNum > 0) THEN
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),ZoneEquipListNum,AlphArray,NumAlphas, &
+    CALL GetObjectItem(CurrentModuleObject,ZoneEquipListNum,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields) !  data for one zone
     IsNotOK=.false.
@@ -877,7 +882,7 @@ CALL EndUniqueNodeCheck('ZoneHVAC:EquipmentConnections')
 CurrentModuleObject = 'AirLoopHVAC:SupplyPath'
 DO PathNum = 1,  NumSupplyAirPaths
 
-  CALL GetObjectItem(TRIM(CurrentModuleObject),PathNum,AlphArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,PathNum,AlphArray,NumAlphas, &
                      NumArray,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields) !  data for one zone
   IsNotOK=.false.
@@ -939,7 +944,7 @@ END DO  ! end loop over supply air paths
 CurrentModuleObject = 'AirLoopHVAC:ReturnPath'
 DO PathNum = 1,  NumReturnAirPaths
 
-  CALL GetObjectItem(TRIM(CurrentModuleObject),PathNum,AlphArray,NumAlphas, &
+  CALL GetObjectItem(CurrentModuleObject,PathNum,AlphArray,NumAlphas, &
                      NumArray,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields) !  data for one zone
 
@@ -1280,9 +1285,161 @@ FUNCTION GetReturnAirNodeForZone(ZoneName) RESULT (ReturnAirNodeNumber)
 
 END FUNCTION GetReturnAirNodeForZone
 
+FUNCTION CalcDesignSpecificationOutdoorAir(DSOAPtr, ActualZoneNum, UseOccSchFlag, UseMinOASchFlag, PerPersonNotSet, &
+                                           MaxOAVolFlowFlag) RESULT (OAVolumeFlowRate)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Richard Raustad, FSEC
+          !       DATE WRITTEN   October 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! This function returns the air volume flow rate based on DesignSpecification:OutdoorAir object.
+
+          ! METHODOLOGY EMPLOYED:
+          ! User inputs and zone index allows calculation of outdoor air quantity.
+          ! Sizing does not use occupancy or min OA schedule and will call with flags set to FALSE
+          ! Ventilation Rate Procedure uses occupancy schedule based on user input.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSizing, ONLY: OARequirements   ! to access DesignSpecification:OutdoorAir inputs
+  USE DataSizing, ONLY: OAFlowNone, OAFlowPPer, OAFlow, OAFlowPerArea, OAFlowACH, OAFlowSum, OAFlowMax
+  USE ScheduleManager, ONLY: GetCurrentScheduleValue, GetScheduleMaxValue
+  USE DataHeatBalance, ONLY: Zone, ZoneIntGain, People, TotPeople
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: DSOAPtr       ! Pointer to DesignSpecification:OutdoorAir object
+  INTEGER, INTENT(IN) :: ActualZoneNum ! Zone index
+  LOGICAL, INTENT(IN) :: UseOccSchFlag ! Zone occupancy schedule will be used instead of using total zone occupancy
+  LOGICAL, INTENT(IN) :: UseMinOASchFlag  ! Use min OA schedule in DesignSpecification:OutdoorAir object
+  LOGICAL, INTENT(IN), OPTIONAL :: PerPersonNotSet ! when calculation should not include occupants (e.g., dual duct)
+  LOGICAL, INTENT(IN), OPTIONAL :: MaxOAVolFlowFlag ! TRUE when calculation uses occupancy schedule  (e.g., dual duct)
+  REAL(r64)           :: OAVolumeFlowRate ! Return value for calculated outdoor air volume flow rate [m3/s]
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) :: DSOAFlowPeople  ! Outdoor air volume flow rate based on occupancy (m3/s)
+  REAL(r64) :: DSOAFlowPerZone ! Outdoor air volume flow rate (m3/s)
+  REAL(r64) :: DSOAFLowPerArea ! Outdoor air volume flow rate based on zone floor area (m3/s)
+  REAL(r64) :: DSOAFlowACH     ! Outdoor air volume flow rate based on air changes per hour (m3/s)
+  REAL(r64) :: PeopleCount     ! total count of people in people objects
+  INTEGER   :: Loop            ! index counter in LOOP
+  LOGICAL   :: PerPersonModeNotSet
+  LOGICAL   :: MaxOAFlag
+
+  OAVolumeFlowRate = 0.d0
+  IF(DSOAPtr .EQ. 0)RETURN
+
+  IF(PRESENT(PerPersonNotSet))THEN
+    PerPersonModeNotSet = PerPersonNotSet
+  ELSE
+    PerPersonModeNotSet = .FALSE.
+  END IF
+
+  IF(PRESENT(MaxOAVolFlowFlag))THEN
+    MaxOAFlag = MaxOAVolFlowFlag
+  ELSE
+    MaxOAFlag = .FALSE.
+  END IF
+
+  ! Calculate people outdoor air flow rate as needed
+  SELECT CASE(OARequirements(DSOAPtr)%OAFlowMethod)
+    CASE(OAFlowPPer, OAFlowSum, OAFlowMax)
+      IF(UseOccSchFlag)THEN
+        IF(MaxOAFlag)THEN
+          ! OAPerPersonMode == PerPersonDCVByCurrentLevel (UseOccSchFlag = TRUE)
+          ! for dual duct, get max people according to max schedule value when requesting MaxOAFlow
+          PeopleCount = 0.d0
+          DO Loop = 1, TotPeople
+            IF (ActualZoneNum /= People(Loop)%ZonePtr) CYCLE
+            PeopleCount = PeopleCount + People(Loop)%NumberOfPeople &
+                       * GetScheduleMaxValue(People(Loop)%NumberOfPeoplePtr )
+          ENDDO
+          DSOAFlowPeople = PeopleCount * OARequirements(DSOAPtr)%OAFlowPerPerson
+        ELSE
+          DSOAFlowPeople = ZoneIntGain(ActualZoneNum)%NOFOCC * OARequirements(DSOAPtr)%OAFlowPerPerson
+        END IF
+      ELSE
+        IF(MaxOAFlag)THEN
+          ! OAPerPersonMode == PerPersonByDesignLevel (UseOccSchFlag = FALSE)
+          ! use total people when requesting MaxOAFlow
+          DSOAFlowPeople = Zone(ActualZoneNum)%TotOccupants * OARequirements(DSOAPtr)%OAFlowPerPerson
+        ELSE
+          DSOAFlowPeople = Zone(ActualZoneNum)%TotOccupants * OARequirements(DSOAPtr)%OAFlowPerPerson
+        END IF
+      END IF
+      IF(PerPersonModeNotSet)DSOAFlowPeople = 0.d0  ! for Dual Duct if Per Person Ventilation Rate Mode is not entered
+    CASE DEFAULT
+      DSOAFlowPeople = 0.d0
+  END SELECT
+
+  ! Calculate minimum outdoor air flow rate
+  SELECT CASE(OARequirements(DSOAPtr)%OAFlowMethod)
+    CASE(OAFlowNone)
+      ! Special case for no DesignSpecification:OutdoorAir object in Sizing:Zone object
+      ! probably won't get to this CASE statement since it will RETURN above (Ptr=0)
+      ! See SizingManager GetZoneSizingInput for Sizing:Zone input field Design Specification Outdoor Air Object Name
+      OAVolumeFlowRate = 0.d0
+    CASE(OAFlowPPer)
+      ! Multiplied by occupancy
+      OAVolumeFlowRate = DSOAFlowPeople
+    CASE(OAFlow)
+      ! User input
+      OAVolumeFlowRate = OARequirements(DSOAPtr)%OAFlowPerZone
+    CASE(OAFlowPerArea)
+      ! Multiplied by zone floor area
+      OAVolumeFlowRate = OARequirements(DSOAPtr)%OAFlowPerArea * Zone(ActualZoneNum)%FloorArea
+    CASE(OAFlowACH)
+      ! Multiplied by zone volume
+      OAVolumeFlowRate = OARequirements(DSOAPtr)%OAFlowACH * Zone(ActualZoneNum)%Volume / 3600.d0
+
+    CASE(OAFlowSum, OAFlowMax)
+      ! Use sum or max of per person and the following
+      DSOAFlowPerZone = OARequirements(DSOAPtr)%OAFlowPerZone
+      DSOAFLowPerArea = OARequirements(DSOAPtr)%OAFlowPerArea * Zone(ActualZoneNum)%FloorArea
+      DSOAFlowACH     = OARequirements(DSOAPtr)%OAFlowACH * Zone(ActualZoneNum)%Volume / 3600.d0
+      IF(OARequirements(DSOAPtr)%OAFlowMethod == OAFlowMax)THEN
+        OAVolumeFlowRate = MAX(DSOAFlowPeople, DSOAFlowPerZone, DSOAFlowPerArea, DSOAFlowACH)
+      ELSE
+        OAVolumeFlowRate = DSOAFlowPeople + DSOAFlowPerZone + DSOAFlowPerArea + DSOAFlowACH
+      END IF
+
+    CASE DEFAULT
+      ! Will never get here
+      OAVolumeFlowRate = 0.d0
+  END SELECT
+
+  ! Apply zone multipliers and zone list multipliers
+  OAVolumeFlowRate = OAVolumeFlowRate * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier
+
+  ! Apply schedule as needed. Sizing does not use schedule.
+  IF(OARequirements(DSOAPtr)%OAFlowFracSchPtr .GT. 0 .AND. UseMinOASchFlag)THEN
+    IF(MaxOAFlag)THEN
+      OAVolumeFlowRate = OAVolumeFlowRate * GetScheduleMaxValue(OARequirements(DSOAPtr)%OAFlowFracSchPtr)
+    ELSE
+      OAVolumeFlowRate = OAVolumeFlowRate * GetCurrentScheduleValue(OARequirements(DSOAPtr)%OAFlowFracSchPtr)
+    END IF
+  END IF
+
+  END FUNCTION CalcDesignSpecificationOutdoorAir
+
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

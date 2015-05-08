@@ -366,17 +366,15 @@ CONTAINS
 
        ! Get schedule
       HWBaseboard(BaseboardNum)%Schedule  = cAlphaArgs(2)
-      HWBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-
-      IF (HWBaseboard(BaseboardNum)%SchedPtr == 0) THEN
-        IF (lAlphaFieldBlanks(2)) THEN
-          CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Water//'="'//trim(cAlphaArgs(1))// &
-           '", '//TRIM(cAlphaFieldNames(2))//' is required, but is missing.')
-        ELSE
+      IF (lAlphaFieldBlanks(2)) THEN
+        HWBaseboard(BaseboardNum)%SchedPtr  = ScheduleAlwaysOn
+      ELSE
+        HWBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+        IF (HWBaseboard(BaseboardNum)%SchedPtr == 0) THEN
           CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Water//'="'//trim(cAlphaArgs(1))// &
            '", '//TRIM(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+          ErrorsFound=.true.
         END IF
-        ErrorsFound=.true.
       ENDIF
 
          ! Get inlet node number
@@ -549,37 +547,35 @@ CONTAINS
        ! Setup Report variables for the Coils
     DO BaseboardNum = 1, NumHWBaseboards
       ! CurrentModuleObject='ZoneHVAC:Baseboard:RadiantConvective:Water'
-      CALL SetupOutputVariable('Baseboard Convective System Impact Rate[W]', HWBaseboard(BaseboardNum)%TotPower, &
+      CALL SetupOutputVariable('Baseboard Total Heating Rate [W]', HWBaseboard(BaseboardNum)%TotPower, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Heating Rate[W]', HWBaseboard(BaseboardNum)%Power, &
+
+      CALL SetupOutputVariable('Baseboard Convective Heating Rate [W]', HWBaseboard(BaseboardNum)%ConvPower, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Convective Heating Rate[W]', HWBaseboard(BaseboardNum)%ConvPower, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Rate [W]', HWBaseboard(BaseboardNum)%RadPower, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Rate[W]', HWBaseboard(BaseboardNum)%RadPower, &
-                               'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Convective System Impact Energy[J]', HWBaseboard(BaseboardNum)%TotEnergy, &
-                               'System','Sum',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Heating Energy[J]', HWBaseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Total Heating Energy [J]', HWBaseboard(BaseboardNum)%TotEnergy, &
                                'System','Sum',HWBaseboard(BaseboardNum)%EquipID, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BASEBOARD',GroupKey='System')
-      CALL SetupOutputVariable('Baseboard Convective Heating Energy[J]', HWBaseboard(BaseboardNum)%ConvEnergy, &
+
+      CALL SetupOutputVariable('Baseboard Convective Heating Energy [J]', HWBaseboard(BaseboardNum)%ConvEnergy, &
                                'System','Sum',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Energy[J]', HWBaseboard(BaseboardNum)%RadEnergy, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Energy [J]', HWBaseboard(BaseboardNum)%RadEnergy, &
                                'System','Sum',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Hot Water Consumption[J]', HWBaseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Hot Water Energy [J]', HWBaseboard(BaseboardNum)%Energy, &
                                'System','Sum',HWBaseboard(BaseboardNum)%EquipID, &
                                 ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='BASEBOARD',GroupKey='System')
-      CALL SetupOutputVariable('Baseboard Water Mass Flow Rate[kg/s]', HWBaseboard(BaseboardNum)%WaterMassFlowRate, &
+      CALL SetupOutputVariable('Baseboard Hot Water Mass Flow Rate [kg/s]', HWBaseboard(BaseboardNum)%WaterMassFlowRate, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Air Mass Flow Rate[kg/s]', HWBaseboard(BaseboardNum)%AirMassFlowRate, &
+      CALL SetupOutputVariable('Baseboard Air Mass Flow Rate [kg/s]', HWBaseboard(BaseboardNum)%AirMassFlowRate, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Air Inlet Temperature[C]', HWBaseboard(BaseboardNum)%AirInletTemp, &
+      CALL SetupOutputVariable('Baseboard Air Inlet Temperature [C]', HWBaseboard(BaseboardNum)%AirInletTemp, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Air Outlet Temperature[C]', HWBaseboard(BaseboardNum)%AirOutletTemp, &
+      CALL SetupOutputVariable('Baseboard Air Outlet Temperature [C]', HWBaseboard(BaseboardNum)%AirOutletTemp, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Water Inlet Temperature[C]', HWBaseboard(BaseboardNum)%WaterInletTemp, &
+      CALL SetupOutputVariable('Baseboard Water Inlet Temperature [C]', HWBaseboard(BaseboardNum)%WaterInletTemp, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Water Outlet Temperature[C]', HWBaseboard(BaseboardNum)%WaterOutletTemp, &
+      CALL SetupOutputVariable('Baseboard Water Outlet Temperature [C]', HWBaseboard(BaseboardNum)%WaterOutletTemp, &
                                'System','Average',HWBaseboard(BaseboardNum)%EquipID)
     END DO
 
@@ -741,7 +737,7 @@ SUBROUTINE InitHWBaseboard(BaseboardNum, ControlledZoneNumSub, FirstHVACIteratio
                                    HWBaseboard(BaseboardNum)%BranchNum,            &
                                    HWBaseboard(BaseboardNum)%CompNum)
 
-      Node(WaterInletNode)%Temp                      = 60.0
+      Node(WaterInletNode)%Temp                      = 60.0d0
 
       Cp =  GetSpecificHeatGlycol(PlantLoop(HWBaseboard(BaseboardNum)%LoopNum)%FluidName,  &
                                  Node(WaterInletNode)%Temp,                      &
@@ -1678,7 +1674,7 @@ END SUBROUTINE UpdateHWBaseboardPlantConnection
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

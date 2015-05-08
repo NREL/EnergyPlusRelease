@@ -452,7 +452,7 @@ SUBROUTINE InitInteriorConvectionCoeffs(SurfaceTemperatures,ZoneToResimulate)
   INTEGER :: SurfNum            ! DO loop counter for surfaces in zone
   LOGICAL,SAVE :: NodeCheck=.true.  ! for CeilingDiffuser Zones
   LOGICAL,SAVE :: ActiveSurfaceCheck=.TRUE. ! for radiant surfaces in zone
-  LOGICAL, SAVE :: MyEnvirnFlag = .TRUE. 
+  LOGICAL, SAVE :: MyEnvirnFlag = .TRUE.
 
           ! FLOW:
   IF (GetUserSuppliedConvectionCoeffs) THEN
@@ -1529,10 +1529,10 @@ SUBROUTINE GetUserConvectionCoefficients
 
   ! first get user-defined H models so they can be processed for later objects
   CurrentModuleObject='SurfaceConvectionAlgorithm:Inside:UserCurve'
-  TotInsideHcUserCurves = GetNumObjectsFound(TRIM( CurrentModuleObject ) )
+  TotInsideHcUserCurves = GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(HcInsideUserCurve(TotInsideHcUserCurves))
   DO Loop=1,TotInsideHcUserCurves
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     HcInsideUserCurve(loop)%Name = cAlphaArgs(1)
@@ -1642,10 +1642,10 @@ SUBROUTINE GetUserConvectionCoefficients
   ENDDO !end of 'SurfaceConvectionAlgorithm:Inside:UserCurve'
 
   CurrentModuleObject='SurfaceConvectionAlgorithm:Outside:UserCurve'
-  TotOutsideHcUserCurves = GetNumObjectsFound(TRIM( CurrentModuleObject ) )
+  TotOutsideHcUserCurves = GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(HcOutsideUserCurve(TotOutsideHcUserCurves))
   DO Loop=1,TotOutsideHcUserCurves
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     HcOutsideUserCurve(loop)%Name = cAlphaArgs(1)
@@ -1744,9 +1744,9 @@ SUBROUTINE GetUserConvectionCoefficients
   TotIntConvCoeff=0
   TotExtConvCoeff=0
   CurrentModuleObject='SurfaceProperty:ConvectionCoefficients:MultipleSurface'
-  Count=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Count=GetNumObjectsFound(CurrentModuleObject)
   DO Loop=1,Count
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (Alphas(2) == 'INSIDE') THEN
@@ -1773,9 +1773,9 @@ SUBROUTINE GetUserConvectionCoefficients
     ENDIF
   ENDDO
   CurrentModuleObject='SurfaceProperty:ConvectionCoefficients'
-  Count=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Count=GetNumObjectsFound(CurrentModuleObject)
   DO Loop=1,Count
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (Alphas(2) == 'INSIDE') THEN
@@ -1810,9 +1810,9 @@ SUBROUTINE GetUserConvectionCoefficients
 
   !   Now, get for real and check for consistency
   CurrentModuleObject='SurfaceProperty:ConvectionCoefficients'
-  Count=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Count=GetNumObjectsFound(CurrentModuleObject)
   DO Loop=1,Count
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     Found=FindItemInList(Alphas(1),Surface%Name,TotSurfaces)
@@ -2038,9 +2038,9 @@ SUBROUTINE GetUserConvectionCoefficients
   ENDDO
 
   CurrentModuleObject='SurfaceProperty:ConvectionCoefficients:MultipleSurface'
-  Count=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Count=GetNumObjectsFound(CurrentModuleObject)
   DO Loop=1,Count
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ! Check Field 1 for validity
@@ -2314,10 +2314,10 @@ SUBROUTINE GetUserConvectionCoefficients
   !get SurfaceConvectionAlgorithm:Inside:AdaptiveModelSelections
 
   CurrentModuleObject='SurfaceConvectionAlgorithm:Inside:AdaptiveModelSelections'
-  Count = GetNumObjectsFound(TRIM( CurrentModuleObject ) )
+  Count = GetNumObjectsFound(CurrentModuleObject)
   !IF (Count > 1) ! throw  error ... TODO or IP handles it
   IF (Count == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     InsideFaceAdaptiveConvectionAlgo%Name = cAlphaArgs(1) !not used by E+, unique object
@@ -3364,10 +3364,10 @@ SUBROUTINE GetUserConvectionCoefficients
   ENDIF !end of 'SurfaceConvectionAlgorithm:Inside:AdaptiveModelSelections'
 
   CurrentModuleObject='SurfaceConvectionAlgorithm:Outside:AdaptiveModelSelections'
-  Count = GetNumObjectsFound(TRIM( CurrentModuleObject ) )
+  Count = GetNumObjectsFound(CurrentModuleObject)
   !IF (Count > 1) ! throw  error ... TODO or IP handles it
   IF (Count == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status,  &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     OutsideFaceAdaptiveConvectionAlgo%Name = cAlphaArgs(1) !not used by E+, unique object
@@ -5093,7 +5093,7 @@ SUBROUTINE CalcISO15099WindowIntConvCoeff(SurfNum,SurfaceTemperature,AirTemperat
     RaCV = 2.5D+5 * ( EXP(0.72d0*TiltDeg) / sineTilt)**0.2D0 ! eq. 137
 
     IF (RaH <= RaCV) Then
-      Nuint = 0.56D0*(RaH * sineTilt)**0.25  ! eq. 135 in ISO 15099
+      Nuint = 0.56D0*(RaH * sineTilt)**0.25d0  ! eq. 135 in ISO 15099
     ELSE
       Nuint = 0.13D0 * (RaH**OneThird - RaCV**OneThird) &
               + 0.56D0 * (RaCV * sineTilt )**0.25D0 ! eq. 136 in ISO 15099
@@ -5103,11 +5103,11 @@ SUBROUTINE CalcISO15099WindowIntConvCoeff(SurfNum,SurfaceTemperature,AirTemperat
   ELSEIF  ( (90.0D0 < TiltDeg) .AND. (TiltDeg  <= 179.0D0) ) THEN
     ! bound by applicability
     IF (RaH * sineTilt < 1.0D+5) THEN
-      Nuint = 0.56D0*(1.0D+5)**0.25 ! bounded
+      Nuint = 0.56D0*(1.0D+5)**0.25d0 ! bounded
     ElseIF (RaH * sineTilt >= 1.0D+11 ) THEN
-      Nuint = 0.56D0*(1.0D+11)**0.25 ! bounded
+      Nuint = 0.56D0*(1.0D+11)**0.25d0 ! bounded
     Else
-      Nuint = 0.56D0*(RaH * sineTilt)**0.25 ! eq.. 138
+      Nuint = 0.56D0*(RaH * sineTilt)**0.25d0 ! eq.. 138
     ENDIF
 
   ! case d)
@@ -6240,17 +6240,17 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
   CASE(HcInt_AlamdariHammondStableHorizontal)
     ZoneNum =  Surface(SurfNum)%Zone
     tmpHc = CalcAlamdariHammondStableHorizontal((TH(SurfNum,1,2) - MAT(ZoneNum)), &
-                                                            Surface(SurfNum)%IntConvZoneHorizHydrDiam )
+                                                 Surface(SurfNum)%IntConvZoneHorizHydrDiam, SurfNum )
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_AlamdariHammondVerticalWall)
     ZoneNum =  Surface(SurfNum)%Zone
     tmpHc = CalcAlamdariHammondVerticalWall((TH(SurfNum,1,2) - MAT(ZoneNum)), &
-                                                        Surface(SurfNum)%IntConvZoneWallHeight )
+                                             Surface(SurfNum)%IntConvZoneWallHeight, SurfNum )
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_AlamdariHammondUnstableHorizontal)
     ZoneNum =  Surface(SurfNum)%Zone
     tmpHc = CalcAlamdariHammondUnstableHorizontal((TH(SurfNum,1,2) - MAT(ZoneNum)), &
-                                                              Surface(SurfNum)%IntConvZoneHorizHydrDiam )
+                                                              Surface(SurfNum)%IntConvZoneHorizHydrDiam , SurfNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_KhalifaEq3WallAwayFromHeat)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6312,7 +6312,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneWallHeight, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_BeausoleilMorrisonMixedOppossingWall)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6345,7 +6345,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneWallHeight, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
 
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_BeausoleilMorrisonMixedStableCeiling)
@@ -6379,7 +6379,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_BeausoleilMorrisonMixedUnstableCeiling)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6412,7 +6412,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_BeausoleilMorrisonMixedStableFloor)
     ZoneNum  = Surface(SurfNum)%Zone
@@ -6445,7 +6445,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_BeausoleilMorrisonMixedUnstableFloor)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6478,14 +6478,14 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
                                                                Surface(SurfNum)%IntConvZoneHorizHydrDiam, &
                                                                TH(SurfNum,1,2),   &
                                                                SupplyAirTemp,     &
-                                                               AirChangeRate)
+                                                               AirChangeRate, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_FohannoPolidoriVerticalWall)
     ZoneNum =  Surface(SurfNum)%Zone
     tmpHc = CalcFohannoPolidoriVerticalWall((TH(SurfNum,1,2) - MAT(ZoneNum)), &
                                     Surface(SurfNum)%IntConvZoneWallHeight, &
                                     TH(SurfNum,1,2), &
-                                    - QdotConvInRepPerArea(SurfNum))
+                                    - QdotConvInRepPerArea(SurfNum), SurfNum)
     Surface(SurfNum)%TAirRef = ZoneMeanAirTemp
   CASE(HcInt_KaradagChilledCeiling)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6505,7 +6505,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserWindow(AirSystemVolFlowRate, &
                              Surface(SurfNum)%IntConvZonePerimLength, &
                              Surface(SurfNum)%IntConvWindowWallRatio,  &
-                             Surface(SurfNum)%IntConvWindowLocation )
+                             Surface(SurfNum)%IntConvWindowLocation, ZoneNum)
     Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
   CASE(HcInt_GoldsteinNovoselacCeilingDiffuserWalls)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6515,7 +6515,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
     AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate /(AirDensity * ZoneMult)
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserWall(AirSystemVolFlowRate, &
                             Surface(SurfNum)%IntConvZonePerimLength, &
-                            Surface(SurfNum)%IntConvWindowLocation )
+                            Surface(SurfNum)%IntConvWindowLocation, ZoneNum )
     Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
   CASE(HcInt_GoldsteinNovoselacCeilingDiffuserFloor)
     ZoneNum =  Surface(SurfNum)%Zone
@@ -6524,7 +6524,7 @@ SUBROUTINE EvaluateIntHcModels(SurfNum, ConvModelEquationNum, Hc)
     AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,Node(ZoneNode)%Temp,PsyWFnTdpPb(Node(ZoneNode)%Temp,OutBaroPress))
     AirSystemVolFlowRate = Node(ZoneNode)%MassFlowRate / (AirDensity * ZoneMult)
     tmpHc = CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemVolFlowRate, &
-                            Surface(SurfNum)%IntConvZonePerimLength )
+                            Surface(SurfNum)%IntConvZonePerimLength, ZoneNum )
     Surface(SurfNum)%TAirRef = ZoneSupplyAirTemp
   END SELECT
 
@@ -6603,12 +6603,12 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
   CASE (HcExt_AlamdariHammondVerticalWall)
 
     Hn = CalcAlamdariHammondVerticalWall( (TH(SurfNum, 1, 1) - Surface(SurfNum)%OutDryBulbTemp) , &
-                                          Surface(SurfNum)%OutConvFaceHeight )
+                                          Surface(SurfNum)%OutConvFaceHeight , SurfNum)
   CASE (HcExt_FohannoPolidoriVerticalWall)
     Hn = CalcFohannoPolidoriVerticalWall( (TH(SurfNum, 1, 1) - Surface(SurfNum)%OutDryBulbTemp) , &
                                           Surface(SurfNum)%OutConvFaceHeight , &
                                           TH(SurfNum, 1, 1), &
-                                          -QdotConvOutRepPerArea(SurfNum) )
+                                          -QdotConvOutRepPerArea(SurfNum) , SurfNum)
 !  CASE (HcExt_ISO15099Windows)
 
   CASE (HcExt_AlamdariHammondStableHorizontal)
@@ -6618,7 +6618,7 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
       HydraulicDiameter = SQRT(Surface(SurfNum)%OutConvFaceArea)
     ENDIF
     Hn = CalcAlamdariHammondStableHorizontal((TH(SurfNum, 1, 1) - Surface(SurfNum)%OutDryBulbTemp), &
-                                               HydraulicDiameter )
+                                               HydraulicDiameter, SurfNum )
   CASE (HcExt_AlamdariHammondUnstableHorizontal)
     IF (Surface(SurfNum)%OutConvFacePerimeter > 0.d0) THEN
       HydraulicDiameter = 4.d0 * Surface(SurfNum)%OutConvFaceArea / Surface(SurfNum)%OutConvFacePerimeter
@@ -6626,7 +6626,7 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
       HydraulicDiameter = SQRT(Surface(SurfNum)%OutConvFaceArea)
     ENDIF
     Hn = CalcAlamdariHammondUnstableHorizontal((TH(SurfNum, 1, 1) - Surface(SurfNum)%OutDryBulbTemp), &
-                                               HydraulicDiameter )
+                                               HydraulicDiameter, SurfNum )
   END SELECT
 
 
@@ -6648,7 +6648,7 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
     Hf = CalcSparrowWindward(Material(Construct(ConstructNum)%LayerPoint(1))%Roughness, &
                              Surface(SurfNum)%OutConvFacePerimeter, &
                              Surface(SurfNum)%OutConvFaceArea, &
-                             SurfWindSpeed )
+                             SurfWindSpeed , SurfNum)
 
   CASE (HcExt_SparrowLeeward)
     ConstructNum = Surface(SurfNum)%Construction
@@ -6662,7 +6662,7 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
     Hf = CalcSparrowLeeward(Material(Construct(ConstructNum)%LayerPoint(1))%Roughness, &
                              Surface(SurfNum)%OutConvFacePerimeter, &
                              Surface(SurfNum)%OutConvFaceArea, &
-                             SurfWindSpeed )
+                             SurfWindSpeed, SurfNum )
   CASE (HcExt_MoWiTTWindward)
     IF (.NOT. Surface(SurfNum)%ExtWind) THEN
       SurfWindSpeed = 0.d0  ! No wind exposure
@@ -6732,7 +6732,7 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
     ELSE
       SurfWindSpeed = Surface(SurfNum)%WindSpeed
     ENDIF
-    Hf = CalcMitchell(SurfWindSpeed,CubeRootOfOverallBuildingVolume)
+    Hf = CalcMitchell(SurfWindSpeed,CubeRootOfOverallBuildingVolume, SurfNum)
 
   CASE (HcExt_ClearRoof)
     IF (.NOT. Surface(SurfNum)%ExtWind) THEN
@@ -6748,10 +6748,10 @@ SUBROUTINE EvaluateExtHcModels(SurfNum, NaturalConvModelEqNum, ForcedConvModelEq
   CASE (HcExt_BlockenWindward)
     Hf = CalcBlockenWindward(WindSpeed, WindDir, Surface(SurfNum)%Azimuth)
   CASE (HcExt_EmmelVertical)
-    Hf = CalcEmmelVertical(WindSpeed, WindDir, Surface(SurfNum)%Azimuth)
+    Hf = CalcEmmelVertical(WindSpeed, WindDir, Surface(SurfNum)%Azimuth, SurfNum)
   CASE (HcExt_EmmelRoof)
 
-    Hf = CalcEmmelRoof(WindSpeed, WindDir, RoofLongAxisOutwardAzimuth)
+    Hf = CalcEmmelRoof(WindSpeed, WindDir, RoofLongAxisOutwardAzimuth, SurfNum)
 
   END SELECT
 
@@ -7164,14 +7164,17 @@ SUBROUTINE DynamicIntConvSurfaceClassification(SurfNum)
       Re = 0.d0
     ENDIF
 
-    Ri = GrH/(Re**2)  !Richardson Number
-
-    IF (Ri > 10.d0 ) Then ! natural convection expected
+    IF (Re > 0.d0) THEN
+      Ri = GrH/(Re**2)  !Richardson Number
+      IF (Ri > 10.d0 ) Then ! natural convection expected
+        FinalFlowRegime = InConvFlowRegime_A3
+      ELSEIF (Ri < 0.1d0) THEN !forced
+        ! no change, already a forced regime
+      ELSE  ! mixed
+        FinalFlowRegime = InConvFlowRegime_E
+      ENDIF
+    ELSE ! natural convection expected
       FinalFlowRegime = InConvFlowRegime_A3
-    ELSEIF (Ri < 0.1d0) THEN !forced
-      ! no change, already a forced regime
-    ELSE  ! mixed
-      FinalFlowRegime = InConvFlowRegime_E
     ENDIF
   ENDIF
 
@@ -8426,7 +8429,7 @@ FUNCTION CalcFisherPedersenCeilDiffuserWalls(AirChangeRate) RESULT (Hc)
 
 END FUNCTION CalcFisherPedersenCeilDiffuserWalls
 
-FUNCTION CalcAlamdariHammondUnstableHorizontal(DeltaTemp, HydraulicDiameter )  RESULT (Hn)
+FUNCTION CalcAlamdariHammondUnstableHorizontal(DeltaTemp, HydraulicDiameter, SurfNum )  RESULT (Hn)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -8454,6 +8457,7 @@ FUNCTION CalcAlamdariHammondUnstableHorizontal(DeltaTemp, HydraulicDiameter )  R
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: DeltaTemp         ! [C] temperature difference between surface and air
   REAL(r64), INTENT(IN) :: HydraulicDiameter ! [m] characteristic size, = (4 * area) / perimeter
+  INTEGER,   INTENT(IN) :: SurfNum  ! for messages
   REAL(r64)             :: Hn ! function result
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -8469,22 +8473,26 @@ FUNCTION CalcAlamdariHammondUnstableHorizontal(DeltaTemp, HydraulicDiameter )  R
   INTEGER, SAVE :: ErrorIndex = 0
 
   IF (HydraulicDiameter > 0.d0) THEN
-    Hn  = (  ((1.4d0 * (( ABS(DeltaTemp)/HydraulicDiameter)**OneFourth))**6.0d0) &
-           + ((1.63d0*( (ABS(DeltaTemp))**OneThird)**6.0d0) ))**OneSixth
+    Hn  = (  ((1.4d0 * (( ABS(DeltaTemp)/HydraulicDiameter)**OneFourth))**6) &
+           + ((1.63d0*( (ABS(DeltaTemp))**OneThird)**6) ))**OneSixth
   ELSE
     Hn = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcAlamdariHammondUnstableHorizontal: bad inputs, Hydraulic Diameter =' &
-                               //TRIM(RoundSigDigits(HydraulicDiameter,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondUnstableHorizontal: bad inputs, Hydraulic Diameter =' &
-                               //TRIM(RoundSigDigits(HydraulicDiameter,4)),  ErrorIndex )
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcAlamdariHammondUnstableHorizontal: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for surface =' &
+                              //TRIM(Surface(SurfNum)%name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondUnstableHorizontal: Convection model not evaluated because zero' &
+                               //' hydraulic diameter and set to 9.999 [W/m2-K]',  ErrorIndex )
   ENDIF
 
   RETURN
 
 END FUNCTION CalcAlamdariHammondUnstableHorizontal
 
-FUNCTION CalcAlamdariHammondStableHorizontal(DeltaTemp, HydraulicDiameter )  RESULT (Hn)
+FUNCTION CalcAlamdariHammondStableHorizontal(DeltaTemp, HydraulicDiameter, SurfNum )  RESULT (Hn)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -8512,6 +8520,7 @@ FUNCTION CalcAlamdariHammondStableHorizontal(DeltaTemp, HydraulicDiameter )  RES
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: DeltaTemp         ! [C] temperature difference between surface and air
   REAL(r64), INTENT(IN) :: HydraulicDiameter ! [m] characteristic size, = (4 * area) / perimeter
+  INTEGER,   INTENT(IN) :: SurfNum  ! for messages
   REAL(r64)             :: Hn ! function result, natural convection Hc value
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -8527,21 +8536,24 @@ FUNCTION CalcAlamdariHammondStableHorizontal(DeltaTemp, HydraulicDiameter )  RES
   INTEGER, SAVE :: ErrorIndex = 0
 
   IF (HydraulicDiameter > 0.d0) THEN
-    Hn  = 0.6d0 * (( ABS(DeltaTemp)/(HydraulicDiameter**2.0d0 )) ** OneFifth)
+    Hn  = 0.6d0 * (( ABS(DeltaTemp)/(HydraulicDiameter**2 )) ** OneFifth)
   ELSE
     Hn = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcAlamdariHammondStableHorizontal: bad inputs, Hydraulic Diameter =' &
-                               //TRIM(RoundSigDigits(HydraulicDiameter,4)))
-      CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondStableHorizontal: bad inputs, Hydraulic Diameter =' &
-                               //TRIM(RoundSigDigits(HydraulicDiameter,4)) , ErrorIndex )
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcAlamdariHammondStableHorizontal: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for surface =' &
+                              //TRIM(Surface(SurfNum)%name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondStableHorizontal: Convection model not evaluated because zero' &
+                               //' hydraulic diameter and set to 9.999 [W/m2-K]' , ErrorIndex )
   ENDIF
 
   RETURN
 
 END FUNCTION CalcAlamdariHammondStableHorizontal
 
-FUNCTION CalcAlamdariHammondVerticalWall(DeltaTemp, Height )  RESULT (Hn)
+FUNCTION CalcAlamdariHammondVerticalWall(DeltaTemp, Height, SurfNum )  RESULT (Hn)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -8569,6 +8581,7 @@ FUNCTION CalcAlamdariHammondVerticalWall(DeltaTemp, Height )  RESULT (Hn)
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: DeltaTemp         ! [C] temperature difference between surface and air
   REAL(r64), INTENT(IN) :: Height ! [m] characteristic size, = zone height
+  INTEGER,   INTENT(IN) :: SurfNum  ! for messages
   REAL(r64)             :: Hn ! function result, natural convection Hc value
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -8584,15 +8597,18 @@ FUNCTION CalcAlamdariHammondVerticalWall(DeltaTemp, Height )  RESULT (Hn)
   INTEGER, SAVE :: ErrorIndex = 0
 
   IF (Height > 0.d0) THEN
-    Hn  = (  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6.0d0) &
-           + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6.0d0) ))**OneSixth
+    Hn  = (  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6) &
+           + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6) ))**OneSixth
   ELSE
-    Hn  = 9.999
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcAlamdariHammondVerticalWall: bad inputs, Height =' &
-                               //TRIM(RoundSigDigits(Height,4)))
-      CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondVerticalWall: bad inputs, Height =' &
-                               //TRIM(RoundSigDigits(Height,4)) , ErrorIndex)
+    Hn  = 9.999d0
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcAlamdariHammondVerticalWall: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for surface =' &
+                              //TRIM(Surface(SurfNum)%name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcAlamdariHammondVerticalWall: Convection model not evaluated because zero' &
+                               //' hydraulic diameter and set to 9.999 [W/m2-K]' , ErrorIndex)
   ENDIF
 
   RETURN
@@ -8943,7 +8959,7 @@ FUNCTION CalcAwbiHattonHeatedWall(DeltaTemp, HydraulicDiameter)  RESULT (Hc)
 
 END FUNCTION CalcAwbiHattonHeatedWall
 
-FUNCTION CalcBeausoleilMorrisonMixedAssistedWall(DeltaTemp, Height, SurfTemp, SupplyAirTemp, AirChangeRate)  RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedAssistedWall(DeltaTemp, Height, SurfTemp, SupplyAirTemp, AirChangeRate, ZoneNum)  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -8974,6 +8990,7 @@ FUNCTION CalcBeausoleilMorrisonMixedAssistedWall(DeltaTemp, Height, SurfTemp, Su
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -8989,22 +9006,35 @@ FUNCTION CalcBeausoleilMorrisonMixedAssistedWall(DeltaTemp, Height, SurfTemp, Su
   INTEGER, SAVE :: ErrorIndex = 0
 
   IF ((DeltaTemp /= 0.d0) .and. (Height /= 0.d0)) THEN
-    Hc =   (  ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6.0d0)            &
-             + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6.0d0) )**OneSixth)**0.5d0   &
-             + (( ((SurfTemp -  SupplyAirTemp)/ABS(DeltaTemp)) *(-0.199d0 + 0.190d0*(AirChangeRate**0.8d0) ) )**3.d0) ))**OneThird
+    Hc =   (  ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6)            &
+             + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6) )**OneSixth)**0.5d0   &
+             + (( ((SurfTemp -  SupplyAirTemp)/ABS(DeltaTemp)) *(-0.199d0 + 0.190d0*(AirChangeRate**0.8d0) ) )**3) ))**OneThird
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedAssistedWall: bad inputs, Delta Temp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Height='//TRIM(RoundSigDigits(Height,4)))
-      CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedAssistedWall: bad inputs, Delta Temp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Height='//TRIM(RoundSigDigits(Height,4)) , ErrorIndex )
+    IF (Height == 0.d0) THEN
+      CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedAssistedWall: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective height is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    IF (DeltaTemp == 0.d0 .AND. .NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) THEN
+        CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedAssistedWall: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+
+      CALL ShowRecurringWarningErrorAtEnd('CalcBeausoleilMorrisonMixedAssistedWall: Convection model not evaluated because' &
+                  //' of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
+
   ENDIF
   RETURN
 
 END FUNCTION CalcBeausoleilMorrisonMixedAssistedWall
 
-FUNCTION CalcBeausoleilMorrisonMixedOpposingWall(DeltaTemp, Height, SurfTemp, SupplyAirTemp, AirChangeRate)  RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedOpposingWall(DeltaTemp, Height, SurfTemp, SupplyAirTemp, AirChangeRate, ZoneNum)  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9035,6 +9065,7 @@ FUNCTION CalcBeausoleilMorrisonMixedOpposingWall(DeltaTemp, Height, SurfTemp, Su
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9056,20 +9087,24 @@ FUNCTION CalcBeausoleilMorrisonMixedOpposingWall(DeltaTemp, Height, SurfTemp, Su
   IF ((DeltaTemp /= 0.d0) ) THEN ! protect divide by zero
 
     IF (Height /= 0.d0) THEN
-      HcTmp1 =   (  ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6.0d0)            &
-            + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6.0d0) )**OneSixth)**0.5d0   &
-            - (( ((SurfTemp -  SupplyAirTemp)/ABS(DeltaTemp)) *(-0.199d0 + 0.190d0*(AirChangeRate**0.8d0) )  )**3.d0) ))**OneThird
+      HcTmp1 =   (  ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6)            &
+            + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6) )**OneSixth)**0.5d0   &
+            - (( ((SurfTemp -  SupplyAirTemp)/ABS(DeltaTemp)) *(-0.199d0 + 0.190d0*(AirChangeRate**0.8d0) )  )**3) ))**OneThird
 
-      HcTmp2 = 0.8d0 * ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6.0d0)            &
-                 + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6.0d0) ))**OneSixth)
+      HcTmp2 = 0.8d0 * ((  ((1.5d0 * (( ABS(DeltaTemp)/Height)**OneFourth))**6)            &
+                 + ((1.23d0*( (ABS(DeltaTemp))**OneThird)**6) ))**OneSixth)
     ELSE
       HcTmp1 = 9.999d0
       HcTmp2 = 9.999d0
-      IF (ErrorIndex2 == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedOpposingWall: bad inputs, Height =' &
-                               //TRIM(RoundSigDigits(Height,4)))
-      CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedOpposingWall: bad inputs, Height =' &
-                               //TRIM(RoundSigDigits(Height,4)) , ErrorIndex2 )
+      IF (ErrorIndex2 == 0) THEN
+        CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedOpposingWall: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('Effective height is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+
+      ENDIF
+      CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedOpposingWall: Convection model not evaluated because ' &
+                               //' of zero height and set to 9.999 [W/m2-K]', ErrorIndex2 )
 
     ENDIF
     HcTmp3 = 0.8d0 *  ((SurfTemp -  SupplyAirTemp)/ABS(DeltaTemp)) *(-0.199d0 + 0.190d0*(AirChangeRate**0.8d0) )
@@ -9078,18 +9113,24 @@ FUNCTION CalcBeausoleilMorrisonMixedOpposingWall(DeltaTemp, Height, SurfTemp, Su
 
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedOpposingWall: bad inputs, Delta Temperature =' &
-                               //TRIM(RoundSigDigits(DeltaTemp,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedOpposingWall: bad inputs, Delta Temperature =' &
-                               //TRIM(RoundSigDigits(DeltaTemp,4)) , ErrorIndex )
+    IF (.NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) Then
+        CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedOpposingWall: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+      CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedOpposingWall: Convection model not evaluated because ' &
+                  //'of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
   ENDIF
 
   RETURN
 
 END FUNCTION CalcBeausoleilMorrisonMixedOpposingWall
 
-FUNCTION CalcBeausoleilMorrisonMixedStableFloor(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate)  RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedStableFloor(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate, &
+                                ZoneNum)  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9120,6 +9161,7 @@ FUNCTION CalcBeausoleilMorrisonMixedStableFloor(DeltaTemp, HydraulicDiameter, Su
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9139,18 +9181,31 @@ FUNCTION CalcBeausoleilMorrisonMixedStableFloor(DeltaTemp, HydraulicDiameter, Su
         + (((SurfTemp -  SupplyAirTemp )/ABS(DeltaTemp))* (0.159d0 + 0.116d0* (AirChangeRate **0.8d0)) )**3 )**OneThird
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedStableFloor: bad inputs, DeltaTemp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedStableFloor: bad inputs, DeltaTemp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)), &
-                ErrorIndex )
+    IF (HydraulicDiameter == 0.d0) THEN
+      CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedStableFloor: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    IF (DeltaTemp == 0.d0 .AND. .NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) THEN
+        CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedStableFloor: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+
+      CALL ShowRecurringWarningErrorAtEnd('CalcBeausoleilMorrisonMixedStableFloor: Convection model not evaluated because' &
+                  //' of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
+
   ENDIF
   RETURN
 
 END FUNCTION CalcBeausoleilMorrisonMixedStableFloor
 
-FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate) RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate, &
+                                                  ZoneNum) RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9181,6 +9236,7 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor(DeltaTemp, HydraulicDiameter, 
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9201,12 +9257,23 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor(DeltaTemp, HydraulicDiameter, 
         + (((SurfTemp -  SupplyAirTemp )/ABS(DeltaTemp))* (0.159d0 + 0.116d0* (AirChangeRate **0.8d0)) )**3 )**OneThird
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedUnstableFloor: bad inputs, DeltaTemp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedUnstableFloor: bad inputs, DeltaTemp =' &
-               //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)) , &
-               ErrorIndex )
+    IF (HydraulicDiameter == 0.d0) THEN
+      CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedUnstableFloor: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    IF (DeltaTemp == 0.d0 .AND. .NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) THEN
+        CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedUnstableFloor: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+
+      CALL ShowRecurringWarningErrorAtEnd('CalcBeausoleilMorrisonMixedUnstableFloor: Convection model not evaluated because' &
+                  //' of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
 
   ENDIF
 
@@ -9214,7 +9281,8 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor(DeltaTemp, HydraulicDiameter, 
 
 END FUNCTION CalcBeausoleilMorrisonMixedUnstableFloor
 
-FUNCTION CalcBeausoleilMorrisonMixedStableCeiling(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate) RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedStableCeiling(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate, &
+                                                    ZoneNum) RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9245,6 +9313,7 @@ FUNCTION CalcBeausoleilMorrisonMixedStableCeiling(DeltaTemp, HydraulicDiameter, 
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9264,20 +9333,31 @@ FUNCTION CalcBeausoleilMorrisonMixedStableCeiling(DeltaTemp, HydraulicDiameter, 
            + ( ((SurfTemp -  SupplyAirTemp )/ABS(DeltaTemp))* (-0.166d0 + 0.484d0* (AirChangeRate **0.8d0)) )**3 )**OneThird
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedStableCeiling: bad inputs, DeltaTemp =' &
-                 //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedStableCeiling: bad inputs, DeltaTemp =' &
-                 //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)), &
-                 ErrorIndex )
+    IF (HydraulicDiameter == 0.d0) THEN
+      CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedStableCeiling: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    IF (DeltaTemp == 0.d0 .AND. .NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) THEN
+        CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedStableCeiling: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+
+      CALL ShowRecurringWarningErrorAtEnd('CalcBeausoleilMorrisonMixedStableCeiling: Convection model not evaluated because' &
+                  //' of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
 
   ENDIF
   RETURN
 
 END FUNCTION CalcBeausoleilMorrisonMixedStableCeiling
 
-FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp, AirChangeRate)  &
-               RESULT (Hc)
+FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling(DeltaTemp, HydraulicDiameter, SurfTemp, SupplyAirTemp,   &
+                          AirChangeRate, ZoneNum) RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9298,7 +9378,7 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling(DeltaTemp, HydraulicDiameter
           !  PhD. Thesis. University of Strathclyde, Glasgow, UK.
 
           ! USE STATEMENTS:
-          ! na
+  USE DataGlobals, ONLY : WarmUpFlag
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -9308,6 +9388,7 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling(DeltaTemp, HydraulicDiameter
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: SupplyAirTemp ![C] temperature of supply air into zone
   REAL(r64), INTENT(IN) :: AirChangeRate ! [ACH] [1/hour] supply air ACH for zone
+  INTEGER,   INTENT(IN) :: ZoneNum  ! index of zone for messaging
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9327,19 +9408,29 @@ FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling(DeltaTemp, HydraulicDiameter
           + (((SurfTemp -  SupplyAirTemp )/ABS(DeltaTemp))* (-0.166d0 + 0.484d0* (AirChangeRate **0.8d0)) )**3 )**OneThird
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcBeausoleilMorrisonMixedUnstableCeiling: bad inputs, DeltaTemp =' &
-                 //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcBeausoleilMorrisonMixedUnstableCeiling: bad inputs, DeltaTemp =' &
-                 //TRIM(RoundSigDigits(DeltaTemp,4))//', Hydraulic Diameter='//TRIM(RoundSigDigits(HydraulicDiameter,4)) , &
-                 ErrorIndex )
+    IF (HydraulicDiameter == 0.d0) THEN
+      CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedUnstableCeiling: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective hydraulic diameter is zero, convection model not applicable for zone named =' &
+                                //TRIM(Zone(ZoneNum)%Name))
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    IF (DeltaTemp == 0.d0 .AND. .NOT. WarmUpFlag) THEN
+      IF (ErrorIndex == 0) THEN
+        CALL ShowWarningMessage('CalcBeausoleilMorrisonMixedUnstableCeiling: Convection model not evaluated (would divide by zero)')
+        CALL ShowContinueError('The temperature difference between surface and air is zero')
+        CALL ShowContinueError('Occurs for zone named = ' //TRIM(Zone(ZoneNum)%Name))
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
 
+      CALL ShowRecurringWarningErrorAtEnd('CalcBeausoleilMorrisonMixedUnstableCeiling: Convection model not evaluated because' &
+                  //' of zero temperature difference and set to 9.999 [W/m2-K]',  ErrorIndex )
+    ENDIF
   ENDIF
   RETURN
 
 END FUNCTION CalcBeausoleilMorrisonMixedUnstableCeiling
 
-FUNCTION CalcFohannoPolidoriVerticalWall(DeltaTemp, Height, SurfTemp, QdotConv)  RESULT (Hn)
+FUNCTION CalcFohannoPolidoriVerticalWall(DeltaTemp, Height, SurfTemp, QdotConv, SurfNum)  RESULT (Hn)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9367,6 +9458,7 @@ FUNCTION CalcFohannoPolidoriVerticalWall(DeltaTemp, Height, SurfTemp, QdotConv) 
   REAL(r64), INTENT(IN) :: Height ! [m] characteristic size, height of zone
   REAL(r64), INTENT(IN) :: SurfTemp ![C] surface temperature
   REAL(r64), INTENT(IN) :: QdotConv ![W/m2] heat flux rate for rayleigh #
+  INTEGER,   INTENT(IN) :: SurfNum  ! for messages
   REAL(r64)             :: Hn ! function result, natural convection coefficient
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9397,11 +9489,15 @@ FUNCTION CalcFohannoPolidoriVerticalWall(DeltaTemp, Height, SurfTemp, QdotConv) 
   ELSE
    ! bad value for Height, but we have little info to identify calling culprit
     Hn = 9.999d0
-    IF (ErrorIndex == 0) &
-      CALL ShowSevereMessage('CalcFohannoPolidoriVerticalWall: bad value for height=' &
-             //TRIM(RoundSigDigits(Height,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcFohannoPolidoriVerticalWall: bad value for height=' &
-             //TRIM(RoundSigDigits(Height,5)) , ErrorIndex)
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcFohannoPolidoriVerticalWall: Convection model not evaluated (would divide by zero)')
+      CALL ShowContinueError('Effective surface height is zero, convection model not applicable for surface =' &
+                              //TRIM(Surface(SurfNum)%name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcFohannoPolidoriVerticalWall: Convection model not evaluated because zero' &
+                               //' height and set to 9.999 [W/m2-K]' , ErrorIndex)
   ENDIF
 
   RETURN
@@ -9455,7 +9551,7 @@ END FUNCTION CalcKaradagChilledCeiling
 
 
 FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWindow(AirSystemFlowRate, ZoneExtPerimLength, WindWallRatio,  &
-                             WindowLocationType )  RESULT (Hc)
+                             WindowLocationType , ZoneNum)  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9484,6 +9580,7 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWindow(AirSystemFlowRate, ZoneExtP
   REAL(r64), INTENT(IN) :: ZoneExtPerimLength ! [m] length of zone perimeter with exterior walls
   REAL(r64), INTENT(IN) :: WindWallRatio ![ ] fraction of window area to wall area for zone
   INTEGER, INTENT(IN)   :: WindowLocationType !index for location types
+  INTEGER, INTENT(IN)   :: ZoneNum ! for messages
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
 
@@ -9513,29 +9610,37 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWindow(AirSystemFlowRate, ZoneExtP
       ELSE
         !shouldn'tcome
         Hc = 9.999d0
-        IF (ErrorIndex == 0) &
-          CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWindow: bad code for relative window location =' &
-                                                                  //TRIM(RoundSigDigits(WindowLocationType)))
-        CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWindow: bad code for relative window location =' &
-                                                                  //TRIM(RoundSigDigits(WindowLocationType)) , ErrorIndex )
+        IF (ErrorIndex == 0) THEN
+          CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWindow: Convection model not evaluated ' &
+                                  //'( bad relative window location)')
+          CALL ShowContinueError('Value for window location = '//TRIM(RoundSigDigits(WindowLocationType)))
+          CALL ShowContinueError('Occurs for zone named = '//TRIM(Zone(ZoneNum)%Name) )
+          CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+        ENDIF
+        CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWindow: Convection model not evaluated because ' &
+                               //'bad window location and set to 9.999 [W/m2-K]', ErrorIndex )
       ENDIF
     ELSE
       Hc = 0.103d0*((AirSystemFlowRate / ZoneExtPerimLength)**0.8d0)
     ENDIF
   ELSE
-   Hc = 9.999d0
-   IF (ErrorIndex2 == 0) &
-     CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWindow: bad value for Zone Exterior Perimeter Length=' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
-   CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWindow: bad value for Zone Exterior Perimeter Length=' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)) , ErrorIndex2 )
+    Hc = 9.999d0
+    IF (ErrorIndex2 == 0) THEN
+      CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWindow: Convection model not evaluated ' &
+                               //'(zero zone exterior perimeter length)' )
+      CALL ShowContinueError('Value for zone exterior perimeter length = ' //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
+      CALL ShowContinueError('Occurs for zone named = '//TRIM(Zone(ZoneNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWindow: Convection model not evaluated because ' &
+                                //' bad perimeter length and set to 9.999 [W/m2-K]' , ErrorIndex2 )
   ENDIF
   RETURN
 
 END FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWindow
 
 FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWall(AirSystemFlowRate, ZoneExtPerimLength, &
-                            WindowLocationType )  RESULT (Hc)
+                            WindowLocationType, ZoneNum )  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9563,6 +9668,7 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWall(AirSystemFlowRate, ZoneExtPer
   REAL(r64), INTENT(IN) :: AirSystemFlowRate  ! [m3/s] air system flow rate
   REAL(r64), INTENT(IN) :: ZoneExtPerimLength ! [m] length of zone perimeter with exterior walls
   INTEGER, INTENT(IN)   :: WindowLocationType !index for location types
+  INTEGER, INTENT(IN)   :: ZoneNum ! for messages
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
 
@@ -9587,26 +9693,35 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWall(AirSystemFlowRate, ZoneExtPer
       Hc = 0.063d0*((AirSystemFlowRate / ZoneExtPerimLength)**0.8d0)  ! assumption for case not covered by model
     ELSE
       Hc = 9.999d0
-      IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWall: bad code for relative window location =' &
-                                                                    //TRIM(RoundSigDigits(WindowLocationType)))
-      CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWall: bad code for relative window location =' &
-                                                                    //TRIM(RoundSigDigits(WindowLocationType)), ErrorIndex )
+      IF (ErrorIndex == 0) THEN
+        CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWall: Convection model not evaluated ' &
+                                //'( bad relative window location)')
+        CALL ShowContinueError('Value for window location = '//TRIM(RoundSigDigits(WindowLocationType)))
+        CALL ShowContinueError('Occurs for zone named = '//TRIM(Zone(ZoneNum)%Name) )
+        CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+      ENDIF
+      CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWall: Convection model not evaluated because ' &
+                              //'bad window location and set to 9.999 [W/m2-K]', ErrorIndex )
 
     ENDIF
   ELSE
     Hc = 9.999d0
-    IF (ErrorIndex2 == 0) &
-        CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWall: bad Zone Exterior Perimeter Length =' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWall: bad Zone Exterior Perimeter Length =' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)) , ErrorIndex2 )
+    IF (ErrorIndex2 == 0) THEN
+      CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserWall: Convection model not evaluated ' &
+                               //'(zero zone exterior perimeter length)' )
+      CALL ShowContinueError('Value for zone exterior perimeter length = ' //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
+      CALL ShowContinueError('Occurs for zone named = '//TRIM(Zone(ZoneNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserWall: Convection model not evaluated because ' &
+                                //' bad perimeter length and set to 9.999 [W/m2-K]' , ErrorIndex2 )
+
   ENDIF
   RETURN
 
 END FUNCTION CalcGoldsteinNovoselacCeilingDiffuserWall
 
-FUNCTION CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemFlowRate, ZoneExtPerimLength )  RESULT (Hc)
+FUNCTION CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemFlowRate, ZoneExtPerimLength, ZoneNum )  RESULT (Hc)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9633,6 +9748,7 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemFlowRate, ZoneExtPe
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: AirSystemFlowRate  ! [m3/s] air system flow rate
   REAL(r64), INTENT(IN) :: ZoneExtPerimLength ! [m] length of zone perimeter with exterior walls
+  INTEGER, INTENT(IN)   :: ZoneNum ! for messages
   REAL(r64)             :: Hc ! function result, total convection coefficient
 
 
@@ -9650,18 +9766,23 @@ FUNCTION CalcGoldsteinNovoselacCeilingDiffuserFloor(AirSystemFlowRate, ZoneExtPe
   IF (ZoneExtPerimLength > 0.d0) THEN
     Hc = 0.048d0*((AirSystemFlowRate / ZoneExtPerimLength)**0.8d0)
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserFloor: bad value for Zone Exterior Perimeter Length=' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserFloor: bad value for Zone Exterior Perimeter Length=' &
-                                      //TRIM(RoundSigDigits(ZoneExtPerimLength,5)) , ErrorIndex)
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcGoldsteinNovoselacCeilingDiffuserFloor: Convection model not evaluated ' &
+                               //'(zero zone exterior perimeter length)' )
+      CALL ShowContinueError('Value for zone exterior perimeter length = ' //TRIM(RoundSigDigits(ZoneExtPerimLength,5)))
+      CALL ShowContinueError('Occurs for zone named = '//TRIM(Zone(ZoneNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcGoldsteinNovoselacCeilingDiffuserFloor: Convection model not evaluated because ' &
+                                //' bad perimeter length and set to 9.999 [W/m2-K]' , ErrorIndex )
+
     Hc = 9.999d0 ! safe but noticeable
   ENDIF
   RETURN
 
 END FUNCTION CalcGoldsteinNovoselacCeilingDiffuserFloor
 
-FUNCTION CalcSparrowWindward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) RESULT (Hf)
+FUNCTION CalcSparrowWindward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ, SurfNum) RESULT (Hf)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9696,6 +9817,7 @@ FUNCTION CalcSparrowWindward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) R
   REAL(r64), INTENT(IN) :: FacePerimeter
   REAL(r64), INTENT(IN) :: FaceArea
   REAL(r64), INTENT(IN) :: WindAtZ
+  INTEGER  , INTENT(IN) :: SurfNum
   REAL(r64)             :: Hf
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9714,18 +9836,21 @@ FUNCTION CalcSparrowWindward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) R
     Hf = 2.53d0 * RoughnessMultiplier(RoughnessIndex)*(( FacePerimeter * WindAtZ/FaceArea)**0.5d0)
 
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcSparrowWindward: bad value for face area=' &
-                                      //TRIM(RoundSigDigits(FaceArea,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcSparrowWindward: bad value for face area=' &
-                                      //TRIM(RoundSigDigits(FaceArea,5)) , ErrorIndex )
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcSparrowWindward: Convection model not evaluated (bad face area)')
+      CALL ShowContinueError('Value for effective face area = ' //TRIM(RoundSigDigits(FaceArea,5)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcSparrowWindward: Convection model not evaluated because ' &
+                                      //'bad face area and set to 9.999 [W/m2-k]' , ErrorIndex )
     Hf = 9.999d0 ! safe but noticeable
   ENDIF
   RETURN
 
 END FUNCTION CalcSparrowWindward
 
-FUNCTION CalcSparrowLeeward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) RESULT (Hf)
+FUNCTION CalcSparrowLeeward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ, SurfNum) RESULT (Hf)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -9760,6 +9885,7 @@ FUNCTION CalcSparrowLeeward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) RE
   REAL(r64), INTENT(IN) :: FacePerimeter
   REAL(r64), INTENT(IN) :: FaceArea
   REAL(r64), INTENT(IN) :: WindAtZ
+  INTEGER  , INTENT(IN) :: SurfNum
   REAL(r64)             :: Hf
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -9777,11 +9903,15 @@ FUNCTION CalcSparrowLeeward(RoughnessIndex, FacePerimeter, FaceArea, WindAtZ) RE
   IF (FaceArea > 0.d0) THEN
     Hf = 2.53d0 * 0.5d0 * RoughnessMultiplier(RoughnessIndex)*(( FacePerimeter * WindAtZ/FaceArea)**0.5d0)
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcSparrowLeeward: bad value for face area=' &
-                                      //TRIM(RoundSigDigits(FaceArea,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcSparrowLeeward: bad value for face area=' &
-                                      //TRIM(RoundSigDigits(FaceArea,5)) , ErrorIndex )
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcSparrowLeeward: Convection model not evaluated (bad face area)')
+      CALL ShowContinueError('Value for effective face area = ' //TRIM(RoundSigDigits(FaceArea,5)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcSparrowLeeward: Convection model not evaluated because ' &
+                                      //'bad face area and set to 9.999 [W/m2-k]' , ErrorIndex )
+
     Hf = 9.999d0 ! safe but noticeable
   ENDIF
   RETURN
@@ -10097,7 +10227,7 @@ FUNCTION CalcMcAdams(WindAtZ) RESULT (Hc)
 
 END FUNCTION CalcMcAdams
 
-FUNCTION CalcMitchell(WindAtZ, LengthScale ) RESULT (Hf)
+FUNCTION CalcMitchell(WindAtZ, LengthScale , SurfNum) RESULT (Hf)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -10126,6 +10256,7 @@ FUNCTION CalcMitchell(WindAtZ, LengthScale ) RESULT (Hf)
           ! FUNCTION ARGUMENT DEFINITIONS:
   REAL(r64), INTENT(IN) :: WindAtZ
   REAL(r64), INTENT(IN) :: LengthScale
+  INTEGER  , INTENT(IN) :: SurfNum
   REAL(r64)             :: Hf
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -10143,11 +10274,14 @@ FUNCTION CalcMitchell(WindAtZ, LengthScale ) RESULT (Hf)
   IF (LengthScale > 0.d0) THEN
     Hf = 8.6d0 * (WindAtZ**0.6d0) / (LengthScale**0.4d0)
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcMitchell: bad value for length scale =' &
-                                    //TRIM(RoundSigDigits(LengthScale,5)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcMitchell: bad value for length scale =' &
-                                    //TRIM(RoundSigDigits(LengthScale,5)) , ErrorIndex )
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcMitchell: Convection model not evaluated (bad length scale)')
+      CALL ShowContinueError('Value for effective length scale = ' //TRIM(RoundSigDigits(LengthScale,5)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcMitchell: Convection model not evaluated because ' &
+                                      //'bad length scale and set to 9.999 [W/m2-k]' , ErrorIndex )
     Hf = 9.999d0 ! safe but noticeable
   ENDIF
   RETURN
@@ -10216,7 +10350,7 @@ FUNCTION CalcBlockenWindward(WindAt10m, WindDir, SurfAzimuth) RESULT (Hf)
 
 END FUNCTION CalcBlockenWindward
 
-FUNCTION CalcEmmelVertical(WindAt10m, WindDir, SurfAzimuth) RESULT (Hf)
+FUNCTION CalcEmmelVertical(WindAt10m, WindDir, SurfAzimuth, SurfNum) RESULT (Hf)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -10245,6 +10379,7 @@ FUNCTION CalcEmmelVertical(WindAt10m, WindDir, SurfAzimuth) RESULT (Hf)
   REAL(r64) , INTENT(IN) :: WindAt10m
   REAL(r64) , INTENT(IN) :: WindDir ! Wind direction measured clockwise from geographhic North
   REAL(r64) , INTENT(IN) :: SurfAzimuth ! or Facing, Direction the surface outward normal faces (degrees)
+  INTEGER   , INTENT(IN) :: SurfNum
   REAL(r64)              :: Hf
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -10275,16 +10410,22 @@ FUNCTION CalcEmmelVertical(WindAt10m, WindDir, SurfAzimuth) RESULT (Hf)
     Hf = 3.54d0 * (WindAt10m**0.76d0)
 
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcEmmelVertical: check angle calculations')
-    CALL ShowRecurringSevereErrorAtEnd('CalcEmmelVertical: check angle calculations', ErrorIndex)
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcEmmelVertical: Convection model wind angle calculation suspect' &
+                               //'(developer issue)' )
+      CALL ShowContinueError('Value for theta angle = ' //TRIM(RoundSigDigits(Theta,5)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection model uses high theta correlation and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcEmmelVertical: Convection model wind angle calculation suspect' &
+                             //' and high theta correlation', ErrorIndex)
     Hf = 3.54d0 * (WindAt10m**0.76d0)
   ENDIF
   RETURN
 
 END FUNCTION CalcEmmelVertical
 
-FUNCTION CalcEmmelRoof(WindAt10m, WindDir, LongAxisOutwardAzimuth) RESULT (Hf)
+FUNCTION CalcEmmelRoof(WindAt10m, WindDir, LongAxisOutwardAzimuth, SurfNum) RESULT (Hf)
 
           ! FUNCTION INFORMATION:
           !       AUTHOR         Brent Griffith
@@ -10313,6 +10454,7 @@ FUNCTION CalcEmmelRoof(WindAt10m, WindDir, LongAxisOutwardAzimuth) RESULT (Hf)
   REAL(r64) , INTENT(IN) :: WindAt10m
   REAL(r64) , INTENT(IN) :: WindDir ! Wind direction measured clockwise from geographhic North
   REAL(r64) , INTENT(IN) :: LongAxisOutwardAzimuth ! or Facing, Direction the surface outward normal faces (degrees)
+  INTEGER   , INTENT(IN) :: SurfNum
   REAL(r64)              :: Hf
 
           ! FUNCTION PARAMETER DEFINITIONS:
@@ -10343,9 +10485,16 @@ FUNCTION CalcEmmelRoof(WindAt10m, WindDir, LongAxisOutwardAzimuth) RESULT (Hf)
     Hf = 3.54d0 * (WindAt10m**0.76d0)
 
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcEmmelRoof: check angle calculations')
-    CALL ShowRecurringSevereErrorAtEnd('CalcEmmelRoof: check angle calculations', ErrorIndex)
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcEmmelRoof: Convection model wind angle calculation suspect' &
+                               //'(developer issue)' )
+      CALL ShowContinueError('Value for theta angle = ' //TRIM(RoundSigDigits(Theta,5)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection model uses high theta correlation and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcEmmelRoof: Convection model wind angle calculation suspect' &
+                             //' and high theta correlation', ErrorIndex)
+
     Hf = 3.54d0 * (WindAt10m**0.76d0)
   ENDIF
   RETURN
@@ -10426,7 +10575,7 @@ FUNCTION CalcClearRoof(SurfNum, SurfTemp, AirTemp, WindAtZ, WindDirect, RoofArea
   BetaFilm = 1.d0 / (KelvinConv + SurfTemp + 0.5d0 * DeltaTemp)
   AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress,AirTemp,OutHumRat)
 
-  GrLn = g * (AirDensity**2) * (Ln**3.d0) * ABS(DeltaTemp) * BetaFilm / v**2
+  GrLn = g * (AirDensity**2) * (Ln**3 ) * ABS(DeltaTemp) * BetaFilm / v**2
   RaLn = GrLn * Pr
 
   Rex = WindAtZ * AirDensity * x / v
@@ -10440,11 +10589,14 @@ FUNCTION CalcClearRoof(SurfNum, SurfTemp, AirTemp, WindAtZ, WindDirect, RoofArea
   IF ( x > 0.d0) THEN
     Hc = eta *(k/Ln)*0.15d0*(RaLn**OneThird) + (k/x)*Rf*0.0296d0*(Rex**FourFifths)*(Pr**OneThird)
   ELSE
-    IF (ErrorIndex == 0) &
-        CALL ShowSevereMessage('CalcClearRoof: bad value for distance to roof edge=' &
-                                      //TRIM(RoundSigDigits(x,3)))
-    CALL ShowRecurringSevereErrorAtEnd('CalcClearRoof: bad value for distance to roof edge=' &
-                                      //TRIM(RoundSigDigits(x,3)) , ErrorIndex)
+    IF (ErrorIndex == 0) THEN
+      CALL ShowSevereMessage('CalcClearRoof: Convection model not evaluated (bad value for distance to roof edge)')
+      CALL ShowContinueError('Value for distance to roof edge ='//TRIM(RoundSigDigits(x,3)))
+      CALL ShowContinueError('Occurs for surface named = ' //TRIM(Surface(SurfNum)%Name) )
+      CALL ShowContinueError('Convection surface heat transfer coefficient set to 9.999 [W/m2-K] and the simulation continues')
+    ENDIF
+    CALL ShowRecurringSevereErrorAtEnd('CalcClearRoof: Convection model not evaluated because ' &
+                                       //'bad value for distance to roof edge and set to 9.999 [W/m2-k]' , ErrorIndex)
     Hc = 9.9999d0 ! safe but noticeable
   ENDIf
   RETURN
@@ -10453,7 +10605,7 @@ END FUNCTION CalcClearRoof
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

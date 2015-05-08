@@ -1,1298 +1,2536 @@
-MODULE EconomizerHeatExchanger
+MODULE PlantHeatExchangerFluidToFluid
 
-  ! Module containing the routines dealing with Economizer hydronic heat
-  ! exchanger components.
+          ! Module containing the routines dealing with the HeatExchanger:FluidToFluid
 
-  ! MODULE INFORMATION:
-  !       AUTHOR         Sankaranarayanan K P
-  !       DATE WRITTEN   August 2007
-  !       MODIFIED       na
-  !       RE-ENGINEERED  na
+          ! MODULE INFORMATION:
+          !       AUTHOR         B. Griffith, derived from legacy code by  Sankaranarayanan K P, and S. Rees
+          !       DATE WRITTEN   November 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
 
-  ! PURPOSE OF THIS MODULE:
-  ! The purpose of this module is to simulate a Economizer hydronic heat
-  ! exchanger.This component is a simple hydronic heat exchanger that can be
-  ! used to couple plant side and condenser side hydronic loops. The purpose
-  ! is primarily to enable implementation of Economizer. In other words,
-  ! coupling the zone plant directly to the heat rejection equipment. For example,
-  ! coupling a radiant hydronic system to a cooling tower and bypassing the
-  ! heat pump or chiller.
+          ! PURPOSE OF THIS MODULE:
+          ! Simulate a generic plant heat exchanger with a variety of control options
 
-  ! METHODOLOGY EMPLOYED:
-  ! The component is concieved as a simple hydronic heat exchanger but with some
-  ! control abilities. Another component (chiller or heat pump) on the
-  ! loops is switched on or off by this component. When the other component is
-  ! operating the loops are 'uncoupled' and no heat exchange takes place. When
-  ! the control conditions are satisfied this heat exchanger switches the other
-  ! component off and heat exchange between the loops is calculated. This is to
-  ! emulate a bypass arrangement. The heat exchanger can be operated in 'Ideal'
-  ! mode, that is the max possible heat exchanger occurs. If the loop fluids are
-  ! the same, and the flow rates are the same, complete coupling will occur i.e.
-  ! it will be as if the condenser fluid flowed through the plant loop.
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
 
-  ! REFERENCES:
+          ! REFERENCES:
+          ! na
 
-  ! OTHER NOTES: none
+          ! OTHER NOTES:
+          ! na
 
-  ! USE STATEMENTS:
-  ! Use statements for data only modules
+          ! USE STATEMENTS:
 USE DataPrecisionGlobals
-USE DataGlobals,       ONLY : MaxNameLength, InitConvTemp, BeginTimeStepFlag, BeginEnvrnFlag, SecInHour
-USE DataInterfaces,    ONLY : ShowWarningError, ShowSevereError, ShowFatalError, &
-                              ShowContinueError, SetupOutputVariable
+USE DataInterfaces
 USE DataPlant
-USE General,           ONLY : TrimSigDigits
-
-  ! Use statements for access to subroutines in other modules
-
-IMPLICIT NONE         ! Enforce explicit typing of all variables
+USE DataLoopNode
+USE DataGlobals, ONLY: MaxNameLength
+IMPLICIT NONE ! Enforce explicit typing of all variables
 
 PRIVATE ! Everything private unless explicitly made public
 
-  ! MODULE PARAMETER DEFINITIONS
-  ! zero load tolerance used in equipment operation decisions (Watts)
-  REAL(r64), PARAMETER                         :: zeroloadtol = 1.0d0
-  !zero capacity tolerance used in heat exchanger cal (kg/s * J/kg/K)
-  REAL(r64), PARAMETER                         :: zerocaptol  = .00001d0
-  ! Economizer HX type string
-  CHARACTER(len=*), PARAMETER :: cThisModuleObjectName = 'HeatExchanger:WatersideEconomizer'
-  CHARACTER(len=*), PARAMETER :: Blank = ' '
+          ! MODULE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER :: CrossFlowBothUnMixed    = 1
+  INTEGER, PARAMETER :: CrossFlowBothMixed      = 2
+  INTEGER, PARAMETER :: CrossFlowSupplyLoopMixedDemandLoopUnMixed = 3
+  INTEGER, PARAMETER :: CrossFlowSupplyLoopUnMixedDemandLoopMixed = 4
+  INTEGER, PARAMETER :: CounterFlow   = 5
+  INTEGER, PARAMETER :: ParallelFlow  = 6
+  INTEGER, PARAMETER :: Ideal         = 7
 
-  INTEGER, PARAMETER :: PlateFrame = 1
-  INTEGER, PARAMETER :: CounterFlow = 2
-  INTEGER, PARAMETER :: ParallelFlow    = 3
-  INTEGER, PARAMETER :: Ideal = 4
+  INTEGER, PARAMETER :: UncontrolledOn                            = 1001
+  INTEGER, PARAMETER :: OperationSchemeModulated                  = 1002
+  INTEGER, PARAMETER :: OperationSchemeOnOff                      = 1003
+  INTEGER, PARAMETER :: HeatingSetpointModulated                  = 1004
+  INTEGER, PARAMETER :: HeatingSetpointOnOff                      = 1005
+  INTEGER, PARAMETER :: CoolingSetpointModulated                  = 1006
+  INTEGER, PARAMETER :: CoolingSetpointOnOff                      = 1007
+  INTEGER, PARAMETER :: DualDeadbandSetpointModulated             = 1008
+  INTEGER, PARAMETER :: DualDeadbandSetpointOnOff                 = 1009
+  INTEGER, PARAMETER :: CoolingDifferentialOnOff                  = 1010
+  INTEGER, PARAMETER :: CoolingSetpointOnOffWithComponentOverride = 1011
+  INTEGER, PARAMETER :: TrackComponentOnOff                       = 1012
 
-  INTEGER, PARAMETER :: AirCooled = 1
-  INTEGER, PARAMETER :: WaterCooled = 2
+  INTEGER, PARAMETER :: WetBulbTemperature                        = 10
+  INTEGER, PARAMETER :: DryBulbTemperature                        = 11
+  INTEGER, PARAMETER :: LoopTemperature                           = 12
 
-  REAL(r64), PARAMETER    :: BigNum = 1.0d+12
+  INTEGER, PARAMETER :: HeatingSupplySideLoop   = 501
+  INTEGER, PARAMETER :: CoolingSupplySideLoop   = 502
 
-  ! DERIVED TYPE DEFINITIONS
-TYPE HXData
-  ! Input data
-  CHARACTER(len=MaxNameLength) :: Name                  = Blank  ! name of the Economizer HX component
-  CHARACTER(len=MaxNameLength) :: HXType                = Blank  ! Type of the Economizer HX component
-  INTEGER                      :: HXTypeOf              = 0      ! Integer value to specify type of HX
-  INTEGER                      :: AssociatedPlantLoop   =0      ! Plant Loop Num Associated with HX
-  CHARACTER(len=MaxNameLength) :: Schedule              = Blank  ! Type of the Economizer HX component
-  INTEGER                      :: ScheduleNum           =0       ! Integer value to specify Condenser Type
-  CHARACTER(len=MaxNameLength) :: PlantInletNode        = Blank  ! plant side inlet node name
-  INTEGER                      :: PlantInletNodeNum     =0       ! plant side inlet node number
-  CHARACTER(len=MaxNameLength) :: PlantOutletNode       = Blank  ! plant side outlet node name
-  INTEGER                      :: PlantOutletNodeNum    =0       ! plant side outlet node number
-  CHARACTER(len=MaxNameLength) :: CondInletNode         = Blank  ! condenser side inlet node name
-  INTEGER                      :: CondInletNodeNum      =0       ! condenser side inlet node number
-  CHARACTER(len=MaxNameLength) :: CondOutletNode        = Blank  ! condenser side outlet node name
-  INTEGER                      :: CondOutletNodeNum     =0       ! condenser side outlet node number
-  REAL(r64)                    :: UA                    =0.0     ! UA for heat exchanger (ignored in ideal mode)
-  REAL(r64)                    :: TempDiff              =0.0     ! Minimum Temperature Difference to activate HX
-  REAL(r64)                    :: DesCapacity           =0.0     ! Design Capacity for HX
-  REAL(r64)                    :: CondSideFlowRate      =0.0     ! volumetric flow rate through condenser side of unit m3/s
-  REAL(r64)                    :: CondSideDesMassFlowRate = 0.d0 ! condenser side mass flow rate design level kg/s
-  REAL(r64)                    :: PlantSideFlowRate     =0.0     ! volumetric flow rate through plant side of unit m3/s
-  REAL(r64)                    :: PlantSideDesMassFlowRate = 0.d0 !plant side  mass flow rate design level kg/s
-  REAL(r64)                    :: MinSideDesCpMassFlux  = 0.d0   ! lower of plant and cond cp*mdot 
-  ! Report data
-  REAL(r64)                    :: CondInletTemp          =0.0    ! condenser inlet temperature
-  REAL(r64)                    :: CondOutletTemp         =0.0    ! condenser outlet temperature
-  REAL(r64)                    :: PlantInletTemp         =0.0    ! plant inlet temperature
-  REAL(r64)                    :: PlantOutletTemp        =0.0    ! plant outlet temperature
-  REAL(r64)                    :: CondMassFlowRate       =0.0    ! condenser mass flow rate
-  REAL(r64)                    :: PlantMassFlowRate      =0.0    ! plant mass flow rate
-  REAL(r64)                    :: HeatTransRate          =0.0    ! total heat transfer rate, Watts
-  REAL(r64)                    :: HeatTransEnergy        =0.0    ! total heat transfer energy, Joules
-  REAL(r64)                    :: CurntCapacity          =0.d0    ! capacity for current temps and flows
-  REAL(r64)                    :: Effectiveness          =0.d0    ! heat exchange effectiveness
+          ! DERIVED TYPE DEFINITIONS:
+  TYPE PlantConnectionStruct
+    INTEGER        :: LoopNum              = 0  ! plant loop connection index
+    INTEGER        :: LoopSideNum          = 0  ! plant loop side connection index
+    INTEGER        :: BranchNum            = 0  ! plant loop branch connection index
+    INTEGER        :: CompNum              = 0  ! plant loop component connection index
+    INTEGER        :: InletNodeNum         = 0  ! plant loop inlet node index
+    INTEGER        :: OutletNodeNum        = 0  ! plant loop outlet node index
+    REAL(r64)      :: MassFlowRateMin      = 0.d0 ! minimum (hardware) flow rate for component [kg/s]
+    REAL(r64)      :: MassFlowRateMax      = 0.d0 ! maximum (hardware) flow rate for component [kg/s]
+    REAL(r64)      :: DesignVolumeFlowRate = 0.d0 ! design flow rate [m3/s]
+    REAL(r64)      :: MyLoad  =0.d0   ! current load request of supply equip for op scheme control[W]
+    REAL(r64)      :: MinLoad = 0.d0  ! reports back size for load dispatch routines [W]
+    REAL(r64)      :: MaxLoad = 0.d0  ! reports back size for load dispatch [W]
+    REAL(r64)      :: OptLoad = 0.d0  ! reports back size for load dispatch [W]
+    REAL(r64)      :: InletTemp = 0.d0 ! current inlet fluid temperature [C]
+    REAL(r64)      :: InletMassFlowRate = 0.d0 ! current inlet mass flow rate [kg/s]
+    REAL(r64)      :: OutletTemp = 0.d0 ! componenent outlet temperature [C]
+  END TYPE PlantConnectionStruct
 
-  !loop topology variables
-  INTEGER                      :: CondLoopNum            =0 ! condenser side plant loop number
-  INTEGER                      :: CondLoopSideNum        =0 ! condenser side plant loop side number
-  INTEGER                      :: CondBranchNum          =0 ! condenser side plant loop branch number
-  INTEGER                      :: CondCompNum            =0 ! condenser side plant component number
-  INTEGER                      :: PlantLoopNum            =0 ! plant side plant loop number
-  INTEGER                      :: PlantLoopSideNum        =0 ! plant side plant loop side number
-  INTEGER                      :: PlantBranchNum          =0 ! plant side plant loop branch number
-  INTEGER                      :: PlantCompNum            =0 ! plant side plant component number
+  TYPE PlantLocatorStruct
+    INTEGER        :: LoopNum              = 0  ! plant loop connection index
+    INTEGER        :: LoopSideNum          = 0  ! plant loop side connection index
+    INTEGER        :: BranchNum            = 0  ! plant loop branch connection index
+    INTEGER        :: CompNum              = 0  ! plant loop component connection index
+    INTEGER        :: InletNodeNum         = 0  ! plant loop inlet node index
+  END TYPE PlantLocatorStruct
 
-END TYPE HXData
+  TYPE HeatExchangerStruct
+    CHARACTER(len=MaxNameLength) :: Name                  = ' '
+    INTEGER                      :: AvailSchedNum         = 0
+    INTEGER                      :: HeatExchangeModelType = 0
+    REAL(r64)                    :: UA                    = 0.d0
+    INTEGER                      :: ControlMode           = 0
+    INTEGER                      :: SetpointNodeNum       = 0
+    REAL(r64)                    :: TempControlTol        = 0.d0
+    INTEGER                      :: ControlSignalTemp     = 0
+    REAL(r64)                    :: MinOperationTemp      = -99999.d0
+    REAL(r64)                    :: MaxOperationTemp      =  99999.d0
+    TYPE(PlantConnectionStruct)  :: DemandSideLoop        ! plant connections and data for the side of HX connected to demand side
+    TYPE(PlantConnectionStruct)  :: SupplySideLoop
+    CHARACTER(len=MaxNameLength) :: HeatTransferMeteringEndUse = ' '
+    CHARACTER(len=MaxNameLength) :: ComponentUserName     = ' ' ! user name for control-associated  component
+    CHARACTER(len=MaxNameLength) :: ComponentClassName    = ' ' ! object class name for control-associated component
+    INTEGER                      :: ComponentTypeOfNum    = 0
+    TYPE(PlantLocatorStruct)     :: OtherCompSupplySideLoop
+    TYPE(PlantLocatorStruct)     :: OtherCompDemandSideLoop
+    REAL(r64)                    :: SizingFactor          = 1.d0
+    REAL(r64)                    :: HeatTransferRate      = 0.d0
+    REAL(r64)                    :: HeatTransferEnergy    = 0.d0
+    REAL(r64)                    :: Effectiveness         = 0.d0
+    REAL(r64)                    :: OperationStatus       = 0.d0
+    INTEGER                      :: DmdSideModulatSolvNoConvergeErrorCount = 0
+    INTEGER                      :: DmdSideModulatSolvNoConvergeErrorIndex = 0
+    INTEGER                      :: DmdSideModulatSolvFailErrorCount = 0
+    INTEGER                      :: DmdSideModulatSolvFailErrorIndex = 0
+  END TYPE HeatExchangerStruct
 
-TYPE(HXData), DIMENSION(:), ALLOCATABLE :: HXWaterEcon
+          ! MODULE VARIABLE DECLARATIONS:
+  CHARACTER(Len=26) :: ComponentClassName = 'HeatExchanger:FluidToFluid'
+  INTEGER  :: NumberOfPlantFluidHXs = 0
+  TYPE(HeatExchangerStruct), DIMENSION(:), ALLOCATABLE :: FluidHX
+  LOGICAL  :: GetInput = .TRUE.
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckFluidHXs
 
-  ! MODULE VARIABLE DECLARATIONS:
+          ! SUBROUTINE SPECIFICATIONS FOR MODULE
+  PUBLIC SimFluidHeatExchanger
+  PRIVATE GetFluidHeatExchangerInput
 
-INTEGER :: NumOfHX                =0    ! Number of Economizer heat exchangers
-INTEGER :: CondInletNodeNum       =0    ! module variable for condenser side inlet node number
-INTEGER :: CondOutletNodeNum      =0    ! module variable for condenser side outlet node number
-INTEGER :: PlantInletNodeNum      =0    ! module variable for plant side inlet node number
-INTEGER :: PlantOutletNodeNum     =0    ! module variable for plant side outlet node number
-
-REAL(r64)    :: PlantMassFlowRate=0.0   ! Flow rate of Plant side fluid
-REAL(r64)    :: CondMassFlowRate =0.0   ! Flow rate of Condenser side fluid
-REAL(r64)    :: AvailSchedValue
-
-LOGICAL, ALLOCATABLE, DIMENSION(:) :: CheckEquipName
-LOGICAL  :: GetInputFlag = .TRUE.    ! First time, input is "gotten"
-
-  ! SUBROUTINE SPECIFICATIONS FOR MODULE PlantOutsideHX
-
-PUBLIC  SimEconHeatExchanger
-PRIVATE GetEconHeatExchanger
-PRIVATE SizeEconHeatExchanger
-PRIVATE InitEconHeatExchanger
-PRIVATE EconomizerOperation
-PRIVATE CalcEconHeatExchanger
-PRIVATE UpdateEconHeatExchanger
-PRIVATE ReportEconHeatExchanger
+  PRIVATE InitFluidHeatExchanger
+  PRIVATE SizeFluidHeatExchanger
+  PRIVATE ControlFluidHeatExchanger
+  PRIVATE FindHXDemandSideLoopFlow
+  PRIVATE HXDemandSideLoopFlowResidual
+  PRIVATE CalcFluidHeatExchanger
+  PRIVATE UpdateFluidHeatExchanger
+  PRIVATE ReportFluidHeatExchanger
 
 CONTAINS
 
-!==============================================================================
-
-SUBROUTINE SimEconHeatExchanger(LoopNum,CompType,CompName,CompFlowCtrl,CompIndex,RunFlag, &
-                                InitLoopEquip,Demand,MaxLoad, MinLoad, OptLoad, FirstHVACIteration)
+SUBROUTINE SimFluidHeatExchanger(LoopNum, LoopSideNum, EquipType,EquipName, &
+                                 CompIndex,InitLoopEquip,MyLoad,MaxCap,MinCap,OptCap)
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   November 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine is the public interface to this Economizer
-          ! heat exchanger component. Control operation and requirement
-          ! for coupling the plant side and condenser side are checked here.
-          ! Other calcs are made by calling private routines.
+          ! Main entry point and simulation manager for heat exchanger
 
           ! METHODOLOGY EMPLOYED:
-          ! na
+          ! <description>
 
           ! REFERENCES:
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor,  ONLY : FindItemInList
-  USE DataEnvironment, ONLY : OutDryBulbTemp, OutWetBulbTemp
-  USE ScheduleManager, ONLY : GetCurrentScheduleValue
-  USE DataLoopNode,    ONLY : Node
-  USE DataHVACGlobals, ONLY : NumPlantLoops,NumCondLoops
-  USE PlantUtilities,  ONLY : UpdateChillerComponentCondenserSide
+  USE InputProcessor, ONLY: FindItemInList
+  USE General,        ONLY: TrimSigDigits
 
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  CHARACTER(len=*), INTENT(IN)  :: CompType 
-  CHARACTER(len=*), INTENT(IN)  :: CompName            ! name of the Economizer heat exchanger.
-  INTEGER,          INTENT(IN)  :: CompFlowCtrl
-  INTEGER,       INTENT(INOUT)  :: CompIndex         ! index in local derived types
-  LOGICAL,       INTENT(INOUT)  :: RunFlag       ! TRUE if Component is ON
-  LOGICAL,          INTENT(IN)  :: InitLoopEquip       ! for init
-  REAL(r64),        INTENT(IN)  :: Demand
-  REAL(r64),     INTENT(INOUT)  :: MaxLoad
-  REAL(r64),     INTENT(INOUT)  :: MinLoad
-  REAL(r64),     INTENT(INOUT)  :: OptLoad
-  LOGICAL,          INTENT(IN)  :: FirstHVACIteration  ! TRUE if 1st HVAC simulation of system timestep
-  INTEGER,          INTENT(IN)  :: LoopNum
+  INTEGER, INTENT(IN)          :: LoopNum  ! plant loop sim call originated from
+  INTEGER, INTENT(IN)          :: LoopSideNum  ! plant loop side sim call originated from
+  CHARACTER(len=*), INTENT(IN) :: EquipType  ! type of equipment, 'PlantComponent:UserDefined'
+  CHARACTER(len=*), INTENT(IN) :: EquipName  ! user name for component
+  INTEGER, INTENT(INOUT)       :: CompIndex
+  LOGICAL, INTENT(INOUT)       :: InitLoopEquip
+  REAL(r64), INTENT(IN)        :: MyLoad
+  REAL(r64), INTENT(OUT)       :: MinCap
+  REAL(r64), INTENT(OUT)       :: MaxCap
+  REAL(r64), INTENT(OUT)       :: OptCap
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER       :: CompNum
 
-  INTEGER       :: PlantLoopNum
-  INTEGER       :: HXNum         ! index in local derived types
-
-          ! check for input
-  IF (GetInputFlag) THEN
-    CALL GetEconHeatExchanger
-    GetInputFlag=.FALSE.
-  ENDIF
+  IF (GetInput) THEN
+    CALL GetFluidHeatExchangerInput
+    GetInput=.FALSE.
+  END IF
 
   ! Find the correct Equipment
   IF (CompIndex == 0) THEN
-    HXNum = FindItemInList(CompName,HXWaterEcon%Name,NumOfHX)
-    IF (HXNum == 0) THEN
-      CALL ShowFatalError('SimEconHeatExchanger: Unit not found='//TRIM(CompName))
+    CompNum = FindItemInList(EquipName, FluidHX%Name, NumberOfPlantFluidHXs)
+    IF (CompNum == 0) THEN
+      CALL ShowFatalError('SimFluidHeatExchanger: HeatExchanger:FluidToFluid not found')
     ENDIF
-    CompIndex=HXNum
+    CompIndex = CompNum
   ELSE
-    HXNum=CompIndex
-    IF (HXNum > NumOfHX .or. HXNum < 1) THEN
-      CALL ShowFatalError('SimEconHeatExchanger:  Invalid CompIndex passed='//  &
-                          TRIM(TrimSigDigits(HXNum))// &
-                          ', Number of Units='//TRIM(TrimSigDigits(NumOfHX))//  &
-                          ', Entered Unit name='//TRIM(CompName))
+    CompNum = CompIndex
+    IF (CompNum < 1 .OR. CompNum > NumberOfPlantFluidHXs) THEN
+      CALL ShowFatalError('SimFluidHeatExchanger: Invalid CompIndex passed='//  &
+                           TRIM(TrimSigDigits(CompNum))// &
+                           ', Number of heat exchangers ='//TRIM(TrimSigDigits(NumberOfPlantFluidHXs))// &
+                           ', Entered heat exchanger name = '//TRIM(EquipName) )
     ENDIF
-    IF (CheckEquipName(HXNum)) THEN
-      IF (CompName /= HXWaterEcon(HXNum)%Name) THEN
-        CALL ShowFatalError('SimEconHeatExchanger: Invalid CompIndex passed='//  &
-                            TRIM(TrimSigDigits(HXNum))// &
-                            ', Unit name='//TRIM(CompName)//', stored Unit Name for that index='//  &
-                            TRIM(HXWaterEcon(HXNum)%Name))
+    IF(CheckFluidHXs(CompNum)) THEN
+      IF (EquipName /= FluidHX(CompNum)%Name) THEN
+        CALL ShowFatalError('SimFluidHeatExchanger: Invalid CompIndex passed='//  &
+                           TRIM(TrimSigDigits(CompNum))// &
+                           ', heat exchanger name='//TRIM(EquipName)//', stored name for that index='// &
+                           TRIM(FluidHX(CompNum)%Name) )
       ENDIF
-      CheckEquipName(HXNum)=.false.
+      CheckFluidHXs(CompNum) = .FALSE.
     ENDIF
   ENDIF
 
   IF (InitLoopEquip) THEN
-    IF(.NOT. ALLOCATED(EconOn)) ALLOCATE(EconOn(TotNumLoops)) 
-    HXWaterEcon(HXNum)%AssociatedPlantLoop =LoopNum
-    PlantLoopNum = HXWaterEcon(HXNum)%AssociatedPlantLoop
-    PlantLoop(PlantLoopNum)%EconomizerHtExchanger = HXWaterEcon(HXNum)%Name
-    PlantLoop(PlantLoopNum)%EconPlantSideSensedNodeNum = HXWaterEcon(HXNum)%PlantInletNodeNum
-    PlantLoop(PlantLoopNum)%EconCondSideSensedNodeNum = HXWaterEcon(HXNum)%CondInletNodeNum
-    PlantLoop(PlantLoopNum)%EconControlTempDiff = HXWaterEcon(HXNum)%TempDiff
-    CALL InitEconHeatExchanger(HXNum,FirstHVACIteration, RunFlag)
-    CALL SizeEconHeatExchanger(HXNum)
-    IF (LoopNum == HXWaterEcon(HXNum)%PlantLoopNum) THEN
-      MinLoad = 0.0
-      OptLoad = HXWaterEcon(HXNum)%DesCapacity
-      MaxLoad = HXWaterEcon(HXNum)%DesCapacity * 1.25d0
-    ELSEIF (LoopNum == HXWaterEcon(HXNum)%CondLoopNum) THEN 
-      MinLoad = 0.d0
-      OptLoad = 0.d0
-      MaxLoad = 0.d0
+    CALL InitFluidHeatExchanger(CompNum, LoopNum)
+    CALL SizeFluidHeatExchanger(CompNum)
+    IF (LoopNum == FluidHX(CompNum)%DemandSideLoop%LoopNum) THEN
+      MinCap = 0.d0
+      MaxCap = FluidHX(CompNum)%DemandSideLoop%MaxLoad
+      OptCap = FluidHX(CompNum)%DemandSideLoop%MaxLoad * 0.9d0
+    ELSEIF(LoopNum == FluidHX(CompNum)%SupplySideLoop%LoopNum) THEN
+      MinCap = 0.d0
+      MaxCap = FluidHX(CompNum)%SupplySideLoop%MaxLoad
+      OptCap = FluidHX(CompNum)%SupplySideLoop%MaxLoad * 0.9d0
     ENDIF
-    RETURN
   ENDIF
 
-  ! Initialize economizer: ScanPlantLoops, Interconnect, InitComponentNodes, and reset module variables
+  CALL InitFluidHeatExchanger(CompNum, LoopNum)
 
+  ! for op scheme led HXs, only call controls if called from Loop Supply Side
+  IF ((FluidHX(CompNum)%ControlMode == OperationSchemeModulated) .OR. &
+      (FluidHX(CompNum)%ControlMode == OperationSchemeOnOff ) ) THEN
+    IF (LoopNum == FluidHX(CompNum)%SupplySideLoop%LoopNum) THEN
+      CALL ControlFluidHeatExchanger(CompNum, LoopNum, MyLoad)
+    ENDIF
+  ELSE
+    CALL ControlFluidHeatExchanger(CompNum, LoopNum, MyLoad)
+  ENDIF
 
-  IF(LoopNum == HXWaterEcon(HXNum)%PlantLoopNum) THEN
-  
-    CALL InitEconHeatExchanger(HXNum,FirstHVACIteration, RunFlag)
-    
-   ! Determine whether the economizer should turn on for the current conditions
-    CALL EconomizerOperation(HXNum,RunFlag,Demand)  
+  CALL CalcFluidHeatExchanger(CompNum, &
+                              Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%MassFlowRate, &
+                              Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%MassFlowRate)
 
-   ! SetComponentFlowRate and calculate heat transfer
-    CALL CalcEconHeatExchanger(HXNum,RunFlag)
+  CALL UpdateFluidHeatExchanger(CompNum)
 
-   ! update nodes
-    CALL UpdateEconHeatExchanger(HXNum)
-   
-   ! update report variables
-    CALL ReportEconHeatExchanger(HXNum)
+  CALL ReportFluidHeatExchanger(CompNum)
 
-  ELSEIF (LoopNum == HXWaterEcon(HXNum)%CondLoopNum) THEN 
+  RETURN
 
-    ! update condenser side
-    CALL UpdateChillerComponentCondenserSide(HXWaterEcon(HXNum)%CondLoopNum, &
-                                     HXWaterEcon(HXNum)%CondLoopSideNum,     &
-                                     TypeOf_WaterSideEconHtExchg,            &
-                                     HXWaterEcon(HXNum)%CondInletNodeNum,    &
-                                     HXWaterEcon(HXNum)%CondOutletNodeNum,   &
-                                     HXWaterEcon(HXNum)%HeatTransRate,    &
-                                     HXWaterEcon(HXNum)%CondInletTemp,       &
-                                     HXWaterEcon(HXNum)%CondOutletTemp,      &
-                                     HXWaterEcon(HXNum)%CondMassFlowRate,    &
-                                     FirstHVACIteration)
+END SUBROUTINE SimFluidHeatExchanger
 
-  END IF
-
- RETURN
-
-END SUBROUTINE SimEconHeatExchanger
-
-!==============================================================================
-
-SUBROUTINE GetEconHeatExchanger
+SUBROUTINE GetFluidHeatExchangerInput
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   November 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine reads the input for Economizer heat exchangers
-          ! from the user input file.  This will contain all of the information
-          ! needed to define and simulate the heat exchanger. Some input data
-          ! checking is done, and report variables set up.
+          ! get input for heat exchanger model
 
           ! METHODOLOGY EMPLOYED:
-          ! Standard EnergyPlus methodology.
+          ! <description>
 
           ! REFERENCES:
           ! na
 
           ! USE STATEMENTS:
-  USE InputProcessor,     ONLY : GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList, SameString
-  USE DataIPShortCuts
-  USE NodeInputManager,   ONLY : GetOnlySingleNode
-  USE ScheduleManager,    ONLY : GetScheduleIndex
-  USE BranchNodeConnections, ONLY : TestCompSet
-  USE FluidProperties,    ONLY : CheckFluidPropertyName
-  USE OutAirNodeManager,  ONLY: CheckAndAddAirNodeNumber
-  USE DataLoopNode
-  USE General,            ONLY: RoundSigDigits
+  USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectDefMaxArgs, GetObjectItem, &
+                                   FindItemInList, VerifyName, SameString, FindItem
+  USE General,               ONLY: RoundSigDigits
+  USE NodeInputManager,      ONLY: GetOnlySingleNode
+  USE BranchNodeConnections, ONLY: TestCompSet
+  USE DataGlobals,           ONLY: ScheduleAlwaysOn, AnyEnergyManagementSystemInModel
+  USE ScheduleManager,       ONLY: GetScheduleIndex
+  USE EMSManager ,           ONLY: CheckIfNodeSetpointManagedByEMS, iTemperatureSetpoint, &
+                                   iTemperatureMinSetpoint, iTemperatureMaxSetpoint
 
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetFluidHeatExchangerInput: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
 
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
+          ! DERIVED TYPE DEFINITIONS:
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL    :: ErrorsFound = .FALSE.
+  INTEGER    :: NumAlphas ! Number of elements in the alpha array
+  INTEGER    :: NumNums   ! Number of elements in the numeric array
+  INTEGER    :: IOStat    ! IO Status when calling get input subroutine
+  LOGICAL    :: IsNotOK   ! Flag to verify name
+  LOGICAL    :: IsBlank   ! Flag for blank name
+  INTEGER    :: MaxNumAlphas = 0 !argument for call to GetObjectDefMaxArgs
+  INTEGER    :: MaxNumNumbers = 0 !argument for call to GetObjectDefMaxArgs
+  INTEGER    :: TotalArgs = 0 !argument for call to GetObjectDefMaxArgs
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cAlphaFieldNames
+  CHARACTER(len=MaxNameLength+40),ALLOCATABLE, DIMENSION(:) :: cNumericFieldNames
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericFieldBlanks
+  LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaFieldBlanks
+  CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
+  REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
+  CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+  INTEGER  :: CompLoop
+  LOGICAL :: NodeEMSSetpointMissing
 
-  INTEGER                        :: IOStatus   ! Used in GetObjectItem
-  INTEGER                        :: Item       ! Item to be "gotten"
-  INTEGER                        :: NumAlphas  ! Number of Alphas for each GetObjectItem call
-  INTEGER                        :: NumNumbers ! Number of Numbers for each GetObjectItem call
-  INTEGER                        :: NumFluids  ! number of fluids in sim.
-  LOGICAL                        :: ErrorsFound  ! Set to true if errors in input, fatal at end of routine
-  LOGICAL                        :: IsNotOK    ! Used to validate component
-  LOGICAL                        :: IsBlank    ! Used to validate component
-!  LOGICAL                        :: Okay
+  cCurrentModuleObject = 'HeatExchanger:FluidToFluid'
 
-          ! Initializations and allocations
-  cCurrentModuleObject = cThisModuleObjectName
-  NumOfHX = GetNumObjectsFound(TRIM(cCurrentModuleObject))       ! 'HeatExchanger:WatersideEconomizer'
+  NumberOfPlantFluidHXs = GetNumObjectsFound(cCurrentModuleObject)
+  IF (NumberOfPlantFluidHXs == 0) RETURN
 
-  ALLOCATE(HXWaterEcon(NumOfHX))
-  ALLOCATE(CheckEquipName(NumOfHX))
-  CheckEquipName=.true.
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
+  MaxNumNumbers=NumNums
+  MaxNumAlphas=NumAlphas
 
-  ErrorsFound=.false.
-
-          ! Obtain all of the user data
-  DO Item = 1, NumOfHX
-
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
-                    AlphaBlank=lAlphaFieldBlanks, &
-                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-
-
-          ! General user input data
-    HXWaterEcon(Item)%Name = cAlphaArgs(1)
-    IsNotOK = .FALSE.
-    IsBlank = .FALSE.
-    CALL VerifyName(cAlphaArgs(1),HXWaterEcon%Name,Item-1, &
-                    IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
-    IF (IsNotOK) THEN
-      ErrorsFound = .TRUE.
-      IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
-    END IF
-
-    HXWaterEcon(Item)%HXType = cAlphaArgs(2)
-
-    IF(HXWaterEcon(Item)%HXType == 'PLATEFRAME') THEN
-      HXWaterEcon(Item)%HXTypeOf = PlateFrame
-    ELSE IF(HXWaterEcon(Item)%HXType == 'COUNTERFLOW') THEN
-      HXWaterEcon(Item)%HXTypeOf = CounterFlow
-    ELSE IF(HXWaterEcon(Item)%HXType == 'PARALLELFLOW') THEN
-      HXWaterEcon(Item)%HXTypeOf = ParallelFlow
-    ELSE IF(HXWaterEcon(Item)%HXType == 'IDEAL') THEN
-      HXWaterEcon(Item)%HXTypeOf = Ideal
-    ELSE
-      CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-      ErrorsFound=.true.
-    END IF
-
-    HXWaterEcon(Item)%Schedule = cAlphaArgs(3)
-    HXWaterEcon(Item)%ScheduleNum = GetScheduleIndex(HXWaterEcon(Item)%Schedule)
-    IF (HXWaterEcon(Item)%ScheduleNum == 0) THEN
-      CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-      ErrorsFound=.true.
-    ENDIF
-
-       ! get Plant side inlet node data
-    HXWaterEcon(Item)%PlantInletNode = cAlphaArgs(4)
-    HXWaterEcon(Item)%PlantInletNodeNum  = GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
-    IF (HXWaterEcon(Item)%PlantInletNodeNum == 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-      CALL ShowContinueError('Inlet node was not found.')
-      ErrorsFound=.true.
-    END IF
-
-        ! get Plant side outlet node data
-    HXWaterEcon(Item)%PlantOutletNode = cAlphaArgs(5)
-    HXWaterEcon(Item)%PlantOutletNodeNum  = GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
-    IF (HXWaterEcon(Item)%PlantOutletNodeNum == 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-      CALL ShowContinueError('Outlet node was not found.')
-      ErrorsFound=.true.
-    END IF
-
-    CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(4),cAlphaArgs(5),'Water Nodes')
-
-    HXWaterEcon(Item)%CondInletNodeNum    = GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,  &
-             TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-             NodeType_Water,NodeConnectionType_Inlet, 2, ObjectIsNotParent)
-    HXWaterEcon(Item)%CondOutletNodeNum  = GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,  &
-             TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-             NodeType_Water,NodeConnectionType_Outlet, 2, ObjectIsNotParent)
-
-    CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(6),cAlphaArgs(7),'Condenser Water Nodes')
-
-    !Condenser Inlet node name is necessary for Water Cooled
-    IF (lAlphaFieldBlanks(6) .or.  lAlphaFieldBlanks(7) ) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Condenser Inlet or Outlet Node Name is blank,='//TRIM(cAlphaArgs(1)))
-      ErrorsFound=.true.
-    ENDIF
-
-        ! Flow Rate data
-    HXWaterEcon(Item)%CondSideFlowRate = rNumericArgs(1)
-    HXWaterEcon(Item)%PlantSideFlowRate = rNumericArgs(2)
-
-        ! UA effectiveness data
-    HXWaterEcon(Item)%UA = rNumericArgs(3)
-
-    IF (rNumericArgs(3) == 0.0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(3))//'='//TRIM(RoundSigDigits(rNumericArgs(3),2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-      CALL ShowContinueError('UA must be greater than zero.')
-      ErrorsFound=.true.
-    END IF
-
-    HXWaterEcon(Item)%TempDiff = rNumericArgs(4)
-
-    IF(HXWaterEcon(Item)%TempDiff ==0.0) HXWaterEcon(Item)%TempDiff = 0.001d0
+  ALLOCATE(cAlphaFieldNames(MaxNumAlphas))
+  cAlphaFieldNames=' '
+  ALLOCATE(cAlphaArgs(MaxNumAlphas))
+  cAlphaArgs=' '
+  ALLOCATE(lAlphaFieldBlanks(MaxNumAlphas))
+  lAlphaFieldBlanks=.false.
+  ALLOCATE(cNumericFieldNames(MaxNumNumbers))
+  cNumericFieldNames=' '
+  ALLOCATE(rNumericArgs(MaxNumNumbers))
+  rNumericArgs=0.0d0
+  ALLOCATE(lNumericFieldBlanks(MaxNumNumbers))
+  lNumericFieldBlanks=.false.
 
 
-  END DO  ! end of input loop
 
-          ! Set up the output variables
-  DO Item = 1, NumOfHX
+  IF (NumberOfPlantFluidHXs > 0) THEN
+    ALLOCATE(FluidHX(NumberOfPlantFluidHXs))
+    ALLOCATE(CheckFluidHXs(NumberOfPlantFluidHXs))
+    CheckFluidHXs = .TRUE.
+    DO CompLoop =1, NumberOfPlantFluidHXs
+      CALL GetObjectItem(cCurrentModuleObject, CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
+             NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
+             AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+      IsNotOK = .FALSE.
+      IsBlank = .FALSE.
+      CALL VerifyName(cAlphaArgs(1), FluidHX%Name, CompLoop - 1, IsNotOK, IsBlank, TRIM(cCurrentModuleObject)//' Name')
+      IF (IsNotOK) THEN
+        ErrorsFound = .TRUE.
+        IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
+      END IF
+      FluidHX(CompLoop)%Name =  cAlphaArgs(1)
 
-    ! heat transfer CurrentModuleObject='HeatExchanger:WatersideEconomizer'
-    CALL SetupOutputVariable('Economizer Heat Exchanger Heat Transfer Rate [W]',    &
-                              HXWaterEcon(Item)%HeatTransRate,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    CALL SetupOutputVariable('Economizer Heat Exchanger Heat Transfer Energy [J]',    &
-                              HXWaterEcon(Item)%HeatTransEnergy,'System','Sum', HXWaterEcon(Item)%Name, &
-                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='FREECOOLING',GroupKey='Plant')
+      IF (lAlphaFieldBlanks(2)) THEN
+        FluidHX(CompLoop)%AvailSchedNum = ScheduleAlwaysOn
+      ELSE
+        FluidHX(CompLoop)%AvailSchedNum = GetScheduleIndex(cAlphaArgs(2))
+        IF (FluidHX(CompLoop)%AvailSchedNum <= 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
+          CALL ShowContinueError('Schedule was not found ')
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
 
-    ! flow rates
-    CALL SetupOutputVariable('Economizer Heat Exchanger Condenser Side Mass Flow rate [kg/s]',      &
-                              HXWaterEcon(Item)%CondMassFlowRate,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    CALL SetupOutputVariable('Economizer Heat Exchanger Plant Side Mass Flow rate [kg/s]',      &
-                              HXWaterEcon(Item)%PlantMassFlowRate,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    ! condenser side temps
-    CALL SetupOutputVariable('Economizer Heat Exchanger Condenser Side Inlet Temp [C]',     &
-                              HXWaterEcon(Item)%CondInletTemp,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    CALL SetupOutputVariable('Economizer Heat Exchanger Condenser Side Outlet Temp [C]',     &
-                              HXWaterEcon(Item)%CondOutletTemp,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    ! plant side temps
-    CALL SetupOutputVariable('Economizer Heat Exchanger Plant Side Inlet Temp [C]',     &
-                              HXWaterEcon(Item)%PlantInletTemp,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-    CALL SetupOutputVariable('Economizer Heat Exchanger Plant Side Outlet Temp [C]',     &
-                              HXWaterEcon(Item)%PlantOutletTemp,'System','Average', &
-                              HXWaterEcon(Item)%Name)
-  END DO
+      FluidHX(CompLoop)%DemandSideLoop%InletNodeNum = &
+        GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+      FluidHX(CompLoop)%DemandSideLoop%OutletNodeNum = &
+               GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+      CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(3),cAlphaArgs(4),  &
+             'Loop Demand Side Plant Nodes')
+      FluidHX(CompLoop)%DemandSideLoop%DesignVolumeFlowRate = rNumericArgs(1)
+
+      FluidHX(CompLoop)%SupplySideLoop%InletNodeNum = &
+        GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+      FluidHX(CompLoop)%SupplySideLoop%OutletNodeNum = &
+               GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+      CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),  &
+             'Loop Supply Side Plant Nodes')
+      FluidHX(CompLoop)%SupplySideLoop%DesignVolumeFlowRate = rNumericArgs(2)
+
+      IF (SameString(cAlphaArgs(7), 'CrossFlowBothUnMixed')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = CrossFlowBothUnMixed
+      ELSEIF (SameString(cAlphaArgs(7), 'CrossFlowBothMixed')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = CrossFlowBothMixed
+      ELSEIF (SameString(cAlphaArgs(7), 'CrossFlowSupplyMixedDemandUnMixed')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = CrossFlowSupplyLoopMixedDemandLoopUnMixed
+      ELSEIF (SameString(cAlphaArgs(7), 'CrossFlowSupplyUnMixedDemandMixed')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = CrossFlowSupplyLoopUnMixedDemandLoopMixed
+      ELSEIF (SameString(cAlphaArgs(7), 'CounterFlow')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = CounterFlow
+      ELSEIF (SameString(cAlphaArgs(7), 'ParallelFlow')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = ParallelFlow
+      ELSEIF (SameString(cAlphaArgs(7),'Ideal')) THEN
+        FluidHX(CompLoop)%HeatExchangeModelType = Ideal
+      ELSE
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//' = '//TRIM(cAlphaArgs(7)) )
+        ErrorsFound = .TRUE.
+      ENDIF
+
+      IF (.NOT. lNumericFieldBlanks(3)) THEN
+        FluidHX(CompLoop)%UA = rNumericArgs(3)
+      ELSE
+        IF (FluidHX(CompLoop)%HeatExchangeModelType /= Ideal) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Missing entry for '//TRIM(cNumericFieldNames(3)) )
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
+
+      IF (    SameString(cAlphaArgs(8) , 'UncontrolledOn')) THEN
+        FluidHX(CompLoop)%ControlMode = UncontrolledOn
+      ELSEIF (SameString(cAlphaArgs(8) , 'OperationSchemeModulated')) THEN
+        FluidHX(CompLoop)%ControlMode = OperationSchemeModulated
+      ELSEIF (SameString(cAlphaArgs(8) , 'OperationSchemeOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = OperationSchemeOnOff
+      ELSEIF (SameString(cAlphaArgs(8) , 'HeatingSetpointModulated')) THEN
+        FluidHX(CompLoop)%ControlMode = HeatingSetpointModulated
+      ELSEIF (SameString(cAlphaArgs(8) , 'HeatingSetpointOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = HeatingSetpointOnOff
+      ELSEIF (SameString(cAlphaArgs(8) , 'CoolingSetpointModulated')) THEN
+        FluidHX(CompLoop)%ControlMode = CoolingSetpointModulated
+      ELSEIF (SameString(cAlphaArgs(8) , 'CoolingSetpointOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = CoolingSetpointOnOff
+      ELSEIF (SameString(cAlphaArgs(8) , 'DualDeadbandSetpointModulated')) THEN
+        FluidHX(CompLoop)%ControlMode = DualDeadbandSetpointModulated
+      ELSEIF (SameString(cAlphaArgs(8) , 'DualDeadbandSetpointOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = DualDeadbandSetpointOnOff
+      ELSEIF (SameString(cAlphaArgs(8) , 'CoolingDifferentialOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = CoolingDifferentialOnOff
+      ELSEIF (SameString(cAlphaArgs(8) , 'CoolingSetpointOnOffWithComponentOverride')) THEN
+        FluidHX(CompLoop)%ControlMode = CoolingSetpointOnOffWithComponentOverride
+      ELSEIF (SameString(cAlphaArgs(8) , 'TrackComponentOnOff')) THEN
+        FluidHX(CompLoop)%ControlMode = TrackComponentOnOff
+      ELSE
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(8))//' = '//TRIM(cAlphaArgs(8)) )
+        ErrorsFound = .TRUE.
+      ENDIF
+
+      IF (.NOT. lAlphaFieldBlanks(9)) THEN
+        FluidHX(CompLoop)%SetpointNodeNum = &
+               GetOnlySingleNode(cAlphaArgs(9),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Sensor, 1, ObjectIsNotParent)
+        ! check that node actually has setpoints on it
+        IF (    (FluidHX(CompLoop)%ControlMode == HeatingSetpointModulated) &
+           .OR. (FluidHX(CompLoop)%ControlMode == HeatingSetpointOnOff)     &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointModulated) &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOff)     &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOffWithComponentOverride) ) THEN
+          IF (Node(FluidHX(CompLoop)%SetpointNodeNum)%TempSetPoint == SensedNodeFlagValue) THEN
+            IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+              CALL ShowSevereError(RoutineName//' Missing temperature setpoint for node = '//TRIM(cAlphaArgs(9)) )
+              CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1)) )
+              CALL ShowContinueError(' Use a setpoint manager to place a single temperature setpoint on the node')
+              ErrorsFound=.true.
+            ELSE
+                ! need call to EMS to check node
+              NodeEMSSetpointMissing = .FALSE.
+              CALL CheckIfNodeSetpointManagedByEMS(FluidHX(CompLoop)%SetpointNodeNum,  &
+                                   iTemperatureSetpoint, NodeEMSSetpointMissing)
+              IF (NodeEMSSetpointMissing) THEN
+                CALL ShowSevereError(RoutineName//' Missing temperature setpoint for node = '//TRIM(cAlphaArgs(9)) )
+                CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1)) )
+                CALL ShowContinueError( &
+                     'Use a setpoint manager or EMS actuator to place a single temperature setpoint on the node')
+                ErrorsFound=.true.
+              ENDIF
+            ENDIF
+          ENDIF
+        ELSEIF ((FluidHX(CompLoop)%ControlMode == DualDeadbandSetpointModulated) &
+             .OR. (FluidHX(CompLoop)%ControlMode == DualDeadbandSetpointOnOff)) THEN
+          IF ((Node(FluidHX(CompLoop)%SetpointNodeNum)%TempSetPointHi == SensedNodeFlagValue) &
+              .OR. (Node(FluidHX(CompLoop)%SetpointNodeNum)%TempSetPointLo == SensedNodeFlagValue) ) THEN
+            IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+              CALL ShowSevereError(RoutineName//' Missing dual temperature setpoints for node = '//TRIM(cAlphaArgs(9)) )
+              CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1)) )
+              CALL ShowContinueError(' Use a setpoint manager to place a dual temperature setpoint on the node')
+              ErrorsFound=.true.
+            ELSE
+                ! need call to EMS to check node
+              NodeEMSSetpointMissing = .FALSE.
+              CALL CheckIfNodeSetpointManagedByEMS(FluidHX(CompLoop)%SetpointNodeNum,  &
+                                   iTemperatureMinSetpoint, NodeEMSSetpointMissing)
+              CALL CheckIfNodeSetpointManagedByEMS(FluidHX(CompLoop)%SetpointNodeNum,  &
+                                   iTemperatureMaxSetpoint, NodeEMSSetpointMissing)
+              IF (NodeEMSSetpointMissing) THEN
+                CALL ShowSevereError(RoutineName//' Missing temperature setpoint for node = '//TRIM(cAlphaArgs(9)) )
+                CALL ShowContinueError('Occurs for '//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1)) )
+                CALL ShowContinueError( &
+                     'Use a setpoint manager or EMS actuators to place a dual temperature setpoints on the node')
+                ErrorsFound=.true.
+              ENDIF
+            ENDIF
+          ENDIF
+        ENDIF
+
+
+      ELSE
+        ! need to name a setpoint node if using a setpoint type control mode
+        IF (    (FluidHX(CompLoop)%ControlMode == HeatingSetpointModulated) &
+           .OR. (FluidHX(CompLoop)%ControlMode == HeatingSetpointOnOff)     &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointModulated) &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOff)     &
+           .OR. (FluidHX(CompLoop)%ControlMode == DualDeadbandSetpointModulated) &
+           .OR. (FluidHX(CompLoop)%ControlMode == DualDeadbandSetpointOnOff) &
+           .OR. (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOffWithComponentOverride) ) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Missing entry for '//TRIM(cAlphaFieldNames(9)) )
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
+
+      IF (.NOT. lNumericFieldBlanks(4)) THEN
+        FluidHX(CompLoop)%TempControlTol = rNumericArgs(4)
+      ELSE
+        FluidHX(CompLoop)%TempControlTol = 0.01d0
+      ENDIF
+
+      FluidHX(CompLoop)%HeatTransferMeteringEndUse = cAlphaArgs(10)
+
+      IF (.NOT. lAlphaFieldBlanks(11)) THEN
+        FluidHX(CompLoop)%OtherCompSupplySideLoop%InletNodeNum = &
+             GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Actuator, 1, ObjectIsNotParent)
+      ELSE
+        IF (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOffWithComponentOverride) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Missing entry for '//TRIM(cAlphaFieldNames(11)) )
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
+
+      IF (.NOT. lAlphaFieldBlanks(12)) THEN
+        FluidHX(CompLoop)%OtherCompDemandSideLoop%InletNodeNum = &
+             GetOnlySingleNode(cAlphaArgs(12),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
+               NodeConnectionType_Actuator, 1, ObjectIsNotParent)
+      ELSE
+        IF (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOffWithComponentOverride) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Missing entry for '//TRIM(cAlphaFieldNames(12)) )
+          ErrorsFound = .TRUE.
+        ENDIF
+      ENDIF
+
+      IF (.NOT. lAlphaFieldBlanks(13)) THEN
+        IF (     SameString(cAlphaArgs(13) , 'WetBulbTemperature')) THEN
+          FluidHX(CompLoop)%ControlSignalTemp = WetBulbTemperature
+        ELSEIF ( SameString(cAlphaArgs(13) , 'DryBulbTemperature')) THEN
+          FluidHX(CompLoop)%ControlSignalTemp = DryBulbTemperature
+        ELSEIF ( SameString(cAlphaArgs(13) , 'Loop')) THEN
+          FluidHX(CompLoop)%ControlSignalTemp = LoopTemperature
+        ENDIF
+      ELSE
+        IF (FluidHX(CompLoop)%ControlMode == CoolingSetpointOnOffWithComponentOverride) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid entry.')
+          CALL ShowContinueError('Missing entry for '//TRIM(cAlphaFieldNames(13)) )
+          ErrorsFound = .TRUE.
+        ENDIF
+
+      ENDIF
+
+      IF (.NOT. lNumericFieldBlanks(5)) THEN
+        FluidHX(CompLoop)%SizingFactor = rNumericArgs(5)
+      ELSE
+        FluidHX(CompLoop)%SizingFactor = 1.d0
+      ENDIF
+
+      IF (.NOT. lNumericFieldBlanks(6)) THEN
+        FluidHX(CompLoop)%MinOperationTemp = rNumericArgs(6)
+      ELSE
+        FluidHX(CompLoop)%MinOperationTemp = -9999.d0
+      ENDIF
+
+      IF (.NOT. lNumericFieldBlanks(7)) THEN
+        FluidHX(CompLoop)%MaxOperationTemp = rNumericArgs(7)
+      ELSE
+        FluidHX(CompLoop)%MaxOperationTemp =  9999.d0
+      ENDIF
+
+    ENDDO
+  ENDIF
+
 
 
   IF (ErrorsFound) THEN
-    CALL ShowFatalError('Errors found in processing input for '//TRIM(cCurrentModuleObject) )
-  END IF
+    CALL ShowFatalError(RoutineName//'Errors found in processing '//TRIM(cCurrentModuleObject)//' input.')
+  ENDIF
+
+  DO CompLoop =1, NumberOfPlantFluidHXs
+
+    CALL SetupOutputVariable('Fluid Heat Exchanger Heat Transfer Rate [W]', &
+                            FluidHX(CompLoop)%HeatTransferRate, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+
+    CALL SetupOutputVariable('Fluid Heat Exchanger Heat Transfer Energy [J]', &
+                            FluidHX(CompLoop)%HeatTransferEnergy, 'System', 'Sum', &
+                            FluidHX(CompLoop)%Name, &
+                            ResourceTypeKey='ENERGYTRANSFER',EndUseKey=TRIM(FluidHX(CompLoop)%HeatTransferMeteringEndUse) &
+                            ,GroupKey='Plant')
+
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Supply Side Mass Flow Rate [kg/s]', &
+                            FluidHX(CompLoop)%SupplySideLoop%InletMassFlowRate, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Supply Side Inlet Temperature [C]', &
+                            FluidHX(CompLoop)%SupplySideLoop%InletTemp, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Supply Side Outlet Temperature [C]', &
+                            FluidHX(CompLoop)%SupplySideLoop%OutletTemp, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Demand Side Mass Flow Rate [kg/s]', &
+                            FluidHX(CompLoop)%DemandSideLoop%InletMassFlowRate, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Demand Side Inlet Temperature [C]', &
+                            FluidHX(CompLoop)%DemandSideLoop%InletTemp, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Loop Demand Side Outlet Temperature [C]', &
+                            FluidHX(CompLoop)%DemandSideLoop%OutletTemp, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Operation Status [ ]', &
+                            FluidHX(CompLoop)%OperationStatus, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+    CALL SetupOutputVariable('Fluid Heat Exchanger Effectiveness [ ]', &
+                            FluidHX(CompLoop)%Effectiveness, 'System', 'Average', &
+                            FluidHX(CompLoop)%Name )
+  ENDDO
 
   RETURN
 
-END SUBROUTINE GetEconHeatExchanger
+END SUBROUTINE GetFluidHeatExchangerInput
 
-!==============================================================================
-
-SUBROUTINE SizeEconHeatExchanger(HXNum)
+SUBROUTINE InitFluidHeatExchanger(CompNum, LoopNum)
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   november, 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine reads the input for Economizer heat exchangers
-          ! from the user input file.  This will contain all of the information
-          ! needed to define and simulate the heat exchanger. Some input data
-          ! checking is done, and report variables set up.
+          ! Initialize heat exchanger model
 
           ! METHODOLOGY EMPLOYED:
-          ! Standard EnergyPlus methodology.
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE PlantUtilities,     ONLY: InitComponentNodes, InterConnectTwoPlantLoopSides
+  USE FluidProperties,    ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE DataGlobals,        ONLY: BeginEnvrnFlag, InitConvTemp
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: CompNum
+  INTEGER, INTENT(IN) :: LoopNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE. ! one time flag
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyEnvrnFlag            ! environment flag
+  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFlag
+  LOGICAL  :: errFlag
+  CHARACTER(len=MaxNameLength):: RoutineName = 'InitFluidHeatExchanger: '
+  REAL(r64)  :: rho
+  INTEGER    :: LoopNum2
+  INTEGER    :: LoopSideNum
+  INTEGER    :: BranchNum
+  INTEGER    :: LoopCompNum
+
+  IF (MyOneTimeFlag) THEN
+    ALLOCATE(MyFlag(NumberOfPlantFluidHXs))
+    ALLOCATE(MyEnvrnFlag(NumberOfPlantFluidHXs))
+    MyFlag = .TRUE.
+    MyEnvrnFlag = .TRUE.
+    MyOneTimeFlag = .FALSE.
+  END IF
+
+  IF (MyFlag(CompNum)) THEN
+    ! locate the main two connections to the plant loops
+    errFlag = .FALSE.
+    CALL ScanPlantLoopsForObject(FluidHX(CompNum)%Name,           &
+                                 TypeOf_FluidToFluidPlantHtExchg, &
+                                 FluidHX(CompNum)%DemandSideLoop%LoopNum, &
+                                 FluidHX(CompNum)%DemandSideLoop%LoopSideNum, &
+                                 FluidHX(CompNum)%DemandSideLoop%BranchNum, &
+                                 FluidHX(CompNum)%DemandSideLoop%CompNum, &
+                                 InletNodeNumber = FluidHX(CompNum)%DemandSideLoop%InletNodeNum, &
+                                 errFlag=errFlag )
+
+    IF (FluidHX(CompNum)%DemandSideLoop%LoopSideNum /= DemandSide) THEN ! throw error
+      CALL ShowSevereError(TRIM(RoutineName)//' Invalid connections for '//  &
+                            TRIM(ccSimPlantEquipTypes(TypeOf_FluidToFluidPlantHtExchg)) &
+                            //' name = "'//TRIM(FluidHX(CompNum)%Name)//'"')
+      CALL ShowContinueError('The "Loop Demand Side" connections are not on the Demand Side of a plant loop')
+      errFlag = .TRUE.
+    ENDIF
+
+    CALL ScanPlantLoopsForObject(FluidHX(CompNum)%Name,           &
+                                 TypeOf_FluidToFluidPlantHtExchg, &
+                                 FluidHX(CompNum)%SupplySideLoop%LoopNum, &
+                                 FluidHX(CompNum)%SupplySideLoop%LoopSideNum, &
+                                 FluidHX(CompNum)%SupplySideLoop%BranchNum, &
+                                 FluidHX(CompNum)%SupplySideLoop%CompNum, &
+                                 InletNodeNumber = FluidHX(CompNum)%SupplySideLoop%InletNodeNum, &
+                                 errFlag=errFlag )
+
+    IF (FluidHX(CompNum)%SupplySideLoop%LoopSideNum /= SupplySide) THEN ! throw error
+      CALL ShowSevereError(TRIM(RoutineName)//' Invalid connections for '//  &
+         TRIM(ccSimPlantEquipTypes(TypeOf_FluidToFluidPlantHtExchg)) &
+                            //' name = "'//TRIM(FluidHX(CompNum)%Name)//'"')
+      CALL ShowContinueError('The "Loop Supply Side" connections are not on the Supply Side of a plant loop')
+      errFlag = .TRUE.
+    ENDIF
+
+    ! make sure it is not the same loop on both sides.
+    IF (FluidHX(CompNum)%SupplySideLoop%LoopNum == FluidHX(CompNum)%DemandSideLoop%LoopNum) THEN ! user is being too tricky, don't allow
+      CALL ShowSevereError(TRIM(RoutineName)//' Invalid connections for '//  &
+         TRIM(ccSimPlantEquipTypes(TypeOf_FluidToFluidPlantHtExchg)) &
+                            //' name = "'//TRIM(FluidHX(CompNum)%Name)//'"')
+      CALL ShowContinueError('The "Loop Supply Side" and "Loop Demand Side" need to be on different loops.')
+      errFlag = .TRUE.
+    ELSE
+
+      CALL InterConnectTwoPlantLoopSides(FluidHX(CompNum)%SupplySideLoop%LoopNum, &
+                                       FluidHX(CompNum)%SupplySideLoop%LoopSideNum, &
+                                       FluidHX(CompNum)%DemandSideLoop%LoopNum, &
+                                       FluidHX(CompNum)%DemandSideLoop%LoopSideNum, &
+                                       TypeOf_FluidToFluidPlantHtExchg, &
+                                       .TRUE. )
+    ENDIF
+
+    !find remote component if control mode is of that type.
+    IF  (FluidHX(CompNum)%ControlMode == CoolingSetpointOnOffWithComponentOverride)  THEN
+
+      CALL ScanPlantLoopsForNodeNum( RoutineName, &
+                                     FluidHX(CompNum)%OtherCompSupplySideLoop%InletNodeNum, &
+                                     FluidHX(CompNum)%OtherCompSupplySideLoop%LoopNum, &
+                                     FluidHX(CompNum)%OtherCompSupplySideLoop%LoopSideNum, &
+                                     FluidHX(CompNum)%OtherCompSupplySideLoop%BranchNum, &
+                                     CompNum = FluidHX(CompNum)%OtherCompSupplySideLoop%CompNum)
+
+      CALL ScanPlantLoopsForNodeNum( RoutineName, &
+                                     FluidHX(CompNum)%OtherCompDemandSideLoop%InletNodeNum, &
+                                     FluidHX(CompNum)%OtherCompDemandSideLoop%LoopNum, &
+                                     FluidHX(CompNum)%OtherCompDemandSideLoop%LoopSideNum, &
+                                     FluidHX(CompNum)%OtherCompDemandSideLoop%BranchNum, &
+                                     CompNum = FluidHX(CompNum)%OtherCompDemandSideLoop%CompNum)
+
+      ! revise how loads served category for other controlled equipment
+      LoopNum2     = FluidHX(CompNum)%OtherCompSupplySideLoop%LoopNum
+      LoopSideNum = FluidHX(CompNum)%OtherCompSupplySideLoop%LoopSideNum
+      BranchNum   = FluidHX(CompNum)%OtherCompSupplySideLoop%BranchNum
+      LoopCompNum = FluidHX(CompNum)%OtherCompSupplySideLoop%CompNum
+
+      SELECT CASE (PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%HowLoadServed)
+
+      CASE (HowMet_ByNominalCap)
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%HowLoadServed &
+                = HowMet_ByNominalCapFreeCoolCntrl
+      CASE (HowMet_ByNominalCapLowOutLimit)
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%HowLoadServed &
+                = HowMet_ByNominalCapLowOutLimitFreeCoolCntrl
+      END SELECT
+
+      SELECT CASE(FluidHX(CompNum)%ControlSignalTemp)
+      CASE(WetBulbTemperature)
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%FreeCoolCntrlMode &
+                = FreeCoolControlMode_WetBulb
+      CASE(DryBulbTemperature)
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%FreeCoolCntrlMode &
+                = FreeCoolControlMode_DryBulb
+      CASE(LoopTemperature)
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%FreeCoolCntrlMode &
+                = FreeCoolControlMode_Loop
+        PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%FreeCoolCntrlNodeNum &
+                = FluidHX(CompNum)%OtherCompDemandSideLoop%InletNodeNum
+      END SELECT
+
+    ENDIF
+    IF  (FluidHX(CompNum)%ControlMode == TrackComponentOnOff) THEN
+      IF (FluidHX(CompNum)%OtherCompSupplySideLoop%InletNodeNum > 0) THEN
+        CALL ScanPlantLoopsForObject( FluidHX(CompNum)%ComponentUserName,                   &
+                                      FluidHX(CompNum)%ComponentTypeOfNum,                  &
+                                      FluidHX(CompNum)%OtherCompSupplySideLoop%LoopNum,     &
+                                      FluidHX(CompNum)%OtherCompSupplySideLoop%LoopSideNum, &
+                                      FluidHX(CompNum)%OtherCompSupplySideLoop%BranchNum,   &
+                                      FluidHX(CompNum)%OtherCompSupplySideLoop%CompNum,     &
+                                      InletNodeNumber = FluidHX(CompNum)%OtherCompSupplySideLoop%InletNodeNum, &
+                                      errFlag=errFlag )
+      ENDIF
+      IF (FluidHX(CompNum)%OtherCompDemandSideLoop%InletNodeNum > 0) THEN
+        CALL ScanPlantLoopsForObject( FluidHX(CompNum)%ComponentUserName,                   &
+                                      FluidHX(CompNum)%ComponentTypeOfNum,                  &
+                                      FluidHX(CompNum)%OtherCompDemandSideLoop%LoopNum,     &
+                                      FluidHX(CompNum)%OtherCompDemandSideLoop%LoopSideNum, &
+                                      FluidHX(CompNum)%OtherCompDemandSideLoop%BranchNum,   &
+                                      FluidHX(CompNum)%OtherCompDemandSideLoop%CompNum,     &
+                                      InletNodeNumber = FluidHX(CompNum)%OtherCompDemandSideLoop%InletNodeNum, &
+                                      errFlag=errFlag )
+      ENDIF
+    ENDIF
+
+    IF (errFlag) THEN
+      CALL ShowFatalError(TRIM(RoutineName)//'Program terminated due to previous condition(s).')
+    ENDIF
+    MyFlag(CompNum) = .FALSE.
+  ENDIF ! plant setup
+
+  IF (BeginEnvrnFlag .AND. MyEnvrnFlag(CompNum) .AND. (PlantSizesOkayToFinalize)) THEN
+    IF (PlantSizeNotComplete)  CALL SizeFluidHeatExchanger(CompNum)
+    rho = GetDensityGlycol(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidName, &
+                           InitConvTemp, &
+                           PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidIndex, &
+                           'InitFluidHeatExchanger')
+    FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax = rho *  &
+                        FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate
+    CALL InitComponentNodes(FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin,  &
+                            FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax,  &
+                            FluidHX(CompNum)%DemandSideLoop%InletNodeNum,     &
+                            FluidHX(CompNum)%DemandSideLoop%OutletNodeNum,    &
+                            FluidHX(CompNum)%DemandSideLoop%LoopNum,          &
+                            FluidHX(CompNum)%DemandSideLoop%LoopSideNum,      &
+                            FluidHX(CompNum)%DemandSideLoop%BranchNum,        &
+                            FluidHX(CompNum)%DemandSideLoop%CompNum)
+
+    rho = GetDensityGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
+                           InitConvTemp, &
+                           PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                           'InitFluidHeatExchanger')
+    FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax = rho *  &
+                        FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate
+    CALL InitComponentNodes(FluidHX(CompNum)%SupplySideLoop%MassFlowRateMin,  &
+                            FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax,  &
+                            FluidHX(CompNum)%SupplySideLoop%InletNodeNum,     &
+                            FluidHX(CompNum)%SupplySideLoop%OutletNodeNum,    &
+                            FluidHX(CompNum)%SupplySideLoop%LoopNum,          &
+                            FluidHX(CompNum)%SupplySideLoop%LoopSideNum,      &
+                            FluidHX(CompNum)%SupplySideLoop%BranchNum,        &
+                            FluidHX(CompNum)%SupplySideLoop%CompNum)
+    MyEnvrnFlag(CompNum) = .FALSE.
+  ENDIF
+  IF (.not. BeginEnvrnFlag) THEN
+    MyEnvrnFlag(CompNum) = .TRUE.
+  ENDIF
+
+  FluidHX(CompNum)%DemandSideLoop%InletTemp = Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp
+  FluidHX(CompNum)%SupplySideLoop%InletTemp = Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp
+
+  IF  (FluidHX(CompNum)%ControlMode == CoolingSetpointOnOffWithComponentOverride)  THEN
+    ! store current value for setpoint in central plant loop data structure
+    LoopNum2     = FluidHX(CompNum)%OtherCompSupplySideLoop%LoopNum
+    LoopSideNum = FluidHX(CompNum)%OtherCompSupplySideLoop%LoopSideNum
+    BranchNum   = FluidHX(CompNum)%OtherCompSupplySideLoop%BranchNum
+    LoopCompNum = FluidHX(CompNum)%OtherCompSupplySideLoop%CompNum
+
+    PlantLoop(LoopNum2)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(LoopCompNum)%FreeCoolCntrlMinCntrlTemp &
+                = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE InitFluidHeatExchanger
+
+SUBROUTINE SizeFluidHeatExchanger(CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   December 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Size plant heat exchanger flow rates, UA, and max capacity
+
+          ! METHODOLOGY EMPLOYED:
+          ! the supply side flow rate is obtained from the plant sizing structure
+          ! the demand side is sized to match the supply side
+          ! the UA is sized for an effectiveness of 1.0 using sizing temps
+          ! the capacity uses the full HX model
 
           ! REFERENCES:
           ! na
 
           ! USE STATEMENTS:
   USE DataSizing
-  USE DataPlant
-  USE DataHVACGlobals,     ONLY: SmallWaterVolFlow
-  USE DataInterfaces,      ONLY: ShowFatalError, ShowSevereError, ShowContinueError
-  USE PlantUtilities,      ONLY: RegisterPlantCompDesignFlow
-  USE ReportSizingManager, ONLY: ReportSizingOutput
-  USE OutputReportPredefined
-  USE FluidProperties,     ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE DataHVACGlobals,        ONLY: SmallWaterVolFlow
+  USE DataGlobals,            ONLY: InitConvTemp
+  USE FluidProperties,        ONLY: GetDensityGlycol, GetSpecificHeatGlycol
+  USE OutputReportPredefined, ONLY: pdchMechType, pdchMechNomCap, PreDefTableEntry
+  USE PlantUtilities,         ONLY: RegisterPlantCompDesignFlow
+  USE ReportSizingManager,    ONLY: ReportSizingOutput
 
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: HXNum
+  INTEGER, INTENT(IN) :: CompNum
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
-          ! INTERFACE BLOCK SPECIFICATIONS
+          ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
 
-          ! DERIVED TYPE DEFINITIONS
+          ! DERIVED TYPE DEFINITIONS:
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER             :: PltSizIndex   ! Plant Sizing Do loop index
-  INTEGER             :: PltSizNum     ! Plant Sizing index corresponding to CurLoopNum
-  INTEGER             :: PltSizCondNum ! Plant Sizing index for condenser loop
-  INTEGER             :: CurrentLoopNum
-  LOGICAL             :: ErrorsFound   ! If errors detected in input
-  CHARACTER(len=MaxNameLength) :: equipName
-  REAL(r64)           :: rho
-  REAL(r64)           :: Cp
-  REAL(r64)           :: tmpCondSideFlowRate
-  REAL(r64)           :: tmpPlantSideFlowRate
-  REAL(r64)           :: tmpUA
-  REAL(r64)           :: tmpDesCap
-  REAL(r64)           :: AssumedDeltaT
+  INTEGER    :: PltSizNumSupSide     ! Plant Sizing index for Loop Supply Side
+  INTEGER    :: PltSizNumDmdSide     ! plant sizing index for Loop Demand Side
+  REAL(r64)  :: tmpSupSideDesignVolFlowRate
+  REAL(r64)  :: tmpDmdSideDesignVolFlowRate
+  REAL(r64)  :: tmpUA
+  REAL(r64)  :: tmpDeltaTSupLoop
+  REAL(r64)  :: tmpDeltaTloopToLoop
+  LOGICAL    :: ErrorsFound
+  REAL(r64)  :: Cp
+  REAL(r64)  :: rho
+  REAL(r64)  :: tmpDesCap
+  REAL(r64)  :: SupSideMdot
+  REAL(r64)  :: DmdSideMdot
 
-  ErrorsFound=.false.
-  tmpCondSideFlowRate = HXWaterEcon(HXNum)%CondSideFlowRate
-  tmpPlantSideFlowRate = HXWaterEcon(HXNum)%PlantSideFlowRate
-  tmpUA = HXWaterEcon(HXNum)%UA
-  tmpDesCap = HXWaterEcon(HXNum)%DesCapacity
-  
-  PltSizCondNum = PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%PlantSizNum
-  PltSizNum     = PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%PlantSizNum
-  
-  PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%EconomizerHtExchanger      = HXWaterEcon(HXNum)%Name
-  PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%EconPlantSideSensedNodeNum = HXWaterEcon(HXNum)%PlantInletNodeNum
-  PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%EconCondSideSensedNodeNum  = HXWaterEcon(HXNum)%CondInletNodeNum
-  PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%EconControlTempDiff        = HXWaterEcon(HXNum)%TempDiff
-
-  HXWaterEcon(HXNum)%AssociatedPlantLoop = HXWaterEcon(HXNum)%PlantLoopNum
-
-  IF (HXWaterEcon(HXNum)%PlantSideFlowRate == AutoSize) THEN
-    IF (PltSizNum > 0) THEN
-      IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-        tmpPlantSideFlowRate = PlantSizData(PltSizNum)%DesVolFlowRate
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%PlantSideFlowRate = tmpPlantSideFlowRate
+  ! first deal with Loop Supply Side
+  ErrorsFound = .FALSE.
+  PltSizNumSupSide = PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%PlantSizNum
+  PltSizNumDmdSide = PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%PlantSizNum
+  tmpSupSideDesignVolFlowRate = FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate
+  IF (FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate == AutoSize) THEN
+    IF (PltSizNumSupSide > 0) THEN
+      IF (PlantSizData(PltSizNumSupSide)%DesVolFlowRate >= SmallWaterVolFlow) THEN
+        tmpSupSideDesignVolFlowRate  = PlantSizData(PltSizNumSupSide)%DesVolFlowRate * FluidHX(CompNum)%SizingFactor
+        IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate = tmpSupSideDesignVolFlowRate
       ELSE
-        tmpPlantSideFlowRate = 0.d0
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%PlantSideFlowRate = tmpPlantSideFlowRate
-      END IF
-      IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(cThisModuleObjectName, HXWaterEcon(HXNum)%Name, &
-                              'Chilled Water Side Maximum Flow Rate [m3/s]', &
-                              HXWaterEcon(HXNum)%PlantSideFlowRate)
+        tmpSupSideDesignVolFlowRate = 0.d0
+        IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate = tmpSupSideDesignVolFlowRate
+      ENDIF
+      IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput('HeatExchanger:FluidToFluid', FluidHX(CompNum)%Name, &
+                                           'Loop Supply Side Design Fluid Flow Rate [m3/s]', &
+                                           FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate )
     ELSE
-      CALL ShowSevereError('Autosizing of Water to Water heat Exchanger plant flow rate requires a loop Sizing:Plant object')
-      CALL ShowContinueError('Occurs in Water to water heat exchanger object='//TRIM(HXWaterEcon(HXNum)%Name))
+      CALL ShowSevereError('SizeFluidHeatExchanger: Autosizing of requires a loop Sizing:Plant object')
+      CALL ShowContinueError('Occurs in heat exchanger object='//TRIM(FluidHX(CompNum)%Name))
       ErrorsFound = .TRUE.
     END IF
-  END IF
+  ENDIF
+  CALL RegisterPlantCompDesignFlow(FluidHX(CompNum)%SupplySideLoop%InletNodeNum, tmpSupSideDesignVolFlowRate)
 
-  CALL RegisterPlantCompDesignFlow(HXWaterEcon(HXNum)%PlantInletNodeNum,tmpPlantSideFlowRate)
+  ! second deal with Loop Demand Side
+  tmpDmdSideDesignVolFlowRate = FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate
+  IF (FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate == AutoSize) THEN
+    IF (tmpSupSideDesignVolFlowRate > SmallWaterVolFlow) THEN
+      tmpDmdSideDesignVolFlowRate = tmpSupSideDesignVolFlowRate
+      IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate = tmpDmdSideDesignVolFlowRate
+    ELSE
+      tmpDmdSideDesignVolFlowRate = 0.d0
+      IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate = tmpDmdSideDesignVolFlowRate
+    ENDIF
+    IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput('HeatExchanger:FluidToFluid', FluidHX(CompNum)%Name, &
+                                           'Loop Demand Side Design Fluid Flow Rate [m3/s]', &
+                                           FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate )
+  ENDIF
+  CALL RegisterPlantCompDesignFlow(FluidHX(CompNum)%DemandSideLoop%InletNodeNum, tmpDmdSideDesignVolFlowRate)
 
-  IF (PltSizNum > 0) THEN
-    IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
+  ! size UA if needed
+  tmpUA = FluidHX(CompNum)%UA
+  IF (FluidHX(CompNum)%UA == AutoSize) THEN
+    ! get nominal delta T between two loops
+    IF (PltSizNumSupSide > 0 .AND. PltSizNumDmdSide > 0) THEN
 
-      Cp = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                                 InitConvTemp, &
-                                 PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                 'SizeEconHeatExchanger' )
+      SELECT CASE (PlantSizData(PltSizNumSupSide)%LoopType)
 
-      rho = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                                 InitConvTemp, &
-                                 PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                 'SizeEconHeatExchanger' )
+      CASE (HeatingLoop)
+        tmpDeltaTloopToLoop = ABS( (PlantSizData(PltSizNumSupSide)%ExitTemp - PlantSizData(PltSizNumSupSide)%DeltaT ) &
+                                          - PlantSizData(PltSizNumDmdSide)%ExitTemp )
+      CASE (CoolingLoop)
+        tmpDeltaTloopToLoop = ABS( (PlantSizData(PltSizNumSupSide)%ExitTemp + PlantSizData(PltSizNumSupSide)%DeltaT ) &
+                                          - PlantSizData(PltSizNumDmdSide)%ExitTemp )
+      CASE (CondenserLoop)
+        tmpDeltaTloopToLoop = ABS( (PlantSizData(PltSizNumSupSide)%ExitTemp + PlantSizData(PltSizNumSupSide)%DeltaT ) &
+                                          - PlantSizData(PltSizNumDmdSide)%ExitTemp )
+      CASE (SteamLoop)
+        tmpDeltaTloopToLoop = ABS( (PlantSizData(PltSizNumSupSide)%ExitTemp - PlantSizData(PltSizNumSupSide)%DeltaT ) &
+                                          - PlantSizData(PltSizNumDmdSide)%ExitTemp )
+      END SELECT
 
-      tmpDesCap = Cp * rho * PlantSizData(PltSizNum)%DeltaT &
-                                                * PlantSizData(PltSizNum)%DesVolFlowRate
-      IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%DesCapacity = tmpDesCap
+      tmpDeltaTloopToLoop = MAX(2.d0, tmpDeltaTloopToLoop)
+      tmpDeltaTSupLoop    = PlantSizData(PltSizNumSupSide)%DeltaT
+      IF (tmpSupSideDesignVolFlowRate >= SmallWaterVolFlow) THEN
 
-    END IF
-  END IF
-
-  IF (HXWaterEcon(HXNum)%UA  == AutoSize) THEN
-    IF (PltSizNum > 0) THEN
-      IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-
-
-        Cp = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
+        Cp = GetSpecificHeatGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
                                    InitConvTemp, &
-                                   PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                   'SizeEconHeatExchanger' )
+                                   PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                                   'SizeFluidHeatExchanger' )
 
-        rho = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
+        rho = GetDensityGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
                                    InitConvTemp, &
-                                   PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                   'SizeEconHeatExchanger' )
+                                   PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                                   'SizeFluidHeatExchanger' )
 
-        tmpDesCap = Cp * rho * PlantSizData(PltSizNum)%DeltaT &
-                                                    * PlantSizData(PltSizNum)%DesVolFlowRate
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%DesCapacity = tmpDesCap
-        tmpUA = tmpDesCap/PlantSizData(PltSizNum)%DeltaT 
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%UA = tmpUA
+        tmpDesCap = Cp * rho * tmpDeltaTSupLoop * tmpSupSideDesignVolFlowRate
+        tmpUA = tmpDesCap/tmpDeltaTloopToLoop
+        IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%UA = tmpUA
       ELSE
         tmpUA = 0.d0
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%UA = tmpUA
+        IF (PlantSizesOkayToFinalize) FluidHX(CompNum)%UA = tmpUA
       END IF
-      IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(cThisModuleObjectName, HXWaterEcon(HXNum)%Name, &
-                              'Heat Exchanger U-Factor Times Area Value [W/C]', HXWaterEcon(HXNum)%UA)
+      IF (PlantSizesOkayToFinalize) THEN
+        CALL ReportSizingOutput('HeatExchanger:FluidToFluid', FluidHX(CompNum)%Name, &
+                              'Heat Exchanger U-Factor Times Area Value [W/C]', FluidHX(CompNum)%UA)
+        CALL ReportSizingOutput('HeatExchanger:FluidToFluid', FluidHX(CompNum)%Name, &
+                              'Loop-to-loop Temperature Difference Used to Size Heat Exchanger U-Factor Times Area Value [C]' &
+                              ,tmpDeltaTloopToLoop)
+      ENDIF
     ELSE
-      CALL ShowSevereError('Autosizing of Water to Water heat Exchanger UA requires a loop Sizing:Plant object')
-      CALL ShowContinueError('Occurs in Water to water heat exchanger object='//TRIM(HXWaterEcon(HXNum)%Name))
+      CALL ShowSevereError('SizeFluidHeatExchanger: Autosizing of heat '//  &
+         'Exchanger UA requires a loop Sizing:Plant objects for both loops')
+      CALL ShowContinueError('Occurs in heat exchanger object='//TRIM(FluidHX(CompNum)%Name))
       ErrorsFound = .TRUE.
     END IF
-  END IF
 
-   IF (HXWaterEcon(HXNum)%CondSideFlowRate == AutoSize) THEN
-    IF (PltSizCondNum > 0) THEN
-      IF (PlantSizData(PltSizNum)%DesVolFlowRate >= SmallWaterVolFlow) THEN
-
-
-        Cp = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName, &
-                                   InitConvTemp, &
-                                   PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex, &
-                                   'SizeEconHeatExchanger' )
-
-        rho = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName, &
-                                   InitConvTemp, &
-                                   PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex, &
-                                   'SizeEconHeatExchanger' )
-        tmpCondSideFlowRate = HXWaterEcon(HXNum)%DesCapacity / &
-                                (PlantSizData(PltSizCondNum)%DeltaT * Cp * rho)
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%CondSideFlowRate = tmpCondSideFlowRate
-      ELSE
-        tmpCondSideFlowRate = 0.d0
-        IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%CondSideFlowRate = tmpCondSideFlowRate
-      END IF
-        IF (PlantSizesOkayToFinalize) CALL ReportSizingOutput(cThisModuleObjectName, HXWaterEcon(HXNum)%Name, &
-                              'Condenser Side Maximum Flow Rate [m3/s]', &
-                              tmpCondSideFlowRate)
-    ELSE
-      CALL ShowSevereError('Autosizing of Economizer Heat Exchanger condenser flow rate requires a condenser')
-      CALL ShowContinueError('loop Sizing:Plant object')
-      CALL ShowContinueError('Occurs in Economizer Heat Exchanger object='//TRIM(HXWaterEcon(HXNum)%Name))
-      ErrorsFound = .TRUE.
-    END IF
-   END IF
-   CALL RegisterPlantCompDesignFlow(HXWaterEcon(HXNum)%CondInletNodeNum,tmpCondSideFlowRate)
-
-  IF (tmpDesCap == 0.d0) THEN ! not autosized but still need a design capacity from inputs
-    AssumedDeltaT = 2.d0
-    Cp = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                               InitConvTemp, &
-                               PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                               'SizeEconHeatExchanger' )
-
-    rho = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                               InitConvTemp, &
-                               PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                               'SizeEconHeatExchanger' )
-    tmpDesCap = Cp * rho * AssumedDeltaT  * tmpPlantSideFlowRate
-    IF (PlantSizesOkayToFinalize) HXWaterEcon(HXNum)%DesCapacity = tmpDesCap
   ENDIF
 
-  IF (ErrorsFound) THEN
-    CALL ShowFatalError('Preceding sizing errors cause program termination')
-  END IF
+  ! size capacities for load range based op schemes
+  IF (PlantSizesOkayToFinalize  ) THEN
 
+    IF (PltSizNumSupSide > 0 ) THEN
+      SELECT CASE (PlantSizData(PltSizNumSupSide)%LoopType)
+      CASE (HeatingLoop)
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+                          (PlantSizData(PltSizNumSupSide)%ExitTemp - PlantSizData(PltSizNumSupSide)%DeltaT )
+      CASE (CoolingLoop)
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+                         (PlantSizData(PltSizNumSupSide)%ExitTemp + PlantSizData(PltSizNumSupSide)%DeltaT )
+      CASE (CondenserLoop)
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+                         (PlantSizData(PltSizNumSupSide)%ExitTemp + PlantSizData(PltSizNumSupSide)%DeltaT )
+      CASE (SteamLoop)
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+                         (PlantSizData(PltSizNumSupSide)%ExitTemp - PlantSizData(PltSizNumSupSide)%DeltaT )
+      END SELECT
+
+    ELSE ! don't rely on sizing, use loop setpoints
+      ! loop supply side
+      IF (PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%LoopDemandCalcScheme == SingleSetPoint ) THEN
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+                      Node(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPoint
+      ELSEIF (PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%LoopDemandCalcScheme == DualSetPointDeadBand) THEN
+        Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp = &
+              (Node(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPointHi + &
+               Node(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPointLo) / 2.d0
+      ENDIF
+
+    ENDIF
+
+    IF (PltSizNumDmdSide > 0) THEN
+      Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp = PlantSizData(PltSizNumDmdSide)%ExitTemp
+    ELSE ! don't rely on sizing, use loop setpoints
+      ! loop demand side
+      IF (PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%LoopDemandCalcScheme == SingleSetPoint ) THEN
+        Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp = &
+                      Node(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPoint
+      ELSEIF (PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%LoopDemandCalcScheme == DualSetPointDeadBand) THEN
+        Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp = &
+              (Node(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPointHi + &
+               Node(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%TempSetPointNodeNum)%TempSetPointLo) / 2.d0
+      ENDIF
+    ENDIF
+
+    rho = GetDensityGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
+                           InitConvTemp, &
+                           PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                           'SizeFluidHeatExchanger')
+    SupSideMdot = FluidHX(CompNum)%SupplySideLoop%DesignVolumeFlowRate * rho
+    rho = GetDensityGlycol(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidName, &
+                           InitConvTemp, &
+                           PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidIndex, &
+                           'SizeFluidHeatExchanger')
+    DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%DesignVolumeFlowRate * rho
+
+    CALL CalcFluidHeatExchanger(CompNum, SupSideMdot, DmdSideMdot)
+    FluidHX(CompNum)%SupplySideLoop%MaxLoad = ABS( FluidHX(CompNum)%HeatTransferRate )
+
+  ENDIF
   IF (PlantSizesOkayToFinalize) THEN
-    !create predefined report
-    equipName = HXWaterEcon(HXNum)%Name
-    CALL PreDefTableEntry(pdchMechType,equipName,cThisModuleObjectName)
-  !  CALL PreDefTableEntry(pdchMechNomUA,equipName,HXWaterEcon(HXNum)%UA)
-    CALL PreDefTableEntry(pdchMechNomCap,equipName,HXWaterEcon(HXNum)%DesCapacity)
+    CALL PreDefTableEntry(pdchMechType,FluidHX(CompNum)%Name,'HeatExchanger:FluidToFluid')
+    CALL PreDefTableEntry(pdchMechNomCap,FluidHX(CompNum)%Name,FluidHX(CompNum)%SupplySideLoop%MaxLoad)
   ENDIF
 
   RETURN
 
-END SUBROUTINE SizeEconHeatExchanger
+END SUBROUTINE SizeFluidHeatExchanger
 
-SUBROUTINE InitEconHeatExchanger(HXNum,FirstHVACIteration, RunFlag)
+SUBROUTINE ControlFluidHeatExchanger(CompNum, LoopNum, MyLoad)
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   November 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine just sets some local variables used to store
-          ! node numbers for current component.
+          ! determine control state for fluid to fluid heat exchanger
+          ! make fluid flow requests accordingly
 
           ! METHODOLOGY EMPLOYED:
-          ! Reads Economizer HX component data structure
+          ! long CASE statement for different control options
 
           ! REFERENCES:
           ! na
 
           ! USE STATEMENTS:
-
-  USE DataHVACGlobals, ONLY : NumPlantLoops, NumCondLoops
-  USE DataLoopNode,    ONLY : Node
-  USE ScheduleManager, ONLY : GetCurrentScheduleValue
-  USE DataPlant,       ONLY : TypeOf_WaterSideEconHtExchg, DemandSide, SupplySide, &
-                              PlantSizesOkayToFinalize, PlantSizeNotComplete
-  USE PlantUtilities,  ONLY : InterConnectTwoPlantLoopSides, InitComponentNodes
-  USE FluidProperties, ONLY : GetDensityGlycol, GetSpecificHeatGlycol
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  USE DataBranchAirLoopPlant, ONLY: MassFlowTolerance
+  USE ScheduleManager,        ONLY: GetCurrentScheduleValue
+  USE DataHVACGlobals,        ONLY: SmallLoad
+  USE FluidProperties,        ONLY: GetSpecificHeatGlycol
+  USE PlantUtilities,         ONLY: SetComponentFlowRate
+  USE DataEnvironment,        ONLY: OutDryBulbTemp, OutWetBulbTemp
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-
-  INTEGER, INTENT(IN) :: HXNum             ! Index for the Economizer heat exchanger.
-  LOGICAL, INTENT(IN) :: FirstHVACIteration !unused1208
-  LOGICAL, INTENT(IN) :: RunFlag !unused1208
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-
-  INTEGER             :: Num                     ! counter
-  REAL(r64)           :: DesignPlantMassFlowRate  ! Mass flow rate used to initialize plant nodes
-  REAL(r64)           :: DesignCondMassFlowRate  ! Mass flow rate used to initialize condenser nodes
-!  REAL(r64)           :: CondInletdensity    ! density on condenser side
-  LOGICAL, SAVE       :: MyEnvrnFlag=.true.
-  LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFlag
-  LOGICAL, SAVE                            :: MyOneTimeFlag = .TRUE.
-  LOGICAL :: errFlag
-  REAL(r64) :: rhoCond   ! local fluid density for condenser side
-  REAL(r64) :: rhoPlant  ! local fluid density for plant side
-  REAL(r64) :: PlantFluidCp 
-  REAL(r64) :: CondFluidCp
-  REAL(r64) :: PlantCapRate
-  REAL(r64) :: CondCapRate
-
-  IF (MyOneTimeFlag) THEN
-    ALLOCATE(MyFlag(NumOfHX))
-    MyOneTimeFlag = .false.
-    MyFlag = .TRUE.
-  END IF
-
-  ! Init more variables
-  IF (MyFlag(HXNum)) THEN
-    ! Locate the hx on the plant loops for later usage
-    errFlag=.false.
-    CALL ScanPlantLoopsForObject(HXWaterEcon(HXNum)%Name, &
-                                 TypeOf_WaterSideEconHtExchg, &
-                                 HXWaterEcon(HXNum)%CondLoopNum, &
-                                 HXWaterEcon(HXNum)%CondLoopSideNum, &
-                                 HXWaterEcon(HXNum)%CondBranchNum, &
-                                 HXWaterEcon(HXNum)%CondCompNum, &
-                                 InletNodeNumber = HXWaterEcon(HXNum)%CondInletNodeNum,  &
-                                 errFlag=errFlag)
-    CALL ScanPlantLoopsForObject(HXWaterEcon(HXNum)%Name, &
-                                 TypeOf_WaterSideEconHtExchg, &
-                                 HXWaterEcon(HXNum)%PlantLoopNum, &
-                                 HXWaterEcon(HXNum)%PlantLoopSideNum, &
-                                 HXWaterEcon(HXNum)%PlantBranchNum, &
-                                 HXWaterEcon(HXNum)%PlantCompNum, &
-                                 InletNodeNumber = HXWaterEcon(HXNum)%PlantInletNodeNum,  &
-                                 errFlag=errFlag)
-    !now test if HX is nominally connected to the proper loop side CR 8276
-    IF (HXWaterEcon(HXNum)%CondLoopSideNum /= DemandSide) THEN ! throw error
-      CALL ShowSevereError('Invalid connections for '// cThisModuleObjectName //' = ' //HXWaterEcon(HXNum)%name )
-      CALL ShowContinueError(' The condenser side of component is not connected to the demand side of the loop')
-      errFlag = .TRUE.
-    ENDIF
-    
-    IF (HXWaterEcon(HXNum)%PlantLoopSideNum /= SupplySide) THEN !throw error
-      CALL ShowSevereError('Invalid connections for '// cThisModuleObjectName //' = ' //HXWaterEcon(HXNum)%name )
-      CALL ShowContinueError(' The plant side of component is not connected to the supply side of the loop')
-      errFlag = .TRUE.
-    ENDIF
-    
-    CALL InterConnectTwoPlantLoopSides( HXWaterEcon(HXNum)%CondLoopNum,      &
-                                        HXWaterEcon(HXNum)%CondLoopSideNum,  &
-                                        HXWaterEcon(HXNum)%PlantLoopNum,     &
-                                        HXWaterEcon(HXNum)%PlantLoopSideNum, &
-                                        TypeOf_WaterSideEconHtExchg, .FALSE. )
-    IF (errFlag) THEN
-      CALL ShowFatalError('InitHeatExchanger: Program terminated due to previous condition(s).')
-    ENDIF
-    MyFlag(HXNum)=.FALSE.
-  ENDIF
-
-  IF (BeginEnvrnFlag .and. MyEnvrnFlag .AND. (PlantSizesOkayToFinalize)) THEN  
-
-    DO Num = 1, NumOfHX
-      IF (PlantSizeNotComplete)  CALL SizeEconHeatExchanger(HXNum)
-      rhoPlant = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                                  InitConvTemp, &
-                                  PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                  'InitHeatExchanger')
-      rhoCond  = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName, &
-                                  InitConvTemp, &
-                                  PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex, &
-                                  'InitHeatExchanger')
-
-      DesignPlantMassFlowRate = HXWaterEcon(Num)%PlantSideFlowRate * rhoPlant
-      HXWaterEcon(Num)%PlantSideDesMassFlowRate = DesignPlantMassFlowRate
-      DesignCondMassFlowRate  = HXWaterEcon(Num)%CondSideFlowRate  * rhoCond
-      HXWaterEcon(Num)%CondSideDesMassFlowRate = DesignCondMassFlowRate
-
-      CALL InitComponentNodes(0.0D0,DesignPlantMassFlowRate,  &
-                              HXWaterEcon(Num)%PlantInletNodeNum,        &
-                              HXWaterEcon(Num)%PlantOutletNodeNum,       &
-                              HXWaterEcon(Num)%PlantLoopNum,               &
-                              HXWaterEcon(Num)%PlantLoopSideNum,           &
-                              HXWaterEcon(Num)%PlantBranchNum,             &
-                              HXWaterEcon(Num)%PlantCompNum)
-
-      CALL InitComponentNodes(0.0D0,DesignCondMassFlowRate,  &
-                              HXWaterEcon(Num)%CondInletNodeNum,        &
-                              HXWaterEcon(Num)%CondOutletNodeNum,       &
-                              HXWaterEcon(Num)%CondLoopNum,               &
-                              HXWaterEcon(Num)%CondLoopSideNum,           &
-                              HXWaterEcon(Num)%CondBranchNum,             &
-                              HXWaterEcon(Num)%CondCompNum)
-
-      PlantFluidCp   = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, InitConvTemp, &
-                                         PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex,'InitHeatExchanger')
-      PlantCapRate = PlantFluidCp * DesignPlantMassFlowRate
-      CondFluidCp    = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName,InitConvTemp, &
-                                             PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex,'InitHeatExchanger')
-      CondCapRate  = CondFluidCp * DesignCondMassFlowRate
-      HXWaterEcon(HXNum)%MinSideDesCpMassFlux  = MIN(CondCapRate, PlantCapRate)
-      
-    END DO
-    MyEnvrnFlag = .FALSE.
-  END IF
-  IF (.not. BeginEnvrnFlag) THEN
-    MyEnvrnFlag=.true.
-  ENDIF
-
-
-  AvailSchedValue = GetCurrentScheduleValue(HXWaterEcon(HXNum)%ScheduleNum)
-
-  !  set module variables for node numbers for this heat exchanger
-  CondInletNodeNum   = HXWaterEcon(HXNum)%CondInletNodeNum
-  CondOutletNodeNum  = HXWaterEcon(HXNum)%CondOutletNodeNum
-  PlantInletNodeNum  = HXWaterEcon(HXNum)%PlantInletNodeNum
-  PlantOutletNodeNum = HXWaterEcon(HXNum)%PlantOutletNodeNum
-  HXWaterEcon(HXNum)%HeatTransRate = 0.0
-  HXWaterEcon(HXNum)%HeatTransEnergy = 0.0
-
-  EconLoadMet = 0.0
-
-  RETURN
-
-END SUBROUTINE InitEconHeatExchanger
-
-SUBROUTINE EconomizerOperation(HXNum,RunFlag,LoopDemand)
-
-   ! SUBROUTINE INFORMATION:
-   !       AUTHOR         Sankaranarayanan K P
-   !       DATE WRITTEN   August 2007
-   !       MODIFIED       na
-   !       RE-ENGINEERED  na
-   !
-   ! PURPOSE OF THIS SUBROUTINE:
-   ! This subroutine places necessary call to the heat exchanger module. The branch and component number
-   ! for the heat exchanger are saved in arrays EconBranch and EconComp. These numbers are used directly
-   ! so that looping over all branches and components is avoided .
-   !
-   ! METHODOLOGY EMPLOYED:
-   ! Standard EnergyPlus methodology.
-   !
-   ! USE STATEMENTS:
- USE DataPlant
- USE DataGlobals
- USE DataInterfaces
- USE DataLoopNode,  ONLY: Node
-
- IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-   ! SUBROUTINE ARGUMENT DEFINITIONS:
- INTEGER, INTENT(IN)  :: HXNum
- LOGICAL, INTENT(OUT) :: RunFlag  
- REAL(r64), INTENT(IN):: LoopDemand           
-
-   ! SUBROUTINE PARAMETER DEFINITIONS:
-   ! na
-
-   ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
- INTEGER     :: LoopNum   
- INTEGER     :: LoopSideNum   
- INTEGER     :: EconBranch
- INTEGER     :: EconComp
- INTEGER     :: EquipNum       ! Plant side component list equipment number
- INTEGER     :: EquipTypeNum
- INTEGER     :: GeneralEquipType !Basic Equipment type from EquipType Used to
- INTEGER     :: PlantSideSensedNode      !Node num for control node on plant side
- INTEGER     :: CondSideSensedNode       !Node num for control node on condenser side
-
- REAL(r64)   :: PlantSideControlTemp             !Current temperature on PlantSideSensedNode
- REAL(r64)   :: CondSideControlTemp              !Current temperature on CondSideSensedNode
- REAL(r64)   :: ControlTemp                      !Difference between PlantSideControlTemp and CondSideControlTemp
- REAL(r64)   :: EconControlTempDiff              !User specified control treshold
-
- CHARACTER(len=MaxNameLength) :: EquipType !local equipment type
- CHARACTER(len=MaxNameLength) :: EquipName ! local equipment name
- LOGICAL    :: EconomizerOn
- 
- LoopNum = HXWaterEcon(HXNum)%PlantLoopNum
- LoopSideNum = HXWaterEcon(HXNum)%PlantLoopSideNum
-
- PlantSideSensedNode = PlantLoop(LoopNum)%EconPlantSideSensedNodeNum
- CondSideSensedNode = PlantLoop(LoopNum)%EconCondSideSensedNodeNum
-
- PlantSideControlTemp = Node(PlantSideSensedNode)%Temp
- CondSideControlTemp = Node(CondSideSensedNode)%Temp
-
- ControlTemp = PlantSideControlTemp - CondSideControlTemp
- EconControlTempDiff = PlantLoop(LoopNum)%EconControlTempDiff
- EconOn(LoopNum) = .FALSE.
- IF(ControlTemp .GT. EconControlTempDiff) THEN
-  EconOn(LoopNum) = .TRUE.
- END IF
- IF(LoopDemand .GE. 0.0) EconOn(LoopNum) = .FALSE.
-
- EconomizerOn = EconOn(LoopNum)
- RunFlag = EconomizerOn
-
- RETURN
-
-END SUBROUTINE EconomizerOperation
-
-!==============================================================================
-
-SUBROUTINE CalcEconHeatExchanger(HXNum,RunFlag)
-
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This calculates the total heat transfer rate between the
-          ! two loop fluids streams. This heat transfer rate is used
-          ! in the update routine to calc the node temps.
-
-          ! METHODOLOGY EMPLOYED:
-          ! NTU-effectiveness heat exchanger model. Effectiveness is
-          ! calculated from the user supplied UA value. If 'Ideal' mode
-          ! has been set, effectiveness is set to 1.0.
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-  USE DataPlant
-  USE DataLoopNode,    ONLY : Node
-  USE FluidProperties, ONLY : GetSpecificHeatGlycol, GetDensityGlycol
-  USE PlantUtilities,  ONLY : SetComponentFlowRate, PullCompInterconnectTrigger
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN)  :: HXNum          ! Index for the Economizer heat exchanger.
-  LOGICAL, INTENT(IN)  :: RunFlag        ! TRUE if Component is ON
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-  CHARACTER(len=*), PARAMETER :: CalledFrom='PlantHeatExchanger:Calc'
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)    :: PlantFluidCp        ! Specific heat of Plant side fluid
-  REAL(r64)    :: PlantCapRate        ! Capacity rate (mdot*Cp) of Plant side fluid
-  REAL(r64)    :: PlantInletTemp      ! Plant side inlet temperature
-  REAL(r64)    :: CondFluidCp         ! Specific heat of condenser side fluid
-  REAL(r64)    :: PlantInletdensity   ! density on plant side
-  REAL(r64)    :: CondInletDensity    ! density on cond side
-  REAL(r64)    :: CondCapRate         ! Capacity rate (mdot*Cp) of condenser side fluid
-  REAL(r64)    :: CondInletTemp       ! condenser side inlet temperature
-  REAL(r64)    :: MinCapRate          ! minimum capacity rate
-  REAL(r64)    :: CapRatio            ! capacity ratio (min/max)
-  REAL(r64)    :: Effectiveness       ! heat exchanger effectiveness
-  REAL(r64)    :: NTU                 ! dimensionless NTU calculated from UA
-  REAL(r64)    :: ChillerLoad         ! current load on chiller (Myload)
-  LOGICAL      :: ItemNotFound        ! error flag
-
-  INTEGER :: PlantLoopNum
-  INTEGER :: LoopSideNum
-
-  ItemNotFound = .FALSE.
-
-  PlantInletdensity = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, &
-                                       Node(HXWaterEcon(HXNum)%PlantInletNodeNum)%Temp, &
-                                       PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex, &
-                                       'CalcEconHeatExchanger')
-
-  CondInletDensity = GetDensityGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName, &
-                                       Node(HXWaterEcon(HXNum)%CondInletNodeNum)%Temp, &
-                                       PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex, &
-                                       'CalcEconHeatExchanger')
-
-  PlantLoopNum = HXWaterEcon(HXNum)%AssociatedPlantLoop
-  LoopSideNum = HXWaterEcon(HXNum)%PlantLoopSideNum
-
-  IF(.NOT. RunFlag .OR. AvailSchedValue == 0.0) THEN ! just try to turn off and RETURN
-   CondMassFlowRate = 0.0
-   PlantMassFlowRate = 0.0
-   Call SetComponentFlowRate(PlantMassFlowRate,  &
-                            PlantInletNodeNum , PlantOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%PlantLoopNum,     &
-                            HXWaterEcon(HXNum)%PlantLoopSideNum, &
-                            HXWaterEcon(HXNum)%PlantBranchNum, &
-                            HXWaterEcon(HXNum)%PlantCompNum)
-
-   Call SetComponentFlowRate(CondMassFlowRate,  &
-                            CondInletNodeNum , CondOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%CondLoopNum, &
-                            HXWaterEcon(HXNum)%CondLoopSideNum, &
-                            HXWaterEcon(HXNum)%CondBranchNum, &
-                            HXWaterEcon(HXNum)%CondCompNum)
-   RETURN
-  END IF
-
-  ! if we didn't return, then we should try to turn on and run, first calculate desired flows
-  PlantMassFlowRate = HXWaterEcon(HXNum)%PlantSideFlowRate*PlantInletdensity*AvailSchedValue
-  CondMassFlowRate = HXWaterEcon(HXNum)%CondSideFlowRate * CondInletDensity*AvailSchedValue
-
-  ! then use worker routines to determine if we can get this amount
-  Call SetComponentFlowRate(PlantMassFlowRate,  &
-                            PlantInletNodeNum , PlantOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%PlantLoopNum,     &
-                            HXWaterEcon(HXNum)%PlantLoopSideNum, &
-                            HXWaterEcon(HXNum)%PlantBranchNum, &
-                            HXWaterEcon(HXNum)%PlantCompNum)
-  Call SetComponentFlowRate(CondMassFlowRate,  &
-                            CondInletNodeNum , CondOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%CondLoopNum, &
-                            HXWaterEcon(HXNum)%CondLoopSideNum, &
-                            HXWaterEcon(HXNum)%CondBranchNum, &
-                            HXWaterEcon(HXNum)%CondCompNum)
-
-    !set local variables for heat exchanger calculation
-  CondInletTemp     = Node(CondInletNodeNum)%Temp
-  PlantInletTemp    = Node(PlantInletNodeNum)%Temp
-  PlantFluidCp   = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, PlantInletTemp, &
-                                         PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex,CalledFrom)
-  PlantCapRate = PlantFluidCp * PlantMassFlowRate
-  CondFluidCp    = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName,CondInletTemp, &
-                                         PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex,CalledFrom)
-  CondCapRate  = CondFluidCp * CondMassFlowRate
-  MinCapRate = MIN(CondCapRate, PlantCapRate)
-
-    !If there is no flow rate on either the condenser or plant side, try to turn off heat exchanger and return
-  IF (CondCapRate <= zerocaptol .OR. PlantCapRate <= zerocaptol)THEN
-    HXWaterEcon(HXNum)%HeatTransRate = 0.0
-    
-   CondMassFlowRate = 0.0
-   PlantMassFlowRate = 0.0
-   Call SetComponentFlowRate(PlantMassFlowRate,  &
-                            PlantInletNodeNum , PlantOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%PlantLoopNum,     &
-                            HXWaterEcon(HXNum)%PlantLoopSideNum, &
-                            HXWaterEcon(HXNum)%PlantBranchNum, &
-                            HXWaterEcon(HXNum)%PlantCompNum)
-
-   Call SetComponentFlowRate(CondMassFlowRate,  &
-                            CondInletNodeNum , CondOutletNodeNum  , &
-                            HXWaterEcon(HXNum)%CondLoopNum, &
-                            HXWaterEcon(HXNum)%CondLoopSideNum, &
-                            HXWaterEcon(HXNum)%CondBranchNum, &
-                            HXWaterEcon(HXNum)%CondCompNum)
-
-    RETURN
-  END IF
-
-  ! calc effectiveness - 1.0 if in ideal mode
-  IF(HXWaterEcon(HXNum)%HXTypeOf == PlateFrame)THEN
-    ! assume cross flow, both mixed
-   NTU = HXWaterEcon(HXNum)%UA/MinCapRate
-   IF(CondCapRate == BigNum .OR. PlantCapRate ==  BigNum) THEN
-    CapRatio = 0.0
-    IF (-NTU >= EXP_LowerLimit) THEN
-      Effectiveness = 1.0-EXP(-NTU)
-      Effectiveness = MIN(1.0d0,Effectiveness)
-    ELSE
-      Effectiveness = 1.0
-    ENDIF
-   ELSE
-    CapRatio = MinCapRate/MAX(CondCapRate, PlantCapRate)
-    Effectiveness = 1.0d0 - EXP((NTU**0.22d0/CapRatio) * &
-                (EXP(-CapRatio*NTU**0.78d0) - 1.0d0))
-    Effectiveness = MIN(1.0d0,Effectiveness)
-   END IF
-  ELSE IF(HXWaterEcon(HXNum)%HXTypeOf == ParallelFlow)THEN
-    ! assume cross flow, both mixed
-   NTU = HXWaterEcon(HXNum)%UA/MinCapRate
-   IF(CondCapRate == BigNum .OR. PlantCapRate ==  BigNum) THEN
-    CapRatio = 0.0
-    Effectiveness = 1.d0-EXP(-NTU)
-    Effectiveness = MIN(1.0d0,Effectiveness)
-   ELSE
-    CapRatio = MinCapRate/MAX(CondCapRate, PlantCapRate)
-    Effectiveness = (1.d0-EXP(-NTU*(1.d0+CapRatio)))/(1.d0+CapRatio)
-    Effectiveness = MIN(1.0d0,Effectiveness)
-   END IF
-  ELSE IF(HXWaterEcon(HXNum)%HXTypeOf == CounterFlow)THEN
-    ! assume cross flow, both mixed
-   NTU = HXWaterEcon(HXNum)%UA/MinCapRate
-   IF(CondCapRate == BigNum .OR. PlantCapRate ==  BigNum) THEN
-    CapRatio = 0.0
-    Effectiveness = 1.d0-EXP(-NTU)
-    Effectiveness = MIN(1.0d0,Effectiveness)
-   ELSE
-    CapRatio = MinCapRate/MAX(CondCapRate, PlantCapRate)
-    Effectiveness = (1.d0-EXP(-NTU*(1.d0-CapRatio)))/(1.d0-CapRatio*EXP(-NTU*(1.d0-CapRatio)))
-    Effectiveness = MIN(1.0d0,Effectiveness)
-   END IF
-  ELSE IF(HXWaterEcon(HXNum)%HXTypeOf == Ideal) THEN
-    ! must be in ideal mode
-    Effectiveness = 1.0
-  END IF
-  ! overall heat transfer rate
-  ! convention is +ve rate is rejected from plant side to condenser side
-  HXWaterEcon(HXNum)%HeatTransRate = Effectiveness*MinCapRate*(PlantInletTemp-CondInletTemp)
-  HXWaterEcon(HXNum)%Effectiveness = Effectiveness
-  RETURN
-
-END SUBROUTINE CalcEconHeatExchanger
-
-!==============================================================================
-
-SUBROUTINE UpdateEconHeatExchanger(HXNum)
-
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine takes the inlet conditions and the previously
-          ! calculated heat transfer rate to calculate the outlet temperatures.
-          ! All flow rates are passed through. If the loops are not coupled
-          ! All node info is passed through from inlet to outlet
-
-          ! METHODOLOGY EMPLOYED:
-          ! use previously calcultated heat transfer rate and update node data.
-
-          ! USE STATEMENTS:
-  USE DataLoopNode,    ONLY : Node
-  USE FluidProperties, ONLY : GetSpecificHeatGlycol
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: HXNum  ! Index for the Economizer heat exchanger.
+  INTEGER,   INTENT(IN) :: CompNum
+  INTEGER,   INTENT(IN) :: LoopNum
+  REAL(r64), INTENT(IN) :: MyLoad
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  REAL(r64)    :: CondFluidCp         ! Specific heat of condenser side fluid
-  REAL(r64)    :: PlantFluidCp        ! Specific heat of Plant side fluid
-  REAL(r64)    :: CondInletTemp       ! condenser side inlet temperature
-  REAL(r64)    :: PlantInletTemp      ! Plant side inlet temperature
+  REAL(r64)  :: AvailSchedValue
+  LOGICAL    :: ScheduledOff
+  LOGICAL    :: LimitTrippedOff
+  REAL(r64)  :: mdotSupSide
+  REAL(r64)  :: mdotDmdSide
+  REAL(r64)  :: DeltaTCooling
+  REAL(r64)  :: DeltaTHeating
+  REAL(r64)  :: DeltaTCoolSetpointDemand
+  REAL(r64)  :: DeltaTCoolSetpointSupply
+  REAL(r64)  :: DeltaTHeatSetpointDemand
+  REAL(r64)  :: DeltaTHeatSetpointSupply
+  REAL(r64)  :: cp ! specific heat of fluid
+  REAL(r64)  :: TargetLeavingTemp ! target temperature deg. C
+  REAL(r64)  :: SetpointTemp  ! temperature setpoint for single setpoint
+  REAL(r64)  :: SetpointTempLo ! low setpoint for dual deadband temperature setpoints
+  REAL(r64)  :: SetpointTempHi ! High setpoint for dual deadband temperature setpoints
+  REAL(r64)  :: ControlSignalValue
+  LOGICAL    :: ChillerShutDown
 
-
-  ! inlet temps and specific heats
-  PlantInletTemp = Node(PlantInletNodeNum)%Temp
-  CondInletTemp  = Node(CondInletNodeNum)%Temp
-  PlantFluidCp   = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidName, PlantInletTemp, &
-                                         PlantLoop(HXWaterEcon(HXNum)%PlantLoopNum)%FluidIndex,'UpdateEconHeatExchanger')
-  CondFluidCp    = GetSpecificHeatGlycol(PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidName,CondInletTemp, &
-                                         PlantLoop(HXWaterEcon(HXNum)%CondLoopNum)%FluidIndex,'UpdateEconHeatExchanger')
-
-  ! check if coupled or zero heat transfer rate
-  IF(HXWaterEcon(HXNum)%HeatTransRate /= 0.0) THEN
-    ! calc outlet temps from heat transfer rate
-   IF(CondMassFlowRate .NE. 0.0) &
-    Node(CondOutletNodeNum)%Temp = Node(CondInletNodeNum)%Temp + HXWaterEcon(HXNum)%HeatTransRate/ &
-                                                           (CondMassFlowRate * CondFluidCp)
-
-   IF(PlantMassFlowRate .NE. 0.0) &
-    Node(PlantOutletNodeNum)%Temp = Node(PlantInletNodeNum)%Temp - HXWaterEcon(HXNum)%HeatTransRate/ &
-                                                            (PlantMassFlowRate * PlantFluidCp)
+  ! check if available by schedule
+  AvailSchedValue = GetCurrentScheduleValue(FluidHX(CompNum)%AvailSchedNum)
+  IF (AvailSchedValue <= 0) THEN
+    ScheduledOff = .TRUE.
   ELSE
-    ! just pass through
-    Node(CondOutletNodeNum)%Temp  = Node(CondInletNodeNum)%Temp
-    Node(PlantOutletNodeNum)%Temp = Node(PlantInletNodeNum)%Temp
-  END IF
+    ScheduledOff = .FALSE.
+  ENDIF
 
-  EconLoadMet = HXWaterEcon(HXNum)%HeatTransRate
+  ! check if operational limits trip off unit
+  LimitTrippedOff = .FALSE.
+  IF ((Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp < FluidHX(CompNum)%MinOperationTemp) &
+       .OR.  ( Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp <  FluidHX(CompNum)%MinOperationTemp)) THEN
+    LimitTrippedOff = .TRUE.
+  ENDIF
+  IF ((Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp > FluidHX(CompNum)%MaxOperationTemp) &
+       .OR.  ( Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp >  FluidHX(CompNum)%MaxOperationTemp)) THEN
+    LimitTrippedOff = .TRUE.
+  ENDIF
+
+  IF (.NOT. ScheduledOff .AND. .NOT. LimitTrippedOff) THEN
+
+    SELECT CASE (FluidHX(CompNum)%ControlMode)
+
+    CASE (UncontrolledOn)
+
+    ! make passive request for supply side loop flow
+      mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+      CALL SetComponentFlowRate(mdotSupSide,                           &
+                        FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                        FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                        FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                        FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                        FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                        FluidHX(CompNum)%SupplySideLoop%CompNum)
+      IF (mdotSupSide > MassFlowTolerance) THEN
+          ! if supply side loop has massflow, request demand side flow
+        mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+      ELSE
+        mdotDmdSide = 0.d0
+      ENDIF
+      CALL SetComponentFlowRate(mdotDmdSide,                           &
+                        FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                        FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                        FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                        FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                        FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                        FluidHX(CompNum)%DemandSideLoop%CompNum)
+
+    CASE (OperationSchemeModulated)
+
+      IF (ABS(MyLoad) > SmallLoad) THEN
+        IF (MyLoad < -1.d0*SmallLoad) THEN ! requesting cooling
+          DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+          IF ( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) THEN ! can do cooling so turn on
+            mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+            CALL SetComponentFlowRate(mdotSupSide,                      &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+            IF (mdotSupSide > MassFlowTolerance) THEN
+              ! if supply side loop has massflow, request demand side flow
+              cp = GetSpecificHeatGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
+                                     FluidHX(CompNum)%SupplySideLoop%InletTemp,                        &
+                                     PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex,    &
+                                     'ControlFluidHeatExchanger' )
+              TargetLeavingTemp = FluidHX(CompNum)%SupplySideLoop%InletTemp - ABS(MyLoad)/(cp * mdotSupSide)
+
+              CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, CoolingSupplySideLoop)
+            ELSE ! no flow on supply side so do not request flow on demand side
+              mdotDmdSide = 0.d0
+              CALL SetComponentFlowRate(mdotDmdSide,                          &
+                               FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                               FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                               FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                               FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                               FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                               FluidHX(CompNum)%SupplySideLoop%CompNum)
+            ENDIF
+          ELSE ! not able to cool so turn off
+            mdotSupSide = 0.d0
+            CALL SetComponentFlowRate(mdotSupSide,                          &
+                             FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                             FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                             FluidHX(CompNum)%SupplySideLoop%CompNum)
+            mdotDmdSide = 0.d0
+            CALL SetComponentFlowRate(mdotDmdSide,                          &
+                             FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                             FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                             FluidHX(CompNum)%SupplySideLoop%CompNum)
+          ENDIF
+
+        ELSE ! requesting heating
+          DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+          IF ( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) THEN ! can do heating so turn on
+            mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+            CALL SetComponentFlowRate(mdotSupSide,                      &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+            IF (mdotSupSide > MassFlowTolerance) THEN
+              cp = GetSpecificHeatGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
+                                     FluidHX(CompNum)%SupplySideLoop%InletTemp, &
+                                     PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                                     'ControlFluidHeatExchanger' )
+              TargetLeavingTemp = FluidHX(CompNum)%SupplySideLoop%InletTemp + ABS(MyLoad)/(cp * mdotSupSide)
+
+              CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, HeatingSupplySideLoop)
+            ELSE ! no flow on supply side so do not request flow on demand side
+              mdotDmdSide = 0.d0
+              CALL SetComponentFlowRate(mdotDmdSide,                          &
+                               FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                               FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                               FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                               FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                               FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                               FluidHX(CompNum)%DemandSideLoop%CompNum)
+            ENDIF
+          ELSE ! not able to heat so turn off
+            mdotSupSide = 0.d0
+            CALL SetComponentFlowRate(mdotSupSide,                          &
+                             FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                             FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                             FluidHX(CompNum)%SupplySideLoop%CompNum)
+            mdotDmdSide = 0.d0
+            CALL SetComponentFlowRate(mdotDmdSide,                          &
+                             FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                             FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                             FluidHX(CompNum)%DemandSideLoop%CompNum)
+          ENDIF
+        ENDIF
+
+      ELSE !  no load
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                          &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                          &
+                         FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                         FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                         FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (OperationSchemeOnOff)
+      IF (ABS(MyLoad) > SmallLoad)  THEN
+        IF (MyLoad < SmallLoad) THEN ! requesting cooling
+          DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+          IF ( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) THEN ! can do cooling so turn on
+            mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+            CALL SetComponentFlowRate(mdotSupSide,                      &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+            IF (mdotSupSide > MassFlowTolerance) THEN
+              mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+            ELSE
+              mdotDmdSide = 0.d0
+            ENDIF
+
+            CALL SetComponentFlowRate(mdotDmdSide,                      &
+                         FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                         FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                         FluidHX(CompNum)%DemandSideLoop%CompNum)
+          ELSE ! not able to cool so turn off
+            mdotSupSide = 0.d0
+            CALL SetComponentFlowRate(mdotSupSide,                          &
+                             FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                             FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                             FluidHX(CompNum)%SupplySideLoop%CompNum)
+            mdotDmdSide = 0.d0
+            CALL SetComponentFlowRate(mdotDmdSide,                          &
+                             FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                             FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                             FluidHX(CompNum)%DemandSideLoop%CompNum)
+          ENDIF
+
+        ELSE ! requesting heating
+          DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+          IF ( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) THEN ! can do heating so turn on
+            mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+            CALL SetComponentFlowRate(mdotSupSide,                      &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+            IF (mdotSupSide > MassFlowTolerance) THEN
+              mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+            ELSE
+              mdotDmdSide = 0.d0
+            ENDIF
+            CALL SetComponentFlowRate(mdotDmdSide,                      &
+                         FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                         FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                         FluidHX(CompNum)%DemandSideLoop%CompNum)
+          ELSE ! not able to heat so turn off
+            mdotSupSide = 0.d0
+            CALL SetComponentFlowRate(mdotSupSide,                          &
+                             FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                             FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                             FluidHX(CompNum)%SupplySideLoop%CompNum)
+            mdotDmdSide = 0.d0
+            CALL SetComponentFlowRate(mdotDmdSide,                          &
+                             FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                             FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                             FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                             FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                             FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                             FluidHX(CompNum)%DemandSideLoop%CompNum)
+          ENDIF
+        ENDIF
+
+      ELSE ! no load
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                          &
+                         FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                         FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                         FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                          &
+                         FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                         FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                         FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                         FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                         FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                         FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (HeatingSetpointModulated)
+
+      SetpointTemp = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+      DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      IF (( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (SetpointTemp > FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to heat
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+
+          TargetLeavingTemp = SetpointTemp
+          CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, HeatingSupplySideLoop)
+        ELSE
+          mdotDmdSide = 0.d0
+          CALL SetComponentFlowRate(mdotDmdSide,                           &
+                            FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                            FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                            FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                            FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                            FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                            FluidHX(CompNum)%DemandSideLoop%CompNum)
+        ENDIF
+      ELSE ! not able are wanting to heat so turn off
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (HeatingSetpointOnOff)
+
+      SetpointTemp = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+      DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      IF (( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (SetpointTemp > FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to heat
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ELSE ! not able are wanting to heat so turn off
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (CoolingSetpointModulated)
+
+      SetpointTemp = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+      DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      IF (( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (SetpointTemp < FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          TargetLeavingTemp = SetpointTemp
+          CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, CoolingSupplySideLoop)
+        ELSE
+          mdotDmdSide = 0.d0
+          CALL SetComponentFlowRate(mdotDmdSide,                           &
+                            FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                            FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                            FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                            FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                            FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                            FluidHX(CompNum)%DemandSideLoop%CompNum)
+        ENDIF
+      ELSE ! not able are wanting to cool so turn off
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (CoolingSetpointOnOff)
+
+      SetpointTemp = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+      DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      IF (( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (SetpointTemp < FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ELSE ! not able or are wanting to cool so turn off
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (DualDeadbandSetpointModulated)
+
+      SetpointTempLo = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPointLo
+      SetpointTempHi = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPointHi
+      DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      DeltaTCoolSetpointDemand = SetpointTempHi - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      DeltaTCoolSetpointSupply = SetpointTempHi - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      DeltaTHeatSetpointDemand = SetpointTempLo - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      DeltaTHeatSetpointSupply = SetpointTempLo - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      IF (( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (DeltaTCoolSetpointSupply < (-1.d0 * FluidHX(CompNum)%TempControlTol)) .AND. &
+          (DeltaTCoolSetpointDemand > FluidHX(CompNum)%TempControlTol)  ) THEN
+        ! can and want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          TargetLeavingTemp = SetpointTempHi
+          CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, CoolingSupplySideLoop)
+        ELSE
+          mdotDmdSide = 0.d0
+          CALL SetComponentFlowRate(mdotDmdSide,                           &
+                            FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                            FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                            FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                            FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                            FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                            FluidHX(CompNum)%DemandSideLoop%CompNum)
+        ENDIF
+      ELSEIF (( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) .AND. &
+              (DeltaTHeatSetpointDemand < (-1.d0 * FluidHX(CompNum)%TempControlTol)) .AND. &
+              (DeltaTHeatSetpointSupply > FluidHX(CompNum)%TempControlTol) ) THEN
+        ! can and want to heat
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          TargetLeavingTemp = SetpointTempLo
+          CALL FindHXDemandSideLoopFlow(CompNum, TargetLeavingTemp, HeatingSupplySideLoop)
+        ELSE
+          mdotDmdSide = 0.d0
+          CALL SetComponentFlowRate(mdotDmdSide,                           &
+                            FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                            FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                            FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                            FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                            FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                            FluidHX(CompNum)%DemandSideLoop%CompNum)
+        ENDIF
+      ELSE ! not able or don't want conditioning
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (DualDeadbandSetpointOnOff)
+
+      SetpointTempLo = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPointLo
+      SetpointTempHi = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPointHi
+      DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      DeltaTHeating = FluidHX(CompNum)%DemandSideLoop%InletTemp - FluidHX(CompNum)%SupplySideLoop%InletTemp
+      IF (( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) .AND. &
+          (SetpointTempHi < FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ELSEIF (( DeltaTHeating > FluidHX(CompNum)%TempControlTol ) .AND. &
+              (SetpointTempLo > FluidHX(CompNum)%SupplySideLoop%InletTemp)) THEN
+        ! can and want to heat
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ELSE ! not able or don't want conditioning
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (CoolingDifferentialOnOff)
+
+      DeltaTCooling = FluidHX(CompNum)%SupplySideLoop%InletTemp - FluidHX(CompNum)%DemandSideLoop%InletTemp
+      IF ( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) THEN
+        !  want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ELSE ! not wanting to cool so turn off
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    CASE (CoolingSetpointOnOffWithComponentOverride)
+
+      SELECT CASE (FluidHX(CompNum)%ControlSignalTemp)
+      CASE (WetBulbTemperature)
+        ControlSignalValue = OutWetBulbTemp
+      CASE (DryBulbTemperature)
+        ControlSignalValue = OutDryBulbTemp
+      CASE (LoopTemperature )
+        ! ControlSignalValue = FluidHX(CompNum)%DemandSideLoop%InletTemp
+        ControlSignalValue = Node(FluidHX(CompNum)%OtherCompDemandSideLoop%InletNodeNum)%TempLastTimestep
+      END SELECT
+
+      SetpointTemp = Node(FluidHX(CompNum)%SetpointNodeNum)%TempSetPoint
+      DeltaTCooling = SetpointTemp - ControlSignalValue
+      !obtain shut down state
+      ChillerShutDown = PlantLoop(FluidHX(CompNum)%OtherCompSupplySideLoop%LoopNum)     &
+                        %LoopSide(FluidHX(CompNum)%OtherCompSupplySideLoop%LoopSideNum) &
+                          %Branch(FluidHX(CompNum)%OtherCompSupplySideLoop%BranchNum)   &
+                            %Comp(FluidHX(CompNum)%OtherCompSupplySideLoop%CompNum)%FreeCoolCntrlShutDown
+      IF (ChillerShutDown .AND. ( DeltaTCooling > FluidHX(CompNum)%TempControlTol ) ) THEN
+        ! can and want to cool
+        mdotSupSide = FluidHX(CompNum)%SupplySideLoop%MassFlowRateMax
+        CALL SetComponentFlowRate(mdotSupSide,                       &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+        IF (mdotSupSide > MassFlowTolerance) THEN
+          mdotDmdSide = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+        ELSE
+          mdotDmdSide = 0.d0
+        ENDIF
+        CALL SetComponentFlowRate(mdotDmdSide,                       &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+
+      ELSE
+        mdotSupSide = 0.d0
+        CALL SetComponentFlowRate(mdotSupSide,                           &
+                          FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                          FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                          FluidHX(CompNum)%SupplySideLoop%CompNum)
+        mdotDmdSide = 0.d0
+        CALL SetComponentFlowRate(mdotDmdSide,                           &
+                          FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                          FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                          FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                          FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                          FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                          FluidHX(CompNum)%DemandSideLoop%CompNum)
+      ENDIF
+
+    END SELECT
+
+  ELSE ! scheduled off
+    mdotSupSide = 0.d0
+    CALL SetComponentFlowRate(mdotSupSide,                           &
+                      FluidHX(CompNum)%SupplySideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%SupplySideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%SupplySideLoop%LoopNum,       &
+                      FluidHX(CompNum)%SupplySideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%SupplySideLoop%BranchNum,     &
+                      FluidHX(CompNum)%SupplySideLoop%CompNum)
+    mdotDmdSide = 0.d0
+    CALL SetComponentFlowRate(mdotDmdSide,                           &
+                      FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                      FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                      FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                      FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                      FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                      FluidHX(CompNum)%DemandSideLoop%CompNum)
+  ENDIF
 
   RETURN
 
-END SUBROUTINE UpdateEconHeatExchanger
+END SUBROUTINE ControlFluidHeatExchanger
 
-!==============================================================================
-
-SUBROUTINE ReportEconHeatExchanger(HXNum)
+SUBROUTINE CalcFluidHeatExchanger(CompNum, SupSideMdot, DmdSideMdot)
 
           ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Sankaranarayanan K P
-          !       DATE WRITTEN   August 2007
+          !       AUTHOR         B.Griffith, derived from CalcEconHeatExchanger by  Sankaranarayanan K P aug. 2007
+          !       DATE WRITTEN   November 2012
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Updates the Economizer heat exchanger variables used for reporting.
+          ! Evalutate heat exchanger model and calculate leaving temperatures
 
           ! METHODOLOGY EMPLOYED:
-          ! Update variables from node data.
+          ! apply heat transfer model depending on type of HX used
+
+          ! REFERENCES:
+          ! na
 
           ! USE STATEMENTS:
-  USE DataLoopNode,    ONLY : Node
-  USE DataHVACGlobals, ONLY : TimeStepSys
+  USE FluidProperties, ONLY: GetSpecificHeatGlycol
+  USE DataLoopNode,    ONLY: Node
 
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-  INTEGER, INTENT(IN) :: HXNum  ! Index for the Economizer heat exchanger.
+  INTEGER,   INTENT(IN)  :: CompNum
+  REAL(r64), INTENT(IN)  :: SupSideMdot ! mass flow rate of fluid entering from supply side loop
+  REAL(r64), INTENT(IN)  :: DmdSideMdot ! mass flow rate of fluid entering from demand side loop
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER, PARAMETER     :: CmaxMixedCminUnmixed = 40
+  INTEGER, PARAMETER     :: CmaxUnMixedCminMixed = 41
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64)  :: SupSideLoopInletTemp
+  REAL(r64)  :: DmdSideLoopInletTemp
+  REAL(r64)  :: SupSideLoopInletCp  ! specific heat of fluid entering from supply side loop at inlet temp
+  REAL(r64)  :: DmdSideLoopInletCp  ! specific heat of fluid entering from demand side loop at inlet temp
+  REAL(r64)  :: SupSideCapRate ! product of specific heat and mass flow for supply side loop at inlet temp
+  REAL(r64)  :: DmdSideCapRate ! product of specific heat and mass flow for demand side loop at inlet temp
+  REAL(r64)  :: MinCapRate ! minimum capacity flow rate
+  REAL(r64)  :: MaxCapRate ! maximum capacity flow rate
+  REAL(r64)  :: NTU ! number of transfer units for heat exchanger performance model
+  REAL(r64)  :: CapRatio
+  REAL(r64)  :: ExpCheckValue1
+  REAL(r64)  :: ExpCheckValue2
+  REAL(r64)  :: Effectiveness
+  REAL(r64)  :: HeatTransferRate
+  REAL(r64)  :: MdotDmdSide
+  REAL(r64)  :: LeavingTempMinFlow
+  REAL(r64)  :: LeavingTempFullFlow
+  INTEGER    :: CrossFlowEquation
+
+  SupSideLoopInletTemp = Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%Temp
+  DmdSideLoopInletTemp = Node(FluidHX(CompNum)%DemandSideLoop%InletNodeNum)%Temp
+
+  SupSideLoopInletCp = GetSpecificHeatGlycol(PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidName, &
+                                SupSideLoopInletTemp ,  &
+                                PlantLoop(FluidHX(CompNum)%SupplySideLoop%LoopNum)%FluidIndex, &
+                                'CalcFluidHeatExchanger')
+  DmdSideLoopInletCp = GetSpecificHeatGlycol(PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidName, &
+                                DmdSideLoopInletTemp ,  &
+                                PlantLoop(FluidHX(CompNum)%DemandSideLoop%LoopNum)%FluidIndex, &
+                                'CalcFluidHeatExchanger')
+
+  SupSideCapRate = SupSideMdot * SupSideLoopInletCp
+  DmdSideCapRate = DmdSideMdot * DmdSideLoopInletCp
+  MinCapRate = MIN(SupSideCapRate, DmdSideCapRate)
+  MaxCapRate = MAX(SupSideCapRate, DmdSideCapRate)
+
+  IF (MinCapRate > 0.d0) THEN
+
+    SELECT CASE (FluidHX(CompNum)%HeatExchangeModelType)
+
+    CASE (CrossFlowBothUnMixed)
+      NTU = FluidHX(CompNum)%UA/MinCapRate
+      CapRatio = MinCapRate/MaxCapRate
+      EXPCheckValue1 = NTU**0.22d0/CapRatio
+      EXPCheckValue2 = -CapRatio*NTU**0.78d0
+      IF ((EXPCheckValue1 > EXP_UpperLimit) .OR. (EXPCheckValue2 > EXP_UpperLimit)) THEN
+        IF (-NTU >= EXP_LowerLimit) THEN
+          Effectiveness = 1.d0-EXP(-NTU)
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = 1.d0
+        ENDIF
+      ELSE
+        Effectiveness = 1.d0 - EXP((NTU**0.22d0/CapRatio) * &
+                    (EXP(-CapRatio*NTU**0.78d0) - 1.0d0))
+        Effectiveness = MIN(1.d0,Effectiveness)
+      ENDIF
+
+    CASE (CrossFlowBothMixed)
+      NTU = FluidHX(CompNum)%UA/MinCapRate
+      CapRatio = MinCapRate/MaxCapRate
+      EXPCheckValue1 =  -CapRatio*NTU
+      EXPCheckValue2 =  -NTU
+      IF (EXPCheckValue1 <  EXP_LowerLimit) THEN
+        IF (EXPCheckValue2 >= EXP_LowerLimit) THEN
+          Effectiveness = 1.d0-EXP(-NTU)
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = 1.d0
+        ENDIF
+
+      ELSEIF ( (EXP(-NTU) == 1.d0) .or. (NTU == 0.d0) .OR. (EXP(-CapRatio*NTU) == 1.d0) ) THEN ! don't div by zero
+
+        Effectiveness = 0.d0
+      ELSE
+        Effectiveness = 1.d0/( (1.d0/(1-EXP(-NTU))) + (CapRatio/(1.d0 - EXP(-CapRatio*NTU) ) ) - ( 1.d0/ NTU) )
+        Effectiveness = MIN(1.0d0,Effectiveness)
+      ENDIF
+
+    CASE (CrossFlowSupplyLoopMixedDemandLoopUnMixed, CrossFlowSupplyLoopUnMixedDemandLoopMixed)
+
+      IF (SupSideCapRate == MaxCapRate .AND. FluidHX(CompNum)%HeatExchangeModelType &
+                         == CrossFlowSupplyLoopMixedDemandLoopUnMixed) THEN
+        CrossFlowEquation = CmaxMixedCminUnmixed
+      ELSEIF (SupSideCapRate == MinCapRate .AND. FluidHX(CompNum)%HeatExchangeModelType &
+                         == CrossFlowSupplyLoopMixedDemandLoopUnMixed) THEN
+        CrossFlowEquation = CmaxUnMixedCminMixed
+      ELSEIF (DmdSideCapRate == MaxCapRate .AND. FluidHX(CompNum)%HeatExchangeModelType &
+                         == CrossFlowSupplyLoopUnMixedDemandLoopMixed) THEN
+        CrossFlowEquation = CmaxMixedCminUnmixed
+      ELSEIF (DmdSideCapRate == MinCapRate .AND. FluidHX(CompNum)%HeatExchangeModelType &
+                         == CrossFlowSupplyLoopUnMixedDemandLoopMixed) THEN
+        CrossFlowEquation = CmaxUnMixedCminMixed
+      ELSE
+        CrossFlowEquation = CmaxMixedCminUnmixed
+      ENDIF
+
+      NTU = FluidHX(CompNum)%UA/MinCapRate
+      CapRatio = MinCapRate/MaxCapRate
+      IF (CrossFlowEquation == CmaxMixedCminUnmixed) THEN
+        ExpCheckValue1 = -NTU
+        IF (CapRatio == 0.d0) THEN ! protect div by zero
+          IF (ExpCheckValue1 >= EXP_LowerLimit) THEN
+            Effectiveness = 1.d0-EXP(-NTU)
+            Effectiveness = MIN(1.d0,Effectiveness)
+          ELSE
+            Effectiveness = 1.d0
+          ENDIF
+        ElSEIF (ExpCheckValue1 < EXP_LowerLimit ) THEN
+          Effectiveness = 0.632d0/CapRatio
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = (1.d0/CapRatio) * (1.d0 - EXP(CapRatio*EXP(-NTU)- 1.d0 ) )
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ENDIF
+      ELSEIF (CrossFlowEquation == CmaxUnMixedCminMixed) THEN
+        ExpCheckValue1 = -CapRatio*NTU
+        IF (CapRatio == 0.d0) THEN
+          IF (-NTU >= EXP_LowerLimit) THEN
+            Effectiveness = 1.d0-EXP(-NTU)
+            Effectiveness = MIN(1.d0,Effectiveness)
+          ELSE
+            Effectiveness = 1.d0
+          ENDIF
+        ELSE
+          EXPCheckValue2 = -(1/CapRatio)*(1 - EXP(-CapRatio*NTU) )
+          IF (EXPCheckValue2 < EXP_LowerLimit) THEN
+            Effectiveness = 1.d0
+          ELSE
+            Effectiveness = 1.d0 - EXP(-(1/CapRatio)*(1 - EXP(-CapRatio*NTU) ) )
+            Effectiveness = MIN(1.d0,Effectiveness)
+          ENDIF
+        ENDIF
+      ENDIF
+
+    CASE (CounterFlow)
+      NTU = FluidHX(CompNum)%UA/MinCapRate
+      CapRatio = MinCapRate/MaxCapRate
+      EXPCheckValue1 = -NTU*(1.d0-CapRatio)
+      IF (EXPCheckValue1 > EXP_UpperLimit) THEN
+        IF (-NTU >= EXP_LowerLimit) THEN
+          Effectiveness = 1.d0-EXP(-NTU)
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = 1.d0
+        ENDIF
+      ELSEIF (CapRatio*EXP(-NTU*(1.d0-CapRatio)) == 1.0) THEN
+        IF (-NTU >= EXP_LowerLimit) THEN
+          Effectiveness = 1.d0-EXP(-NTU)
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = 1.d0
+        ENDIF
+      ELSE
+        Effectiveness = (1.d0-EXP(-NTU*(1.d0-CapRatio)))/(1.d0-CapRatio*EXP(-NTU*(1.d0-CapRatio)))
+        Effectiveness = MIN(1.0d0,Effectiveness)
+      ENDIF
+
+    CASE (ParallelFlow)
+      NTU = FluidHX(CompNum)%UA/MinCapRate
+      CapRatio = MinCapRate/MaxCapRate
+      EXPCheckValue1 = -NTU*(1.d0+CapRatio)
+      IF (EXPCheckValue1 > EXP_UpperLimit) THEN
+        IF (-NTU >= EXP_LowerLimit) THEN
+          Effectiveness = 1.d0-EXP(-NTU)
+          Effectiveness = MIN(1.d0,Effectiveness)
+        ELSE
+          Effectiveness = 1.d0
+        ENDIF
+      ELSE
+        Effectiveness = (1.d0-EXP(-NTU*(1.d0+CapRatio)))/(1.d0+CapRatio)
+        Effectiveness = MIN(1.d0,Effectiveness)
+      ENDIF
+
+    CASE (Ideal)
+      Effectiveness = 1.d0
+    END SELECT
+
+  ELSE ! no capacity
+    Effectiveness = 0.d0
+
+  ENDIF
+
+  HeatTransferRate = Effectiveness * MinCapRate * ( SupSideLoopInletTemp - DmdSideLoopInletTemp) ! + means supply side is cooled
+
+  IF (SupSideMdot > 0.d0 ) THEN
+    FluidHX(CompNum)%SupplySideLoop%OutletTemp = SupSideLoopInletTemp - HeatTransferRate/ (SupSideLoopInletCp * SupSideMdot)
+  ELSE
+    FluidHX(CompNum)%SupplySideLoop%OutletTemp = SupSideLoopInletTemp
+  ENDIF
+
+  IF (DmdSideMdot > 0.d0) THEN
+    FluidHX(CompNum)%DemandSideLoop%OutletTemp = DmdSideLoopInletTemp + HeatTransferRate/ (DmdSideLoopInletCp * DmdSideMdot)
+  ELSE
+    FluidHX(CompNum)%DemandSideLoop%OutletTemp = DmdSideLoopInletTemp
+  ENDIF
+  FluidHX(CompNum)%Effectiveness                    = Effectiveness
+  FluidHX(CompNum)%HeatTransferRate                 = HeatTransferRate
+  FluidHX(CompNum)%SupplySideLoop%InletTemp         = SupSideLoopInletTemp
+  FluidHX(CompNum)%SupplySideLoop%InletMassFlowRate = SupSideMdot
+  FluidHX(CompNum)%DemandSideLoop%InletTemp         = DmdSideLoopInletTemp
+  FluidHX(CompNum)%DemandSideLoop%InletMassFlowRate = DmdSideMdot
+
+  RETURN
+
+END SUBROUTINE CalcFluidHeatExchanger
+
+SUBROUTINE FindHXDemandSideLoopFlow(CompNum, TargetSupplySideLoopLeavingTemp, HXActionMode)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   November 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! modulate demand side flow rate to hit a target leaving temperature (within tolerance)
+
+          ! METHODOLOGY EMPLOYED:
+          ! uses E+'s Regula Falsi numercial method
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,    ONLY: WarmUpFlag
+  USE General,        ONLY: RoundSigDigits, SolveRegulaFalsi
+  USE PlantUtilities, ONLY: SetComponentFlowRate
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER,   INTENT(IN) :: CompNum
+  REAL(r64), INTENT(IN) :: TargetSupplySideLoopLeavingTemp
+  INTEGER,   INTENT(IN) :: HXActionMode
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER,   PARAMETER  :: MaxIte    = 500     ! Maximum number of iterations for solver
+  REAL(r64), PARAMETER  :: Acc       = 1.d-3   ! Accuracy of solver result
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER                 :: SolFla              ! Flag of solver
+  REAL(r64), DIMENSION(2) :: Par                 ! Parameter array passed to solver
+
+  REAL(r64)               :: LeavingTempMinFlow
+  REAL(r64)               :: LeavingTempFullFlow
+  REAL(r64)  :: SupSideMdot ! mass flow rate of fluid entering from supply side loop
+  REAL(r64)  :: DmdSideMdot ! mass flow rate of fluid entering from demand side loop
+
+  SupSideMdot = Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%MassFlowRate
+  ! first see if root is bracketed
+  ! min demand flow
+  DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin
+  CALL CalcFluidHeatExchanger(CompNum,SupSideMdot, DmdSideMdot)
+  LeavingTempMinFlow = FluidHX(CompNum)%SupplySideLoop%OutletTemp
+
+  ! full demand flow
+  DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+  CALL CalcFluidHeatExchanger(CompNum,SupSideMdot, DmdSideMdot)
+  LeavingTempFullFlow = FluidHX(CompNum)%SupplySideLoop%OutletTemp
+
+  SELECT CASE (HXActionMode)
+
+  CASE (HeatingSupplySideLoop)
+    IF ((LeavingTempFullFlow > TargetSupplySideLoopLeavingTemp) &
+        .AND. (TargetSupplySideLoopLeavingTemp > LeavingTempMinFlow )) THEN
+      ! need to solve
+      Par(1) = REAL( CompNum , r64) ! HX index
+      Par(2) = TargetSupplySideLoopLeavingTemp
+
+      CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, DmdSideMdot, HXDemandSideLoopFlowResidual,&
+                            FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin , &
+                            FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax, Par)
+
+      IF (SolFla == -1) THEN ! no convergence
+        IF (.NOT. WarmupFlag) THEN
+          IF (FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount < 1) THEN
+            FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount = FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount + 1
+            CALL ShowWarningError(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Iteration Limit exceeded calculating demand side loop flow rate' )
+            CALL ShowContinueError('Simulation continues with calculated demand side mass flow rate = ' &
+                                    //RoundSigDigits(DmdSideMdot, 7) )
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Iteration Limit exceeded calculating demand side loop flow rate continues.', &
+                                  FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorIndex, DmdSideMdot, DmdSideMdot)
+        ENDIF
+      ELSEIF (SolFla == -2) THEN !f(x0) and f(x1) have the same sign
+        DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax * &
+                       (LeavingTempFullFlow - TargetSupplySideLoopLeavingTemp) &
+                       /(LeavingTempFullFlow - LeavingTempMinFlow)
+        IF (.NOT. WarmupFlag) THEN
+          IF (FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount < 1) THEN
+            FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount = FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount + 1
+            CALL ShowWarningError(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Solver failed to calculate demand side loop flow rate' )
+            CALL ShowContinueError('Simulation continues with estimated demand side mass flow rate = ' &
+                                    //RoundSigDigits(DmdSideMdot, 7) )
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Solver failed to calculate demand side loop flow rate continues.', &
+                                  FluidHX(CompNum)%DmdSideModulatSolvFailErrorIndex, DmdSideMdot, DmdSideMdot)
+        ENDIF
+      ENDIF
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                 FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                 FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                 FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                 FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                 FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                 FluidHX(CompNum)%DemandSideLoop%CompNum)
+
+    ELSEIF ( ( TargetSupplySideLoopLeavingTemp >= LeavingTempFullFlow ) &
+         .AND. (LeavingTempFullFlow > LeavingTempMinFlow) ) THEN
+      ! run at full flow
+      DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                   FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                   FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                   FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                   FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                   FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                   FluidHX(CompNum)%DemandSideLoop%CompNum)
+
+    ELSEIF ( LeavingTempMinFlow >=  TargetSupplySideLoopLeavingTemp) THEN
+
+      ! run at min flow
+      DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                 FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                 FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                 FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                 FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                 FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                 FluidHX(CompNum)%DemandSideLoop%CompNum)
+    ENDIF
+  CASE (CoolingSupplySideLoop)
+    IF ((LeavingTempFullFlow < TargetSupplySideLoopLeavingTemp) &
+        .AND. (TargetSupplySideLoopLeavingTemp <  LeavingTempMinFlow )) THEN
+      ! need to solve
+      Par(1) = REAL( CompNum , r64) ! HX index
+      Par(2) = TargetSupplySideLoopLeavingTemp
+
+      CALL SolveRegulaFalsi(Acc, MaxIte, SolFla, DmdSideMdot, HXDemandSideLoopFlowResidual,&
+                            FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin , &
+                            FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax, Par)
+
+      IF (SolFla == -1) THEN ! no convergence
+        IF (.NOT. WarmupFlag) THEN
+          IF (FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount < 1) THEN
+            FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount = FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorCount + 1
+            CALL ShowWarningError(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Iteration Limit exceeded calculating demand side loop flow rate' )
+            CALL ShowContinueError('Simulation continues with calculated demand side mass flow rate = ' &
+                                    //RoundSigDigits(DmdSideMdot, 7) )
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Iteration Limit exceeded calculating demand side loop flow rate continues.', &
+                                  FluidHX(CompNum)%DmdSideModulatSolvNoConvergeErrorIndex, DmdSideMdot, DmdSideMdot)
+        ENDIF
+      ELSEIF (SolFla == -2) THEN !f(x0) and f(x1) have the same sign
+        DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax * &
+                       (LeavingTempFullFlow - TargetSupplySideLoopLeavingTemp) &
+                       /(LeavingTempFullFlow - LeavingTempMinFlow)
+        IF (.NOT. WarmupFlag) THEN
+          IF (FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount < 1) THEN
+            FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount = FluidHX(CompNum)%DmdSideModulatSolvFailErrorCount + 1
+            CALL ShowWarningError(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Solver failed to calculate demand side loop flow rate' )
+            CALL ShowContinueError('Simulation continues with estimated demand side mass flow rate = ' &
+                                    //RoundSigDigits(DmdSideMdot, 7) )
+          ENDIF
+          CALL ShowRecurringWarningErrorAtEnd(ComponentClassName//' named '//TRIM(FluidHX(CompNum)%Name)// &
+                                  ' - Solver failed to calculate demand side loop flow rate continues.' ,&
+                                  FluidHX(CompNum)%DmdSideModulatSolvFailErrorIndex, DmdSideMdot, DmdSideMdot)
+        ENDIF
+      ENDIF
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                 FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                 FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                 FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                 FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                 FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                 FluidHX(CompNum)%DemandSideLoop%CompNum)
+    ELSEIF ( ( TargetSupplySideLoopLeavingTemp <= LeavingTempFullFlow ) &
+         .AND. (LeavingTempFullFlow < LeavingTempMinFlow) ) THEN
+      ! run at full flow
+      DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMax
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                   FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                   FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                   FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                   FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                   FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                   FluidHX(CompNum)%DemandSideLoop%CompNum)
+    ELSEIF ( LeavingTempMinFlow <=  TargetSupplySideLoopLeavingTemp) THEN
+
+        ! run at min flow
+      DmdSideMdot = FluidHX(CompNum)%DemandSideLoop%MassFlowRateMin
+      CALL SetComponentFlowRate(DmdSideMdot,                      &
+                 FluidHX(CompNum)%DemandSideLoop%InletNodeNum,  &
+                 FluidHX(CompNum)%DemandSideLoop%OutletNodeNum, &
+                 FluidHX(CompNum)%DemandSideLoop%LoopNum,       &
+                 FluidHX(CompNum)%DemandSideLoop%LoopSideNum,   &
+                 FluidHX(CompNum)%DemandSideLoop%BranchNum,     &
+                 FluidHX(CompNum)%DemandSideLoop%CompNum)
+    ENDIF
+
+  END SELECT
+
+  RETURN
+
+END SUBROUTINE FindHXDemandSideLoopFlow
+
+FUNCTION HXDemandSideLoopFlowResidual(DmdSideMassFlowRate, Par ) RESULT (Residuum)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   December 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! calculate residual value for regula falsi solver
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE PlantUtilities,   ONLY: SetComponentFlowRate
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  REAL(r64), INTENT(IN) :: DmdSideMassFlowRate
+  REAL(r64), INTENT(IN), DIMENSION(:), OPTIONAL :: Par ! Par(1) = HX index number
+                                                    ! Par(2) = desired supply side loop outlet temperature [C]
+  REAL(r64)         :: Residuum                   ! Residual to be minimized to zero
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: CompNum
+  REAL(r64) :: SupSideLoopOutletTemp
+  REAL(r64) :: MdotTrial
+  REAL(r64)  :: SupSideMdot ! mass flow rate of fluid entering from supply side loop
+
+
+  MdotTrial = DmdSideMassFlowRate
+  CompNum = INT(Par(1))
+  SupSideMdot = Node(FluidHX(CompNum)%SupplySideLoop%InletNodeNum)%MassFlowRate
+
+  CALL CalcFluidHeatExchanger(CompNum,SupSideMdot ,MdotTrial )
+
+  SupSideLoopOutletTemp = FluidHX(CompNum)%SupplySideLoop%OutletTemp
+
+  Residuum = Par(2) - SupSideLoopOutletTemp
+
+  RETURN
+
+END FUNCTION HXDemandSideLoopFlowResidual
+
+SUBROUTINE UpdateFluidHeatExchanger(CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   December 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! update calculate results
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: CompNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           ! na
 
-  ! update condenser side variables
-  HXWaterEcon(HXNum)%CondInletTemp     = Node(CondInletNodeNum)%Temp
-  HXWaterEcon(HXNum)%CondOutletTemp    = Node(CondOutletNodeNum)%Temp
-  HXWaterEcon(HXNum)%CondMassFlowRate  = CondMassFlowRate   
-
-  ! update plant side variables
-  HXWaterEcon(HXNum)%PlantInletTemp    = Node(PlantInletNodeNum)%Temp
-  HXWaterEcon(HXNum)%PlantOutletTemp   = Node(PlantOutletNodeNum)%Temp
-  HXWaterEcon(HXNum)%PlantMassFlowRate = PlantMassFlowRate  
-
-  ! update the energy reporting variable
-  HXWaterEcon(HXNum)%HeatTransEnergy   = HXWaterEcon(HXNum)%HeatTransRate*TimeStepSys*SecInHour
+  Node(FluidHX(CompNum)%DemandSideLoop%OutletNodeNum)%Temp = FluidHX(CompNum)%DemandSideLoop%OutletTemp
+  Node(FluidHX(CompNum)%SupplySideLoop%OutletNodeNum)%Temp = FluidHX(CompNum)%SupplySideLoop%OutletTemp
 
   RETURN
 
-END SUBROUTINE ReportEconHeatExchanger
+END SUBROUTINE UpdateFluidHeatExchanger
+
+SUBROUTINE ReportFluidHeatExchanger(CompNum)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   December, 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! update heat exchanger report variables
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataHVACGlobals , ONLY: TimeStepSys, SmallLoad
+  USE DataGlobals,      ONLY: SecInHour
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN) :: CompNum
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+  FluidHX(CompNum)%HeatTransferEnergy = FluidHX(CompNum)%HeatTransferRate *  TimeStepSys * SecInHour
+
+  IF ( (ABS(FluidHX(CompNum)%HeatTransferRate) > SmallLoad) .AND. &
+       (FluidHX(CompNum)%DemandSideLoop%InletMassFlowRate > 0.d0) .AND. &
+       (FluidHX(CompNum)%SupplySideLoop%InletMassFlowRate > 0.d0) ) THEN
+    FluidHX(CompNum)%OperationStatus = 1.d0
+  ELSE
+    FluidHX(CompNum)%OperationStatus = 0.d0
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE ReportFluidHeatExchanger
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -1313,5 +2551,4 @@ END SUBROUTINE ReportEconHeatExchanger
 !
 !     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
 !
-
-END MODULE EconomizerHeatExchanger
+END MODULE PlantHeatExchangerFluidToFluid

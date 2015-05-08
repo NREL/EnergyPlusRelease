@@ -37,7 +37,7 @@ MODULE AirflowNetworkBalanceManager
     USE Fans, ONLY: GetFanVolFlow,GetFanIndex,GetFanInletNode,GetFanOutletNode,GetFanType
     USE DataZoneEquipment, ONLY: ZoneEquipConfig
     USE DataHVACGlobals, ONLY: FanType_SimpleConstVolume,FanType_SimpleOnOff,FanType_ZoneExhaust,OnOffFanPartLoadFraction, &
-                               NumHybridVentSysAvailMgrs, CycFanCycCoil, ContFanCycCoil
+                               NumHybridVentSysAvailMgrs, CycFanCycCoil, ContFanCycCoil, FanType_SimpleVAV
     USE DataContaminantBalance, ONLY: Contaminant, OutdoorCO2, ZoneAirCO2, CO2ZoneTimeMinus1, OutdoorGC, ZoneAirGC, &
                                       GCZoneTimeMinus1
 
@@ -59,48 +59,6 @@ INTEGER, PARAMETER :: VentCtrNum_AdjEnth = 9   ! Enthalpy venting control based 
 
           ! DERIVED TYPE DEFINITIONS:
 ! Report variables
-TYPE AiflowNetworkReportProp
- REAL(r64) :: MultiZoneInfiSenGainW =0.0d0
- REAL(r64) :: MultiZoneInfiSenGainJ =0.0d0
- REAL(r64) :: MultiZoneInfiSenLossW =0.0d0
- REAL(r64) :: MultiZoneInfiSenLossJ =0.0d0
- REAL(r64) :: MultiZoneMixSenGainW =0.0d0
- REAL(r64) :: MultiZoneMixSenGainJ =0.0d0
- REAL(r64) :: MultiZoneMixSenLossW =0.0d0
- REAL(r64) :: MultiZoneMixSenLossJ =0.0d0
- REAL(r64) :: MultiZoneInfiLatGainW =0.0d0
- REAL(r64) :: MultiZoneInfiLatGainJ =0.0d0
- REAL(r64) :: MultiZoneInfiLatLossW =0.0d0
- REAL(r64) :: MultiZoneInfiLatLossJ =0.0d0
- REAL(r64) :: MultiZoneMixLatGainW =0.0d0
- REAL(r64) :: MultiZoneMixLatGainJ =0.0d0
- REAL(r64) :: MultiZoneMixLatLossW =0.0d0
- REAL(r64) :: MultiZoneMixLatLossJ =0.0d0
- REAL(r64) :: LeakSenGainW =0.0d0
- REAL(r64) :: LeakSenGainJ =0.0d0
- REAL(r64) :: LeakSenLossW =0.0d0
- REAL(r64) :: LeakSenLossJ =0.0d0
- REAL(r64) :: LeakLatGainW =0.0d0
- REAL(r64) :: LeakLatGainJ =0.0d0
- REAL(r64) :: LeakLatLossW =0.0d0
- REAL(r64) :: LeakLatLossJ =0.0d0
- REAL(r64) :: CondSenGainW =0.0d0
- REAL(r64) :: CondSenGainJ =0.0d0
- REAL(r64) :: CondSenLossW =0.0d0
- REAL(r64) :: CondSenLossJ =0.0d0
- REAL(r64) :: DiffLatGainW =0.0d0
- REAL(r64) :: DiffLatGainJ =0.0d0
- REAL(r64) :: DiffLatLossW =0.0d0
- REAL(r64) :: DiffLatLossJ =0.0d0
- REAL(r64) :: TotalSenGainW =0.0d0
- REAL(r64) :: TotalSenGainJ =0.0d0
- REAL(r64) :: TotalSenLossW =0.0d0
- REAL(r64) :: TotalSenLossJ =0.0d0
- REAL(r64) :: TotalLatGainW =0.0d0
- REAL(r64) :: TotalLatGainJ =0.0d0
- REAL(r64) :: TotalLatLossW =0.0d0
- REAL(r64) :: TotalLatLossJ =0.0d0
-END TYPE AiflowNetworkReportProp
 
 Type AirflowNetworkReportVars
   REAL(r64) :: MeanAirTemp         =0.0d0 ! Mean Air Temperature {C}
@@ -127,13 +85,13 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: PZ
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MA
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: MV
 INTEGER, ALLOCATABLE, DIMENSION(:) :: IVEC
+INTEGER, DIMENSION(:), ALLOCATABLE :: SplitterNodeNumbers
 
 logical :: AirflowNetworkGetInputFlag = .True.
 INTEGER :: VentilationCtrl = 0    ! Hybrid ventilation control type
 INTEGER :: NumOfExhaustFans = 0   ! Number of exhaust fans
 
 
-TYPE(AiflowNetworkReportProp), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkReportData
 
 TYPE (AirflowNetworkReportVars), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkZnRpt
 
@@ -267,6 +225,8 @@ SUBROUTINE ManageAirflowNetworkBalance(FirstHVACIteration, Iter, ResimulateAirZo
      If ((Node(SupplyFanOutletNode)%MassFlowRate > VerySmallMassFlow) .AND. (.NOT. FirstHVACIteration)) then
        If (LoopFanOperationMode .EQ. CycFanCycCoil) Then
          If (LoopSystemOnMassFlowrate > 0) AirflowNetworkFanActivated = .TRUE.
+       Else If (SupplyFanType .EQ. FanType_SimpleVAV) Then
+         If (PRESENT(Iter) .AND. Iter > 1) AirflowNetworkFanActivated = .TRUE.
        Else
          AirflowNetworkFanActivated = .TRUE.
        End If
@@ -280,6 +240,9 @@ SUBROUTINE ManageAirflowNetworkBalance(FirstHVACIteration, Iter, ResimulateAirZo
      IF (AirflowNetworkFanActivated .and. Iter .LT. 3 .and. SupplyFanType .EQ. FanType_SimpleOnOff) then
        ResimulateAirZone = .TRUE.
      End If
+     IF (SupplyFanType .EQ. FanType_SimpleVAV) Then
+       IF (.NOT. AirflowNetworkFanActivated .AND. Iter .LT. 3) ResimulateAirZone = .TRUE.
+     End If
    End If
    if (AirflowNetworkFanActivated .and. SimulateAirflowNetwork > AirflowNetworkControlMultizone) then
       NetworkNumOfNodes = AirflowNetworkNumOfNodes
@@ -287,6 +250,9 @@ SUBROUTINE ManageAirflowNetworkBalance(FirstHVACIteration, Iter, ResimulateAirZo
    End if
 
    If (ALLOCATED(ZoneEquipConfig)) CALL ValidateExhaustFanInput
+
+   ! VAV terminal set only
+   If (PRESENT(FirstHVACIteration) .AND. FirstHVACIteration) VAVTerminalRatio = 0.d0
 
    if (AirflowNetworkFanActivated .and. SimulateAirflowNetwork > AirflowNetworkControlMultizone) then
      CALL ValidateDistributionSystem
@@ -434,7 +400,7 @@ SUBROUTINE GetAirflowNetworkInput
   CALL GetObjectDefMaxArgs('AirflowNetwork:Distribution:Component:Duct',TotalArgs,NumAlphas,NumNumbers)
   MaxNums=MAX(MaxNums,NumNumbers)
   MaxAlphas=MAX(MaxAlphas,NumAlphas)
-  CALL GetObjectDefMaxArgs('AirflowNetwork:Distribution:Component:ConstantVolumeFan',TotalArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs('AirflowNetwork:Distribution:Component:Fan',TotalArgs,NumAlphas,NumNumbers)
   MaxNums=MAX(MaxNums,NumNumbers)
   MaxAlphas=MAX(MaxAlphas,NumAlphas)
   CALL GetObjectDefMaxArgs('AirflowNetwork:Distribution:Component:Coil',TotalArgs,NumAlphas,NumNumbers)
@@ -468,7 +434,7 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation parameters
   CurrentModuleObject='AirflowNetwork:SimulationControl'
-  NumAirflowNetwork = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumAirflowNetwork = GetNumObjectsFound(CurrentModuleObject)
   if (NumAirflowNetwork .EQ. 0) then
      SimulateAirflowNetwork = AirflowNetworkControlSimple
      WRITE(OutputFileInits,110)
@@ -481,7 +447,7 @@ SUBROUTINE GetAirflowNetworkInput
   end if
 
   SimObjectError=.false.
-  CALL GetObjectItem(TRIM(CurrentModuleObject),NumAirflowNetwork,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+  CALL GetObjectItem(CurrentModuleObject,NumAirflowNetwork,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                      NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -694,13 +660,13 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation zone data
   CurrentModuleObject='AirflowNetwork:MultiZone:Zone'
-  AirflowNetworkNumOfZones = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfZones = GetNumObjectsFound(CurrentModuleObject)
   if (AirflowNetworkNumOfZones > 0) then
    Allocate(MultizoneZoneData(AirflowNetworkNumOfZones))
    ALLOCATE(AirflowNetworkZoneFlag(NumOfZones)) ! AirflowNetwork zone flag
    AirflowNetworkZoneFlag = .False.
    Do i=1,AirflowNetworkNumOfZones
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -902,11 +868,11 @@ SUBROUTINE GetAirflowNetworkInput
   if (AirflowNetworkSimu%iWPCCntr == iWPCCntr_Input) then
    ! Wind coefficient == Surface-Average does not need inputs of external nodes
    CurrentModuleObject='AirflowNetwork:MultiZone:ExternalNode'
-   AirflowNetworkNumOfExtNode = GetNumObjectsFound(TRIM(CurrentModuleObject))
+   AirflowNetworkNumOfExtNode = GetNumObjectsFound(CurrentModuleObject)
    If (AirflowNetworkNumOfExtNode > 0) then
     Allocate(MultizoneExternalNodeData(AirflowNetworkNumOfExtNode))
     Do i=1,AirflowNetworkNumOfExtNode
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -937,11 +903,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation surface data
   CurrentModuleObject='AirflowNetwork:MultiZone:Surface'
-  AirflowNetworkNumOfSurfaces = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfSurfaces = GetNumObjectsFound(CurrentModuleObject)
   if (AirflowNetworkNumOfSurfaces > 0) then
    Allocate(MultizoneSurfaceData(AirflowNetworkNumOfSurfaces))
    Do i=1,AirflowNetworkNumOfSurfaces
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1199,11 +1165,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork simulation detailed openings
   CurrentModuleObject='AirflowNetwork:MultiZone:Component:DetailedOpening'
-  AirflowNetworkNumOfDetOpenings = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfDetOpenings = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfDetOpenings > 0) then
    Allocate(MultizoneCompDetOpeningData(AirflowNetworkNumOfDetOpenings))
    Do i=1,AirflowNetworkNumOfDetOpenings
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1454,11 +1420,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork simulation simple openings
   CurrentModuleObject='AirflowNetwork:MultiZone:Component:SimpleOpening'
-  AirflowNetworkNumOfSimOpenings = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfSimOpenings = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfSimOpenings > 0) then
    Allocate(MultizoneCompSimpleOpeningData(AirflowNetworkNumOfSimOpenings))
    Do i=1,AirflowNetworkNumOfSimOpenings
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1479,11 +1445,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork simulation horizontal openings
   CurrentModuleObject='AirflowNetwork:MultiZone:Component:HorizontalOpening'
-  AirflowNetworkNumOfHorOpenings = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfHorOpenings = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfHorOpenings > 0) then
    Allocate(MultizoneCompHorOpeningData(AirflowNetworkNumOfHorOpenings))
    Do i=1,AirflowNetworkNumOfHorOpenings
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1556,7 +1522,7 @@ SUBROUTINE GetAirflowNetworkInput
         MultizoneSurfaceData(i)%VentingSchNum = 0
       End if
       Select Case (MultizoneSurfaceData(i)%VentSurfCtrNum)
-        Case (VentCtrNum_Temp)
+        Case (VentCtrNum_Temp, VentCtrNum_AdjTemp)
           MultizoneSurfaceData(i)%VentSchNum = GetScheduleIndex(MultizoneSurfaceData(i)%VentSchName)
           if (MultizoneSurfaceData(i)%VentSchName == Blank) THEN
              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' object, '//  &
@@ -1595,7 +1561,7 @@ SUBROUTINE GetAirflowNetworkInput
             MultizoneSurfaceData(i)%UpValueTemp = 100.0d0
           end if
 
-        Case (VentCtrNum_Enth)
+        Case (VentCtrNum_Enth, VentCtrNum_AdjEnth)
           MultizoneSurfaceData(i)%VentSchNum = GetScheduleIndex(MultizoneSurfaceData(i)%VentSchName)
           if (MultizoneSurfaceData(i)%VentSchName == Blank) THEN
              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' object, '//  &
@@ -1676,11 +1642,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation reference crack conditions
   CurrentModuleObject='AirflowNetwork:MultiZone:ReferenceCrackConditions'
-  AirflowNetworkNumOfStdCndns = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfStdCndns = GetNumObjectsFound(CurrentModuleObject)
   IF (AirflowNetworkNumOfStdCndns > 0) THEN
     Allocate(MultizoneSurfaceStdConditionsCrackData(0:AirflowNetworkNumOfStdCndns))
     Do i=1,AirflowNetworkNumOfStdCndns
-      CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+      CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
       IsNotOK=.false.
@@ -1719,11 +1685,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation surface crack component
   CurrentModuleObject='AirflowNetwork:MultiZone:Surface:Crack'
-  AirflowNetworkNumOfSurCracks = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfSurCracks = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfSurCracks > 0) then
    Allocate(MultizoneSurfaceCrackData(AirflowNetworkNumOfSurCracks))
    Do i=1,AirflowNetworkNumOfSurCracks
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1765,11 +1731,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation surface effective leakage area component
   CurrentModuleObject='AirflowNetwork:MultiZone:Surface:EffectiveLeakageArea'
-  AirflowNetworkNumOfSurELA = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfSurELA = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfSurELA > 0) then
    Allocate(MultizoneSurfaceELAData(AirflowNetworkNumOfSurELA))
    Do i=1,AirflowNetworkNumOfSurELA
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1792,12 +1758,12 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! *** Read AirflowNetwork simulation zone exhaust fan component
   CurrentModuleObject='AirflowNetwork:MultiZone:Component:ZoneExhaustFan'
-  AirflowNetworkNumOfExhFan = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfExhFan = GetNumObjectsFound(CurrentModuleObject)
   NumOfExhaustFans = GetNumObjectsFound('Fan:ZoneExhaust')
   If (AirflowNetworkNumOfExhFan > 0) then
    Allocate(MultizoneCompExhaustFanData(AirflowNetworkNumOfExhFan))
    Do i=1,AirflowNetworkNumOfExhFan
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -1857,7 +1823,7 @@ SUBROUTINE GetAirflowNetworkInput
 ! *** Read AirflowNetwork CP Array
  if (AirflowNetworkSimu%iWPCCntr == iWPCCntr_Input) then ! Surface-Average does not need inputs of external nodes
   CurrentModuleObject='AirflowNetwork:MultiZone:WindPressureCoefficientArray'
-  AirflowNetworkNumOfCPArray = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfCPArray = GetNumObjectsFound(CurrentModuleObject)
 
   if (AirflowNetworkNumOfCPArray .NE. 1) then
     CALL ShowSevereError(RoutineName//'Currently only one ("1") '//TRIM(CurrentModuleObject)// &
@@ -1869,7 +1835,7 @@ SUBROUTINE GetAirflowNetworkInput
    Allocate(MultizoneCPArrayData(AirflowNetworkNumOfCPArray))
    Do i=1,AirflowNetworkNumOfCPArray
 
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1912,12 +1878,12 @@ SUBROUTINE GetAirflowNetworkInput
 ! Read AirflowNetwork CP Value
  if (AirflowNetworkSimu%iWPCCntr == iWPCCntr_Input) then ! Surface-Average does not need inputs of external nodes
   CurrentModuleObject='AirflowNetwork:MultiZone:WindPressureCoefficientValues'
-  AirflowNetworkNumOfCPValue = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  AirflowNetworkNumOfCPValue = GetNumObjectsFound(CurrentModuleObject)
   If (AirflowNetworkNumOfCPValue > 0 .AND. AirflowNetworkSimu%iWPCCntr == iWPCCntr_Input) then
    Allocate(MultizoneCPValueData(AirflowNetworkNumOfCPValue))
 
    Do i=1,AirflowNetworkNumOfCPValue
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2008,6 +1974,8 @@ SUBROUTINE GetAirflowNetworkInput
       End DO
     End Do
   End If
+
+  IF (ErrorsFound) CALL ShowFatalError(RoutineName//'Errors found getting inputs. Previous error(s) cause program termination.')
 
   ! Write wind pressure coefficients in the EIO file
   WRITE(OutputFileInits,fmta) '! <AirflowNetwork Model:Wind Direction>, Wind Direction #1 to n (degree)'
@@ -2125,14 +2093,14 @@ SUBROUTINE GetAirflowNetworkInput
   ! Ensure different CPVNum is used to avoid a single side boundary condition
   found = .False.
   Do j=2,AirflowNetworkNumOfExtNode
-    If (MultizoneExternalNodeData(j-1)%CPVNum .NE. MultizoneExternalNodeData(j)%CPVNum) Then 
+    If (MultizoneExternalNodeData(j-1)%CPVNum .NE. MultizoneExternalNodeData(j)%CPVNum) Then
       found = .True.
       Exit
     End If
   End do
   If (.NOT. found) then
     CALL ShowSevereError('The same Wind Pressure Coefficient Values Object name is used in all ' &
-                        //'AirflowNetwork:MultiZone:ExternalNode objects.') 
+                        //'AirflowNetwork:MultiZone:ExternalNode objects.')
     CALL ShowContinueError('Please input at least two different Wind Pressure Coefficient Values Object names'&
                           //' to avoid single side boundary condition.')
     ErrorsFound=.true.
@@ -2143,11 +2111,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system node
   CurrentModuleObject='AirflowNetwork:Distribution:Node'
-  DisSysNumOfNodes = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfNodes = GetNumObjectsFound(CurrentModuleObject)
   if (DisSysNumOfNodes > 0) then
    Allocate(DisSysNodeData(DisSysNumOfNodes))
    Do i=1,DisSysNumOfNodes
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2186,11 +2154,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system component: duct leakage
   CurrentModuleObject='AirflowNetwork:Distribution:Component:Leak'
-  DisSysNumOfLeaks = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfLeaks = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfLeaks > 0) then
    Allocate(DisSysCompLeakData(DisSysNumOfLeaks))
    Do i=1,DisSysNumOfLeaks
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2213,11 +2181,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system component: duct effective leakage ratio
   CurrentModuleObject='AirflowNetwork:Distribution:Component:LeakageRatio'
-  DisSysNumOfELRs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfELRs = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfELRs > 0) then
    Allocate(DisSysCompELRData(DisSysNumOfELRs))
    Do i=1,DisSysNumOfELRs
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2242,11 +2210,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system component: duct
   CurrentModuleObject='AirflowNetwork:Distribution:Component:Duct'
-  DisSysNumOfDucts = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfDucts = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfDucts > 0) then
    Allocate(DisSysCompDuctData(DisSysNumOfDucts))
    Do i=1,DisSysNumOfDucts
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2287,12 +2255,12 @@ SUBROUTINE GetAirflowNetworkInput
 ! Deleted on Aug. 13, 2008
 
 ! Read AirflowNetwork Distribution system component: constant volume fan
-  CurrentModuleObject='AirflowNetwork:Distribution:Component:ConstantVolumeFan'
-  DisSysNumOfCVFs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  CurrentModuleObject='AirflowNetwork:Distribution:Component:Fan'
+  DisSysNumOfCVFs = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfCVFs > 0) then
    Allocate(DisSysCompCVFData(DisSysNumOfCVFs))
    Do i=1,DisSysNumOfCVFs
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      DisSysCompCVFData(i)%Name = Alphas(1)           ! Name of duct effective leakage ratio component
@@ -2311,7 +2279,8 @@ SUBROUTINE GetAirflowNetworkInput
      CALL GetFanType(Alphas(1),FanType_Num,FanErrorFound)
      DisSysCompCVFData(i)%FanTypeNum = FanType_Num
      SupplyFanType = FanType_Num
-     If (.NOT. (FanType_Num .EQ. FanType_SimpleConstVolume .or. FanType_Num .EQ. FanType_SimpleOnOff)) then
+     If (.NOT. (FanType_Num .EQ. FanType_SimpleConstVolume .or. FanType_Num .EQ. FanType_SimpleOnOff .or. &
+         FanType_Num .EQ. FanType_SimpleVAV)) then
        CALL ShowSevereError(RoutineName//'The '//TRIM(cAlphaFields(2))//' in '//TRIM(CurrentModuleObject)//  &
                             ' = '//TRIM(Alphas(1))//' is not a valid fan type.')
        CALL ShowContinueError('Valid fan types are  Fan:ConstantVolume or Fan:OnOff')
@@ -2342,6 +2311,13 @@ SUBROUTINE GetAirflowNetworkInput
        DisSysCompCVFData(i)%OutletNode = GetFanOutletNode('Fan:OnOff',Alphas(1),ErrorsFound)
        SupplyFanOutletNode = DisSysCompCVFData(i)%OutletNode
      End If
+     If (FanType_Num .EQ. FanType_SimpleVAV) then
+       SupplyFanInletNode = GetFanInletNode('Fan:VariableVolume',Alphas(1),ErrorsFound)
+       DisSysCompCVFData(i)%InletNode = SupplyFanInletNode
+       DisSysCompCVFData(i)%OutletNode = GetFanOutletNode('Fan:VariableVolume',Alphas(1),ErrorsFound)
+       SupplyFanOutletNode = DisSysCompCVFData(i)%OutletNode
+       VAVSystem = .TRUE.
+     End If
    end do
   Else
    if (SimulateAirflowNetwork > AirflowNetworkControlMultizone+1) then
@@ -2350,17 +2326,27 @@ SUBROUTINE GetAirflowNetworkInput
    End If
   End If
 
+  ! Check AirTerminal:SingleDuct:Uncontrolled. This object is not allowed
+  If (VAVSystem) Then
+    i = GetNumObjectsFound('AirTerminal:SingleDuct:Uncontrolled')
+    If (i .GT. 0) Then
+      CALL ShowSevereError(RoutineName//'Invalid terminal type for a VAV system = AirTerminal:SingleDuct:Uncontrolled')
+      CALL ShowContinueError('A VAV system requires all ternimal units with type = AirTerminal:SingleDuct:VAV:Reheat')
+      ErrorsFound=.true.
+    End If
+  End If
+
 ! Read AirflowNetwork Distribution system component: Detailed fan
 !  CurrentModuleObject='AIRFLOWNETWORK:DISTRIBUTION:COMPONENT DETAILED FAN'
 ! Deleted on Aug. 13, 2008
 
 ! Read AirflowNetwork Distribution system component: coil
   CurrentModuleObject='AirflowNetwork:Distribution:Component:Coil'
-  DisSysNumOfCoils = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfCoils = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfCoils > 0) then
    Allocate(DisSysCompCoilData(DisSysNumOfCoils))
    Do i=1,DisSysNumOfCoils
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2384,11 +2370,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system component: heat exchanger
   CurrentModuleObject='AirflowNetwork:Distribution:Component:HeatExchanger'
-  DisSysNumOfHXs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfHXs = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfHXs > 0) then
    Allocate(DisSysCompHXData(DisSysNumOfHXs))
    Do i=1,DisSysNumOfHXs
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2409,11 +2395,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork Distribution system component: terminal unit
   CurrentModuleObject='AirflowNetwork:Distribution:Component:TerminalUnit'
-  DisSysNumOfTermUnits = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfTermUnits = GetNumObjectsFound(CurrentModuleObject)
   if (DisSysNumOfTermUnits > 0) then
    Allocate(DisSysCompTermUnitData(DisSysNumOfTermUnits))
    Do i=1,DisSysNumOfTermUnits
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2435,11 +2421,11 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Get input data of constant pressure drop component
   CurrentModuleObject='AirflowNetwork:Distribution:Component:ConstantPressureDrop'
-  DisSysNumOfCPDs = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfCPDs = GetNumObjectsFound(CurrentModuleObject)
   if (DisSysNumOfCPDs > 0) then
    Allocate(DisSysCompCPDData(DisSysNumOfCPDs))
    Do i=1,DisSysNumOfCPDs
-     CALL GetObjectItem(TRIM(CurrentModuleObject),i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,i,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -2542,11 +2528,19 @@ SUBROUTINE GetAirflowNetworkInput
        AirflowNetworkNodeData(i)%ExtNodeNum = AirflowNetworkNumOfExtNode+1
        AirflowNetworkNodeData(i)%NodeTypeNum = 1
      End If
-     If ((SameString(DisSysNodeData(i-NumOfNodesMultiZone)%EPlusType,'OutdoorAir:NodeList') .OR. &
-          SameString(DisSysNodeData(i-NumOfNodesMultiZone)%EPlusType,'OutdoorAir:Node')).AND. J>1) then
-       AirflowNetworkNodeData(i)%EPlusTypeNum = EPlusTypeNum_EXT
-       AirflowNetworkNodeData(i)%ExtNodeNum = AirflowNetworkNumOfExtNode+1
-       AirflowNetworkNodeData(i)%NodeTypeNum = 1
+     If (SameString(DisSysNodeData(i-NumOfNodesMultiZone)%EPlusType,'OutdoorAir:NodeList') .OR. &
+          SameString(DisSysNodeData(i-NumOfNodesMultiZone)%EPlusType,'OutdoorAir:Node')) then
+       If (J > 1) Then
+         AirflowNetworkNodeData(i)%EPlusTypeNum = EPlusTypeNum_EXT
+         AirflowNetworkNodeData(i)%ExtNodeNum = AirflowNetworkNumOfExtNode+1
+         AirflowNetworkNodeData(i)%NodeTypeNum = 1
+       Else
+         CALL ShowSevereError(RoutineName//'AirflowNetwork:Distribution:Node: The outdoor air node is found at ' &
+                            //AirflowNetworkNodeData(i)%Name)
+         Call ShowContinueError('The node with Component Object Type = '//  &
+            'OAMixerOutdoorAirStreamNode is not found. Please check inputs.')
+         ErrorsFound=.true.
+       End If
      End If
     End Do
   end if
@@ -2757,7 +2751,7 @@ SUBROUTINE GetAirflowNetworkInput
 
 ! Read AirflowNetwork linkage data
   CurrentModuleObject='AirflowNetwork:Distribution:Linkage'
-  DisSysNumOfLinks = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  DisSysNumOfLinks = GetNumObjectsFound(CurrentModuleObject)
   If (DisSysNumOfLinks > 0 .AND. SimulateAirflowNetwork .GT. AirflowNetworkControlMultizone) then ! Multizone + Distribution
    AirflowNetworkNumOfLinks = NumOfLinksMultiZone+DisSysNumOfLinks
    Allocate(AirflowNetworkLinkageData(DisSysNumOfLinks+AirflowNetworkNumOfSurfaces))
@@ -2899,7 +2893,7 @@ SUBROUTINE GetAirflowNetworkInput
 
    do count=AirflowNetworkNumOfSurfaces+1,AirflowNetworkNumOfLinks
 
-     CALL GetObjectItem(TRIM(CurrentModuleObject),count-AirflowNetworkNumOfSurfaces,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+     CALL GetObjectItem(CurrentModuleObject,count-AirflowNetworkNumOfSurfaces,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                         NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                         AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
      IsNotOK=.false.
@@ -3024,7 +3018,7 @@ SUBROUTINE GetAirflowNetworkInput
           If (AirflowNetworkCompData(i)%CompTypeNum == CompTypeNum_DMP) &
              CompName(1) = 'AIRFLOWNETWORK:DISTRIBUTION:COMPONENT DAMPER'
           If (AirflowNetworkCompData(i)%CompTypeNum == CompTypeNum_CVF) &
-             CompName(1) = 'AirflowNetwork:Distribution:Component:ConstantVolumeFan'
+             CompName(1) = 'AirflowNetwork:Distribution:Component:Fan'
           If (AirflowNetworkCompData(i)%CompTypeNum == CompTypeNum_CPD) &
              CompName(1) = 'AirflowNetwork:Distribution:Component:ConstantPressureDrop'
           If (AirflowNetworkCompData(i)%CompTypeNum == CompTypeNum_COI) &
@@ -3042,7 +3036,7 @@ SUBROUTINE GetAirflowNetworkInput
           If (AirflowNetworkCompData(j)%CompTypeNum == CompTypeNum_DMP) &
              CompName(2) = 'AIRFLOWNETWORK:DISTRIBUTION:COMPONENT DAMPER'
           If (AirflowNetworkCompData(j)%CompTypeNum == CompTypeNum_CVF) &
-             CompName(2) = 'AirflowNetwork:Distribution:Component:ConstantVolumeFan'
+             CompName(2) = 'AirflowNetwork:Distribution:Component:Fan'
           If (AirflowNetworkCompData(j)%CompTypeNum == CompTypeNum_CPD) &
              CompName(2) = 'AirflowNetwork:Distribution:Component:ConstantPressureDrop'
           If (AirflowNetworkCompData(j)%CompTypeNum == CompTypeNum_COI) &
@@ -3300,31 +3294,31 @@ SUBROUTINE InitAirflowNetwork
        OneTimeFlag = .False.
        IF (Contaminant%CO2Simulation) Then
          DO i=1, NumOfZOnes
-           CALL SetupOutputVariable('AirflowNetwork Zone Outdoor Mass Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHr, &
+           CALL SetupOutputVariable('AFN Zone Outdoor Air Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHr, &
               'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Mixing Mass Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHr, &
+           CALL SetupOutputVariable('AFN Zone Mixing Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHr, &
               'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Outdoor CO2 Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHrCO, &
+           CALL SetupOutputVariable('AFN Zone Outdoor Air CO2 Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHrCO, &
               'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Mixing CO2 Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHrCO, &
+           CALL SetupOutputVariable('AFN Zone Mixing CO2 Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHrCO, &
               'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Total CO2 Rate [kg/s]',AirflowNetworkExchangeData(i)%TotalCO2, &
+           CALL SetupOutputVariable('AFN Zone Total CO2 Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%TotalCO2, &
               'System','Average',Zone(i)%Name)
          END DO
        END IF
        IF (Contaminant%GenericContamSimulation) Then
          DO i=1, NumOfZOnes
            IF (.NOT. Contaminant%CO2Simulation) Then
-             CALL SetupOutputVariable('AirflowNetwork Zone Outdoor Mass Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHr, &
+             CALL SetupOutputVariable('AFN Zone Outdoor Air Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMHr, &
               'System','Average',Zone(i)%Name)
-             CALL SetupOutputVariable('AirflowNetwork Zone Mixing Mass Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHr, &
+             CALL SetupOutputVariable('AFN Zone Mixing Mass Flow Rate [kg/s]',AirflowNetworkExchangeData(i)%SumMMHr, &
               'System','Average',Zone(i)%Name)
            End If
-           CALL SetupOutputVariable('AirflowNetwork Zone Outdoor Generic Contaminant Rate [kg/s]', &
+           CALL SetupOutputVariable('AFN Zone Outdoor Air Generic Air Contaminant Mass Flow Rate [kg/s]', &
               AirflowNetworkExchangeData(i)%SumMHrGC,'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Mixing Generic Contaminant Rate [kg/s]', &
+           CALL SetupOutputVariable('AFN Zone Mixing Generic Air Contaminant Mass Flow Rate [kg/s]', &
               AirflowNetworkExchangeData(i)%SumMMHrGC,'System','Average',Zone(i)%Name)
-           CALL SetupOutputVariable('AirflowNetwork Zone Total Generic Contaminant Rate [kg/s]', &
+           CALL SetupOutputVariable('AFN Zone Total Generic Air Contaminant Mass Flow Rate [kg/s]', &
               AirflowNetworkExchangeData(i)%TotalGC,'System','Average',Zone(i)%Name)
          END DO
        END IF
@@ -3339,6 +3333,12 @@ SUBROUTINE InitAirflowNetwork
         IF (Contaminant%CO2Simulation) AirflowNetworkNodeSimu(I)%CO2Z = OutdoorCO2
         IF (Contaminant%GenericContamSimulation) AirflowNetworkNodeSimu(I)%GCZ = OutdoorGC
      END DO
+
+     DO I=1,AirflowNetworkNumOfLinks
+        AirflowNetworkLinkSimu(I)%flow = 0.0d0
+        AirflowNetworkLinkSimu(I)%flow2 = 0.0d0
+     END DO
+
      DO I=1,NumOfZones
         ANZT(I) = MAT(I)
         ANZW(I) = ZoneAirHumRat(I)
@@ -3471,34 +3471,34 @@ INTEGER, EXTERNAL :: GetNewUnitNumber  ! External  function to "get" a unit numb
 
    ! CurrentModuleObject='AirflowNetwork Simulations'
     DO I=1,AirflowNetworkNumOfNodes
-       CALL SetupOutputVariable('AirflowNetwork Node Temperature [C]',AirflowNetworkNodeSimu(I)%TZ,'System','Average', &
+       CALL SetupOutputVariable('AFN Node Temperature [C]',AirflowNetworkNodeSimu(I)%TZ,'System','Average', &
                                 AirflowNetworkNodeData(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Node Humidity Ratio [kgWater/kgDryAir]',AirflowNetworkNodeSimu(I)%WZ,  &
+       CALL SetupOutputVariable('AFN Node Humidity Ratio [kgWater/kgDryAir]',AirflowNetworkNodeSimu(I)%WZ,  &
           'System','Average',AirflowNetworkNodeData(i)%Name)
-       IF (Contaminant%CO2Simulation)  CALL SetupOutputVariable('AirflowNetwork Node Carbon Dioxide [ppm]' &
+       IF (Contaminant%CO2Simulation)  CALL SetupOutputVariable('AFN Node CO2 Concentration [ppm]' &
                ,AirflowNetworkNodeSimu(I)%CO2Z,'System','Average', AirflowNetworkNodeData(i)%Name)
-       IF (Contaminant%GenericContamSimulation)  CALL SetupOutputVariable('AirflowNetwork Node Generic Contaminant [ppm]' &
+       IF (Contaminant%GenericContamSimulation)  CALL SetupOutputVariable('AFN Node Generic Air Contaminant Concentration [ppm]' &
                ,AirflowNetworkNodeSimu(I)%GCZ,'System','Average', AirflowNetworkNodeData(i)%Name)
        If (.NOT. (SupplyFanType .EQ. FanType_SimpleOnOff .AND. i .LE. AirflowNetworkNumOfZones)) &
-       CALL SetupOutputVariable('AirflowNetwork Node Total Pressure [Pa]',AirflowNetworkNodeSimu(I)%PZ,'System','Average', &
+       CALL SetupOutputVariable('AFN Node Total Pressure [Pa]',AirflowNetworkNodeSimu(I)%PZ,'System','Average', &
                                 AirflowNetworkNodeData(i)%Name)
        If (AirflowNetworkNodeData(i)%ExtNodeNum > 0) then
-          CALL SetupOutputVariable('AirflowNetwork Wind Pressure [Pa]',AirflowNetworkNodeSimu(I)%PZ,'System','Average', &
+          CALL SetupOutputVariable('AFN Node Wind Pressure [Pa]',AirflowNetworkNodeSimu(I)%PZ,'System','Average', &
                                 AirflowNetworkNodeData(i)%Name)
        End If
     END DO
 
     DO i=1,AirflowNetworkNumOfLinks
      If (.NOT. (SupplyFanType .EQ. FanType_SimpleOnOff .AND. i .LE. AirflowNetworkNumOfSurfaces)) Then
-       CALL SetupOutputVariable('AirflowNetwork Mass Flow Rate from Node 1 to 2 [kg/s]',AirflowNetworkLinkReport(I)%FLOW, &
+       CALL SetupOutputVariable('AFN Linkage Node 1 to Node 2 Mass Flow Rate [kg/s]',AirflowNetworkLinkReport(I)%FLOW, &
             'System','Average',AirflowNetworkLinkageData(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mass Flow Rate from Node 2 to 1 [kg/s]',AirflowNetworkLinkReport(I)%FLOW2, &
+       CALL SetupOutputVariable('AFN Linkage Node 2 to Node 1 Mass Flow Rate [kg/s]',AirflowNetworkLinkReport(I)%FLOW2, &
             'System','Average',AirflowNetworkLinkageData(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Volume Flow Rate from Node 1 to 2 [m3/s]',AirflowNetworkLinkReport(I)%VolFLOW, &
+       CALL SetupOutputVariable('AFN Linkage Node 1 to Node 2 Volume Flow Rate [m3/s]',AirflowNetworkLinkReport(I)%VolFLOW, &
             'System','Average',AirflowNetworkLinkageData(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Volume Flow Rate from Node 2 to 1 [m3/s]',AirflowNetworkLinkReport(I)%VolFLOW2, &
+       CALL SetupOutputVariable('AFN Linkage Node 2 to Node 1 Volume Flow Rate [m3/s]',AirflowNetworkLinkReport(I)%VolFLOW2, &
             'System','Average',AirflowNetworkLinkageData(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Linkage Pressure Difference [Pa]',AirflowNetworkLinkSimu(I)%DP, &
+       CALL SetupOutputVariable('AFN Linkage Node 1 to Node 2 Pressure Difference [Pa]',AirflowNetworkLinkSimu(I)%DP, &
             'System','Average',AirflowNetworkLinkageData(i)%Name)
      End If
     END DO
@@ -3509,150 +3509,155 @@ INTEGER, EXTERNAL :: GetNewUnitNumber  ! External  function to "get" a unit numb
           AirflowNetworkCompData(N)%CompTypeNum==CompTypeNum_SOP .OR. &
           AirflowNetworkCompData(N)%CompTypeNum==CompTypeNum_HOP) THEN
           SurfNum = MultizoneSurfaceData(i)%SurfNum
-          CALL SetupOutputVariable('Window/Door Venting Opening Factor []',MultizoneSurfaceData(I)%OpenFactor,'System','Average', &
+          CALL SetupOutputVariable('AFN Surface Venting Window or Door Opening Factor []',  &
+             MultizoneSurfaceData(I)%OpenFactor,'System','Average', &
             MultizoneSurfaceData(I)%SurfName)
           IF (AnyEnergyManagementSystemInModel) THEN
             CALL SetupEMSActuator('AirFlow Network Window/Door Opening', MultizoneSurfaceData(I)%SurfName, &
                                   'Venting Opening Factor' , '[Fraction]', &
                                    MultizoneSurfaceData(I)%EMSOpenFactorActuated, MultizoneSurfaceData(I)%EMSOpenFactor )
           ENDIF
-          CALL SetupOutputVariable('Opening Factor Multiplier for Venting Modulation []',  &
+          CALL SetupOutputVariable('AFN Surface Venting Window or Door Opening Modulation Multiplier []',  &
                SurfaceWindow(SurfNum)%VentingOpenFactorMultRep,'System','Average',Surface(SurfNum)%Name)
-          CALL SetupOutputVariable('Inside Temp Setpoint for AirflowNetwork Venting [C]',  &
+          CALL SetupOutputVariable('AFN Surface Venting Inside Setpoint Temperature [C]',  &
                SurfaceWindow(SurfNum)%InsideTempForVentingRep,'System','Average',Surface(SurfNum)%Name)
-          CALL SetupOutputVariable('Venting Availability []',  &
+          CALL SetupOutputVariable('AFN Surface Venting Availability Status []',  &
                SurfaceWindow(SurfNum)%VentingAvailabilityRep,'System','Average',Surface(SurfNum)%Name)
        END IF
     END DO
 
     DO I=1, NumOfZones
        ! Multizone losses due to force air systems
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Sensible Gain Rate [W]',  &
+       CALL SetupOutputVariable('AFN Zone Infiltration Sensible Heat Gain Rate [W]',  &
                                 AirflowNetworkReportData(i)%MultiZoneInfiSenGainW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Sensible Gain [J]',AirflowNEtworkReportData(i)%MultiZoneInfiSenGainJ, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Sensible Heat Gain Energy [J]',  &
+          AirflowNEtworkReportData(i)%MultiZoneInfiSenGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Sensible Gain Rate [W]',AirflowNetworkReportData(i)%MultiZoneMixSenGainW,  &
+       CALL SetupOutputVariable('AFN Zone Mixing Sensible Heat Gain Rate [W]',AirflowNetworkReportData(i)%MultiZoneMixSenGainW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Sensible Gain [J]',AirflowNEtworkReportData(i)%MultiZoneMixSenGainJ, &
+       CALL SetupOutputVariable('AFN Zone Mixing Sensible Heat Gain Energy [J]',AirflowNEtworkReportData(i)%MultiZoneMixSenGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Sensible Loss Rate [W]',  &
+       CALL SetupOutputVariable('AFN Zone Infiltration Sensible Heat Loss Rate [W]',  &
                                 AirflowNEtworkReportData(i)%MultiZoneInfiSenLossW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Sensible Loss [J]',AirflowNEtworkReportData(i)%MultiZoneInfiSenLossJ, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Sensible Heat Loss Energy [J]',  &
+          AirflowNEtworkReportData(i)%MultiZoneInfiSenLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Sensible Loss Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixSenLossW,  &
+       CALL SetupOutputVariable('AFN Zone Mixing Sensible Heat Loss Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixSenLossW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Sensible Loss [J]',AirflowNEtworkReportData(i)%MultiZoneMixSenLossJ, &
+       CALL SetupOutputVariable('AFN Zone Mixing Sensible Heat Loss Energy [J]',AirflowNEtworkReportData(i)%MultiZoneMixSenLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Latent Gain Rate [W]',  &
+       CALL SetupOutputVariable('AFN Zone Infiltration Latent Heat Gain Rate [W]',  &
                                 AirflowNEtworkReportData(i)%MultiZoneInfiLatGainW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Latent Gain [J]',AirflowNEtworkReportData(i)%MultiZoneInfiLatGainJ, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Latent Heat Gain Energy [J]',  &
+          AirflowNEtworkReportData(i)%MultiZoneInfiLatGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Latent Loss Rate [W]',  &
+       CALL SetupOutputVariable('AFN Zone Infiltration Latent Heat Loss Rate [W]',  &
                                 AirflowNEtworkReportData(i)%MultiZoneInfiLatLossW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Infiltration Latent Loss [J]',AirflowNEtworkReportData(i)%MultiZoneInfiLatLossJ, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Latent Heat Loss Energy [J]',  &
+          AirflowNEtworkReportData(i)%MultiZoneInfiLatLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Latent Gain Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixLatGainW,  &
+       CALL SetupOutputVariable('AFN Zone Mixing Latent Heat Gain Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixLatGainW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Latent Gain [J]',AirflowNEtworkReportData(i)%MultiZoneMixLatGainJ, &
+       CALL SetupOutputVariable('AFN Zone Mixing Latent Heat Gain Energy [J]',AirflowNEtworkReportData(i)%MultiZoneMixLatGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Latent Loss Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixLatLossW,  &
+       CALL SetupOutputVariable('AFN Zone Mixing Latent Heat Loss Rate [W]',AirflowNEtworkReportData(i)%MultiZoneMixLatLossW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Mixing Latent Loss [J]',AirflowNEtworkReportData(i)%MultiZoneInfiLatLossJ, &
+       CALL SetupOutputVariable('AFN Zone Mixing Latent Heat Loss Energy [J]',AirflowNEtworkReportData(i)%MultiZoneInfiLatLossJ, &
                                 'System','Sum',Zone(i)%Name)
        ! Supply leak losses due to force air systems
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Sensible Gain Rate [W]',AirflowNEtworkReportData(i)%LeakSenGainW, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Sensible Heat Gain Rate [W]',AirflowNEtworkReportData(i)%LeakSenGainW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Sensible Gain [J]',AirflowNEtworkReportData(i)%LeakSenGainJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Sensible Heat Gain Energy [J]',AirflowNEtworkReportData(i)%LeakSenGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Sensible Loss Rate [W]',AirflowNEtworkReportData(i)%LeakSenLossW, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Sensible Heat Loss Rate [W]',AirflowNEtworkReportData(i)%LeakSenLossW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Sensible Loss [J]',AirflowNEtworkReportData(i)%LeakSenLossJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Sensible Heat Loss Energy [J]',AirflowNEtworkReportData(i)%LeakSenLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Latent Gain Rate [W]',AirflowNEtworkReportData(i)%LeakLatGainW, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Latent Heat Gain Rate [W]',AirflowNEtworkReportData(i)%LeakLatGainW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Latent Gain [J]',AirflowNEtworkReportData(i)%LeakLatGainJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Latent Heat Gain Energy [J]',AirflowNEtworkReportData(i)%LeakLatGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Latent Loss Rate [W]',AirflowNEtworkReportData(i)%LeakLatLossW, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Latent Heat Loss Rate [W]',AirflowNEtworkReportData(i)%LeakLatLossW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Leak Latent Loss [J]',AirflowNEtworkReportData(i)%LeakLatLossJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Leaked Air Latent Heat Loss Energy [J]',AirflowNEtworkReportData(i)%LeakLatLossJ, &
                                 'System','Sum',Zone(i)%Name)
        ! Conduction losses due to force air systems
-       CALL SetupOutputVariable('AirflowNetwork Duct Conduction Sensible Gain Rate [W]',AirflowNEtworkReportData(i)%CondSenGainW,  &
+       CALL SetupOutputVariable('AFN Zone Duct Conduction Sensible Heat Gain Rate [W]',AirflowNEtworkReportData(i)%CondSenGainW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Conduction Sensible Gain [J]',AirflowNEtworkReportData(i)%CondSenGainJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Conduction Sensible Heat Gain Energy [J]',AirflowNEtworkReportData(i)%CondSenGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Conduction Sensible Loss Rate [W]',AirflowNEtworkReportData(i)%CondSenLossW,  &
+       CALL SetupOutputVariable('AFN Zone Duct Conduction Sensible Heat Loss Rate [W]',AirflowNEtworkReportData(i)%CondSenLossW,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Conduction Sensible Loss [J]',AirflowNEtworkReportData(i)%CondSenLossJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Conduction Sensible Heat Loss Energy [J]',AirflowNEtworkReportData(i)%CondSenLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Diffusion Latent Gain Rate [W]',AirflowNEtworkReportData(i)%DiffLatGainW, &
+       CALL SetupOutputVariable('AFN Zone Duct Diffusion Latent Heat Gain Rate [W]',AirflowNEtworkReportData(i)%DiffLatGainW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Diffusion Latent Gain [J]',AirflowNEtworkReportData(i)%DiffLatGainJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Diffusion Latent Heat Gain Energy [J]',AirflowNEtworkReportData(i)%DiffLatGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Diffusion Latent Loss Rate [W]',AirflowNEtworkReportData(i)%DiffLatLossW, &
+       CALL SetupOutputVariable('AFN Zone Duct Diffusion Latent Heat Loss Rate [W]',AirflowNEtworkReportData(i)%DiffLatLossW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Duct Diffusion Latent Loss [J]',AirflowNEtworkReportData(i)%DiffLatLossJ, &
+       CALL SetupOutputVariable('AFN Zone Duct Diffusion Latent Heat Loss Energy [J]',AirflowNEtworkReportData(i)%DiffLatLossJ, &
                                 'System','Sum',Zone(i)%Name)
        ! Total losses due to force air systems
-       CALL SetupOutputVariable('AirflowNetwork Distribution Sensible Gain Rate [W]',AirflowNetworkReportData(i)%TotalSenGainW, &
+       CALL SetupOutputVariable('AFN Distribution Sensible Heat Gain Rate [W]',AirflowNetworkReportData(i)%TotalSenGainW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Sensible Gain [J]',AirflowNEtworkReportData(i)%TotalSenGainJ, &
+       CALL SetupOutputVariable('AFN Distribution Sensible Heat Gain Energy [J]',AirflowNEtworkReportData(i)%TotalSenGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Sensible Loss Rate [W]',AirflowNEtworkReportData(i)%TotalSenLossW, &
+       CALL SetupOutputVariable('AFN Distribution Sensible Heat Loss Rate [W]',AirflowNEtworkReportData(i)%TotalSenLossW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Sensible Loss [J]',AirflowNEtworkReportData(i)%TotalSenLossJ, &
+       CALL SetupOutputVariable('AFN Distribution Sensible Heat Loss Energy [J]',AirflowNEtworkReportData(i)%TotalSenLossJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Latent Gain Rate [W]',AirflowNEtworkReportData(i)%TotalLatGainW, &
+       CALL SetupOutputVariable('AFN Distribution Latent Heat Gain Rate [W]',AirflowNEtworkReportData(i)%TotalLatGainW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Latent Gain [J]',AirflowNEtworkReportData(i)%TotalLatGainJ, &
+       CALL SetupOutputVariable('AFN Distribution Latent Heat Gain Energy [J]',AirflowNEtworkReportData(i)%TotalLatGainJ, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Latent Loss Rate [W]',AirflowNEtworkReportData(i)%TotalLatLossW, &
+       CALL SetupOutputVariable('AFN Distribution Latent Heat Loss Rate [W]',AirflowNEtworkReportData(i)%TotalLatLossW, &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Distribution Latent Loss [J]',AirflowNEtworkReportData(i)%TotalLatLossJ, &
+       CALL SetupOutputVariable('AFN Distribution Latent Heat Loss Energy [J]',AirflowNEtworkReportData(i)%TotalLatLossJ, &
                                 'System','Sum',Zone(i)%Name)
     END DO
 
     DO i=1,NumOfZones
-       CALL SetupOutputVariable('AirflowNetwork Zone Infiltration Volume [m3]',AirflowNetworkZnRpt(i)%InfilVolume, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Volume [m3]',AirflowNetworkZnRpt(i)%InfilVolume, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Zone Infiltration Mass [kg]',AirflowNetworkZnRpt(i)%InfilMass, &
+       CALL SetupOutputVariable('AFN Zone Infiltration Mass [kg]',AirflowNetworkZnRpt(i)%InfilMass, &
                                 'System','Sum',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Zone Infiltration Air Change Rate [ach]',  &
+       CALL SetupOutputVariable('AFN Zone Infiltration Air Change Rate [ach]',  &
                                 AirflowNetworkZnRpt(i)%InfilAirChangeRate,  &
                                 'System','Average',Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Zone Mixing Volume [m3]',AirflowNetworkZnRpt(i)%MixVolume,'System','Sum',  &
+       CALL SetupOutputVariable('AFN Zone Mixing Volume [m3]',AirflowNetworkZnRpt(i)%MixVolume,'System','Sum',  &
                                  Zone(i)%Name)
-       CALL SetupOutputVariable('AirflowNetwork Zone Mixing Mass [kg]',AirflowNetworkZnRpt(i)%MixMass,'System','Sum',Zone(i)%Name)
+       CALL SetupOutputVariable('AFN Zone Mixing Mass [kg]',AirflowNetworkZnRpt(i)%MixMass,'System','Sum',Zone(i)%Name)
     ENDDO
 
     If (SupplyFanType .EQ. FanType_SimpleOnOff) then
       DO i=1,AirflowNetworkNumOfZones
-        CALL SetupOutputVariable('AirflowNetwork Average Zone Pressure [Pa]',AirflowNetworkNodeReport(i)%PZ, &
+        CALL SetupOutputVariable('AFN Zone Average Pressure [Pa]',AirflowNetworkNodeReport(i)%PZ, &
                                 'System','Average',Zone(i)%Name)
-        CALL SetupOutputVariable('AirflowNetwork Zone Pressure During ON cycle [Pa]',AirflowNetworkNodeReport(i)%PZON, &
+        CALL SetupOutputVariable('AFN Zone On Cycle Pressure [Pa]',AirflowNetworkNodeReport(i)%PZON, &
                                 'System','Average',Zone(i)%Name)
-        CALL SetupOutputVariable('AirflowNetwork Zone Pressure During OFF cycle [Pa]',AirflowNetworkNodeReport(i)%PZOFF, &
+        CALL SetupOutputVariable('AFN Zone Off Cycle Pressure [Pa]',AirflowNetworkNodeReport(i)%PZOFF, &
                                 'System','Average',Zone(i)%Name)
       ENDDO
       Do I=1,AirflowNetworkNumOfSurfaces
-        CALL SetupOutputVariable('AirflowNetwork Average Mass Flow Rate from Node 1 to 2 [kg/s]', &
+        CALL SetupOutputVariable('AFN Linkage Node 1 to 2 Average Mass Flow Rate [kg/s]', &
           AirflowNetworkLinkReport1(I)%FLOW, 'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Average Mass Flow Rate from Node 2 to 1 [kg/s]', &
+        CALL SetupOutputVariable('AFN Linkage Node 2 to 1 Average Mass Flow Rate [kg/s]', &
           AirflowNetworkLinkReport1(I)%FLOW2, 'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Average Volume Flow Rate from Node 1 to 2 [m3/s]', &
+        CALL SetupOutputVariable('AFN Linkage Node 1 to 2 Average Volume Flow Rate [m3/s]', &
           AirflowNetworkLinkReport1(I)%VolFLOW, 'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Average Volume Flow Rate from Node 2 to 1 [m3/s]', &
+        CALL SetupOutputVariable('AFN Linkage Node 2 to 1 Average Volume Flow Rate [m3/s]', &
           AirflowNetworkLinkReport1(I)%VolFLOW2, 'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Surface Average Pressure Difference [Pa]',AirflowNetworkLinkReport1(I)%DP, &
+        CALL SetupOutputVariable('AFN Surface Average Pressure Difference [Pa]',AirflowNetworkLinkReport1(I)%DP, &
             'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Surface Pressure Difference During ON cycle [Pa]',  &
+        CALL SetupOutputVariable('AFN Surface On Cycle Pressure Difference [Pa]',  &
              AirflowNetworkLinkReport1(I)%DPON, &
             'System','Average',MultizoneSurfaceData(I)%SurfName)
-        CALL SetupOutputVariable('AirflowNetwork Surface Pressure Difference During OFF cycle [Pa]',  &
+        CALL SetupOutputVariable('AFN Surface Off Cycle Pressure Difference [Pa]',  &
              AirflowNetworkLinkReport1(I)%DPOFF, &
             'System','Average',MultizoneSurfaceData(I)%SurfName)
       End Do
@@ -4309,7 +4314,8 @@ LOGICAL found,OANode
         end if
      end if
      ! Check reheat unit or coil
-     if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+     if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+        (.NOT. AirflowNetworkLinkageData(i)%VAVTermDamper)) then
         NF = 0
         NT = 0
         if (AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(1))%EPlusNodeNum > 0) then
@@ -4343,7 +4349,8 @@ LOGICAL found,OANode
      DO J=1,AirflowNetworkNumOfLinks
         if (AirflowNetworkLinkageData(J)%NodeNums(1) == I .OR. AirflowNetworkLinkageData(J)%NodeNums(2) == I) then
            CompNum = AirflowNetworkLinkageData(j)%CompNum
-           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+              (.NOT. AirflowNetworkLinkageData(J)%VAVTermDamper)) then
               found = .TRUE.
               Exit
            end if
@@ -4600,7 +4607,8 @@ LOGICAL found,OANode
         end if
      end if
      ! Check reheat unit
-     if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+     if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+        (.NOT. AirflowNetworkLinkageData(i)%VAVTermDamper)) then
         NF = 0
         NT = 0
         if (AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(1))%EPlusNodeNum > 0) then
@@ -4633,7 +4641,8 @@ LOGICAL found,OANode
      DO J=1,AirflowNetworkNumOfLinks
         if (AirflowNetworkLinkageData(J)%NodeNums(1) == I .OR. AirflowNetworkLinkageData(J)%NodeNums(2) == I) then
            CompNum = AirflowNetworkLinkageData(j)%CompNum
-           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+              (.NOT. AirflowNetworkLinkageData(J)%VAVTermDamper)) then
               found = .TRUE.
               Exit
            end if
@@ -4873,7 +4882,8 @@ LOGICAL found,OANode
      DO J=1,AirflowNetworkNumOfLinks
         if (AirflowNetworkLinkageData(J)%NodeNums(1) == I .OR. AirflowNetworkLinkageData(J)%NodeNums(2) == I) then
            CompNum = AirflowNetworkLinkageData(j)%CompNum
-           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+              (.NOT. AirflowNetworkLinkageData(J)%VAVTermDamper)) then
               found = .TRUE.
               Exit
            end if
@@ -5113,7 +5123,8 @@ LOGICAL found,OANode
      DO J=1,AirflowNetworkNumOfLinks
         if (AirflowNetworkLinkageData(J)%NodeNums(1) == I .OR. AirflowNetworkLinkageData(J)%NodeNums(2) == I) then
            CompNum = AirflowNetworkLinkageData(j)%CompNum
-           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT) then
+           if (AirflowNetworkCompData(CompNum)%EPlusTypeNum .EQ. EPlusTypeNum_RHT .AND. &
+              (.NOT. AirflowNetworkLinkageData(J)%VAVTermDamper)) then
               found = .TRUE.
               Exit
            end if
@@ -5309,7 +5320,7 @@ SUBROUTINE ReportAirflowNetwork
           ! na
 
           ! USE STATEMENTS:
-  USE DataHeatBalance, ONLY: MRT
+  USE DataHeatBalance, ONLY: MRT, ZonePreDefRep
   Use DataHVACGlobals, ONLY: TimeStepSys, TurnFansOn, TurnFansOff
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -5708,6 +5719,14 @@ SUBROUTINE ReportAirflowNetwork
     AirflowNetworkZnRpt(i)%InfilMass      = (AirflowNetworkExchangeData(i)%SumMCp/CpAir)*ReportingConstant
     AirflowNetworkZnRpt(i)%MixVolume      = (AirflowNetworkExchangeData(i)%SumMMCp/CpAir/AirDensity)*ReportingConstant
     AirflowNetworkZnRpt(i)%MixMass        = (AirflowNetworkExchangeData(i)%SumMMCp/CPAir)*ReportingConstant
+    !save values for predefined report
+    IF (ZonePreDefRep(i)%isOccupied) THEN
+      ZonePreDefRep(i)%AFNInfilVolTotal = ZonePreDefRep(i)%AFNInfilVolTotal + &
+        AirflowNetworkZnRpt(i)%InfilVolume
+      IF (AirflowNetworkZnRpt(i)%InfilVolume .LT. ZonePreDefRep(i)%AFNInfilVolMin) THEN
+        ZonePreDefRep(i)%AFNInfilVolMin = AirflowNetworkZnRpt(i)%InfilVolume
+      END IF
+    END IF
   END DO    ! ... end of zone loads report variable update loop.
 
   ! Rewrite AirflowNetwork airflow rate
@@ -5783,10 +5802,12 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  Integer I, J, N, M, ZN1, ZN2, Node1, Node2
+  Integer I, J, N, M, ZN1, ZN2, Node1, Node2, Node3
   REAL(r64) CpAir, Qsen, Qlat, AirDensity, Tamb
-  REAL(r64) PartLoadRatio, OnOffRatio
+  REAL(r64) PartLoadRatio, OnOffRatio,NodeMass, AFNMass
+  LOGICAL WriteFlag
   LOGICAL,SAVE :: MyOneTimeFlag = .TRUE.
+  LOGICAL,SAVE :: MyOneTimeFlag1 = .TRUE.
 
   AirflowNetworkExchangeData%SumMCp = 0.0d0
   AirflowNetworkExchangeData%SumMCpT = 0.0d0
@@ -6034,9 +6055,50 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
     End If
   End If
 
+  ! Check mass flow differences in the zone inlet zones and splitter nodes between node and AFN links
+  If (MyOneTimeFlag1) then
+    If ((.NOT. VAVSystem) .AND. DisplayExtraWarnings) Then
+      WriteFlag = .FALSE.
+      Do I=1,AirflowNetworkNumOfLinks
+        Node1 = AirflowNetworkLinkageData(i)%NodeNums(1)
+        Node2 = AirflowNetworkLinkageData(i)%NodeNums(2)
+        If (AirflowNetworkNodeData(Node1)%EPlusTypeNum == EPlusTypeNum_SPI .OR. &
+            AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_SPO .OR. &
+            AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_ZIN) then
+          If (AirflowNetworkNodeData(Node1)%EPlusTypeNum == EPlusTypeNum_SPI) Then
+            Node3 = Node1
+          Else
+            Node3 = Node2
+          End If
+          IF (AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_ZIN) Then
+            If (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%EPlusTypeNum == 0) Cycle 
+          End If
+          NodeMass = Node(AirflowNetworkNodeData(Node3)%EPlusNodeNum)%MassFlowRate
+          AFNMass = AirflowNetworkLinkSimu(I)%FLOW
+          If (NodeMass .GT. 0.0 .AND. AFNMass .GT. NodeMass + 0.01d0) Then
+            CALL ShowWarningError('The mass flow rate difference is found between System Node = ' // &
+               Trim(NodeID(AirflowNetworkNodeData(Node3)%EPlusNodeNum)) & 
+               //' and AFN Link = ' // Trim(AirflowNetworkLinkageData(I)%Name)//'.')
+            CALL ShowContinueError('The system node max mass flow rate = '//TRIM(RoundSigDigits(NodeMass,3)) &
+               //' kg/s. The AFN node mass flow rate = '//TRIM(RoundSigDigits(AFNMass,3)) // ' kg.s.')
+               WriteFlag = .TRUE.
+          End If
+        End If    
+      End Do  
+      MyOneTimeFlag1 = .FALSE.
+      If (WriteFlag) Then
+        CALL ShowWarningError('Please adjust the rate of Maximum Air Flow Rate field in the terminal objects or ' // &
+                        'duct pressure resistance.')
+      End If
+    Else
+      MyOneTimeFlag1 = .FALSE.
+    End If
+  End If
+      
   ! Assign airflows to EPLus nodes
   DO I=1,AirflowNetworkNumOfLinks
-     if (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%CompTypeNum .EQ. CompTypeNum_DWC) then
+     if (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%CompTypeNum .EQ. CompTypeNum_DWC .OR. &
+       AirflowNetworkLinkageData(i)%VAVTermDamper) then
        ! Exclude envelope leakage Crack element
         Node1 = AirflowNetworkLinkageData(i)%NodeNums(1)
         Node2 = AirflowNetworkLinkageData(i)%NodeNums(2)
@@ -6044,15 +6106,21 @@ SUBROUTINE UpdateAirflowNetwork(FirstHVACIteration)
         j=AirflowNetworkNodeData(Node1)%EPlusNodeNum
         if (j > 0 .AND. AirflowNetworkNodeData(Node1)%EPlusZoneNum .EQ. 0) then
            Node(j)%MassFlowRate = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
-           Node(j)%MassFlowRateMaxAvail = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
-           Node(j)%MassFlowRateMax = AirflowNetworkLinkSimu(I)%FLOW
+           If (.NOT. (AirflowNetworkNodeData(Node1)%EPlusTypeNum == EPlusTypeNum_DIN .OR. &
+             AirflowNetworkNodeData(Node1)%EPlusTypeNum == EPlusTypeNum_DOU)) Then
+             Node(j)%MassFlowRateMaxAvail = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
+             Node(j)%MassFlowRateMax = AirflowNetworkLinkSimu(I)%FLOW
+           End If
         end if
 
         j=AirflowNetworkNodeData(Node2)%EPlusNodeNum
         if (j > 0) then
            Node(j)%MassFlowRate = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
-           Node(j)%MassFlowRateMaxAvail = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
-           Node(j)%MassFlowRateMax = AirflowNetworkLinkSimu(I)%FLOW
+           If (.NOT. (AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_DIN .OR. &
+             AirflowNetworkNodeData(Node2)%EPlusTypeNum == EPlusTypeNum_DOU)) Then
+             Node(j)%MassFlowRateMaxAvail = AirflowNetworkLinkSimu(I)%FLOW*PartLoadRatio
+             Node(j)%MassFlowRateMax = AirflowNetworkLinkSimu(I)%FLOW
+           End If
         end if
      end if
   END DO
@@ -6515,7 +6583,7 @@ SUBROUTINE ValidateDistributionSystem
           ! USE STATEMENTS:
   Use DataAirLoop , Only: AirToZoneNodeInfo,AirToOANodeInfo
   USE DataZoneEquipment, ONLY: ZoneEquipConfig
-  Use MixedAir, Only: GetNumOAMixers, GetOAMixerReliefNodeNumber
+  Use MixedAir, Only: GetNumOAMixers, GetOAMixerReliefNodeNumber, GetOAMixerInletNodeNumber
   USE HeatingCoils, ONLY: HeatingCoil, NumHeatingCoils
   USE SingleDuct, ONLY: GetHVACSingleDuctSysIndex
   USE InputProcessor, ONLY: SameString,MakeUPPERCase ! NEEDS TO BE CHANGED AFTER V1.3 RELEASE
@@ -6523,6 +6591,7 @@ SUBROUTINE ValidateDistributionSystem
   USE DataLoopNode
   USE DataBranchNodeConnections, ONLY: NodeConnections,NumOfNodeConnections
   USE ZoneDehumidifier, ONLY: GetZoneDehumidifierNodeNumber
+  USE SplitterComponent, ONLY: GetSplitterNodeNumbers, GetSplitterOutletNumber
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -6699,6 +6768,8 @@ if (OneTimeFlag) then
       Else
         if (i .EQ. GetOAMixerReliefNodeNumber(1)) then
           NodeFound(i) = .TRUE.
+        ElseIf (i .EQ. GetOAMixerInletNodeNumber(1)) Then
+          NodeFound(i) = .TRUE.           
         Else
           CALL ShowSevereError(RoutineName //Trim(NodeID(I)) //' is not defined as an ' &
                                //'AirflowNetwork:Distribution:Node object.')
@@ -6794,6 +6865,13 @@ if (OneTimeFlag) then
           ErrorsFound=.true.
         end if
 
+        CASE ('COIL:COOLING:DX:TWOSPEED')
+        CALL ValidateComponent('Coil:Cooling:DX:TwoSpeed',DisSysCompCoilData(i)%Name,IsNotOK,  &
+                               RoutineName//TRIM(CurrentModuleObject))
+        If (IsNotOk) then
+          ErrorsFound=.true.
+        end if
+
       CASE DEFAULT
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Invalid coil type = ' &
                              //DisSysCompCoilData(i)%Name)
@@ -6803,11 +6881,26 @@ if (OneTimeFlag) then
 
 ! Validate ternimal unit name and type
   Do i=1,DisSysNumOfTermUnits
-    if (SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:ConstantVolume:Reheat')) then
+    if (SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:ConstantVolume:Reheat') .OR. &
+        SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:VAV:Reheat') ) then
       LocalError=.false.
-      CALL GetHVACSingleDuctSysIndex(DisSysCompTermUnitData(i)%Name,n,LocalError,  &
+      If (SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:ConstantVolume:Reheat')) &
+        CALL GetHVACSingleDuctSysIndex(DisSysCompTermUnitData(i)%Name,n,LocalError,  &
                      'AirflowNetwork:Distribution:Component:TerminalUnit')
+      If (SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:VAV:Reheat')) &
+        CALL GetHVACSingleDuctSysIndex(DisSysCompTermUnitData(i)%Name,n,LocalError,  &
+                     'AirflowNetwork:Distribution:Component:TerminalUnit',DisSysCompTermUnitData(i)%DamperInletNode, &
+                     DisSysCompTermUnitData(i)%DamperOutletNode)
       if (LocalError) ErrorsFound = .True.
+      If (VAVSystem) Then
+        If (.NOT. SameString(DisSysCompTermUnitData(i)%EPlusType,'AirTerminal:SingleDuct:VAV:Reheat')) Then
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//' Invalid terminal type for a VAV system = ' &
+                             //DisSysCompTermUnitData(i)%Name)
+          CALL ShowContinueError('The input type = '//TRIM(DisSysCompTermUnitData(i)%EPlusType))
+          CALL ShowContinueError('A VAV system requires all ternimal units with type = AirTerminal:SingleDuct:VAV:Reheat')
+          ErrorsFound=.true.
+        End If
+      End If
     else
       CALL ShowSevereError(RoutineName//'AIRFLOWNETWORK:DISTRIBUTION:COMPONENT TERMINAL UNIT: ' &
                            //'Invalid Terminal unit type = '//DisSysCompTermUnitData(i)%Name)
@@ -6882,6 +6975,18 @@ if (OneTimeFlag) then
     If (AirflowNetworkCompData(J)%EPlusTypeNum == EPlusTypeNum_HEX) then
       AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(2))%EPlusTypeNum = EPlusTypeNum_HXO
     end if
+    If (AirflowNetworkCompData(J)%CompTypeNum == CompTypeNum_TMU) Then
+      If (DisSysCompTermUnitData(AirflowNetworkCompData(j)%TypeNum)%DamperInletNode > 0) Then
+        If (AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(1))%EPlusNodeNum == &
+           DisSysCompTermUnitData(AirflowNetworkCompData(j)%TypeNum)%DamperInletNode .AND. &
+           AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(2))%EPlusNodeNum == &
+           DisSysCompTermUnitData(AirflowNetworkCompData(j)%TypeNum)%DamperOutletNode) Then
+          AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(1))%EPlusTypeNum = EPlusTypeNum_DIN
+          AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(2))%EPlusTypeNum = EPlusTypeNum_DOU
+          AirflowNetworkLinkageData(i)%VAVTermDamper = .TRUE.
+        End If
+      End If
+    End If
   End Do
 
   ! Validate the position of constant pressure drop component
@@ -6958,6 +7063,27 @@ if (OneTimeFlag) then
     End If
   End Do
 
+  Do I=NumOfNodesMultiZone+1,AirflowNetworkNumOfNodes
+    If (AirflowNetworkNodeData(i)%EPlusTypeNum == EPlusTypeNum_SPL) then  
+      LocalError=.false.
+      j = GetSplitterOutletNumber('',1,LocalError)
+      ALLOCATE(SplitterNodeNumbers(j+2))
+      SplitterNodeNumbers = GetSplitterNodeNumbers('',1,LocalError)
+      if (LocalError) ErrorsFound = .True.
+    End If
+  End Do
+
+  ! Assing inlet and oulet nodes for a splitter
+  DO I=1,AirflowNetworkNumOfNodes
+    If (AirflowNetworkNodeData(I)%EplusNodeNum == SplitterNodeNumbers(1)) Then
+      If (AirflowNetworkNodeData(I)%EPlusTypeNum .EQ. 0) AirflowNetworkNodeData(I)%EPlusTypeNum = EPlusTypeNum_SPI
+    End If
+    Do j=1,SplitterNodeNumbers(2)
+      If (AirflowNetworkNodeData(I)%EplusNodeNum == SplitterNodeNumbers(j+2)) Then
+        If (AirflowNetworkNodeData(I)%EPlusTypeNum .EQ. 0) AirflowNetworkNodeData(I)%EPlusTypeNum = EPlusTypeNum_SPO
+      End If
+    End Do
+  End Do
 
   OneTimeFlag = .False.
   IF (ErrorsFound) THEN
@@ -6965,19 +7091,24 @@ if (OneTimeFlag) then
   ENDIF
 end if
 
-  ! Catch a fan flow rate from EPlus input file
+  ! Catch a fan flow rate from EPlus input file and add a flag for VAV teminal damper
   DO I=1,AirflowNetworkNumOfLinks
     select case (AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%CompTypeNum)
       CASE (CompTypeNum_CVF) ! 'CVF'
         j=AirflowNetworkNodeData(AirflowNetworkLinkageData(i)%NodeNums(2))%EPlusNodeNum
+        k = AirflowNetworkCompData(AirflowNetworkLinkageData(i)%CompNum)%TypeNum
         FanFlow=Node(j)%MassFlowRate
+        If (DisSysCompCVFData(k)%FanTypeNum .eq. FanType_SimpleVAV) Then
+          Call GetFanVolFlow(DisSysCompCVFData(k)%FanIndex, FanFlow)
+          DisSysCompCVFData(k)%MaxAirMassFlowRate = FanFlow*StdRhoAir
+        End If
       CASE (CompTypeNum_FAN) !'FAN'
       ! Check ventilation status for large openings
       CASE (CompTypeNum_SOP) !'Simple opening'
+      CASE (CompTypeNum_TMU) ! Terminal unit
       CASE Default
     end select
   END DO
-
 
 END SUBROUTINE ValidateDistributionSystem
 
@@ -7316,7 +7447,7 @@ END FUNCTION GetZoneInfilAirChangeRate
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

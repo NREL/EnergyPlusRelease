@@ -803,7 +803,8 @@ CONTAINS
            ENDIF
            ! Check length of cell - reduce number of divisions if neccessary
            DO
-              testlen=Material(matid)%Thickness*((SIN(pi*(-1/REAL(Material(matid)%divs))-pi/2.0)/2.0)-(SIN(-pi/2.0)/2.0))
+              testlen=Material(matid)%Thickness* &
+               ((SIN(PI*(-1.0d0/REAL(Material(matid)%divs,r64))-PI/2.0d0)/2.0d0)-(SIN(-PI/2.0d0)/2.0d0))
               IF(testlen>adjdist)EXIT
               Material(matid)%divs= Material(matid)%divs-1
               IF(Material(matid)%divs<1)THEN
@@ -996,20 +997,19 @@ CONTAINS
       surftemp(sid)=0.0
       surfexttemp(sid)=0.0
       surfvp(sid)=0.0
-      CALL SetUpOutputVariable('HAMT Surface Water Content [kg/kg]',watertot(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('HAMT Surface Interior Temperature [C]',surftemp(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('HAMT Surface Interior Relative Humidity [%]',surfrh(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('HAMT Surface Interior Vapor Pressure [Pa]',surfvp(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('HAMT Surface Exterior Temperature [C]',surfexttemp(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('HAMT Surface Exterior Relative Humidity [%]',surfextrh(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
-      CALL SetUpOutputVariable('Inside Surface Relative Humidity[]',surfrh(sid),  &
-         'Zone','State',TRIM(Surface(sid)%Name))
+      CALL SetUpOutputVariable('HAMT Surface Average Water Content Ratio [kg/kg]',watertot(sid),  &
+         'Zone','State',Surface(sid)%Name)
+      CALL SetUpOutputVariable('HAMT Surface Inside Face Temperature [C]',surftemp(sid),  &
+         'Zone','State',Surface(sid)%Name)
+      CALL SetUpOutputVariable('HAMT Surface Inside Face Relative Humidity [%]',surfrh(sid),  &
+         'Zone','State',Surface(sid)%Name)
+      CALL SetUpOutputVariable('HAMT Surface Inside Face Vapor Pressure [Pa]',surfvp(sid),  &
+         'Zone','State',Surface(sid)%Name)
+      CALL SetUpOutputVariable('HAMT Surface Outside Face Temperature [C]',surfexttemp(sid),  &
+         'Zone','State',Surface(sid)%Name)
+      CALL SetUpOutputVariable('HAMT Surface Outside Face Relative Humidity [%]',surfextrh(sid),  &
+         'Zone','State',Surface(sid)%Name)
+
 
       ! write cell origins to initilisation output file
       conid=Surface(sid)%Construction
@@ -1023,29 +1023,29 @@ CONTAINS
       concell=1
       DO cid=Extcell(sid),Intcell(sid)
          CALL SetUpOutputVariable( &
-              'HAMT Profile Construction Cell ' &
-              //TRIM(TrimSigDigits(concell))//' Temperature [C]', &
-              cells(cid)%temp,'Zone','State',TRIM(Surface(sid)%Name))
+              'HAMT Surface Temperature Cell ' &
+              //TRIM(TrimSigDigits(concell))//' [C]', &
+              cells(cid)%temp,'Zone','State',Surface(sid)%Name)
          concell=concell+1
       ENDDO
       concell=1
       DO cid=Extcell(sid),Intcell(sid)
          CALL SetUpOutputVariable( &
-              'HAMT Profile Construction Cell ' &
-              //TRIM(TrimSigDigits(concell))//' Water Content [kg/kg]', &
-              cells(cid)%wreport,'Zone','State',TRIM(Surface(sid)%Name))
+              'HAMT Surface Water Content Cell ' &
+              //TRIM(TrimSigDigits(concell))//' [kg/kg]', &
+              cells(cid)%wreport,'Zone','State',Surface(sid)%Name)
          concell=concell+1
       ENDDO
       concell=1
       DO cid=Extcell(sid),Intcell(sid)
          CALL SetUpOutputVariable( &
-              'HAMT Profile Construction Cell ' &
-              //TRIM(TrimSigDigits(concell))//' Relative Humidity [%]', &
-              cells(cid)%rhp,'Zone','State',TRIM(Surface(sid)%Name))
+              'HAMT Surface Relative Humidity Cell ' &
+              //TRIM(TrimSigDigits(concell))//' [%]', &
+              cells(cid)%rhp,'Zone','State',Surface(sid)%Name)
          concell=concell+1
       ENDDO
     ENDDO
-    
+
     CALL ScanForReports('Constructions',DoReport,'Constructions')
     IF (DoReport) THEN
 
@@ -1792,7 +1792,7 @@ CONTAINS
 !
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of
+!     Copyright © 1996-2013 The Board of Trustees of the University of
 !     Illinois and The Regents of the University of California through
 !     Ernest Orlando Lawrence Berkeley National Laboratory.  All rights
 !     reserved.

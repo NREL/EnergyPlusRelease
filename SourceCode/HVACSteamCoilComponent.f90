@@ -289,6 +289,7 @@ CONTAINS
    USE NodeInputManager,   ONLY: GetOnlySingleNode
    USE BranchNodeConnections, ONLY: TestCompSet
    USE FluidProperties ,   ONLY: FindRefrigerant
+   USE GlobalNames, ONLY: VerifyUniqueCoilName
 
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -323,9 +324,10 @@ CONTAINS
    LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
    INTEGER                              :: TotalArgs=0       ! Total number of alpha and numeric arguments (max) for a
                                                              !  certain object in the input file
+   LOGICAL :: errflag
 
    CurrentModuleObject = 'Coil:Heating:Steam'
-   NumStmHeat   = GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumStmHeat   = GetNumObjectsFound(CurrentModuleObject)
    NumSteamCoils = NumStmHeat
    IF (NumSteamCoils.GT.0) THEN
        ALLOCATE(SteamCoil(NumSteamCoils))
@@ -333,7 +335,7 @@ CONTAINS
        CheckEquipName=.true.
    ENDIF
 
-   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNums)
+   CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNums)
    ALLOCATE(AlphArray(NumAlphas))
    AlphArray=' '
    ALLOCATE(cAlphaFields(NumAlphas))
@@ -352,7 +354,7 @@ CONTAINS
 
       CoilNum= StmHeatNum
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),StmHeatNum,AlphArray, &
+      CALL GetObjectItem(CurrentModuleObject,StmHeatNum,AlphArray, &
                          NumAlphas,NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -363,13 +365,21 @@ CONTAINS
         ErrorsFound=.true.
         IF (IsBlank) AlphArray(1)='xxxxx'
       ENDIF
+      CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
+      IF (errflag) THEN
+        ErrorsFound=.true.
+      ENDIF
       SteamCoil(CoilNum)%Name                         = AlphArray(1)
       SteamCoil(CoilNum)%Schedule                     = AlphArray(2)
-      SteamCoil(CoilNum)%SchedPtr                     = GetScheduleIndex(AlphArray(2))
-      IF (SteamCoil(CoilNum)%SchedPtr == 0) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//', '// &
-                             TRIM(cAlphaFields(2))//' not found='//TRIM(AlphArray(2)))
-        ErrorsFound=.true.
+      IF (lAlphaBlanks(2)) THEN
+        SteamCoil(CoilNum)%SchedPtr                     = ScheduleAlwaysOn
+      ELSE
+        SteamCoil(CoilNum)%SchedPtr                     = GetScheduleIndex(AlphArray(2))
+        IF (SteamCoil(CoilNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(AlphArray(1))//'", invalid data.')
+          CALL ShowContinueError(TRIM(cAlphaFields(2))//' not found='//TRIM(AlphArray(2)))
+          ErrorsFound=.true.
+        ENDIF
       ENDIF
 
       SteamCoil(CoilNum)%SteamCoilTypeA      ='Heating'
@@ -441,18 +451,18 @@ CONTAINS
    DO CoilNum=1,NumStmHeat
 
       !Setup the Simple Heating Coil reporting variables
-      CALL SetupOutputVariable('Total Steam Heating Coil Energy[J]', SteamCoil(CoilNum)%TotSteamHeatingCoilEnergy, &
+      CALL SetupOutputVariable('Heating Coil Heating Energy [J]', SteamCoil(CoilNum)%TotSteamHeatingCoilEnergy, &
                    'System','Sum',SteamCoil(CoilNum)%Name, &
                    ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
-      CALL SetupOutputVariable('Total Steam Heating Coil Rate[W]', SteamCoil(CoilNum)%TotSteamHeatingCoilRate, &
+      CALL SetupOutputVariable('Heating Coil Heating Rate [W]', SteamCoil(CoilNum)%TotSteamHeatingCoilRate, &
                   'System','Average',SteamCoil(CoilNum)%Name)
-      CALL SetupOutputVariable('Steam Coil Mass Flow Rate [Kg/s]', SteamCoil(CoilNum)%OutletSteamMassFlowRate, &
+      CALL SetupOutputVariable('Heating Coil Steam Mass Flow Rate [Kg/s]', SteamCoil(CoilNum)%OutletSteamMassFlowRate, &
                    'System','Average',SteamCoil(CoilNum)%Name)
-      CALL SetupOutputVariable('Steam Coil Inlet Temp [C]', SteamCoil(CoilNum)%InletSteamTemp, &
+      CALL SetupOutputVariable('Heating Coil Steam Inlet Temperature [C]', SteamCoil(CoilNum)%InletSteamTemp, &
                    'System','Average',SteamCoil(CoilNum)%Name)
-      CALL SetupOutputVariable('Steam Coil Outlet Temp [C]', SteamCoil(CoilNum)%OutletSteamTemp, &
+      CALL SetupOutputVariable('Heating Coil Steam Outlet Temperature [C]', SteamCoil(CoilNum)%OutletSteamTemp, &
                    'System','Average',SteamCoil(CoilNum)%Name)
-      CALL SetupOutputVariable('Loop Losses[W]', SteamCoil(CoilNum)%LoopLoss, &
+      CALL SetupOutputVariable('Heating Coil Steam Trap Loss Rate [W]', SteamCoil(CoilNum)%LoopLoss, &
                   'System','Average',SteamCoil(CoilNum)%Name)
 
    END DO
@@ -2337,14 +2347,14 @@ FUNCTION GetSteamCoilControlNodeNum(CoilType,CoilName,ErrorFlag) RESULT(NodeNumb
       CALL GetSteamCoilInput
       GetSteamCoilsInputFlag=.false.
   End If
-   
+
   WhichCoil=0
   NodeNumber=0
   IF (SameString(CoilType,'Coil:Heating:Steam')) THEN
-    WhichCoil=FindItem(CoilName,SteamCoil%Name,NumSteamCoils)   
+    WhichCoil=FindItem(CoilName,SteamCoil%Name,NumSteamCoils)
     IF (WhichCoil /= 0) THEN
       NodeNumber=SteamCoil(WhichCoil)%TempSetPointNodeNum
-    ENDIF    
+    ENDIF
   ELSE
     WhichCoil=0
   ENDIF
@@ -2364,7 +2374,7 @@ END FUNCTION GetSteamCoilControlNodeNum
 ! *****************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

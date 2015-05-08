@@ -115,7 +115,7 @@ MODULE ReturnAirPathManager
       RETURN
     ENDIF
     cCurrentModuleObject = 'AirLoopHVAC:ReturnPath'
-    NumReturnAirPaths = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReturnAirPaths = GetNumObjectsFound(cCurrentModuleObject)
 
     IF (NumReturnAirPaths > 0) THEN
 
@@ -123,7 +123,7 @@ MODULE ReturnAirPathManager
 
       DO PathNum = 1,  NumReturnAirPaths
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),PathNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,PathNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT)
 
         IsNotOK=.false.
@@ -285,7 +285,7 @@ MODULE ReturnAirPathManager
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -393,7 +393,7 @@ SUBROUTINE GetSurfaceGroundHeatExchanger
 
           ! Initializations and allocations
   cCurrentModuleObject = 'GroundHeatExchanger:Surface'
-  NumOfSurfaceGHEs = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfSurfaceGHEs = GetNumObjectsFound(cCurrentModuleObject)
   ! allocate data structures
   IF(ALLOCATED(SurfaceGHE)) DEALLOCATE(SurfaceGHE)
   IF(ALLOCATED(SurfaceGHEQTF)) DEALLOCATE(SurfaceGHEQTF)
@@ -411,7 +411,7 @@ SUBROUTINE GetSurfaceGroundHeatExchanger
   DO Item = 1, NumOfSurfaceGHEs
 
     ! get the input data
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
     ! General user input data
@@ -513,38 +513,38 @@ SUBROUTINE GetSurfaceGroundHeatExchanger
 
   ! Set up the output variables
   DO Item = 1, NumOfSurfaceGHEs
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Heat Transfer Rate [W]',    &
+    CALL SetupOutputVariable('Ground Heat Exchanger Heat Transfer Rate [W]',    &
                               SurfaceGHEReport(Item)%HeatTransferRate,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Surface Heat Transfer Rate [W]',    &
+    CALL SetupOutputVariable('Ground Heat Exchanger Surface Heat Transfer Rate [W]',    &
                               SurfaceGHEReport(Item)%SurfHeatTransferRate,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Energy [J]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Heat Transfer Energy [J]', &
                               SurfaceGHEReport(Item)%Energy,'Plant','Sum',SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Mass Flow Rate [kg/s]',      &
+    CALL SetupOutputVariable('Ground Heat Exchanger Mass Flow Rate [kg/s]',      &
                               SurfaceGHEReport(Item)%MassFlowRate,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Inlet Temp [C]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Inlet Temperature [C]',     &
                               SurfaceGHEReport(Item)%InletTemp,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Outlet Temp [C]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Outlet Temperature [C]',     &
                               SurfaceGHEReport(Item)%OutletTemp,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Top Surface Temp [C]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Top Surface Temperature [C]',     &
                               SurfaceGHEReport(Item)%TopSurfaceTemp,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Bottom Surface Temp [C]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Bottom Surface Temperature [C]',     &
                               SurfaceGHEReport(Item)%BtmSurfaceTemp,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Top Surface Flux [J/m2]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Top Surface Heat Transfer Energy per Area [J/m2]',     &
                               SurfaceGHEReport(Item)%TopSurfaceFlux,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Bottom Surface Flux [J/m2]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Bottom Surface Heat Transfer Energy per Area [J/m2]',     &
                               SurfaceGHEReport(Item)%BtmSurfaceFlux,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Surface Energy [J]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Surface Heat Transfer Energy [J]', &
                               SurfaceGHEReport(Item)%SurfEnergy,'Plant','Sum',SurfaceGHE(Item)%Name)
-    CALL SetupOutputVariable('Surface Ground Heat Exchanger Source Temp [C]',     &
+    CALL SetupOutputVariable('Ground Heat Exchanger Source Temperature [C]',     &
                               SurfaceGHEReport(Item)%SourceTemp,'Plant','Average', &
                               SurfaceGHE(Item)%Name)
 
@@ -2147,7 +2147,7 @@ END SUBROUTINE ReportSurfaceGroundHeatExchngr
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -22,6 +22,7 @@ MODULE RoomAirModelManager
     USE InputProcessor,             ONLY : SameString
     USE DataRoomAirModel
     USE DataInterfaces
+    USE General, ONLY: RoundSigDigits
 
     IMPLICIT NONE         ! Enforce explicit typing of all variables
 
@@ -245,7 +246,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
   LOGICAL, INTENT(INOUT) :: ErrorsFound  ! True if errors found during this get input routine
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetUserDefinedPatternData: '
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -273,12 +274,12 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
   INTEGER         :: found !test for FindItemInList
 
     !access input file and setup
-  numTempDistContrldZones = GetNumObjectsFound(TRIM(cUserDefinedControlObject))
+  numTempDistContrldZones = GetNumObjectsFound(cUserDefinedControlObject)
 
-  NumConstantGradient     = GetNumObjectsFound(TRIM(cTempPatternConstGradientObject))
-  NumTwoGradientInterp    = GetNumObjectsFound(TRIM(cTempPatternTwoGradientObject))
-  NumNonDimensionalHeight = GetNumObjectsFound(TRIM(cTempPatternNDHeightObject))
-  NumSurfaceMapping       = GetNumObjectsFound(TRIM(cTempPatternSurfMapObject))
+  NumConstantGradient     = GetNumObjectsFound(cTempPatternConstGradientObject)
+  NumTwoGradientInterp    = GetNumObjectsFound(cTempPatternTwoGradientObject)
+  NumNonDimensionalHeight = GetNumObjectsFound(cTempPatternNDHeightObject)
+  NumSurfaceMapping       = GetNumObjectsFound(cTempPatternSurfMapObject)
 
   NumAirTempPatterns = NumConstantGradient + NumTwoGradientInterp +  NumNonDimensionalHeight + NumSurfaceMapping
 
@@ -299,16 +300,15 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
 
   DO ObjNum = 1, numTempDistContrldZones
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+    CALL GetObjectItem(cCurrentModuleObject,ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                              NumericFieldNames=cNumericFieldNames)
      !first get zone ID
     ZoneNum = 0
     ZoneNum = FindItemInList(cAlphaArgs(2), zone%name, NumOfZones)
     IF (ZoneNum == 0 ) THEN   !throw error
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)) )
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-      CALL ShowContinueError('Zone name not found.' )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".' )
        ErrorsFound = .TRUE.
        RETURN ! halt to avoid hard crash
     ENDIF
@@ -317,20 +317,22 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
     AirPatternZoneInfo(ZoneNum)%ZoneName       = cAlphaArgs(2) ! Zone Name
 
     AirPatternZoneInfo(ZoneNum)%AvailSched     = cAlphaArgs(3)
-    AirPatternZoneInfo(ZoneNum)%AvailSchedID   = GetScheduleIndex(cAlphaArgs(3) )
-    IF (AirPatternZoneInfo(ZoneNum)%AvailSchedID == 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(cAlphaArgs(3)) )
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-      CALL ShowContinueError('Schedule name not found.')
-      ErrorsFound = .TRUE.
-    END IF
+    IF (lAlphaFieldBlanks(3)) THEN
+      AirPatternZoneInfo(ZoneNum)%AvailSchedID   = ScheduleAlwaysOn
+    ELSE
+      AirPatternZoneInfo(ZoneNum)%AvailSchedID   = GetScheduleIndex(cAlphaArgs(3) )
+      IF (AirPatternZoneInfo(ZoneNum)%AvailSchedID == 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
+      END IF
+    ENDIF
 
     AirPatternZoneInfo(ZoneNum)%PatternCntrlSched = cAlphaArgs(4) ! Schedule Name for Leading Pattern Control for this Zone
     AirPatternZoneInfo(ZoneNum)%PatternSchedID    = GetScheduleIndex(cAlphaArgs(4) )
     IF (AirPatternZoneInfo(ZoneNum)%PatternSchedID == 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)) )
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
-      CALL ShowContinueError('Schedule name not found.')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid data.')
+      CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".' )
       ErrorsFound = .TRUE.
     END IF
 
@@ -363,7 +365,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
   DO ZoneNum=1,NumOfZones
     IF (AirModel(ZoneNum)%AirModelType /= RoomAirModel_UserDefined) CYCLE
     IF (AirPatternZoneInfo(ZoneNum)%IsUsed) CYCLE  ! There is a Room Air Temperatures object for this zone
-    CALL ShowSevereError('AirModel for Zone=['//TRIM(Zone(ZoneNum)%Name)//'] is indicated as "User Defined".')
+    CALL ShowSevereError(RoutineName//'AirModel for Zone=['//TRIM(Zone(ZoneNum)%Name)//'] is indicated as "User Defined".')
     CALL ShowContinueError('...but missing a '//TRIM(cCurrentModuleObject)//' object for control.')
     ErrorsFound=.true.
   ENDDO
@@ -377,7 +379,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
   cCurrentModuleObject = cTempPatternConstGradientObject
   DO  ObjNum= 1, NumConstantGradient
     thisPattern = ObjNum
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+    CALL GetObjectItem(cCurrentModuleObject,ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
 
     RoomAirPattern(thisPattern)%Name               = cAlphaArgs(1)
@@ -393,7 +395,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
   cCurrentModuleObject = cTempPatternTwoGradientObject
   DO ObjNum = 1,  NumTwoGradientInterp
     thisPattern = NumConstantGradient + ObjNum
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+    CALL GetObjectItem(cCurrentModuleObject,ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
     RoomAirPattern(thisPattern)%PatternMode = TwoGradInterpPattern
     RoomAirPattern(thisPattern)%Name        = cAlphaArgs(1)
@@ -464,7 +466,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
      thisPattern = NumConstantGradient+NumTwoGradientInterp + ObjNum
      RoomAirPattern(thisPattern)%PatternMode =NonDimenHeightPattern
 
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+     CALL GetObjectItem(cCurrentModuleObject,ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
      RoomAirPattern(thisPattern)%Name       = cAlphaArgs(1)
      RoomAirPattern(thisPattern)%PatrnID    = rNumericArgs(1)
@@ -506,7 +508,7 @@ SUBROUTINE GetUserDefinedPatternData(ErrorsFound)
      thisPattern = NumConstantGradient+NumTwoGradientInterp+NumNonDimensionalHeight+ObjNum
      RoomAirPattern(thisPattern)%PatternMode = SurfMapTempPattern
 
-     CALL GetObjectItem(TRIM(cCurrentModuleObject),ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+     CALL GetObjectItem(cCurrentModuleObject,ObjNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
      RoomAirPattern(thisPattern)%Name       = cAlphaArgs(1)
      RoomAirPattern(thisPattern)%PatrnID    = rNumericArgs(1)
@@ -659,7 +661,7 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
     TotNumOfZoneAirNodes    = 0
 
     cCurrentModuleObject = 'RoomAir:Node'
-    TotNumOfAirNodes = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    TotNumOfAirNodes = GetNumObjectsFound(cCurrentModuleObject)
 
     IF (TotNumOfAirNodes.LE.0) THEN
       ! no air node object is found, terminate the program
@@ -675,7 +677,7 @@ SUBROUTINE GetAirNodeData(ErrorsFound)
     DO AirNodeNum = 1, TotNumOfAirNodes
 
         ! get air node objects
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),AirNodeNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+        CALL GetObjectItem(cCurrentModuleObject,AirNodeNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
         IsBlank=.false.
@@ -889,7 +891,7 @@ SUBROUTINE GetMundtData(ErrorsFound)
     InfiltratFloorSplit         = 0.0
 
     cCurrentModuleObject = 'RoomAirSettings:OneNodeDisplacementVentilation'
-    NumOfMundtContrl = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumOfMundtContrl = GetNumObjectsFound(cCurrentModuleObject)
     IF (NumOfMundtContrl.GT.NumOfZones) THEN
         CALL ShowSevereError('Too many '//TRIM(cCurrentModuleObject)//' objects in input file')
         Call ShowContinueError('There cannot be more '//TRIM(cCurrentModuleObject)//' objects than number of zones.')
@@ -905,7 +907,7 @@ SUBROUTINE GetMundtData(ErrorsFound)
     ! this zone uses Mundt model so get Mundt Model Control
     ! loop through all 'RoomAirSettings:OneNodeDisplacementVentilation' objects
     Mundt_Control_Loop: DO ControlNum=1, NumOfMundtContrl
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),ControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+      CALL GetObjectItem(cCurrentModuleObject,ControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                              AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
       ZoneNum=FindItemInList(cAlphaArgs(1),Zone%Name,NumOfZones)
       IF (ZoneNum == 0) THEN
@@ -976,7 +978,7 @@ SUBROUTINE GetDisplacementVentData(ErrorsFound)
 
   IF (.not. UCSDModelUsed) RETURN
   cCurrentModuleObject = 'RoomAirSettings:ThreeNodeDisplacementVentilation'
-  TotUCSDDV=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotUCSDDV=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (TotUCSDDV <= 0) RETURN
 
@@ -984,7 +986,7 @@ SUBROUTINE GetDisplacementVentData(ErrorsFound)
 
   DO Loop=1,TotUCSDDV
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                              AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, NumericFieldNames=cNumericFieldNames)
     ! First is Zone Name
     ZoneUCSDDV(Loop)%ZoneName = cAlphaArgs(1)
@@ -1080,7 +1082,7 @@ SUBROUTINE GetCrossVentData(ErrorsFound)
 
   IF (.not. UCSDModelUsed) RETURN
   cCurrentModuleObject = 'RoomAirSettings:CrossVentilation'
-  TotUCSDCV=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotUCSDCV=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (TotUCSDCV <= 0) RETURN
 
@@ -1088,7 +1090,7 @@ SUBROUTINE GetCrossVentData(ErrorsFound)
 
   DO Loop=1,TotUCSDCV
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                              AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                              NumericFieldNames=cNumericFieldNames)
     ! First is Zone Name
@@ -1239,9 +1241,9 @@ SUBROUTINE GetUFADZoneData(ErrorsFound)
     RETURN
   END IF
   cCurrentModuleObject = 'RoomAirSettings:UnderFloorAirDistributionInterior'
-  TotUCSDUI=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotUCSDUI=GetNumObjectsFound(cCurrentModuleObject)
   cCurrentModuleObject = 'RoomAirSettings:UnderFloorAirDistributionExterior'
-  TotUCSDUE=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotUCSDUE=GetNumObjectsFound(cCurrentModuleObject)
 
   IF (TotUCSDUI <= 0 .AND. TotUCSDUE <= 0) RETURN
 
@@ -1252,7 +1254,7 @@ SUBROUTINE GetUFADZoneData(ErrorsFound)
 
   cCurrentModuleObject = 'RoomAirSettings:UnderFloorAirDistributionInterior'
   DO Loop=1,TotUCSDUI
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                              AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                              NumericFieldNames=cNumericFieldNames)
     ! First is Zone Name
@@ -1313,7 +1315,7 @@ SUBROUTINE GetUFADZoneData(ErrorsFound)
 
   cCurrentModuleObject = 'RoomAirSettings:UnderFloorAirDistributionExterior'
   DO Loop=1,TotUCSDUE
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                              AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                              NumericFieldNames=cNumericFieldNames)
     ! First is Zone Name
@@ -1603,6 +1605,9 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
 
       IF (ABS((Z2Zone-Z1Zone) - Zone(ZNum)%CeilingHeight) > CeilingHeightDiffMax) THEN
         CALL ShowWarningError ('RoomAirManager: Inconsistent ceiling heights in Zone: '//TRIM(Zone(ZNum)%Name))
+        CALL ShowContinueError('Lowest height=['//trim(RoundSigDigits(Z1Zone,3))//'].')
+        CALL ShowContinueError('Highest height=['//trim(RoundSigDigits(Z2Zone,3))//'].')
+        CALL ShowContinueError('Ceiling height=['//trim(RoundSigDigits(Zone(ZNum)%CeilingHeight,3))//'].')
       ENDIF
     END DO ! Zones
 
@@ -1863,16 +1868,20 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       DO Loop=1,NumOfZones
         If (AirModel(loop)%AirModelType /= RoomAirModel_UCSDDV) cycle  !don't set these up if they don't make sense
         !CurrentModuleObject='RoomAirSettings:ThreeNodeDisplacementVentilation'
-        CALL SetupOutputVariable('DV Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Floor Subzone Temperature [C]',ZTFLOOR(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Fraction Min Recommended Flow Rate [-]',FracMinFlow(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Zone Is Mixed [1-Yes 0-No]',ZoneDVMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Average Temp Gradient [K/m]',AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Maximum Temp Gradient [K/m]',MaxTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Effective Air Temperature for Comfort [C]',TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('DV Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Floor Subzone Temperature [C]',ZTFLOOR(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Recommended Minimum Flow Fraction []', &
+                                  FracMinFlow(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Is Mixed Status []',ZoneDVMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Average Temperature Gradient [K/m]', &
+                                  AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Maximum Temperature Gradient [K/m]', &
+                                  MaxTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Thermal Comfort Effective Air Temperature [C]', &
+                                  TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
       ENDDO
 
     END IF
@@ -1894,16 +1903,18 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       DO Loop=1,NumOfZones
         If (AirModel(loop)%AirModelType /= RoomAirModel_UCSDUFI) cycle  !don't set these up if they don't make sense
         !CurrentModuleObject='RoomAirSettings:UnderFloorAirDistributionInterior'
-        CALL SetupOutputVariable('UF Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Zone Is Mixed [1-Yes 0-No]',ZoneUFMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Average Temp Gradient [K/m]',AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Effective Air Temperature for Comfort [C]',TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Gamma',ZoneUFGamma(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Power In Plumes [W]',ZoneUFPowInPlumes(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Phi',Phi(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Is Mixed Status []',ZoneUFMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Average Temperature Gradient [K/m]', &
+                                  AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Effective Comfort Air Temperature [C]',TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Transition Height Gamma Value []',ZoneUFGamma(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Plume Heat Transfer Rate [W]', &
+                                  ZoneUFPowInPlumes(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Temperature Stratification Fraction []',Phi(Loop),'HVAC','State',Zone(Loop)%Name)
 
         ! set zone equip pointer in the UCSDUI data structure
         DO ZoneEquipConfigNum = 1, NumOfZones
@@ -1916,18 +1927,20 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
       DO Loop=1,NumOfZones
         If (AirModel(loop)%AirModelType /= RoomAirModel_UCSDUFE) cycle  !don't set these up if they don't make sense
         !CurrentModuleObject='RoomAirSettings:UnderFloorAirDistributionExterior'
-        CALL SetupOutputVariable('UF Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Zone Is Mixed [1-Yes 0-No]',ZoneUFMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Average Temp Gradient [K/m]',AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Effective Air Temperature for Comfort [C]',TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Gamma',ZoneUFGamma(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Power In Plumes [W]',ZoneUFPowInPlumes(Loop),'HVAC','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('UF Plume Power from Windows [W]',ZoneUFPowInPlumesfromWindows(Loop),'HVAC',&
+        CALL SetupOutputVariable('Room Air Zone Mixed Subzone Temperature [C]',ZTMX(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Occupied Subzone Temperature [C]',ZTOC(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Transition Height [m]',HeightTransition(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Is Mixed Status []',ZoneUFMixedFlagRep(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Average Temperature Gradient [K/m]', &
+                                  AvgTempGrad(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Effective Comfort Air Temperature [C]',TCMF(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Thermostat Temperature [C]',TempTstatAir(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Transition Height Gamma Value []',ZoneUFGamma(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Plume Heat Transfer Rate [W]', &
+                                  ZoneUFPowInPlumes(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Window Plume Heat Transfer Rate [W]',ZoneUFPowInPlumesfromWindows(Loop),'HVAC',&
                                   'State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('Phi',Phi(Loop),'HVAC','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Temperature Stratification Fraction []',Phi(Loop),'HVAC','State',Zone(Loop)%Name)
         ! set zone equip pointer in the UCSDUE data structure
         DO ZoneEquipConfigNum = 1, NumOfZones
           IF (ZoneEquipConfig(ZoneEquipConfigNum)%ActualZoneNum == Loop) THEN
@@ -2000,15 +2013,17 @@ SUBROUTINE SharedDVCVUFDataInit(ZoneNum)
         ENDIF
 
         !CurrentModuleObject='RoomAirSettings:CrossVentilation'
-        CALL SetupOutputVariable('CV Jet Region Temperature [C]',ZTjet(Loop)%In,'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Recirculation Region Temperature [C]',ZTrec(Loop)%Med,'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Jet Region Average Velocity [m/s]',Ujet(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Recirculation Region Average Velocity [m/s]',Urec(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Inflow Aperture Area [m2]',Ain(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Room Length [m]',Lroom(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Ratio Between Recirculation and Inflow Rate',Rfr(Loop),'Zone','Average',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Zone Air is Mixing [1-Yes 0-No]',ZoneCVisMixing(Loop),'Zone','State',Zone(Loop)%Name)
-        CALL SetupOutputVariable('CV Recirculations Occur In The Flow [1-Yes 0-No]',ZoneCVhasREC(Loop),  &
+        CALL SetupOutputVariable('Room Air Zone Jet Region Temperature [C]',ZTjet(Loop)%In,'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Recirculation Region Temperature [C]', &
+                                  ZTrec(Loop)%Med,'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Jet Region Average Air Velocity [m/s]',Ujet(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Recirculation Region Average Air Velocity [m/s]', &
+                                  Urec(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Inflow Opening Area [m2]',Ain(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Room Length [m]',Lroom(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Recirculation and Inflow Rate Ratio []',Rfr(Loop),'Zone','Average',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Is Mixing Status []',ZoneCVisMixing(Loop),'Zone','State',Zone(Loop)%Name)
+        CALL SetupOutputVariable('Room Air Zone Is Recirculating Status []',ZoneCVhasREC(Loop),  &
                                         'Zone','State',Zone(Loop)%Name)
 
       ENDDO
@@ -2158,7 +2173,7 @@ END SUBROUTINE SharedDVCVUFDataInit
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

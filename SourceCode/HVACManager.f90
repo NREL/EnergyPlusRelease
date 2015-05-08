@@ -29,7 +29,7 @@ USE DataGlobals, ONLY: TimeStepZone,WarmUpFlag,EndHourFlag,  &
                        AnyEnergyManagementSystemInModel, &
                        emsCallFromEndSystemTimestepBeforeHVACReporting, &
                        AnyIdealCondEntSetPointInModel, &
-                       RunOptCondEntTemp
+                       RunOptCondEntTemp, isPulseZoneSizing
 USE DataInterfaces, ONLY: SetupOutputVariable,ShowFatalError,                 &
                        ShowWarningError,ShowContinueError,ShowMessage,     &
                        ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
@@ -111,9 +111,9 @@ SUBROUTINE ManageHVAC
 
   USE NodeInputManager, ONLY: CalcMoreNodeInfo
   USE ZoneEquipmentManager,         ONLY : UpdateZoneSizing
-  USE OutputReportTabular,          ONLY : UpdateTabularReports !added for writing tabular output reports
-  USE SystemReports,                ONLY : InitEnergyReports, ReportMaxVentilationLoads, &
-                                           ReportVentilationEnergyUse,ReportSystemEnergyUse
+  USE OutputReportTabular,          ONLY : UpdateTabularReports,GatherComponentLoadsHVAC !added for writing tabular output reports
+  USE DataGlobals,                  ONLY : CompLoadReportIsReq
+  USE SystemReports,                ONLY : InitEnergyReports, ReportMaxVentilationLoads, ReportSystemEnergyUse
   USE PollutionModule,              ONLY : CalculatePollution
   USE DemandManager,                ONLY : ManageDemand, UpdateDemandManagers
   USE EMSManager,                   ONLY : ManageEMS
@@ -245,14 +245,14 @@ SUBROUTINE ManageHVAC
     CALL ManageZoneContaminanUpdates(iPredictStep,ShortenTimeStepSys,UseZoneTimeStepHistory,PriorTimeStep)
 
   CALL SimHVAC
-  
+
   IF (AnyIdealCondEntSetPointInModel .and. MetersHaveBeenInitialized .and. .NOT. WarmUpFlag) THEN
     RunOptCondEntTemp = .TRUE.
     DO WHILE (RunOptCondEntTemp)
       CALL SimHVAC
-    END DO  
+    END DO
   END IF
-  
+
   CALL ManageWater
 
   ! Only simulate once per zone timestep; must be after SimHVAC
@@ -305,14 +305,13 @@ SUBROUTINE ManageHVAC
 
       If (Contaminant%SimulateContaminants) &
         CALL ManageZoneContaminanUpdates(iPredictStep,ShortenTimeStepSys,UseZoneTimeStepHistory,PriorTimeStep)
-
       CALL SimHVAC
-      
+
       IF (AnyIdealCondEntSetPointInModel .and. MetersHaveBeenInitialized .and. .NOT. WarmUpFlag) THEN
         RunOptCondEntTemp = .TRUE.
         DO WHILE (RunOptCondEntTemp)
           CALL SimHVAC
-        END DO  
+        END DO
       END IF
 
       CALL ManageWater
@@ -362,9 +361,13 @@ SUBROUTINE ManageHVAC
         CALL CalculatePollution
         CALL InitEnergyReports
         CALL ReportSystemEnergyUse
+      END IF
+      IF (DoOutputReporting .OR. (ZoneSizingCalc .AND. CompLoadReportIsReq)) THEN
         CALL ReportAirHeatBalance
+        IF (ZoneSizingCalc) CALL GatherComponentLoadsHVAC
+      END IF
+      IF (DoOutputReporting) THEN
         CALL ReportMaxVentilationLoads
-        CALL ReportVentilationEnergyUse(InitVentReportFlag)
         CALL UpdateDataandReport(HVACTSReporting)
         CALL UpdateTabularReports(HVACTSReporting)
       END IF
@@ -395,6 +398,26 @@ SUBROUTINE ManageHVAC
       CALL CalcMoreNodeInfo
       CALL UpdateDataandReport(HVACTSReporting)
     ELSEIF (UpdateDataDuringWarmupExternalInterface) THEN ! added for FMI
+      IF (BeginDayFlag .and. .not. PrintEnvrnStampWarmupPrinted) THEN
+        PrintEnvrnStampWarmup=.true.
+        PrintEnvrnStampWarmupPrinted=.true.
+      ENDIF
+      IF (.not. BeginDayFlag) PrintEnvrnStampWarmupPrinted=.false.
+      IF (PrintEnvrnStampWarmup) THEN
+        IF (PrintEndDataDictionary .AND. DoOutputReporting .and. .not. PrintedWarmup) THEN
+          WRITE (OutputFileStandard,EndOfHeaderFormat)
+          WRITE (OutputFileMeters,EndOfHeaderFormat)
+          PrintEndDataDictionary = .FALSE.
+        ENDIF
+        IF (DoOutputReporting .and. .not. PrintedWarmup) THEN
+          WRITE (OutputFileStandard,EnvironmentStampFormat) '1', &
+                    'Warmup {'//trim(cWarmupDay)//'} '//Trim(EnvironmentName),Latitude,Longitude,TimeZoneNumber,Elevation
+          WRITE (OutputFileMeters,EnvironmentStampFormat) '1', &
+                    'Warmup {'//trim(cWarmupDay)//'} '//Trim(EnvironmentName),Latitude,Longitude,TimeZoneNumber,Elevation
+          PrintEnvrnStampWarmup=.FALSE.
+        END IF
+        PrintedWarmup=.true.
+      ENDIF
       CALL UpdateDataandReport(HVACTSReporting)
     END IF
     CALL ManageEMS(emsCallFromEndSystemTimestepAfterHVACReporting) ! EMS calling point
@@ -531,7 +554,7 @@ SUBROUTINE SimHVAC
   INTEGER  :: LoopNum
   INTEGER  :: LoopSide
   INTEGER  :: ThisLoopSide
-  
+
   INTEGER  :: AirSysNum
   INTEGER  :: StackDepth
   CHARACTER(len=10) :: HistoryStack
@@ -568,6 +591,10 @@ SUBROUTINE SimHVAC
     AirLoopControlInfo%OASysComponentsSimulated = .FALSE.
     ! set economizer flow locked flag to false, will reset if custom HX control is used
     AirLoopControlInfo%EconomizerFlowLocked = .FALSE.
+    ! set air loop resim flags for when heat recovery is used and air loop needs another iteration
+    AirLoopControlInfo%HeatRecoveryResimFlag = .TRUE.
+    AirLoopControlInfo%HeatRecoveryResimFlag2 = .FALSE.
+    AirLoopControlInfo%ResimAirLoopFlag = .FALSE.
   END IF
 
   ! This setups the reports for the Iteration variable that limits how many times
@@ -579,8 +606,8 @@ SUBROUTINE SimHVAC
   PlantManageHalfLoopCalls = 0
   CALL SetAllPlantSimFlagsToValue(.TRUE.)
   IF (.not. IterSetup) THEN
-    CALL SetupOutputVariable('HVACManage Iterations []',HVACManageIteration,'HVAC','Sum','SimHVAC')
-    CALL SetupOutputVariable('AirLoop-Zone Iterations []',RepIterAir,'HVAC','Sum','SimHVAC')
+    CALL SetupOutputVariable('HVAC System Solver Iteration Count []',HVACManageIteration,'HVAC','Sum','SimHVAC')
+    CALL SetupOutputVariable('Air System Solver Iteration Count []',RepIterAir,'HVAC','Sum','SimHVAC')
     CALL ManageSetPoints  !need to call this before getting plant loop data so setpoint checks can complete okay
     CALL GetPlantLoopData
     CALL GetPlantInput
@@ -593,8 +620,8 @@ SUBROUTINE SimHVAC
     ENDIF
 
     IF (TotNumLoops > 0) THEN
-      CALL SetupOutputVariable('Plant Manager Total Sub Iterations',PLANTManageSubIterations,'HVAC','Sum','SimHVAC')
-      CALL SetupOutputVariable('Plant Manager Total Half Loop Calls',PlantManageHalfLoopCalls,'HVAC','Sum','SimHVAC')
+      CALL SetupOutputVariable('Plant Solver Sub Iteration Count []',PLANTManageSubIterations,'HVAC','Sum','SimHVAC')
+      CALL SetupOutputVariable('Plant Solver Half Loop Calls Count []',PlantManageHalfLoopCalls,'HVAC','Sum','SimHVAC')
       DO LoopNum = 1, TotNumLoops
         ! init plant sizing numbers in main plant data structure
         CALL InitOneTimePlantSizingInfo(LoopNum)
@@ -677,7 +704,7 @@ SUBROUTINE SimHVAC
     If (AnyPlantSplitterMixerLacksContinuity()) THEN
       ! rerun systems in a "Final flow lock/last iteration" mode
       ! now call for one second to last plant simulation
-      SimAirLoopsFlag = .FALSE. 
+      SimAirLoopsFlag = .FALSE.
       SimZoneEquipmentFlag = .FALSE.
       SimNonZoneEquipmentFlag = .FALSE.
       SimPlantLoopsFlag = .TRUE.
@@ -694,7 +721,7 @@ SUBROUTINE SimHVAC
                                   SimElecCircuitsFlag, FirstHVACIteration, SimWithPlantFlowLocked)
       CALL UpdateZoneInletConvergenceLog
       ! now call for a last plant simulation
-      SimAirLoopsFlag = .FALSE. 
+      SimAirLoopsFlag = .FALSE.
       SimZoneEquipmentFlag = .FALSE.
       SimNonZoneEquipmentFlag = .FALSE.
       SimPlantLoopsFlag = .TRUE.
@@ -764,7 +791,7 @@ SUBROUTINE SimHVAC
                   // TRIM(roundSigDigits(AirLoopConvergence(AirSysNum)%HVACFlowDemandToSupplyTolValue(StackDepth), 6)) &
                   // ','
             ENDDO
-           
+
             CALL ShowContinueError('Demand-to-Supply interface mass flow rate check value iteration history trace: ' &
                    //TRIM(HistoryTrace) )
             HistoryTrace = ''
@@ -775,7 +802,7 @@ SUBROUTINE SimHVAC
             ENDDO
             CALL ShowContinueError('Supply-to-demand interface deck 1 mass flow rate check value iteration history trace: ' &
                    //TRIM(HistoryTrace) )
-                   
+
             IF (AirToZoneNodeInfo(AirSysNum)%NumSupplyNodes >= 2) THEN
               HistoryTrace = ''
               DO StackDepth = 1, ConvergLogStackDepth
@@ -787,7 +814,7 @@ SUBROUTINE SimHVAC
                    //TRIM(HistoryTrace) )
             ENDIF
           ENDIF ! mass flow rate not converged
-          
+
           IF (AirLoopConvergence(AirSysNum)%HVACHumRatNotConverged) THEN
 
             CALL ShowContinueError('Air System Named = '//TRIM(AirToZoneNodeInfo(AirSysNum)%AirLoopName)  &
@@ -888,7 +915,7 @@ SUBROUTINE SimHVAC
                    //TRIM(HistoryTrace) )
             ENDIF
           ENDIF ! energy not converged
-          
+
         ENDDO  ! loop over air loop systems
 
         ! loop over zones and check for issues with zone inlet nodes
@@ -898,7 +925,7 @@ SUBROUTINE SimHVAC
             ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedHumRate  = .FALSE.
             ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedMassFlow = .FALSE.
             ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NotConvergedTemp     = .FALSE.
-            
+
             ! Check humidity ratio
             FoundOscillationByDuplicate = .FALSE.
             MonotonicDecreaseFound = .FALSE.
@@ -931,7 +958,7 @@ SUBROUTINE SimHVAC
                             / ( SUM(ConvergLogStackARR)**2 &
                              -  REAL(ConvergLogStackDepth, r64)*SUM( ConvergLogStackARR**2) )
                 IF (ABS(SlopeHumRat) > HVACHumRatSlopeToler) THEN
-                
+
                   IF (SlopeHumRat < 0.d0) THEN  ! check for monotic decrease
                     MonotonicDecreaseFound = .TRUE.
                     DO StackDepth = 2, ConvergLogStackDepth
@@ -968,7 +995,7 @@ SUBROUTINE SimHVAC
                 ENDIF ! significant slope in iterates
               ENDIF !no osciallation
             ENDIF ! last value does not equal average of stack.
-            
+
             IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
               HistoryTrace = ' '
               DO StackDepth = 1, ConvergLogStackDepth
@@ -982,7 +1009,7 @@ SUBROUTINE SimHVAC
                            //TRIM(HistoryTrace) )
             ENDIF ! need to report trace
             ! end humidity ratio
-            
+
             ! Check Mass flow rate
             FoundOscillationByDuplicate = .FALSE.
             MonotonicDecreaseFound = .FALSE.
@@ -1052,7 +1079,7 @@ SUBROUTINE SimHVAC
                 ENDIF ! significant slope in iterates
               ENDIF !no osciallation
             ENDIF ! last value does not equal average of stack.
-            
+
             IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
               HistoryTrace = ' '
               DO StackDepth = 1, ConvergLogStackDepth
@@ -1136,7 +1163,7 @@ SUBROUTINE SimHVAC
                 ENDIF ! significant slope in iterates
               ENDIF !no osciallation
             ENDIF ! last value does not equal average of stack.
-            
+
             IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
               HistoryTrace = ' '
               DO StackDepth = 1, ConvergLogStackDepth
@@ -1153,9 +1180,9 @@ SUBROUTINE SimHVAC
 
           ENDDO ! loop over zone inlet nodes
         ENDDO ! loop over zones
-        
+
         DO LoopNum = 1, TotNumLoops
-        
+
           IF (PlantConvergence(LoopNum)%PlantMassFlowNotConverged) THEN
             CALL ShowContinueError('Plant System Named = '//TRIM(PlantLoop(LoopNum)%Name)  &
                                    // ' did not converge for mass flow rate')
@@ -1176,7 +1203,7 @@ SUBROUTINE SimHVAC
             ENDDO
             CALL ShowContinueError('Supply-to-Demand interface mass flow rate check value iteration history trace: ' &
                  //TRIM(HistoryTrace) )
-            
+
             ! now work with history logs for mass flow to detect issues
             DO ThisLoopSide = 1, SIZE(PlantLoop(LoopNum)%LoopSide)
               ! loop side inlet node
@@ -1245,7 +1272,7 @@ SUBROUTINE SimHVAC
                   ENDIF
                 ENDIF  ! significant slope found
               ENDIF ! no oscillation found
-              
+
               IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
                 HistoryTrace = ' '
                 DO StackDepth = 1, NumConvergenceHistoryTerms
@@ -1257,9 +1284,9 @@ SUBROUTINE SimHVAC
                              //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
                              //' mass flow rate [kg/s] iteration history trace (most recent first): ' &
                              //TRIM(HistoryTrace) )
-              ENDIF ! need to report trace 
+              ENDIF ! need to report trace
               ! end of inlet node
-              
+
               ! loop side outlet node
               FoundOscillationByDuplicate = .FALSE.
               MonotonicDecreaseFound = .FALSE.
@@ -1326,7 +1353,7 @@ SUBROUTINE SimHVAC
                   ENDIF
                 ENDIF  ! significant slope found
               ENDIF ! no oscillation found
-              
+
               IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
                 HistoryTrace = ' '
                 DO StackDepth = 1, NumConvergenceHistoryTerms
@@ -1338,13 +1365,13 @@ SUBROUTINE SimHVAC
                              //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
                              //' mass flow rate [kg/s] iteration history trace (most recent first): ' &
                              //TRIM(HistoryTrace) )
-              ENDIF ! need to report trace 
+              ENDIF ! need to report trace
               ! end of Outlet node
-              
+
             END DO  ! plant loop sides
 
           ENDIF ! mass flow not converged
-          
+
           IF (PlantConvergence(LoopNum)%PlantTempNotConverged) THEN
             CALL ShowContinueError('Plant System Named = '//TRIM(PlantLoop(LoopNum)%Name)  &
                                    // ' did not converge for temperature')
@@ -1434,7 +1461,7 @@ SUBROUTINE SimHVAC
                   ENDIF
                 ENDIF  ! significant slope found
               ENDIF ! no oscillation found
-              
+
               IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
                 HistoryTrace = ' '
                 DO StackDepth = 1, NumConvergenceHistoryTerms
@@ -1446,9 +1473,9 @@ SUBROUTINE SimHVAC
                              //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameIn) &
                              //' temperature [C] iteration history trace (most recent first): ' &
                              //TRIM(HistoryTrace) )
-              ENDIF ! need to report trace 
+              ENDIF ! need to report trace
               ! end of inlet node
-              
+
               ! loop side outlet node
               FoundOscillationByDuplicate = .FALSE.
               MonotonicDecreaseFound = .FALSE.
@@ -1515,7 +1542,7 @@ SUBROUTINE SimHVAC
                   ENDIF
                 ENDIF  ! significant slope found
               ENDIF ! no oscillation found
-              
+
               IF (MonotonicDecreaseFound .OR. MonotonicIncreaseFound .OR. FoundOscillationByDuplicate) THEN
                 HistoryTrace = ' '
                 DO StackDepth = 1, NumConvergenceHistoryTerms
@@ -1527,11 +1554,11 @@ SUBROUTINE SimHVAC
                              //TRIM(PlantLoop(LoopNum)%LoopSide(ThisLoopSide)%NodeNameOut) &
                              //' temperature [C] iteration history trace (most recent first): ' &
                              //TRIM(HistoryTrace) )
-              ENDIF ! need to report trace 
+              ENDIF ! need to report trace
               ! end of Outlet node
-              
+
             END DO  ! plant loop sides
-                 
+
           ENDIF !temperature not converged
         ENDDO ! loop over plant loop systems
       ENDIF
@@ -2989,7 +3016,7 @@ END IF !(TotRefrigerationDoorMixing > 0) THEN
      CASE (InfiltrationDesignFlowRate)
 
        IVF=Infiltration(J)%DesignLevel*GetCurrentScheduleValue(Infiltration(J)%SchedPtr)
-       ! CR68xx if calculated < 0.0, don't propagate
+       ! CR6845 if calculated < 0.0, don't propagate
        IF (IVF < 0.0) IVF=0.0D0
        MCpI_temp=IVF*AirDensity*CpAir*( Infiltration(J)%ConstantTermCoef &
                  + ABS(TempExt-ZMAT(NZ))*Infiltration(J)%TemperatureTermCoef &
@@ -3097,7 +3124,7 @@ SUBROUTINE ReportAirHeatBalance
                                TotZoneAirBalance, ZoneAirBalance, AirBalanceQuadrature, TotRefDoorMixing, RefDoorMixing
   USE DataHVACGlobals, ONLY: CycleOn, CycleOnZoneFansOnly
   USE DataHeatBalFanSys, ONLY: MCPI, MCPV, MdotOA, MdotCPOA !, MCPTI, MCPTV, MCPM, MCPTM, MixingMassFlowZone
-  USE Psychrometrics, ONLY:PsyRhoAirFnPbTdbW,PsyCpAirFnWTdb,PsyHfgAirFnWTdb
+  USE Psychrometrics, ONLY:PsyRhoAirFnPbTdbW,PsyCpAirFnWTdb,PsyHgAirFnWTdb
 
   USE AirflowNetworkBalanceManager, ONLY: ReportAirflowNetwork
   USE DataAirflowNetwork, ONLY: SimulateAirflowNetwork,AirflowNetworkZoneFlag,AirflowNetworkControlSimple, &
@@ -3179,7 +3206,7 @@ SUBROUTINE ReportAirHeatBalance
     END IF
     ! Report infiltration latent gains and losses
     CpAir = PsyCpAirFnWTdb(OutHumRat,Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance')
-    H2OHtOfVap = PsyHfgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:1')
+    H2OHtOfVap = PsyHgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:1')
     IF (ZoneAirHumRat(ZoneLoop) > OutHumRat) THEN
 
       ZnAirRPT(ZoneLoop)%InfilLatentLoss = 0.001*MCPI(ZoneLoop)/CpAir*(ZoneAirHumRat(ZoneLoop)-OutHumRat)*H2OHtOfVap* &
@@ -3259,7 +3286,7 @@ SUBROUTINE ReportAirHeatBalance
         IF (VentZoneNum > 1) CYCLE
 
         ! Report ventilation latent gains and losses
-        H2OHtOfVap = PsyHfgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:2')
+        H2OHtOfVap = PsyHgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:2')
         IF (ZoneAirHumRat(ZoneLoop) > OutHumRat) THEN
           ZnAirRPT(ZoneLoop)%VentilLatentLoss = 0.001*MCPV(ZoneLoop)/CpAir*(ZoneAirHumRat(ZoneLoop)-OutHumRat)*H2OHtOfVap* &
                                         TimeStepSys*SecInHour*1000.0d0*ADSCorrectionFactor
@@ -3301,7 +3328,7 @@ SUBROUTINE ReportAirHeatBalance
     DO MixNum=1,TotMixing
       IF ((Mixing(MixNum)%ZonePtr .eq. ZoneLoop) .AND. MixingReportFlag(MixNum)) THEN
 !        MixSenLoad(ZoneLoop) = MixSenLoad(ZoneLoop)+MCPM(ZoneLoop)*MAT(Mixing(MixNum)%FromZone)
-!        H2OHtOfVap = PsyHfgAirFnWTdb(ZoneAirHumRat(ZoneLoop), MAT(ZoneLoop))
+!        H2OHtOfVap = PsyHgAirFnWTdb(ZoneAirHumRat(ZoneLoop), MAT(ZoneLoop))
 !        Per Jan 17, 2008 conference call, agreed to use average conditions for Rho, Cp and Hfg
 !           and to recalculate the report variable using end of time step temps and humrats
         AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress, (MAT(ZoneLoop)+MAT(Mixing(MixNum)%FromZone))/2.0d0, &
@@ -3314,7 +3341,7 @@ SUBROUTINE ReportAirHeatBalance
                                  Mixing(MixNum)%DesiredAirFlowRate * AirDensity * TimeStepSys * SecInHour * ADSCorrectionFactor
         MixSenLoad(ZoneLoop) = MixSenLoad(ZoneLoop)+Mixing(MixNum)%DesiredAirFlowRate * AirDensity *  CpAir * &
                                (MAT(ZoneLoop) - MAT(Mixing(MixNum)%FromZone))
-        H2OHtOfVap = PsyHfgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(Mixing(MixNum)%FromZone))/2.0d0, &
+        H2OHtOfVap = PsyHgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(Mixing(MixNum)%FromZone))/2.0d0, &
                                     (MAT(ZoneLoop)+MAT(Mixing(MixNum)%FromZone))/2.0d0,'ReportAirHeatBalance:Mixing')
 !        MixLatLoad(ZoneLoop) = MixLatLoad(ZoneLoop)+MixingMassFlowZone(ZoneLoop)*(ZoneAirHumRat(ZoneLoop)- &
 !                     ZoneAirHumRat(Mixing(MixNum)%FromZone))*H2OHtOfVap
@@ -3338,7 +3365,7 @@ SUBROUTINE ReportAirHeatBalance
                                  MVFC(MixNum) * AirDensity * TimeStepSys * SecInHour * ADSCorrectionFactor
         MixSenLoad(ZoneLoop) = MixSenLoad(ZoneLoop)+ MVFC(MixNum) * AirDensity *  CpAir * &
                                (MAT(ZoneLoop) - MAT(CrossMixing(MixNum)%FromZone))
-        H2OHtOfVap = PsyHfgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(CrossMixing(MixNum)%FromZone))/2.0d0, &
+        H2OHtOfVap = PsyHgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(CrossMixing(MixNum)%FromZone))/2.0d0, &
                                     (MAT(ZoneLoop)+MAT(CrossMixing(MixNum)%FromZone))/2.0d0,'ReportAirHeatBalance:XMixing')
 !       MixLatLoad(ZoneLoop) = MixLatLoad(ZoneLoop)+MixingMassFlowZone(ZoneLoop)*(ZoneAirHumRat(ZoneLoop)- &
 !                     ZoneAirHumRat(CrossMixing(MixNum)%FromZone))*H2OHtOfVap
@@ -3364,7 +3391,7 @@ IF (TotRefDoorMixing .GT. 0) THEN
                                       (ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneB))/2.0d0)
           CpAir      = PsyCpAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneB))/2.0d0,  &
                                      (MAT(ZoneLoop)+MAT(ZoneB))/2.0d0)
-          H2OHtOfVap = PsyHfgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneB))/2.0d0, &
+          H2OHtOfVap = PsyHgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneB))/2.0d0, &
                                     (MAT(ZoneLoop)+MAT(ZoneB))/2.0d0,'ReportAirHeatBalance:XMixing')
           ZnAirRpt(ZoneLoop)%MixVolume = ZnAirRpt(ZoneLoop)%MixVolume + &
                                        RefDoorMixing(ZoneLoop)%VolRefDoorFlowRate(J)*&
@@ -3390,7 +3417,7 @@ IF (TotRefDoorMixing .GT. 0) THEN
                                       (ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneA))/2.0d0)
               CpAir      = PsyCpAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneA))/2.0d0,  &
                                      (MAT(ZoneLoop)+MAT(ZoneA))/2.0d0)
-              H2OHtOfVap = PsyHfgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneA))/2.0d0, &
+              H2OHtOfVap = PsyHgAirFnWTdb((ZoneAirHumRat(ZoneLoop)+ZoneAirHumRat(ZoneA))/2.0d0, &
                                     (MAT(ZoneLoop)+MAT(ZoneA))/2.0d0,'ReportAirHeatBalance:XMixing')
               ZnAirRpt(ZoneLoop)%MixVolume = ZnAirRpt(ZoneLoop)%MixVolume + &
                                        RefDoorMixing(ZoneA)%VolRefDoorFlowRate(J)*&
@@ -3452,7 +3479,7 @@ END IF !(TotRefDoorMixing .GT. 0)
           ZnAirRpt(ZoneLoop)%OABalanceHeatGain = -MdotCPOA(ZoneLoop)*(MAT(ZoneLoop)- &
                                            Zone(ZoneLoop)%OutDryBulbTemp)*TimeStepSys*SecInHour*ADSCorrectionFactor
         END IF
-        H2OHtOfVap = PsyHfgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:2')
+        H2OHtOfVap = PsyHgAirFnWTdb(OutHumRat, Zone(ZoneLoop)%OutDryBulbTemp,'ReportAirHeatBalance:2')
         IF (ZoneAirHumRat(ZoneLoop) > OutHumRat) THEN
           ZnAirRPT(ZoneLoop)%OABalanceLatentLoss = 0.001*MdotOA(ZoneLoop)*(ZoneAirHumRat(ZoneLoop)-OutHumRat)*H2OHtOfVap* &
                                         TimeStepSys*SecInHour*1000.0d0*ADSCorrectionFactor
@@ -3752,9 +3779,9 @@ SUBROUTINE UpdateZoneInletConvergenceLog
   INTEGER  :: NodeIndex
   INTEGER  :: NodeNum
   REAL(r64), DIMENSION(ConvergLogStackDepth) :: tmpRealARR
-   
+
   DO ZoneNum = 1, NumOfZones
-  
+
     DO NodeIndex = 1, ZoneInletConvergence(ZoneNum)%NumInletNodes
       NodeNum = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%NodeNum
 
@@ -3762,12 +3789,12 @@ SUBROUTINE UpdateZoneInletConvergenceLog
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(1) = Node(NodeNum)%HumRat
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%HumidityRatio(2:ConvergLogStackDepth) = &
                      TmpRealARR(1:ConvergLogStackDepth-1)
-     
+
       tmpRealARR = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(1) = Node(NodeNum)%MassFlowRate
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%MassFlowRate(2:ConvergLogStackDepth) = &
                      TmpRealARR(1:ConvergLogStackDepth-1)
-                     
+
       tmpRealARR = ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(1) = Node(NodeNum)%Temp
       ZoneInletConvergence(ZoneNum)%InletNode(NodeIndex)%Temperature(2:ConvergLogStackDepth) = &
@@ -3783,7 +3810,7 @@ END SUBROUTINE UpdateZoneInletConvergenceLog
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

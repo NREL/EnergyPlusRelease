@@ -604,7 +604,7 @@ SUBROUTINE GetTowerInput
   cCurrentModuleObject = cCoolingTower_SingleSpeed
   DO SingleSpeedTowerNumber = 1 , NumSingleSpeedTowers
     TowerNum = SingleSpeedTowerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),SingleSpeedTowerNumber,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,SingleSpeedTowerNumber,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames, &
                     NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -754,7 +754,7 @@ SUBROUTINE GetTowerInput
     IF (lAlphaFieldBlanks(11).or.AlphArray(11) == Blank) THEN
       SimpleTower(TowerNum)%CapacityControl = CapacityControl_FanCycling     ! FanCycling
     ELSE
-      SELECT CASE (MakeUPPERCase(TRIM(AlphArray(11))))
+      SELECT CASE (MakeUPPERCase(AlphArray(11)))
         CASE ('FANCYCLING')
           SimpleTower(TowerNum)%CapacityControl = CapacityControl_FanCycling
         CASE ('FLUIDBYPASS')
@@ -898,7 +898,7 @@ SUBROUTINE GetTowerInput
   cCurrentModuleObject = cCoolingTower_TwoSpeed
   DO TwoSpeedTowerNumber = 1 , NumTwoSpeedTowers
     TowerNum = NumSingleSpeedTowers + TwoSpeedTowerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),TwoSpeedTowerNumber,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,TwoSpeedTowerNumber,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1217,7 +1217,7 @@ SUBROUTINE GetTowerInput
   cCurrentModuleObject = cCoolingTower_VariableSpeed
   DO VariableSpeedTowerNumber = 1 , NumVariableSpeedTowers
     TowerNum = NumSingleSpeedTowers + NumTwoSpeedTowers + VariableSpeedTowerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),VariableSpeedTowerNumber,AlphArray,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,VariableSpeedTowerNumber,AlphArray,NumAlphas, &
                        NumArray,NumNums,IOSTAT, AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -1874,29 +1874,30 @@ SUBROUTINE GetTowerInput
 
 ! Set up output variables CurrentModuleObject='CoolingTower:SingleSpeed'
   DO TowerNum = 1, NumSingleSpeedTowers
-    CALL SetupOutputVariable('Tower Water Inlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%InletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Outlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%OutletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleTowerReport(TowerNum)%WaterMassFlowRate,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleTowerReport(TowerNum)%Qactual,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleTowerReport(TowerNum)%FanPower,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%FanEnergy,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
-    CALL SetupOutputVariable('Tower Fluid Bypass Fraction', &             ! Added for fluid bypass
+                       ! Added for fluid bypass
+    CALL SetupOutputVariable('Cooling Tower Bypass Fraction []', &
           SimpleTowerReport(TowerNum)%BypassFraction,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Number of Cells Operating',&
+    CALL SetupOutputVariable('Cooling Tower Operating Cells Count []',&
           SimpleTowerReport(TowerNum)%NumCellON,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Cycling Ratio', &
+    CALL SetupOutputVariable('Cooling Tower Fan Cycling Ratio []', &
           SimpleTowerReport(TowerNum)%FanCyclingRatio,'System','Average',SimpleTower(TowerNum)%Name)
     IF(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
-      CALL SetupOutputVariable('Tower Basin Heater Electric Power [W]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Power [W]', &
           SimpleTowerReport(TowerNum)%BasinHeaterPower,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Basin Heater Electric Consumption [J]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%BasinHeaterConsumption,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
     END IF
@@ -1904,29 +1905,29 @@ SUBROUTINE GetTowerInput
 
   ! CurrentModuleObject='CoolingTower:TwoSpeed'
   DO TowerNum = NumSingleSpeedTowers+1, NumSingleSpeedTowers+NumTwoSpeedTowers
-    CALL SetupOutputVariable('Tower Water Inlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%InletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Outlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%OutletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleTowerReport(TowerNum)%WaterMassFlowRate,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleTowerReport(TowerNum)%Qactual,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleTowerReport(TowerNum)%FanPower,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%FanEnergy,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
-    CALL SetupOutputVariable('Tower Fan Cycling Ratio', &
+    CALL SetupOutputVariable('Cooling Tower Fan Cycling Ratio []', &
           SimpleTowerReport(TowerNum)%FanCyclingRatio,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Fan Speed Selected',&
+    CALL SetupOutputVariable('Cooling Tower Fan Speed Level []',&
           SimpleTowerReport(TowerNum)%SpeedSelected,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Number of Cells Operating',&
+    CALL SetupOutputVariable('Cooling Tower Operating Cells Count []',&
           SimpleTowerReport(TowerNum)%NumCellON,'System','Average',SimpleTower(TowerNum)%Name)
     IF(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff .GT. 0.0)THEN
-      CALL SetupOutputVariable('Tower Basin Heater Electric Power [W]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Power [W]', &
           SimpleTowerReport(TowerNum)%BasinHeaterPower,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Basin Heater Electric Consumption [J]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%BasinHeaterConsumption,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
     END IF
@@ -1934,29 +1935,29 @@ SUBROUTINE GetTowerInput
 
   ! CurrentModuleObject='CoolingTower:VariableSpeed'
   DO TowerNum = NumSingleSpeedTowers+NumTwoSpeedTowers+1, NumSingleSpeedTowers+NumTwoSpeedTowers+NumVariableSpeedTowers
-    CALL SetupOutputVariable('Tower Water Inlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%InletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Outlet Temp [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleTowerReport(TowerNum)%OutletWaterTemp,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleTowerReport(TowerNum)%WaterMassFlowRate,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleTowerReport(TowerNum)%Qactual,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleTowerReport(TowerNum)%FanPower,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%FanEnergy,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
-    CALL SetupOutputVariable('Tower Air Flow Rate Ratio', &
+    CALL SetupOutputVariable('Cooling Tower Air Flow Rate Ratio []', &
           SimpleTowerReport(TowerNum)%AirFlowRatio,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Fan Part-Load Ratio', &
+    CALL SetupOutputVariable('Cooling Tower Fan Part Load Ratio []', &
           SimpleTowerReport(TowerNum)%FanCyclingRatio,'System','Average',SimpleTower(TowerNum)%Name)
-   CALL SetupOutputVariable('Number of Cells Operating',&
+   CALL SetupOutputVariable('Cooling Tower Operating Cells Count []',&
           SimpleTowerReport(TowerNum)%NumCellON,'System','Average',SimpleTower(TowerNum)%Name)
     IF(SimpleTower(TowerNum)%BasinHeaterPowerFTempDiff .GT. 0.0)THEN
-      CALL SetupOutputVariable('Tower Basin Heater Electric Power [W]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Power [W]', &
           SimpleTowerReport(TowerNum)%BasinHeaterPower,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Basin Heater Electric Consumption [J]', &
+      CALL SetupOutputVariable('Cooling Tower Basin Heater Electric Energy [J]', &
           SimpleTowerReport(TowerNum)%BasinHeaterConsumption,'System','Sum',SimpleTower(TowerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
     END IF
@@ -1970,45 +1971,45 @@ SUBROUTINE GetTowerInput
   ! setup common water reporting for all types of towers.
   Do TowerNum = 1 , NumSingleSpeedTowers+NumTwoSpeedTowers+NumVariableSpeedTowers
     If (SimpleTower(TowerNum)%SuppliedByWaterSystem) THEN
-      CALL SetupOutputVariable('Tower Water Make Up Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume Flow Rate [m3/s]', &
             SimpleTowerReport(TowerNum)%MakeUpVdot,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Water Make Up [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%MakeUpVol,'System','Sum',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Water From Storage Tank Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Storage Tank Water Volume Flow Rate [m3/s]', &
             SimpleTowerReport(TowerNum)%TankSupplyVdot,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Water From Storage Tank [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Storage Tank Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%TankSupplyVol,'System','Sum',SimpleTower(TowerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Tower Water Starved By Storage Tank Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Starved Storage Tank Water Volume Flow Rate [m3/s]', &
             SimpleTowerReport(TowerNum)%StarvedMakeUpVdot,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Water Starved By Storage Tank [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Starved Storage Tank Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%StarvedMakeUpVol,'System','Sum',SimpleTower(TowerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Tower Water Make Up Mains Draw [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Mains Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%StarvedMakeUpVol,'System','Sum',SimpleTower(TowerNum)%Name, &
             ResourceTypeKey='MainsWater', EndUseKey='HeatRejection', GroupKey='Plant')
     ELSE ! tower water from mains and gets metered
-      CALL SetupOutputVariable('Tower Water Make Up Rate [m3/s]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume Flow Rate [m3/s]', &
             SimpleTowerReport(TowerNum)%MakeUpVdot,'System','Average',SimpleTower(TowerNum)%Name)
-      CALL SetupOutputVariable('Tower Water Make Up [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%MakeUpVol,'System','Sum',SimpleTower(TowerNum)%Name, &
             ResourceTypeKey='Water', EndUseKey='HeatRejection', GroupKey='Plant')
-      CALL SetupOutputVariable('Tower Water Make Up Mains Draw [m3]', &
+      CALL SetupOutputVariable('Cooling Tower Make Up Mains Water Volume [m3]', &
             SimpleTowerReport(TowerNum)%MakeUpVol,'System','Sum',SimpleTower(TowerNum)%Name, &
             ResourceTypeKey='MainsWater', EndUseKey='HeatRejection', GroupKey='Plant')
     ENDIF
 
-    CALL SetupOutputVariable('Tower Water Evaporation Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Evaporation Volume Flow Rate [m3/s]', &
           SimpleTowerReport(TowerNum)%EvaporationVdot,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Evaporation [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Evaporation Volume [m3]', &
           SimpleTowerReport(TowerNum)%EvaporationVol,'System','Sum',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Drift Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Drift Volume Flow Rate [m3/s]', &
           SimpleTowerReport(TowerNum)%DriftVdot,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Drift [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Drift Volume [m3]', &
           SimpleTowerReport(TowerNum)%DriftVol,'System','Sum',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Blowdown Rate [m3/s]', &
+    CALL SetupOutputVariable('Cooling Tower Water Blowdown Volume Flow Rate [m3/s]', &
           SimpleTowerReport(TowerNum)%BlowdownVdot,'System','Average',SimpleTower(TowerNum)%Name)
-    CALL SetupOutputVariable('Tower Water Blowdown [m3]', &
+    CALL SetupOutputVariable('Cooling Tower Water Blowdown Volume [m3]', &
           SimpleTowerReport(TowerNum)%BlowdownVol,'System','Sum',SimpleTower(TowerNum)%Name)
   ENDDO ! loop all towers
 
@@ -3026,7 +3027,7 @@ SUBROUTINE CalcSingleSpeedTower(TowerNum)
     CASE (DualSetPointDeadBand)
       TempSetPoint       = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TempSetpointHi
     END SELECT
-    
+
     ! Added for fluid bypass. First assume no fluid bypass
     BypassFlag = 0
     BypassFraction = 0.0
@@ -5139,7 +5140,7 @@ END SUBROUTINE ReportTowers
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

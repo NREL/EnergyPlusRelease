@@ -78,7 +78,7 @@ INTEGER, PARAMETER :: VRF_HeatPump      = 1
 CHARACTER(len=*), PARAMETER, DIMENSION(NumVRFSystemTypes) :: cVRFTypes=  &
        (/'AirConditioner:VariableRefrigerantFlow'/)
 
-INTEGER, PARAMETER :: NumValidFuelTypes=7
+INTEGER, PARAMETER :: NumValidFuelTypes=9
 CHARACTER(len=*), PARAMETER, DIMENSION(NumValidFuelTypes) :: cValidFuelTypes=    &
                  (/'Electric  ',  &
                    'NaturalGas',  &
@@ -86,7 +86,9 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumValidFuelTypes) :: cValidFuelTypes=   
                    'Diesel    ',  &
                    'Gasoline  ',  &
                    'FuelOil#1 ',  &
-                   'FuelOil#2 '/)
+                   'FuelOil#2 ',  &
+                   'OtherFuel1', &
+                   'OtherFuel2'/)
 
 ! Fuel Types
 INTEGER, PARAMETER :: FuelTypeElectric    = 1     ! Fuel type for electricity
@@ -96,6 +98,8 @@ INTEGER, PARAMETER :: FuelTypeDiesel      = 4     ! Fuel type for diesel
 INTEGER, PARAMETER :: FuelTypeGasoline    = 5     ! Fuel type for gasoline
 INTEGER, PARAMETER :: FuelTypeFuelOil1    = 6     ! Fuel type for fuel oil #1
 INTEGER, PARAMETER :: FuelTypeFuelOil2    = 7     ! Fuel type for fuel oil #2
+INTEGER, PARAMETER :: FuelTypeOtherFuel1  = 8     ! Fuel type for other fuel #1
+INTEGER, PARAMETER :: FuelTypeOtherFuel2  = 9     ! Fuel type for other fuel #2
 
 ! curve type for equivalent piping losses (not necessarily the same value used in CurveManager)
 INTEGER, PARAMETER :: BiQuadratic     = 4
@@ -290,6 +294,10 @@ TYPE TerminalUnitListData
   LOGICAL, ALLOCATABLE :: TerminalUnitNotSizedYet(:) ! TRUE if terminal unit not sized
   LOGICAL, ALLOCATABLE :: HRHeatRequest(:)        ! defines a heating load on VRFTerminalUnits when QZnReq < 0
   LOGICAL, ALLOCATABLE :: HRCoolRequest(:)        ! defines a cooling load on VRFTerminalUnits when QZnReq > 0
+  LOGICAL, ALLOCATABLE :: CoolingCoilAvailable(:) ! cooling coil availability scheduled on
+  LOGICAL, ALLOCATABLE :: HeatingCoilAvailable(:) ! cooling coil availability scheduled on
+  INTEGER, ALLOCATABLE :: CoolingCoilAvailSchPtr(:) ! cooilng coil availability schedule index
+  INTEGER, ALLOCATABLE :: HeatingCoilAvailSchPtr(:) ! heating coil availability schedule index
 END TYPE TerminalUnitListData
 
 TYPE VRFTerminalUnitEquipment
@@ -897,7 +905,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
   VRF(VRFCond)%CondenserInletTemp = CondInletTemp
 
   ! calculate capacities and energy use
-  IF(CoolingLoad(VRFCond))THEN
+  IF(CoolingLoad(VRFCond) .AND. TerminalUnitList(TUListNum)%CoolingCoilPresent(NumTUInList))THEN
     InletAirWetbulbC = SumCoolInletWB
     TotCoolCapTempModFac = CurveValue(VRF(VRFCond)%CoolCapFT,InletAirWetbulbC,CondInletTemp)
     TotCoolEIRTempModFac = CurveValue(VRF(VRFCond)%CoolEIRFT,InletAirWetbulbC,CondInletTemp)
@@ -941,7 +949,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
       END IF
     END IF
 
-  ELSE IF (HeatingLoad(VRFCond))THEN
+  ELSE IF (HeatingLoad(VRFCond) .AND. TerminalUnitList(TUListNum)%HeatingCoilPresent(NumTUInList))THEN
     InletAirDrybulbC = SumHeatInletDB
     InletAirWetbulbC = SumHeatInletWB
     SELECT CASE(VRF(VRFCond)%HeatingPerformanceOATType)
@@ -1227,7 +1235,7 @@ SUBROUTINE CalcVRFCondenser(VRFCond, FirstHVACIteration)
       END IF
     END IF
 
-    VRF(VRFCond)%HRTime = CurrentEndTime - VRF(VRFCond)%HRTimer
+    VRF(VRFCond)%HRTime = MAX(0.d0,CurrentEndTime - VRF(VRFCond)%HRTimer)
     IF(VRF(VRFCond)%HRTime .LT. (HRCapTC * 5.d0))THEN
       IF(HRCAPTC .GT. 0.d0)THEN
         SUMultiplier = MIN(1.d0, 1.d0 - EXP(-VRF(VRFCond)%HRTime/HRCAPTC))
@@ -1486,7 +1494,7 @@ SUBROUTINE GetVRFInput
     USE MixedAir,              ONLY: GetOAMixerNodeNumbers
     USE DXCoils,               ONLY: GetDXCoolCoilIndex=>GetDXCoilIndex, &
                                      GetDXCoilInletNode=>GetCoilInletNode, GetDXCoilOutletNode=>GetCoilOutletNode, &
-                                     GetCoilCondenserInletNode, GetCoilTypeNum, SetDXCoolingCoilData
+                                     GetCoilCondenserInletNode, GetCoilTypeNum, SetDXCoolingCoilData, GetDXCoilAvailSchPtr
     USE DataHeatBalance,       ONLY: Zone
     USE OutAirNodeManager,     ONLY: CheckOutAirNodeNumber
     USE WaterManager,          ONLY: SetupTankDemandComponent, SetupTankSupplyComponent
@@ -1613,7 +1621,7 @@ SUBROUTINE GetVRFInput
     ! read all terminal unit list objects
     cCurrentModuleObject= 'ZoneTerminalUnitList'
     DO VRFNum = 1,  NumVRFTULists
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),VRFNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,VRFNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                          NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1637,6 +1645,10 @@ SUBROUTINE GetVRFInput
       ALLOCATE(TerminalUnitList(VRFNum)%TerminalUnitNotSizedYet(TerminalUnitList(VRFNum)%NumTUInList))
       ALLOCATE(TerminalUnitList(VRFNum)%HRHeatRequest(TerminalUnitList(VRFNum)%NumTUInList))
       ALLOCATE(TerminalUnitList(VRFNum)%HRCoolRequest(TerminalUnitList(VRFNum)%NumTUInList))
+      ALLOCATE(TerminalUnitList(VRFNum)%CoolingCoilAvailable(TerminalUnitList(VRFNum)%NumTUInList))
+      ALLOCATE(TerminalUnitList(VRFNum)%HeatingCoilAvailable(TerminalUnitList(VRFNum)%NumTUInList))
+      ALLOCATE(TerminalUnitList(VRFNum)%CoolingCoilAvailSchPtr(TerminalUnitList(VRFNum)%NumTUInList))
+      ALLOCATE(TerminalUnitList(VRFNum)%HeatingCoilAvailSchPtr(TerminalUnitList(VRFNum)%NumTUInList))
       TerminalUnitList(VRFNum)%ZoneTUPtr     = 0
       TerminalUnitList(VRFNum)%IsSimulated   = .FALSE.
       TerminalUnitList(VRFNum)%TotalCoolLoad = 0.0d0
@@ -1646,6 +1658,10 @@ SUBROUTINE GetVRFInput
       TerminalUnitList(VRFNum)%TerminalUnitNotSizedYet = .TRUE.
       TerminalUnitList(VRFNum)%HRHeatRequest = .FALSE.
       TerminalUnitList(VRFNum)%HRCoolRequest = .FALSE.
+      TerminalUnitList(VRFNum)%CoolingCoilAvailable = .FALSE.
+      TerminalUnitList(VRFNum)%HeatingCoilAvailable = .FALSE.
+      TerminalUnitList(VRFNum)%CoolingCoilAvailSchPtr = -1
+      TerminalUnitList(VRFNum)%HeatingCoilAvailSchPtr = -1
       DO TUListNum = 1, TerminalUnitList(VRFNum)%NumTUInList
         TerminalUnitList(VRFNum)%ZoneTUName(TUListNum) = cAlphaArgs(TUListNum+1)
       END DO
@@ -1654,7 +1670,7 @@ SUBROUTINE GetVRFInput
     ! read all VRF condenser objects
     cCurrentModuleObject= 'AirConditioner:VariableRefrigerantFlow'
     DO VRFNum = 1,  NumVRFCond
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),VRFNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,VRFNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                          NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1667,8 +1683,18 @@ SUBROUTINE GetVRFInput
       ENDIF
       VRF(VRFNum)%Name  = cAlphaArgs(1)
       VRF(VRFNum)%VRFSystemTypeNum = VRF_HeatPump
-      IF (.NOT. lAlphaFieldBlanks(2)) VRF(VRFNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
- !     CALL TestCompSet(TRIM(cCurrentModuleObject),VRF(VRFTUNum)%Name,cAlphaArgs(3),cAlphaArgs(4),'Air Nodes')
+      IF (lAlphaFieldBlanks(2)) THEN
+        VRF(VRFNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        VRF(VRFNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (VRF(VRFNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(VRF(VRFNum)%Name)//'" invalid data')
+          CALL ShowContinueError('Invalid-not found '//trim(cAlphaFieldNames(2))//'="'//    &
+             trim(cAlphaArgs(2))//'".')
+          ErrorsFound=.true.
+        ENDIF
+      ENDIF
+!     CALL TestCompSet(TRIM(cCurrentModuleObject),VRF(VRFTUNum)%Name,cAlphaArgs(3),cAlphaArgs(4),'Air Nodes')
 
 
       VRF(VRFNum)%CoolingCapacity = rNumericArgs(1)
@@ -1841,7 +1867,7 @@ SUBROUTINE GetVRFInput
       VRF(VRFNum)%MaxOATHeating   = rNumericArgs(9)
       IF(VRF(VRFNum)%MinOATHeating .GE. VRF(VRFNum)%MaxOATHeating)THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//', "'//TRIM(VRF(VRFNum)%Name)//'"')
-        CALL ShowContinueError('... '//TRIM(cNumericFieldNames(7))//' ('//TRIM(TrimSigDigits(VRF(VRFNum)%MinOATHeating,3))// &
+        CALL ShowContinueError('... '//TRIM(cNumericFieldNames(8))//' ('//TRIM(TrimSigDigits(VRF(VRFNum)%MinOATHeating,3))// &
                                ') must be less than maximum ('//TRIM(TrimSigDigits(VRF(VRFNum)%MaxOATHeating,3))//').')
         ErrorsFound=.TRUE.
       END IF
@@ -2164,7 +2190,7 @@ SUBROUTINE GetVRFInput
       VRF(VRFNum)%DefrostCapacity = rNumericArgs(21)
       IF(VRF(VRFNum)%DefrostCapacity .EQ. 0.0d0 .AND. VRF(VRFNum)%DefrostStrategy .EQ. RESISTIVE) THEN
         CALL ShowWarningError(TRIM(cCurrentModuleObject)//', "'//TRIM(VRF(VRFNum)%Name)//&
-                          '" '//TRIM(cNumericFieldNames(20))//' = 0.0 for defrost strategy = RESISTIVE.')
+                          '" '//TRIM(cNumericFieldNames(21))//' = 0.0 for defrost strategy = RESISTIVE.')
       END IF
 
       VRF(VRFNum)%MaxOATDefrost = rNumericArgs(22)
@@ -2220,7 +2246,16 @@ SUBROUTINE GetVRFInput
         ErrorsFound=.TRUE.
       END IF
 
-      VRF(VRFNum)%WaterCondVolFlowRate = rNumericArgs(23)
+      IF(lNumericFieldBlanks(23))THEN
+        IF(VRF(VRFNum)%CondenserType == WaterCooled)THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//', "'//TRIM(VRF(VRFNum)%Name)//&
+                          '" '//TRIM(cNumericFieldNames(23))//' is blank.')
+          CALL ShowContinueError('...input is required when '//TRIM(cAlphaFieldNames(34))//' = '//TRIM(cAlphaArgs(34)))
+          ErrorsFound=.TRUE.
+        END IF
+      ELSE
+        VRF(VRFNum)%WaterCondVolFlowRate = rNumericArgs(23)
+      END IF
       VRF(VRFNum)%EvapCondEffectiveness = rNumericArgs(24)
       VRF(VRFNum)%EvapCondAirVolFlowRate = rNumericArgs(25)
       VRF(VRFNum)%EvapCondPumpPower = rNumericArgs(26)
@@ -2241,7 +2276,7 @@ SUBROUTINE GetVRFInput
       VRF(VRFNum)%BasinHeaterPowerFTempDiff = rNumericArgs(27)
       IF(rNumericArgs(27) .LT. 0.0d0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = "'//TRIM(VRF(VRFNum)%Name)//&
-                   '", '//TRIM(cNumericFieldNames(26))//' must be >= 0')
+                   '", '//TRIM(cNumericFieldNames(27))//' must be >= 0')
         ErrorsFound = .TRUE.
       END IF
 
@@ -2252,7 +2287,7 @@ SUBROUTINE GetVRFInput
         ENDIF
         IF(VRF(VRFNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
           CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = "'//TRIM(VRF(VRFNum)%Name)//&
-           '", '//TRIM(cNumericFieldNames(27))//' is less than 2 deg C. Freezing could occur.')
+           '", '//TRIM(cNumericFieldNames(28))//' is less than 2 deg C. Freezing could occur.')
         END IF
       END IF
 
@@ -2269,7 +2304,9 @@ SUBROUTINE GetVRFInput
       VRF(VRFNum)%FuelType = FuelTypeElectric
       IF(.NOT. lAlphaFieldBlanks(39))THEN
         !A39; \field Fuel type
-        IF (SameString(cAlphaArgs(39),"ELECTRIC")) THEN
+        IF (SameString(cAlphaArgs(39),"ELECTRICITY")) THEN
+          VRF(VRFNum)%FuelType = FuelTypeElectric
+        ELSE IF (SameString(cAlphaArgs(39),"ELECTRIC")) THEN
           VRF(VRFNum)%FuelType = FuelTypeElectric
         ELSE IF (SameString(cAlphaArgs(39),"NATURALGAS")) THEN
           VRF(VRFNum)%FuelType = FuelTypeNaturalGas
@@ -2283,10 +2320,15 @@ SUBROUTINE GetVRFInput
           VRF(VRFNum)%FuelType = FuelTypeFuelOil1
         ELSE IF (SameString(cAlphaArgs(39),"FUELOIL#2")) THEN
           VRF(VRFNum)%FuelType = FuelTypeFuelOil2
+        ELSE IF (SameString(cAlphaArgs(39),'OtherFuel1')) THEN
+          VRF(VRFNum)%FuelType = FuelTypeOtherFuel1
+        ELSE IF (SameString(cAlphaArgs(39),'OtherFuel2')) THEN
+          VRF(VRFNum)%FuelType = FuelTypeOtherFuel2
         ELSE
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//', "'//TRIM(VRF(VRFNum)%Name)//&
                '", '//TRIM(cAlphaFieldNames(39))//' not found = '//TRIM(cAlphaArgs(39)))
-          CALL ShowContinueError('Valid choices are Electric, NaturalGas, PropaneGas, Diesel, Gasoline, FuelOil#1 or FuelOil#2')
+          CALL ShowContinueError('Valid choices are Electric, NaturalGas, PropaneGas, Diesel, Gasoline, FuelOil#1, '//  &
+             'FuelOil#2, OtherFuel1 or OtherFuel2')
           ErrorsFound=.TRUE.
         END IF
       END IF
@@ -2355,7 +2397,7 @@ SUBROUTINE GetVRFInput
             ErrorsFound=.TRUE.
           END SELECT
         END IF
-        IF(.NOT. lNumericFieldBlanks(30))THEN
+        IF(.NOT. lNumericFieldBlanks(31))THEN
           VRF(VRFNum)%HRInitialCoolCapFrac = rNumericArgs(31)
         END IF
         VRF(VRFNum)%HRCoolCapTC          = rNumericArgs(32)
@@ -2460,7 +2502,7 @@ SUBROUTINE GetVRFInput
       HCoilInletNodeNum  = 0
       HCoilOutletNodeNum = 0
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),VRFTUNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,VRFTUNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT, &
                          NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2495,7 +2537,17 @@ SUBROUTINE GetVRFInput
         EXIT
       END DO
       VRFTU(VRFTUNum)%VRFTUType_Num = VRFTUType_ConstVolume
-      IF (.NOT. lAlphaFieldBlanks(2)) VRFTU(VRFTUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (lAlphaFieldBlanks(2)) THEN
+        VRFTU(VRFTUNum)%SchedPtr = ScheduleAlwaysOn
+      ELSE
+        VRFTU(VRFTUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+        IF (VRFTU(VRFTUNum)%SchedPtr == 0) THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(VRFTU(VRFTUNum)%Name)//'" invalid data')
+          CALL ShowContinueError('Invalid-not found '//trim(cAlphaFieldNames(2))//'="'//    &
+             trim(cAlphaArgs(2))//'".')
+          ErrorsFound=.true.
+        ENDIF
+      ENDIF
 
       VRFTU(VRFTUNum)%VRFTUInletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),VRFTU(VRFTUNum)%Name, &
@@ -2515,7 +2567,14 @@ SUBROUTINE GetVRFInput
 
       VRFTU(VRFTUNum)%FanOpModeSchedPtr = GetScheduleIndex(cAlphaArgs(5))
       ! default to constant fan operating mode
-      IF(VRFTU(VRFTUNum)%FanOpModeSchedPtr == 0)VRFTU(VRFTUNum)%OpMode = ContFanCycCoil
+      IF(VRFTU(VRFTUNum)%FanOpModeSchedPtr == 0)THEN
+        IF(.NOT. lAlphaFieldBlanks(5))THEN
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(VRFTU(VRFTUNum)%Name))
+          CALL ShowContinueError('...'//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5))//' not found.')
+          CALL ShowContinueError('...Defaulting to constant fan operating mode and simulation continues.')
+        END IF
+        VRFTU(VRFTUNum)%OpMode = ContFanCycCoil
+      END IF
 
       IF (SameString(cAlphaArgs(6),'BlowThrough') ) VRFTU(VRFTUNum)%FanPlace = BlowThru
       IF (SameString(cAlphaArgs(6),'DrawThrough') ) VRFTU(VRFTUNum)%FanPlace = DrawThru
@@ -2651,6 +2710,8 @@ SUBROUTINE GetVRFInput
        ELSE
          IF (SameString(cAllCoilTypes(VRFTU(VRFTUNum)%DXCoolCoilType_Num),cAllCoilTypes(CoilVRF_Cooling))) THEN
            ErrFlag = .FALSE.
+           TerminalUnitList(VRFTU(VRFTUNum)%TUListIndex)%CoolingCoilAvailSchPtr(VRFTU(VRFTUNum)%IndexToTUInTUList) = &
+               GetDXCoilAvailSchPtr(DXCoolingCoilType,cAlphaArgs(12),ErrFlag)
            CALL GetDXCoolCoilIndex(cAlphaArgs(12),VRFTU(VRFTUNum)%CoolCoilIndex, &
                                   ErrFlag, cAllCoilTypes(CoilVRF_Cooling))
            CCoilInletNodeNum = GetDXCoilInletNode(cAllCoilTypes(CoilVRF_Cooling),cAlphaArgs(12),ErrFlag)
@@ -2706,6 +2767,8 @@ SUBROUTINE GetVRFInput
       ELSE
         IF (SameString(cAllCoilTypes(VRFTU(VRFTUNum)%DXHeatCoilType_Num),cAllCoilTypes(CoilVRF_Heating))) THEN
           ErrFlag = .FALSE.
+          TerminalUnitList(VRFTU(VRFTUNum)%TUListIndex)%HeatingCoilAvailSchPtr(VRFTU(VRFTUNum)%IndexToTUInTUList) = &
+               GetDXCoilAvailSchPtr(DXHeatingCoilType,cAlphaArgs(14),ErrFlag)
           CALL GetDXCoolCoilIndex(cAlphaArgs(14),VRFTU(VRFTUNum)%HeatCoilIndex, &
                                  ErrFlag, cAllCoilTypes(CoilVRF_Heating))
           HCoilInletNodeNum = GetDXCoilInletNode(cAllCoilTypes(CoilVRF_Heating),cAlphaArgs(14),ErrFlag)
@@ -3133,44 +3196,44 @@ SUBROUTINE GetVRFInput
 
     DO VRFNum = 1,  NumVRFTU
       IF(VRFTU(VRFNum)%CoolingCoilPresent)THEN
-        CALL SetupOutputVariable('Zone Terminal Unit Cooling Electric Consumption Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Cooling Electric Power [W]', &
                                   VRFTU(VRFNum)%ParasiticCoolElecPower,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Cooling Electric Consumption[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Cooling Electric Energy [J]', &
                                   VRFTU(VRFNum)%ParasiticElecCoolConsumption, 'System','Sum', VRFTU(VRFNum)%Name, &
                                   ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
-        CALL SetupOutputVariable('Zone Terminal Unit Total Cooling Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Total Cooling Rate [W]', &
                                   VRFTU(VRFNum)%TotalCoolingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Sensible Cooling Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Sensible Cooling Rate [W]', &
                                   VRFTU(VRFNum)%SensibleCoolingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Latent Cooling Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Latent Cooling Rate [W]', &
                                   VRFTU(VRFNum)%LatentCoolingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Total Cooling Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Total Cooling Energy [J]', &
                                   VRFTU(VRFNum)%TotalCoolingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Sensible Cooling Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Sensible Cooling Energy [J]', &
                                   VRFTU(VRFNum)%SensibleCoolingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Latent Cooling Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Latent Cooling Energy [J]', &
                                   VRFTU(VRFNum)%LatentCoolingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
       END IF
       IF(VRFTU(VRFNum)%HeatingCoilPresent)THEN
-        CALL SetupOutputVariable('Zone Terminal Unit Heating Electric Consumption Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Heating Electric Power [W]', &
                                   VRFTU(VRFNum)%ParasiticHeatElecPower,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Heating Electric Consumption[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Heating Electric Energy [J]', &
                                   VRFTU(VRFNum)%ParasiticElecHeatConsumption, 'System','Sum', VRFTU(VRFNum)%Name, &
                                   ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
-        CALL SetupOutputVariable('Zone Terminal Unit Total Heating Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Total Heating Rate [W]', &
                                   VRFTU(VRFNum)%TotalHeatingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Sensible Heating Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Sensible Heating Rate [W]', &
                                   VRFTU(VRFNum)%SensibleHeatingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Latent Heating Rate[W]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Latent Heating Rate [W]', &
                                   VRFTU(VRFNum)%LatentHeatingRate,'System','Average', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Total Heating Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Total Heating Energy [J]', &
                                   VRFTU(VRFNum)%TotalHeatingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Sensible Heating Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Sensible Heating Energy [J]', &
                                   VRFTU(VRFNum)%SensibleHeatingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
-        CALL SetupOutputVariable('Zone Terminal Unit Latent Heating Energy[J]', &
+        CALL SetupOutputVariable('Zone VRF Air Terminal Latent Heating Energy [J]', &
                                   VRFTU(VRFNum)%LatentHeatingEnergy, 'System','Sum', VRFTU(VRFNum)%Name)
       END IF
-      CALL SetupOutputVariable('Zone Terminal Unit Fan Availability Status',&
+      CALL SetupOutputVariable('Zone VRF Air Terminal Fan Availability Status []',&
                                 VRFTU(VRFNum)%AvailStatus,'System','Average',VRFTU(VRFNum)%Name)
       IF (AnyEnergyManagementSystemInModel) THEN
         CALL SetupEMSActuator('Variable Refrigerant Flow Terminal Unit', VRFTU(VRFNum)%Name, 'Part Load Ratio' , '[fraction]', &
@@ -3179,108 +3242,125 @@ SUBROUTINE GetVRFInput
     END DO
 
     DO NumCond = 1, NumVRFCond
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Total Cooling Capacity[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Total Cooling Rate [W]', &
                                 VRF(NumCond)%TotalCoolingCapacity, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Total Heating Capacity[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Total Heating Rate [W]', &
                                 VRF(NumCond)%TotalHeatingCapacity, 'System','Average', VRF(NumCond)%Name)
+      IF (VRF(NumCond)%FuelType == FuelTypeElectric) THEN
+        CALL SetupOutputVariable('VRF Heat Pump Cooling Electric Power [W]', &
+                                  VRF(NumCond)%ElecCoolingPower, 'System','Average', VRF(NumCond)%Name)
+        CALL SetupOutputVariable('VRF Heat Pump Cooling Electric Energy [J]', &
+                                  VRF(NumCond)%CoolElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
+                                  ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
+                                  EndUseKey='COOLING',GroupKey='System')
+      ELSE
+        CALL SetupOutputVariable('VRF Heat Pump Cooling '// &
+                                  TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Rate [W]', &
+                                  VRF(NumCond)%ElecCoolingPower, 'System','Average', VRF(NumCond)%Name)
+        CALL SetupOutputVariable('VRF Heat Pump Cooling '// &
+                                  TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Energy [J]', &
+                                  VRF(NumCond)%CoolElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
+                                  ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
+                                  EndUseKey='COOLING',GroupKey='System')
+      ENDIF
+      IF (VRF(NumCond)%FuelType == FuelTypeElectric) THEN
+        CALL SetupOutputVariable('VRF Heat Pump Heating Electric Power [W]', &
+                                  VRF(NumCond)%ElecHeatingPower, 'System','Average', VRF(NumCond)%Name)
+        CALL SetupOutputVariable('VRF Heat Pump Heating Electric Energy [J]', &
+                                  VRF(NumCond)%HeatElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
+                                  ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
+                                  EndUseKey='HEATING',GroupKey='System')
+      ELSE
+        CALL SetupOutputVariable('VRF Heat Pump Heating '// &
+                                  TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Rate [W]', &
+                                  VRF(NumCond)%ElecHeatingPower, 'System','Average', VRF(NumCond)%Name)
+        CALL SetupOutputVariable('VRF Heat Pump Heating '// &
+                                  TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Energy [J]', &
+                                  VRF(NumCond)%HeatElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
+                                  ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
+                                  EndUseKey='HEATING',GroupKey='System')
+      ENDIF
 
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Cooling '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Consumption Rate[W]', &
-                                VRF(NumCond)%ElecCoolingPower, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Cooling '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Consumption[J]', &
-                                VRF(NumCond)%CoolElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
-                                ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
-                                EndUseKey='COOLING',GroupKey='System')
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Heating '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Consumption Rate[W]', &
-                                VRF(NumCond)%ElecHeatingPower, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Heating '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Consumption[J]', &
-                                VRF(NumCond)%HeatElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
-                                ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
-                                EndUseKey='HEATING',GroupKey='System')
-
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Cooling COP[]', &
+      CALL SetupOutputVariable('VRF Heat Pump Cooling COP []', &
                                 VRF(NumCond)%OperatingCoolingCOP,'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Heating COP[]', &
+      CALL SetupOutputVariable('VRF Heat Pump Heating COP []', &
                                 VRF(NumCond)%OperatingHeatingCOP,'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Operating COP[]', &
+      CALL SetupOutputVariable('VRF Heat Pump COP []', &
                                 VRF(NumCond)%OperatingCOP,'System','Average', VRF(NumCond)%Name)
 
       IF(VRF(NumCond)%DefrostStrategy == Resistive)THEN
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Electric Defrost Consumption Rate[W]', &
+        CALL SetupOutputVariable('VRF Heat Pump Defrost Electric Power [W]', &
                                 VRF(NumCond)%DefrostPower, 'System','Average', VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Electric Defrost Consumption[J]', &
+        CALL SetupOutputVariable('VRF Heat Pump Defrost Electric Energy [J]', &
                                 VRF(NumCond)%DefrostConsumption, 'System','Sum',VRF(NumCond)%Name, &
                                 ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
       ELSE ! defrost energy appied to fuel type
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Defrost Consumption Rate[W]', &
+        CALL SetupOutputVariable('VRF Heat Pump Defrost '// &
+                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Rate [W]', &
                                 VRF(NumCond)%ElecHeatingPower, 'System','Average', VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump '// &
-                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Defrost Consumption[J]', &
+        CALL SetupOutputVariable('VRF Heat Pump Defrost '// &
+                                TRIM(cValidFuelTypes(VRF(NumCond)%FuelType))//' Energy [J]', &
                                 VRF(NumCond)%HeatElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
                                 ResourceTypeKey=TRIM(cValidFuelTypes(VRF(NumCond)%FuelType)), &
                                 EndUseKey='HEATING',GroupKey='System')
       END IF
 
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Part Load Ratio', &
+      CALL SetupOutputVariable('VRF Heat Pump Part Load Ratio []', &
                                 VRF(NumCond)%VRFCondPLR, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Runtime Fraction', &
+      CALL SetupOutputVariable('VRF Heat Pump Runtime Fraction []', &
                                 VRF(NumCond)%VRFCondRTF, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Cycling Ratio', &
+      CALL SetupOutputVariable('VRF Heat Pump Cycling Ratio []', &
                                 VRF(NumCond)%VRFCondCyclingRatio, 'System','Average',VRF(NumCond)%Name)
 
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Operating Mode', &
+      CALL SetupOutputVariable('VRF Heat Pump Operating Mode []', &
                                 VRF(NumCond)%OperatingMode, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Inlet Temp[C]', &
+      CALL SetupOutputVariable('VRF Heat Pump Condenser Inlet Temperature [C]', &
                                 VRF(NumCond)%CondenserInletTemp, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Maximum Terminal Unit Cooling Capacity[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Maximum Capacity Cooling Rate [W]', &
                                 MaxCoolingCapacity(NumCond), 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Maximum Terminal Unit Heating Capacity[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Maximum Capacity Heating Rate [W]', &
                                 MaxHeatingCapacity(NumCond), 'System','Average', VRF(NumCond)%Name)
 
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump CrankCase Heater Electric Power[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Crankcase Heater Electric Power [W]', &
                                 VRF(NumCond)%CrankCaseHeaterPower, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump CrankCase Heater Electric Consumption[J]', &
+      CALL SetupOutputVariable('VRF Heat Pump Crankcase Heater Electric Energy [J]', &
                                 VRF(NumCond)%CrankCaseHeaterElecConsumption, 'System','Sum', VRF(NumCond)%Name, &
                                 ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Terminal Unit Cooling Load[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Terminal Unit Cooling Load Rate [W]', &
                                 VRF(NumCond)%TUCoolingLoad, 'System','Average', VRF(NumCond)%Name)
-      CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Terminal Unit Heating Load[W]', &
+      CALL SetupOutputVariable('VRF Heat Pump Terminal Unit Heating Load Rate [W]', &
                                 VRF(NumCond)%TUHeatingLoad, 'System','Average', VRF(NumCond)%Name)
       IF(VRF(NumCond)%HeatRecoveryUsed)THEN
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Recovery Status Change Multiplier[]', &
+        CALL SetupOutputVariable('VRF Heat Pump Heat Recovery Status Change Multiplier []', &
                                   VRF(NumCond)%SUMultiplier, 'System','Average',VRF(NumCond)%Name)
       END IF
 
       IF(VRF(NumCond)%CondenserType .EQ. EvapCooled)THEN
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Evap Condenser Water Consumption[m3]', &
+        CALL SetupOutputVariable('VRF Heat Pump Evaporative Condenser Water Use Volume [m3]', &
                                   VRF(NumCond)%EvapWaterConsumpRate, 'System','Sum',VRF(NumCond)%Name, &
                                   ResourceTypeKey='Water',EndUseKey='Cooling',GroupKey='System')
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Evap Condenser Pump Electric Power[W]', &
+        CALL SetupOutputVariable('VRF Heat Pump Evaporative Condenser Pump Electric Power [W]', &
                                   VRF(NumCond)%EvapCondPumpElecPower, 'System','Average',VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Evap Condenser Pump Electric Consumption[J]', &
+        CALL SetupOutputVariable('VRF Heat Pump Evaporative Condenser Pump Electric Energy [J]', &
                                   VRF(NumCond)%EvapCondPumpElecConsumption,'System','Sum',VRF(NumCond)%Name, &
                                   ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
 
         IF(VRF(NumCond)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
-          CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Basin Heater Electric Power [W]', &
+          CALL SetupOutputVariable('VRF Heat Pump Basin Heater Electric Power [W]', &
                                     VRF(NumCond)%BasinHeaterPower,'System','Average',VRF(NumCond)%Name)
-          CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Basin Heater Electric Consumption [J]', &
+          CALL SetupOutputVariable('VRF Heat Pump Basin Heater Electric Energy [J]', &
                                     VRF(NumCond)%BasinHeaterConsumption,'System','Sum',VRF(NumCond)%Name, &
                                     ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
         END IF
 
       ELSE IF(VRF(NumCond)%CondenserType .EQ. WaterCooled)THEN
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Outlet Temp [C]', &
+        CALL SetupOutputVariable('VRF Heat Pump Condenser Outlet Temperature [C]', &
                                   VRF(NumCond)%CondenserSideOutletTemp, 'System','Average',VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Water Mass Flow Rate [kg/s]', &
+        CALL SetupOutputVariable('VRF Heat Pump Condenser Mass Flow Rate [kg/s]', &
                                   VRF(NumCond)%WaterCondenserMassFlow, 'System','Average',VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Condenser Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('VRF Heat Pump Condenser Heat Transfer Rate [W]', &
                                   VRF(NumCond)%QCondenser, 'System','Average',VRF(NumCond)%Name)
-        CALL SetupOutputVariable('Variable Refrigerant Flow Heat Pump Condenser Heat Transfer [J]', &
+        CALL SetupOutputVariable('VRF Heat Pump Condenser Heat Transfer Energy [J]', &
                                   VRF(NumCond)%QCondEnergy, 'System','Sum',VRF(NumCond)%Name)
       END IF
 
@@ -3557,12 +3637,12 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
                                  VRF(VRFCond)%SourceBranchNum, &
                                  VRF(VRFCond)%SourceCompNum)
     END IF
-    IF(MyVRFCondFlag(VRFCond))THEN
+!    IF(MyVRFCondFlag(VRFCond))THEN
       VRF(VRFCond)%HRTimer      = 0.d0
       VRF(VRFCond)%ModeChange   = .FALSE.
       VRF(VRFCond)%HRModeChange = .FALSE.
       MyVRFCondFlag(VRFCond)    = .FALSE.
-    END IF
+!    END IF
   END IF ! IF (BeginEnvrnFlag .and. MyEnvrnFlag(VRFTUNum)) THEN
 
   ! reset environment flag for next environment
@@ -3714,6 +3794,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
   END IF
 
   ! if condenser is off, all terminal unit coils are off
+!!!LKL Discrepancy < 0
   IF (GetCurrentScheduleValue(VRF(VRFCond)%SchedPtr) .EQ. 0.0) THEN
     HeatingLoad(VRFCond) = .FALSE.
     CoolingLoad(VRFCond) = .FALSE.
@@ -3748,19 +3829,25 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
           CASE DEFAULT
         END SELECT
         IF(EnableSystem)THEN
-          IF((OutsideDryBulbTemp .GE. VRF(VRFCond)%MinOATHeating .OR. OutsideDryBulbTemp .LE. VRF(VRFCond)%MaxOATHeating) .AND. &
+          IF((OutsideDryBulbTemp .GE. VRF(VRFCond)%MinOATHeating .AND. OutsideDryBulbTemp .LE. VRF(VRFCond)%MaxOATHeating) .AND. &
               ANY(TerminalUnitList(TUListIndex)%HeatingCoilPresent))THEN
             HeatingLoad(VRFCond) = .TRUE.
           ELSE
+          IF(ANY(TerminalUnitList(TUListIndex)%CoolingCoilAvailable))THEN
             IF(VRF(VRFCond)%CoolingMaxTempLimitIndex == 0)THEN
-              CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
-              CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Outdoor Temperature in Cooling Mode Limits have '// &
+              CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+              CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Operating Temperature in Cooling Mode Limits have '// &
                                    'been exceeded and VRF system is disabled.')
-              CALL ShowContinueError('... Outdoor Dry-Bulb Temperature                 = '// &
+              IF(VRF(VRFCond)%CondenserType == WaterCooled) THEN
+                CALL ShowContinueError('... Outdoor Unit Inlet Water Temperature           = '// &
                                    TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
-              CALL ShowContinueError('... Cooling Minimum Outdoor Dry-Bulb Temperature = '// &
+              ELSE
+                CALL ShowContinueError('... Outdoor Unit Inlet Air Temperature                 = '// &
+                                   TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
+              END IF
+              CALL ShowContinueError('... Cooling Minimum Outdoor Unit Inlet Temperature = '// &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MinOATCooling,3)))
-              CALL ShowContinueError('... Cooling Maximum Outdoor Dry-Bulb Temperature = '//  &
+              CALL ShowContinueError('... Cooling Maximum Outdoor Unit Inlet Temperature = '//  &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MaxOATCooling,3)))
               CALL ShowContinueErrorTimeStamp('... Check VRF Heat Pump Min/Max Outdoor Temperature in Cooling Mode limits.')
             END IF
@@ -3768,22 +3855,30 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
                  TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Pump min/max cooling temperature limit error continues...',  &
                  VRF(VRFCond)%CoolingMaxTempLimitIndex,OutsideDryBulbTemp,OutsideDryBulbTemp)
           END IF
+          END IF
         ELSE
+          IF(ANY(TerminalUnitList(TUListIndex)%CoolingCoilAvailable))THEN
           IF(VRF(VRFCond)%CoolingMaxTempLimitIndex == 0)THEN
-            CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
-            CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Outdoor Temperature in Cooling Mode Limits have '// &
+            CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+            CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Operating Temperature in Cooling Mode Limits have '// &
                                    'been exceeded and VRF system is disabled.')
-            CALL ShowContinueError('... Outdoor Dry-Bulb Temperature                 = '// &
+            IF(VRF(VRFCond)%CondenserType == WaterCooled) THEN
+              CALL ShowContinueError('... Outdoor Unit Inlet Water Temperature           = '// &
                                    TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
-            CALL ShowContinueError('... Cooling Minimum Outdoor Dry-Bulb Temperature = '// &
+            ELSE
+              CALL ShowContinueError('... Outdoor Unit Inlet Air Temperature                 = '// &
+                                   TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
+            END IF
+            CALL ShowContinueError('... Cooling Minimum Outdoor Unit Inlet Temperature = '// &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MinOATCooling,3)))
-            CALL ShowContinueError('... Cooling Maximum Outdoor Dry-Bulb Temperature = '//  &
+            CALL ShowContinueError('... Cooling Maximum Outdoor Unit Inlet Temperature = '//  &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MaxOATCooling,3)))
             CALL ShowContinueErrorTimeStamp('... Check VRF Heat Pump Min/Max Outdoor Temperature in Cooling Mode limits.')
           END IF
           CALL ShowRecurringWarningErrorAtEnd(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//  &
                  TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Pump min/max cooling temperature limit error continues...',  &
                  VRF(VRFCond)%CoolingMaxTempLimitIndex,OutsideDryBulbTemp,OutsideDryBulbTemp)
+        END IF
         END IF
       END IF
     ELSEIF(HeatingLoad(VRFCond))THEN
@@ -3800,19 +3895,25 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
           CASE DEFAULT
         END SELECT
         IF(EnableSystem)THEN
-          IF((OutsideDryBulbTemp .GE. VRF(VRFCond)%MinOATCooling .OR. OutsideDryBulbTemp .LE. VRF(VRFCond)%MaxOATCooling) .AND. &
+          IF((OutsideDryBulbTemp .GE. VRF(VRFCond)%MinOATCooling .AND. OutsideDryBulbTemp .LE. VRF(VRFCond)%MaxOATCooling) .AND. &
               ANY(TerminalUnitList(TUListIndex)%CoolingCoilPresent))THEN
-            CoolingLoad(VRFCond) = .TRUE.  ! Starteam code does not do this
+            CoolingLoad(VRFCond) = .TRUE.
           ELSE
+            IF(ANY(TerminalUnitList(TUListIndex)%HeatingCoilAvailable))THEN
             IF(VRF(VRFCond)%HeatingMaxTempLimitIndex == 0)THEN
-              CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
-              CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Outdoor Temperature in Heating Mode Limits '// &
+              CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+              CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Operating Temperature in Heating Mode Limits '// &
                                    'have been exceeded and VRF system is disabled.')
-              CALL ShowContinueError('... Outdoor Dry-Bulb Temperature                 = '// &
+              IF(VRF(VRFCond)%CondenserType == WaterCooled) THEN
+                CALL ShowContinueError('... Outdoor Unit Inlet Water Temperature           = '// &
                                    TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
-              CALL ShowContinueError('... Heating Minimum Outdoor Dry-Bulb Temperature = '// &
+              ELSE
+                CALL ShowContinueError('... Outdoor Unit Inlet Air Temperature             = '// &
+                                   TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
+              ENDIF
+              CALL ShowContinueError('... Heating Minimum Outdoor Unit Inlet Temperature = '// &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MinOATHeating,3)))
-              CALL ShowContinueError('... Heating Maximum Outdoor Dry-Bulb Temperature = '//  &
+              CALL ShowContinueError('... Heating Maximum Outdoor Unit Inlet Temperature = '//  &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MaxOATHeating,3)))
               CALL ShowContinueErrorTimeStamp('... Check VRF Heat Pump Min/Max Outdoor Temperature in Heating Mode limits.')
             END IF
@@ -3820,22 +3921,30 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
                    TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Pump min/max heating temperature limit error continues...',  &
                    VRF(VRFCond)%HeatingMaxTempLimitIndex,OutsideDryBulbTemp,OutsideDryBulbTemp)
           END IF
+          END IF
         ELSE
+          IF(ANY(TerminalUnitList(TUListIndex)%HeatingCoilAvailable))THEN
           IF(VRF(VRFCond)%HeatingMaxTempLimitIndex == 0)THEN
-            CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
-            CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Outdoor Temperature in Heating Mode Limits '// &
+            CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+            CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Operating Temperature in Heating Mode Limits '// &
                                    'have been exceeded and VRF system is disabled.')
-            CALL ShowContinueError('... Outdoor Dry-Bulb Temperature                 = '// &
+            IF(VRF(VRFCond)%CondenserType == WaterCooled) THEN
+              CALL ShowContinueError('... Outdoor Unit Inlet Water Temperature           = '// &
                                    TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
-            CALL ShowContinueError('... Heating Minimum Outdoor Dry-Bulb Temperature = '// &
+            ELSE
+              CALL ShowContinueError('... Outdoor Unit Inlet Air Temperature             = '// &
+                                   TRIM(TrimSigDigits(OutsideDryBulbTemp,3)))
+            END IF
+            CALL ShowContinueError('... Heating Minimum Outdoor Unit Inlet Temperature = '// &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MinOATHeating,3)))
-            CALL ShowContinueError('... Heating Maximum Outdoor Dry-Bulb Temperature = '//  &
+            CALL ShowContinueError('... Heating Maximum Outdoor Unit Inlet Temperature = '//  &
                                    TRIM(TrimSigDigits(VRF(VRFCond)%MaxOATHeating,3)))
             CALL ShowContinueErrorTimeStamp('... Check VRF Heat Pump Min/Max Outdoor Temperature in Heating Mode limits.')
           END IF
           CALL ShowRecurringWarningErrorAtEnd(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//  &
                    TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Pump min/max heating temperature limit error continues...',  &
                    VRF(VRFCond)%HeatingMaxTempLimitIndex,OutsideDryBulbTemp,OutsideDryBulbTemp)
+        END IF
         END IF
       END IF
     END IF
@@ -3891,29 +4000,42 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
   ! TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) - TU will operate in this mode if heat recovery is used
 
     QZnReq = ZoneSysEnergyDemand(VRFTU(VRFTUNum)%ZoneNum)%RemainingOutputRequired
-    LoadToCoolingSP = ZoneSysEnergyDemand(VRFTU(VRFTUNum)%ZoneNum)%OutputRequiredToCoolingSP
+    IF(ABS(QZnReq) .LT. SmallLoad) QZnReq = 0.d0
+    LoadToCoolingSP = ZoneSysEnergyDemand(VRFTU(VRFTUNum)%ZoneNum)%RemainingOutputReqToCoolSP
     ! set initial terminal unit operating mode for heat recovery
     ! operating mode for non-heat recovery set above using CoolingLoad(VRFCond) or HeatingLoad(VRFCond) variables
     ! first turn off terminal unit
     TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
     TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
     ! then set according to LoadToXXXXingSP variables
-    IF(LoadToCoolingSP .LT. 0.0)THEN
+    IF(LoadToCoolingSP .LT. -1.d0*SmallLoad)THEN
       TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .TRUE.
       TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
     END IF
-    LoadToHeatingSP = ZoneSysEnergyDemand(VRFTU(VRFTUNum)%ZoneNum)%OutputRequiredToHeatingSP
-    IF(LoadToHeatingSP .GT. 0.0)THEN
+    LoadToHeatingSP = ZoneSysEnergyDemand(VRFTU(VRFTUNum)%ZoneNum)%RemainingOutputReqToHeatSP
+    IF(LoadToHeatingSP .GT. SmallLoad)THEN
       TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
       TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
     END IF
+    IF(LoadToCoolingSP > 0.d0 .AND. LoadToHeatingSP < 0.d0)QZnReq=0.d0
+
     ! next check for overshoot when constant fan mode is used
     ! check operating load to see if OA will overshoot setpoint temperature when constant fan mode is used
     IF(VRFTU(VRFTUNum)%OpMode == ContFanCycCoil)THEN
       CALL SetCompFlowRate(VRFTUNum, VRFCond, .TRUE.)
       CALL CalcVRF(VRFTUNum,FirstHVACIteration,0.0d0,TempOutput,OnOffAirFlowRatio)
-      ! If the Terminal Unit has a net cooling capacity (NoCompOutput < 0) and
+      ! If the Terminal Unit has a net cooling capacity (TempOutput < 0) and
       ! the zone temp is above the Tstat heating setpoint (QToHeatSetPt < 0)
+      ! see if the terminal unit operation will exceed the setpoint
+      !
+      ! 4 tests here to cover all possibilities:
+      ! IF(TempOutput < 0.0d0 .AND. LoadToHeatingSP .LT. 0.0d0)THEN
+      ! ELSE IF(TempOutput .GT. 0.0d0 .AND. LoadToCoolingSP .GT. 0.0d0)THEN
+      ! ELSE IF(TempOutput .GT. 0.0d0 .AND. LoadToCoolingSP .LT. 0.0d0)THEN
+      ! ELSE IF(TempOutput < 0.0d0 .AND. LoadToHeatingSP .GT. 0.0d0)THEN
+      ! END IF
+      ! could compress these to 2 complex IF's but logic inside each would get more complex
+      !
       IF(TempOutput < 0.0d0 .AND. LoadToHeatingSP .LT. 0.0d0)THEN
         ! If the net cooling capacity overshoots the heating setpoint count as heating load
         IF(TempOutput < LoadToHeatingSP)THEN
@@ -3937,15 +4059,10 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
                 TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
               END IF
             ELSE
-              ! last mode was heating, zone temp will overshoot cooling setpoint, reset QznReq to LoadtoCoolingSP
-!             IF(TempOutput > LoadToCoolingSP)THEN
-!               QZnReq = LoadToCoolingSP
+              ! last mode was heating, zone temp will overshoot heating setpoint, reset QznReq to LoadtoHeatingSP
               QZnReq = LoadToHeatingSP
               TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
               TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
-!             ELSE
-!              QZnReq = 0.d0
-!             END IF
             END IF
           END IF
         ELSE IF(TempOutput > LoadToCoolingSP .AND. LoadToCoolingSP < 0.d0)THEN
@@ -3955,14 +4072,12 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
           TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .TRUE.
         ELSE IF(TempOutput < LoadToCoolingSP .AND. LoadToCoolingSP < 0.d0)THEN
 !       If the net cooling capacity meets the zone cooling load but does not overshoot heating setpoint
-! changes answer, implement later. This code eliminates difference between
-! when cooling is active and when start up multiplier < 1 (difference in time)
-!          QZnReq = 0.d0
-          QZnReq = LoadToCoolingSP
+          QZnReq = 0.d0
           TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
           TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
         END IF
 !     If the terminal unit has a net heating capacity and the zone temp is below the Tstat cooling setpoint
+!     see if the terminal unit operation will exceed the setpoint
       ELSE IF(TempOutput .GT. 0.0d0 .AND. LoadToCoolingSP .GT. 0.0d0)THEN
 !       If the net heating capacity overshoots the cooling setpoint count as cooling load
         IF(TempOutput > LoadToCoolingSP)THEN
@@ -3991,14 +4106,99 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
             END IF
           END IF
         ELSE IF(TempOutput .LT. LoadToHeatingSP)THEN
-          QZnReq = LoadToHeatingSP
-          TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
+!         Don't count as heating load unless mode is allowed. Also check for floating zone.
+          IF(TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. SingleCoolingSetPoint .AND. &
+             TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. 0)THEN
+            IF(.NOT. LastModeHeating(VRFCond))THEN
+              IF(VRFTU(VRFTUNum)%OAMixerUsed)THEN
+                Node(VRFTU(VRFTUNum)%VRFTUOAMixerRetNodeNum)%MassFlowRate = VRFTU(VRFTUNum)%MaxHeatAirMassFlow
+                Node(VRFTU(VRFTUNum)%VRFTUOAMixerOANodeNum)%MassFlowRate = VRFTU(VRFTUNum)%HeatOutAirMassFlow
+                CALL SimOAMixer(VRFTU(VRFTUNum)%OAMixerName,FirstHVACIteration,VRFTU(VRFTUNum)%OAMixerIndex)
+              ELSE
+                Node(VRFTU(VRFTUNum)%VRFTUInletNodeNum)%MassFlowRate = VRFTU(VRFTUNum)%MaxHeatAirMassFlow
+              END IF
+              CALL CalcVRF(VRFTUNum,FirstHVACIteration,0.0d0,TempOutput,OnOffAirFlowRatio)
+              ! if zone temp will overshoot, pass the LoadToHeatingSP as the load to meet
+              IF(TempOutput < LoadToHeatingSP)THEN
+                QZnReq = LoadToHeatingSP
+                TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
+                TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+              END IF
+            ELSE
+              QZnReq = LoadToHeatingSP
+              TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
+              TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+            END IF
+          END IF
+        ELSE IF(TempOutput > LoadToHeatingSP .AND. TempOutput < LoadToCoolingSP)THEN
+!         If the net capacity does not overshoot either setpoint
+          QZnReq = 0.d0
+          TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
           TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
-        ELSE IF(TempOutput > QZnReq)THEN
+        ELSE
 !         If the net heating capacity meets the zone heating load but does not overshoot cooling setpoint
           QZnReq = 0.d0
           TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
           TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+        END IF
+!     If the terminal unit has a net heating capacity and the zone temp is above the Tstat cooling setpoint
+!     see if the terminal unit operation will exceed the setpoint
+      ELSE IF(TempOutput .GT. 0.0d0 .AND. LoadToCoolingSP .LT. 0.0d0)THEN
+!       If the net heating capacity overshoots the cooling setpoint count as cooling load
+!       Don't count as cooling load unless mode is allowed. Also check for floating zone.
+        IF(TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. SingleHeatingSetPoint .AND. &
+           TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. 0)THEN
+          IF(.NOT. LastModeCooling(VRFCond))THEN
+            IF(VRFTU(VRFTUNum)%OAMixerUsed)THEN
+              Node(VRFTU(VRFTUNum)%VRFTUOAMixerRetNodeNum)%MassFlowRate = VRFTU(VRFTUNum)%MaxCoolAirMassFlow
+              Node(VRFTU(VRFTUNum)%VRFTUOAMixerOANodeNum)%MassFlowRate = VRFTU(VRFTUNum)%CoolOutAirMassFlow
+              CALL SimOAMixer(VRFTU(VRFTUNum)%OAMixerName,FirstHVACIteration,VRFTU(VRFTUNum)%OAMixerIndex)
+            ELSE
+              Node(VRFTU(VRFTUNum)%VRFTUInletNodeNum)%MassFlowRate = VRFTU(VRFTUNum)%MaxCoolAirMassFlow
+            END IF
+            CALL CalcVRF(VRFTUNum,FirstHVACIteration,0.0d0,TempOutput,OnOffAirFlowRatio)
+            ! if zone temp will overshoot, pass the LoadToCoolingSP as the load to meet
+            IF(TempOutput > LoadToCoolingSP)THEN
+              QZnReq = LoadToCoolingSP
+              TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .TRUE.
+              TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
+            END IF
+          ! last mode was cooling, zone temp will overshoot cooling setpoint, reset QznReq to LoadtoCoolingSP
+          ELSE
+            QZnReq = LoadToCoolingSP
+            TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .TRUE.
+            TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
+          END IF
+        END IF
+      ! If the Terminal Unit has a net cooling capacity (TempOutput < 0) and
+      ! the zone temp is below the Tstat heating setpoint (QToHeatSetPt > 0)
+      ! see if the terminal unit operation will exceed the setpoint
+      ELSE IF(TempOutput < 0.0d0 .AND. LoadToHeatingSP .GT. 0.0d0)THEN
+        ! Don't count as heating load unless mode is allowed. Also check for floating zone.
+        IF(TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. SingleCoolingSetPoint .AND. &
+          TempControlType(VRFTU(VRFTUNum)%ZoneNum) .NE. 0)THEN
+          IF(.NOT. LastModeHeating(VRFCond))THEN
+            ! system last operated in cooling mode, change air flows and repeat coil off capacity test
+            IF(VRFTU(VRFTUNum)%OAMixerUsed)THEN
+              Node(VRFTU(VRFTUNum)%VRFTUOAMixerRetNodeNum)%MassFlowRate = VRFTU(VRFTUNum)%MaxHeatAirMassFlow
+              Node(VRFTU(VRFTUNum)%VRFTUOAMixerOANodeNum)%MassFlowRate = VRFTU(VRFTUNum)%HeatOutAirMassFlow
+              CALL SimOAMixer(VRFTU(VRFTUNum)%OAMixerName,FirstHVACIteration,VRFTU(VRFTUNum)%OAMixerIndex)
+            ELSE
+              Node(InNode)%MassFlowRate = VRFTU(VRFTUNum)%MaxHeatAirMassFlow
+            END IF
+            CALL CalcVRF(VRFTUNum,FirstHVACIteration,0.0d0,TempOutput,OnOffAirFlowRatio)
+            ! if zone temp will overshoot, pass the LoadToHeatingSP as the load to meet
+            IF(TempOutput < LoadToHeatingSP)THEN
+              QZnReq = LoadToHeatingSP
+              TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
+              TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+            END IF
+          ELSE
+            ! last mode was heating, zone temp will overshoot heating setpoint, reset QznReq to LoadtoHeatingSP
+            QZnReq = LoadToHeatingSP
+            TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .TRUE.
+            TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+          END IF
         END IF
       END IF
     END IF ! IF(VRFTU(VRFTUNum)%OpMode == ContFanCycCoil)THEN
@@ -4009,7 +4209,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
       IF(ANY(TerminalUnitList(TUListIndex)%HRCoolRequest) .OR. &
         ANY(TerminalUnitList(TUListIndex)%HRHeatRequest))THEN
           IF(VRF(VRFCond)%HRMaxTempLimitIndex == 0)THEN
-            CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+            CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
             CALL ShowContinueError('...InitVRF: VRF Heat Pump Min/Max Outdoor Temperature in Heat Recovery Mode Limits '// &
                                    'have been exceeded and VRF heat recovery is disabled.')
             CALL ShowContinueError('... Outdoor Dry-Bulb Temperature                       = '// &
@@ -4022,11 +4222,18 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
             CALL ShowContinueError('...the system will operate in heat pump mode when applicable.')
           END IF
           CALL ShowRecurringWarningErrorAtEnd(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//  &
-                 TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Pump min/max cooling temperature limit error continues...',  &
+                 TRIM(VRF(VRFCond)%Name)//'" -- Exceeded VRF Heat Recovery min/max outdoor temperature limit error continues...', &
                  VRF(VRFCond)%HRMaxTempLimitIndex,OutsideDryBulbTemp,OutsideDryBulbTemp)
       END IF
-      TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
-      TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
+      ! Allow heat pump mode to operate if within limits
+      IF(OutsideDryBulbTemp .LT. VRF(VRFCond)%MinOATCooling .OR. OutsideDryBulbTemp .GT. VRF(VRFCond)%MaxOATCooling)THEN
+        ! Disable cooling mode only, heating model will still be allowed
+        TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList) = .FALSE.
+      END IF
+      IF(OutsideDryBulbTemp .LT. VRF(VRFCond)%MinOATHeating .OR. OutsideDryBulbTemp .GT. VRF(VRFCond)%MaxOATHeating)THEN
+        ! Disable heating mode only, cooling model will still be allowed
+        TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList) = .FALSE.
+      END IF
     END IF
   ELSE
     TerminalUnitList(TUListIndex)%HRHeatRequest = .FALSE.
@@ -4059,7 +4266,7 @@ SUBROUTINE InitVRF(VRFTUNum, ZoneNum, FirstHVACIteration, OnOffAirFlowRatio, QZn
       END IF
     ELSE
       IF(VRF(VRFCond)%HPOperatingModeErrorIndex == 0)THEN
-        CALL ShowWarningError(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
+        CALL ShowWarningMessage(TRIM(cVRFTypes(VRF(VRFCond)%VRFSystemTypeNum))//' "'//TRIM(VRF(VRFCond)%Name)//'".')
         CALL ShowContinueError('...InitVRF: Illegal HP operating mode = '// &
                                TRIM(TrimSigDigits(VRF(VRFCond)%EMSValueForHPOperatingMode,0)))
         CALL ShowContinueError('...InitVRF: VRF HP operating mode will not be controlled by EMS.')
@@ -4781,6 +4988,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
           !
   INTEGER, PARAMETER   :: MaxIte   = 500          ! maximum number of iterations
   REAL(r64), PARAMETER :: MinPLF   = 0.0          ! minimum part load factor allowed
+  REAL(r64), PARAMETER :: ErrorTol = 0.001d0      ! tolerance for RegulaFalsi iterations
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -4792,7 +5000,6 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
   REAL(r64)          :: FullOutput    ! unit full output when compressor is operating [W]
   REAL(r64)          :: TempOutput    ! unit output when iteration limit exceeded [W]
   REAL(r64)          :: NoCompOutput  ! output when no active compressor [W]
-  REAL(r64)          :: ErrorToler    ! error tolerance
   INTEGER            :: SolFla        ! Flag of RegulaFalsi solver
   REAL(r64), DIMENSION(6) :: Par      ! Parameters passed to RegulaFalsi
   CHARACTER(len=20)  :: IterNum       ! Max number of iterations for warning message
@@ -4818,8 +5025,14 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
   HRCoolingMode  = TerminalUnitList(TUListIndex)%HRCoolRequest(IndexToTUInTUList)
   HRHeatingMode  = TerminalUnitList(TUListIndex)%HRHeatRequest(IndexToTUInTUList)
 
-  ! do nothing if TU is scheduled off
+  ! The RETURNS here will jump back to SimVRF where the CalcVRF routine will simulate with lastest PLR
+
+  ! do nothing else if TU is scheduled off
+!!!LKL Discrepancy < 0
   IF (GetCurrentScheduleValue(VRFTU(VRFTUNum)%SchedPtr) .EQ. 0.0) RETURN
+
+  ! do nothing if TU has no load (TU will be modeled using PLR=0)
+  IF (QZnReq == 0.d0) RETURN
 
   ! Set EMS value for PLR and return
   IF (VRFTU(VRFTUNum)%EMSOverridePartLoadFrac) THEN
@@ -4827,63 +5040,56 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
     RETURN
   ENDIF
 
-  ! do nothing if TU has no load (TU will be modeled using PLR=0)
-  IF (QZnReq == 0.d0) RETURN
-
   ! Get result when DX coil is off
   PartLoadRatio = 0.0d0
   CALL CalcVRF(VRFTUNum, FirstHVACIteration, 0.0d0, NoCompOutput, OnOffAirFlowRatio)
 
   IF(VRFCoolingMode .AND. HRHeatingMode)THEN
+    ! IF the system is in cooling mode, but the terminal unit requests heating (heat recovery)
     IF(NoCompOutput .GE. QZnReq)RETURN
   ELSE IF(VRFHeatingMode .AND. HRCoolingMode)THEN
+    ! IF the system is in heating mode, but the terminal unit requests cooling (heat recovery)
     IF(NoCompOutput .LE. QZnReq)RETURN
   ELSE IF(VRFCoolingMode .OR. HRCoolingMode)THEN
+    ! IF the system is in cooling mode and/or the terminal unit requests cooling
     IF(NoCompOutput .LE. QZnReq)RETURN
   ELSE IF(VRFHeatingMode .OR. HRHeatingMode)THEN
+    ! IF the system is in heating mode and/or the terminal unit requests heating
     IF(NoCompOutput .GE. QZnReq)RETURN
   END IF
 
   ! Otherwise the coil needs to turn on. Get full load result
   PartLoadRatio  = 1.0
   CALL CalcVRF(VRFTUNum, FirstHVACIteration, PartLoadRatio, FullOutput, OnOffAirFlowRatio)
-  PartLoadRatio  = 0.0  !**RAR I thought this was not needed, but the answer changes
+  PartLoadRatio  = 0.0
 
-  IF (VRFCoolingMode .OR. &
+  IF ((VRFCoolingMode .AND. .NOT. VRF(VRFCond)%HeatRecoveryUsed) .OR. &
       (VRF(VRFCond)%HeatRecoveryUsed .AND. HRCoolingMode)) THEN
-  ! Since we are cooling, we expect FullOutput < NoCompOutput
-  ! Check that this is the case; if not set PartLoadRatio = 0.0 (off) and return
- !   IF (FullOutput >= NoCompOutput) THEN
- !     PartLoadRatio = 0.0
- !     RETURN
- !   END IF
-  ! If the QZnReq <= FullOutput the unit needs to run full out
-    IF (QZnReq  <=  FullOutput .AND. QZnReq < 0.0d0) THEN
-      PartLoadRatio = 1.0
-      IF(.NOT. VRF(VRFCond)%HeatRecoveryUsed)RETURN
-      IF(VRF(VRFCond)%HeatRecoveryUsed .AND. HRCoolingMode)RETURN
-    ELSE IF(QZnReq  >=  FullOutput .AND. HRHeatingMode)THEN
-      PartLoadRatio = 1.0
+    ! Since we are cooling, we expect FullOutput < NoCompOutput
+    ! If the QZnReq <= FullOutput the unit needs to run full out
+    IF (QZnReq  <=  FullOutput) THEN
+      ! if no coil present in terminal unit, no need to reset PLR?
+      IF(VRFTU(VRFTUNum)%CoolingCoilPresent)PartLoadRatio = 1.0
+      RETURN
+    END IF
+  ELSE IF((VRFHeatingMode .AND. .NOT. VRF(VRFCond)%HeatRecoveryUsed) .OR. &
+          (VRF(VRFCond)%HeatRecoveryUsed .AND. HRHeatingMode)) THEN
+    ! Since we are heating, we expect FullOutput > NoCompOutput
+    ! If the QZnReq >= FullOutput the unit needs to run full out
+    IF (QZnReq  >=  FullOutput) THEN
+      ! if no coil present in terminal unit, no need reset PLR?
+      IF(VRFTU(VRFTUNum)%HeatingCoilPresent)PartLoadRatio = 1.0
       RETURN
     END IF
   ELSE
-  ! Since we are heating, we expect FullOutput > NoCompOutput
-  ! Check that this is the case; if not set PartLoadRatio = 0.0 (off)
-    IF (QZnReq  >=  FullOutput .AND. QZnReq > 0.0d0) THEN
-      PartLoadRatio = 1.0
-      IF(.NOT. VRF(VRFCond)%HeatRecoveryUsed)RETURN
-      IF(VRF(VRFCond)%HeatRecoveryUsed .AND. HRHeatingMode)RETURN
-    ELSE IF(QZnReq  <=  FullOutput .AND. HRCoolingMode)THEN
-      PartLoadRatio = 1.0
-      RETURN
-    END IF
-!    ErrorToler = VRFTU(VRFTUNum)%HeatConvergenceTol !Error tolerance for convergence from input deck
+    ! VRF terminal unit is off, PLR already set to 0 above
+    ! shouldn't actually get here
+    RETURN
   END IF
 
-  ! Calculate the part load fraction
+  ! The coil will not operate at PLR=0 or PLR=1, calculate the operating part-load ratio
 
-  IF (((VRFHeatingMode .OR. HRHeatingMode) .AND. QZnReq < FullOutput) .OR. &
-      ((VRFCoolingMode .OR. HRCoolingMode) .AND. QZnReq > FullOutput)) THEN
+  IF ((VRFHeatingMode .OR. HRHeatingMode) .OR. (VRFCoolingMode .OR. HRCoolingMode)) THEN
 
     Par(1) = VRFTUNum
     Par(2)=0.0d0
@@ -4896,7 +5102,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
 !    Par(4) = OpMode
     Par(5) = QZnReq
     Par(6) = OnOffAirFlowRatio
-      CALL SolveRegulaFalsi(0.001d0, MaxIte, SolFla, PartLoadRatio, PLRResidual,   &
+      CALL SolveRegulaFalsi(ErrorTol, MaxIte, SolFla, PartLoadRatio, PLRResidual,   &
                               0.0d0, 1.0d0, Par)
     IF (SolFla == -1) THEN
 !     Very low loads may not converge quickly. Tighten PLR boundary and try again.
@@ -4917,7 +5123,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
         IF(VRFHeatingMode .AND. TempOutput .LT. QZnReq)ContinueIter = .FALSE.
         IF(VRFCoolingMode .AND. TempOutput .GT. QZnReq)ContinueIter = .FALSE.
       END DO
-        CALL SolveRegulaFalsi(ErrorToler, MaxIte, SolFla, PartLoadRatio, PLRResidual,   &
+        CALL SolveRegulaFalsi(ErrorTol, MaxIte, SolFla, PartLoadRatio, PLRResidual,   &
                               TempMinPLR, TempMaxPLR, Par)
       IF (SolFla == -1) THEN
         IF (.NOT. FirstHVACIteration .AND. .NOT. WarmupFlag) THEN
@@ -4981,7 +5187,7 @@ SUBROUTINE ControlVRF(VRFTUNum,QZnReq,FirstHVACIteration,PartLoadRatio, OnOffAir
       IF(FullOutput - NoCompOutput .EQ. 0.d0)THEN
         PartLoadRatio = 0.d0
       ELSE
-        PartLoadRatio = MAX(MinPLF, ABS(QZnReq - NoCompOutput) / ABS(FullOutput - NoCompOutput))
+        PartLoadRatio = MIN(1.d0,MAX(MinPLF, ABS(QZnReq - NoCompOutput) / ABS(FullOutput - NoCompOutput)))
       END IF
     END IF
 
@@ -5122,8 +5328,9 @@ SUBROUTINE CalcVRF(VRFTUNum, FirstHVACIteration, PartLoadRatio, LoadMet, OnOffAi
                              PsyHFnTdbW(Node(VRFTUInletNodeNum)%Temp,MinHumRat))
 
   IF(PRESENT(LatOutputProvided))THEN
-    SpecHumOut = Node(VRFTUOutletNodeNum)%HumRat / (1.0d0 + Node(VRFTUOutletNodeNum)%HumRat)
-    SpecHumIn  = Node(VRFTUInletNodeNum)%HumRat / (1.0d0 + Node(VRFTUInletNodeNum)%HumRat)
+!   CR9155 Remove specific humidity calculations
+    SpecHumOut = Node(VRFTUOutletNodeNum)%HumRat 
+    SpecHumIn  = Node(VRFTUInletNodeNum)%HumRat
     LatOutputProvided = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
   END IF
 
@@ -5505,6 +5712,7 @@ REAL(r64) FUNCTION PLRResidual(PartLoadRatio,Par)
   LOGICAL   :: FirstHVACIteration  ! FirstHVACIteration flag
   INTEGER   :: OpMode              ! Compressor operating mode
   REAL(r64) :: QZnReq              ! zone load (W)
+  REAL(r64) :: QZnReqTemp          ! denominator representing zone load (W)
   REAL(r64) :: OnOffAirFlowRatio   ! ratio of compressor ON airflow to average airflow over timestep
   REAL(r64) :: ActualOutput        ! delivered capacity of VRF terminal unit
 
@@ -5517,10 +5725,12 @@ REAL(r64) FUNCTION PLRResidual(PartLoadRatio,Par)
   END IF
   OpMode = INT(Par(4))
   QZnReq = Par(5)
+  QZnReqTemp = QZnReq
+  IF(ABS(QZnReq) .LT. 100.d0)QZnReqTemp=SIGN(100.d0,QZnReq)
   OnOffAirFlowRatio = Par(6)
 
   CALL CalcVRF(VRFTUNum,FirstHVACIteration,PartLoadRatio,ActualOutput,OnOffAirFlowRatio)
-  PLRResidual = (ActualOutput - QZnReq)/QZnReq
+  PLRResidual = (ActualOutput - QZnReq)/QZnReqTemp
 
   RETURN
 END FUNCTION PLRResidual
@@ -5689,6 +5899,8 @@ SUBROUTINE InitializeOperatingMode(FirstHVACIteration,VRFCond,TUListNum,OnOffAir
       ZoneDeltaT             = 0.0d0
       HeatingLoad(VRFCond) = .FALSE.
       CoolingLoad(VRFCond) = .FALSE.
+      TerminalUnitList(TUListNum)%CoolingCoilAvailable = .FALSE.
+      TerminalUnitList(TUListNum)%HeatingCoilAvailable = .FALSE.
       ! loop through all TU's to find operating mode. Be carefull not to mix loop counters with current TU/Cond index
       DO NumTU = 1, TerminalUnitList(TUListNum)%NumTUInList
         ! make sure TU's have been sized before looping through each one of them to determine operating mode
@@ -5696,6 +5908,22 @@ SUBROUTINE InitializeOperatingMode(FirstHVACIteration,VRFCond,TUListNum,OnOffAir
         IF(ANY(TerminalUnitList(TUListNum)%TerminalUnitNotSizedYet))EXIT
         TUIndex     = TerminalUnitList(TUListNum)%ZoneTUPtr(NumTU)
         ThisZoneNum = VRFTU(TUIndex)%ZoneNum
+
+!       check to see if coil is present
+        IF(TerminalUnitList(VRFCond)%CoolingCoilPresent(NumTU))THEN
+!         now check to see if coil is scheduled off
+          IF(GetCurrentScheduleValue(TerminalUnitList(TUListNum)%CoolingCoilAvailSchPtr(NumTU)) .GT. 0.d0)THEN
+            TerminalUnitList(TUListNum)%CoolingCoilAvailable(NumTU) = .TRUE.
+          END IF
+        END IF
+
+!       check to see if coil is present
+        IF(TerminalUnitList(VRFCond)%HeatingCoilPresent(NumTU))THEN
+!         now check to see if coil is scheduled off
+          IF(GetCurrentScheduleValue(TerminalUnitList(TUListNum)%HeatingCoilAvailSchPtr(NumTU)) .GT. 0.d0)THEN
+            TerminalUnitList(TUListNum)%HeatingCoilAvailable(NumTU) = .TRUE.
+          END IF
+        END IF
 
 !     Constant fan systems are tested for ventilation load to determine if load to be met changes.
 !     more logic may be needed here, what is the OA flow rate, was last mode heating or cooling, what control is used, etc...
@@ -6111,7 +6339,7 @@ END SUBROUTINE LimitCoilCapacity
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

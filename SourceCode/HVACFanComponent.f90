@@ -22,7 +22,7 @@ Module Fans
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataHVACGlobals, ONLY: TurnFansOn, TurnFansOff, Main, Cooling, Heating, Other, OnOffFanPartLoadFraction, &
-                           SmallAirVolFlow, UnbalExhMassFlow, NightVentOn, cFanTypes, &
+                           SmallAirVolFlow, UnbalExhMassFlow, BalancedExhMassFlow, NightVentOn, cFanTypes, &
                            FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, FanType_ZoneExhaust, &
                            FanType_ComponentModel, MinFrac, FixedMin !cpw22Aug2010 Added FanType_ComponentModel
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, WarmupFlag, SysSizingCalc, emsCallFromComponentGetInput
@@ -41,16 +41,21 @@ PRIVATE ! Everything private unless explicitly made public
 
   !MODULE PARAMETER DEFINITIONS
   ! parameters describing fan types are contained in DataHVACGlobals (see USE statement above)
+
+INTEGER, PARAMETER :: ExhaustFanCoupledToAvailManagers     = 150
+INTEGER, PARAMETER :: ExhaustFanDecoupledFromAvailManagers = 151
+
   !na
 
   ! DERIVED TYPE DEFINITIONS
 TYPE FanEquipConditions
   CHARACTER(len=MaxNameLength) :: FanName  =' '  ! Name of the fan
   CHARACTER(len=MaxNameLength) :: FanType  =' '  ! Type of Fan ie. Simple, Vane axial, Centrifugal, etc.
-  CHARACTER(len=MaxNameLength) :: Schedule =' '  ! Fan Operation Schedule
+  CHARACTER(len=MaxNameLength) :: AvailSchedName =' '  ! Fan Operation Schedule
   INTEGER      :: FanType_Num              =0    ! DataHVACGlobals fan type
-  Integer      :: SchedPtr                 =0    ! Pointer to the correct schedule
+  INTEGER      :: AvailSchedPtrNum         =0    ! Pointer to the availability schedule
   REAL(r64)    :: InletAirMassFlowRate     =0.0  !MassFlow through the Fan being Simulated [kg/Sec]
+
   REAL(r64)    :: OutletAirMassFlowRate    =0.0
   REAL(r64)    :: MaxAirFlowRate           =0.0  !Max Specified Volume Flow Rate of Fan [m3/sec]
   LOGICAL      :: MaxAirFlowRateEMSOverrideOn = .FALSE. ! if true, EMS wants to override fan size for Max Volume Flow Rate
@@ -144,6 +149,15 @@ TYPE FanEquipConditions
   REAL(r64)    :: VFDEff                   =0.0d0   !VFD efficiency (electrical)
   REAL(r64)    :: VFDInputPower            =0.0d0   !VFD input power for fan being Simulated [W]
   REAL(r64)    :: MaxFanPowerEncountered   =0.0d0   !Maximum VFD input power encountered [W]
+
+  !zone exhaust fan
+  INTEGER      :: FlowFractSchedNum        =0    ! schedule index flow rate modifier schedule
+  INTEGER      :: AvailManagerMode         =0    ! mode for how exhaust fan should react to availability managers
+  INTEGER      :: MinTempLimitSchedNum     =0    ! schedule index minimum temperature limit
+  INTEGER      :: BalancedFractSchedNum   =0    ! schedule index portion recirculated
+  REAL(r64)    :: UnbalancedOutletMassFlowRate = 0.d0
+  REAL(r64)    :: BalancedOutletMassFlowRate = 0.d0
+
 END TYPE FanEquipConditions
 
 TYPE NightVentPerfData
@@ -358,7 +372,7 @@ SUBROUTINE GetFanInput
     USE BranchNodeConnections, ONLY: TestCompSet
 
 !    USE DataIPShortCuts
-    USE DataGlobals,           ONLY: AnyEnergyManagementSystemInModel
+    USE DataGlobals,           ONLY: AnyEnergyManagementSystemInModel, ScheduleAlwaysOn
     USE DataInterfaces,        ONLY: SetupEMSActuator, SetupEMSInternalVariable
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -473,7 +487,7 @@ SUBROUTINE GetFanInput
       DO SimpFanNum = 1,  NumSimpFan
         FanNum = SimpFanNum
         cCurrentModuleObject= 'Fan:ConstantVolume'
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),SimpFanNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,SimpFanNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -486,20 +500,18 @@ SUBROUTINE GetFanInput
         ENDIF
         Fan(FanNum)%FanName  = cAlphaArgs(1)
         Fan(FanNum)%FanType =  cCurrentModuleObject
-        Fan(FanNum)%Schedule = cAlphaArgs(2)
-        Fan(FanNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        IF (Fan(FanNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                 ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
+        Fan(FanNum)%AvailSchedName = cAlphaArgs(2)
+        IF (lAlphaFieldBlanks(2)) THEN
+          Fan(FanNum)%AvailSchedPtrNum = ScheduleAlwaysOn
+        ELSE
+          Fan(FanNum)%AvailSchedPtrNum = GetScheduleIndex(cAlphaArgs(2))
+          IF (Fan(FanNum)%AvailSchedPtrNum == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                ' entered ='//TRIM(cAlphaArgs(2))// &
                ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
         END IF
-!        Fan(FanNum)%Control = 'CONSTVOLUME'
         Fan(FanNum)%FanType_Num=FanType_SimpleConstVolume
 
         Fan(FanNum)%FanEff        = rNumericArgs(1)
@@ -535,7 +547,7 @@ SUBROUTINE GetFanInput
       DO VarVolFanNum = 1,  NumVarVolFan
         FanNum = NumSimpFan + VarVolFanNum
         cCurrentModuleObject= 'Fan:VariableVolume'
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),VarVolFanNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,VarVolFanNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -548,20 +560,18 @@ SUBROUTINE GetFanInput
         ENDIF
         Fan(FanNum)%FanName = cAlphaArgs(1)
         Fan(FanNum)%FanType = cCurrentModuleObject
-        Fan(FanNum)%Schedule = cAlphaArgs(2)
-        Fan(FanNum)%SchedPtr =GetScheduleIndex(cAlphaArgs(2))
-        IF (Fan(FanNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                 ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
+        Fan(FanNum)%AvailSchedName = cAlphaArgs(2)
+        IF (lAlphaFieldBlanks(2)) THEN
+          Fan(FanNum)%AvailSchedPtrNum = ScheduleAlwaysOn
+        ELSE
+          Fan(FanNum)%AvailSchedPtrNum = GetScheduleIndex(cAlphaArgs(2))
+          IF (Fan(FanNum)%AvailSchedPtrNum == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                ' entered ='//TRIM(cAlphaArgs(2))// &
                ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
-        ENDIF
-!        Fan(FanNum)%Control = 'VARIABLEVOLUME'
+        END IF
         Fan(FanNum)%FanType_Num=FanType_SimpleVAV
 
         Fan(FanNum)%FanEff        = rNumericArgs(1)
@@ -616,7 +626,7 @@ SUBROUTINE GetFanInput
       DO ExhFanNum = 1,  NumZoneExhFan
         FanNum = NumSimpFan + NumVarVolFan + ExhFanNum
         cCurrentModuleObject= 'Fan:ZoneExhaust'
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),ExhFanNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,ExhFanNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -629,25 +639,23 @@ SUBROUTINE GetFanInput
         ENDIF
         Fan(FanNum)%FanName = cAlphaArgs(1)
         Fan(FanNum)%FanType = cCurrentModuleObject
-        Fan(FanNum)%Schedule = cAlphaArgs(2)
-        Fan(FanNum)%SchedPtr =GetScheduleIndex(cAlphaArgs(2))
-        IF (Fan(FanNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                 ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
+        Fan(FanNum)%AvailSchedName = cAlphaArgs(2)
+        IF (lAlphaFieldBlanks(2)) THEN
+          Fan(FanNum)%AvailSchedPtrNum = ScheduleAlwaysOn
+        ELSE
+          Fan(FanNum)%AvailSchedPtrNum = GetScheduleIndex(cAlphaArgs(2))
+          IF (Fan(FanNum)%AvailSchedPtrNum == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                ' entered ='//TRIM(cAlphaArgs(2))// &
                ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
+          ELSE
+            IF (HasFractionalScheduleValue(Fan(FanNum)%AvailSchedPtrNum)) THEN
+              CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
+                '" has fractional values in Schedule='//TRIM(cAlphaArgs(2))//'. Only 0.0 in the schedule value turns the fan off.')
+            ENDIF
           END IF
-          ErrorsFound=.true.
-        ELSE
-          IF (HasFractionalScheduleValue(Fan(FanNum)%SchedPtr)) THEN
-            CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(Fan(FanNum)%FanName)//  &
-              '" has fractional values in Schedule='//TRIM(cAlphaArgs(2))//'. Only 0.0 in the schedule value turns the fan off.')
-          ENDIF
-        ENDIF
-!        Fan(FanNum)%Control = 'CONSTVOLUME'
+        END IF
         Fan(FanNum)%FanType_Num=FanType_ZoneExhaust
 
         Fan(FanNum)%FanEff        = rNumericArgs(1)
@@ -671,11 +679,80 @@ SUBROUTINE GetFanInput
                GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),  &
                             NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
 
-        IF (NumAlphas > 4) THEN
+
+        IF (NumAlphas > 4 .AND. .NOT. lAlphaFieldBlanks(5)) THEN
           Fan(FanNum)%EndUseSubcategoryName = cAlphaArgs(5)
         ELSE
           Fan(FanNum)%EndUseSubcategoryName = 'General'
         END IF
+
+        IF (NumAlphas > 5 .AND. .NOT. lAlphaFieldBlanks(6)) THEN
+          Fan(FanNum)%FlowFractSchedNum = GetScheduleIndex(cAlphaArgs(6))
+          IF (Fan(FanNum)%FlowFractSchedNum == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(6))//  &
+               ' entered ='//TRIM(cAlphaArgs(6))// &
+               ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
+          ELSEIF (Fan(FanNum)%FlowFractSchedNum > 0) THEN
+            IF (.NOT.CheckScheduleValueMinMax(Fan(FanNum)%FlowFractSchedNum,'>=',0.0D0,'<=',1.0D0)) THEN
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(6))//  &
+                   ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(6))//' = '//TRIM(cAlphaArgs(6)) )
+              CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
+              ErrorsFound=.true.
+            ENDIF
+          ENDIF
+        ELSE
+          Fan(FanNum)%FlowFractSchedNum = ScheduleAlwaysOn
+        ENDIF
+
+        IF (NumAlphas > 6 .AND. .NOT. lAlphaFieldBlanks(7)) THEN
+          SELECT CASE ( TRIM(cAlphaArgs(7)) )
+          CASE ( 'COUPLED' )
+            Fan(FanNum)%AvailManagerMode = ExhaustFanCoupledToAvailManagers
+          CASE ( 'DECOUPLED')
+            Fan(FanNum)%AvailManagerMode = ExhaustFanDecoupledFromAvailManagers
+          CASE DEFAULT
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(7))//  &
+               ' entered ='//TRIM(cAlphaArgs(7))// &
+               ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
+          END SELECT
+        ELSE
+          Fan(FanNum)%AvailManagerMode = ExhaustFanCoupledToAvailManagers
+        ENDIF
+
+        IF (NumAlphas > 7 .AND. .NOT. lAlphaFieldBlanks(8)) THEN
+          Fan(FanNum)%MinTempLimitSchedNum = GetScheduleIndex(cAlphaArgs(8))
+          IF (Fan(FanNum)%MinTempLimitSchedNum == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(8))//  &
+               ' entered ='//TRIM(cAlphaArgs(8))// &
+               ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
+          ENDIF
+        ELSE
+          Fan(FanNum)%MinTempLimitSchedNum = 0
+        ENDIF
+
+        IF (NumAlphas > 8 .AND. .NOT. lAlphaFieldBlanks(9)) THEN
+          Fan(FanNum)%BalancedFractSchedNum = GetScheduleIndex(cAlphaArgs(9))
+          IF (Fan(FanNum)%BalancedFractSchedNum == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(9))//  &
+               ' entered ='//TRIM(cAlphaArgs(9))// &
+               ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
+          ELSEIF (Fan(FanNum)%BalancedFractSchedNum > 0) THEN
+            IF (.NOT.CheckScheduleValueMinMax(Fan(FanNum)%BalancedFractSchedNum,'>=',0.0D0,'<=',1.0D0)) THEN
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(9))//  &
+                   ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowContinueError('Error found in '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(cAlphaArgs(9)) )
+              CALL ShowContinueError('Schedule values must be (>=0., <=1.)')
+              ErrorsFound=.true.
+            ENDIF
+          ENDIF
+        ELSE
+          Fan(FanNum)%BalancedFractSchedNum = 0
+        ENDIF
 
         ! Component sets not setup yet for zone equipment
         ! CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(3),cAlphaArgs(4),'Air Nodes')
@@ -685,7 +762,7 @@ SUBROUTINE GetFanInput
       DO OnOffFanNum = 1,  NumOnOff
         FanNum = NumSimpFan + NumVarVolFan + NumZoneExhFan + OnOffFanNum
         cCurrentModuleObject= 'Fan:OnOff'
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),OnOffFanNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,OnOffFanNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -698,20 +775,18 @@ SUBROUTINE GetFanInput
         ENDIF
         Fan(FanNum)%FanName  = cAlphaArgs(1)
         Fan(FanNum)%FanType  = cCurrentModuleObject
-        Fan(FanNum)%Schedule = cAlphaArgs(2)
-        Fan(FanNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-        IF (Fan(FanNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                 ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
+        Fan(FanNum)%AvailSchedName = cAlphaArgs(2)
+        IF (lAlphaFieldBlanks(2)) THEN
+          Fan(FanNum)%AvailSchedPtrNum = ScheduleAlwaysOn
+        ELSE
+          Fan(FanNum)%AvailSchedPtrNum = GetScheduleIndex(cAlphaArgs(2))
+          IF (Fan(FanNum)%AvailSchedPtrNum == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                ' entered ='//TRIM(cAlphaArgs(2))// &
                ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
-        ENDIF
-!        Fan(FanNum)%Control = 'ONOFF'
+        END IF
         Fan(FanNum)%FanType_Num=FanType_SimpleOnOff
 
         Fan(FanNum)%FanEff        = rNumericArgs(1)
@@ -759,7 +834,7 @@ SUBROUTINE GetFanInput
 
 
       cCurrentModuleObject= 'FanPerformance:NightVentilation'
-      NumNightVentPerf = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+      NumNightVentPerf = GetNumObjectsFound(cCurrentModuleObject)
 
       IF (NumNightVentPerf > 0) THEN
         ALLOCATE(NightVentPerf(NumNightVentPerf))
@@ -773,7 +848,7 @@ SUBROUTINE GetFanInput
       END IF
       ! input the night ventilation performance objects
       DO NVPerfNum=1,NumNightVentPerf
-         CALL GetObjectItem(TRIM(cCurrentModuleObject),NVPerfNum,cAlphaArgs,NumAlphas, &
+         CALL GetObjectItem(cCurrentModuleObject,NVPerfNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -811,7 +886,7 @@ SUBROUTINE GetFanInput
         FanNum = NumSimpFan + NumVarVolFan + NumZoneExhFan + NumOnOff + CompModelFanNum
 
         cCurrentModuleObject= 'Fan:ComponentModel'
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),CompModelFanNum,cAlphaArgs,NumAlphas, &
+        CALL GetObjectItem(cCurrentModuleObject,CompModelFanNum,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -834,18 +909,17 @@ SUBROUTINE GetFanInput
 
         CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(2),cAlphaArgs(3),'Air Nodes')
 
-        Fan(FanNum)%Schedule = cAlphaArgs(4) ! Availability schedule name
-        Fan(FanNum)%SchedPtr =GetScheduleIndex(cAlphaArgs(4))
-        IF (Fan(FanNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(4)) THEN
-            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(4))//  &
-                 ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
+        Fan(FanNum)%AvailSchedName = cAlphaArgs(4) ! Availability schedule name
+        IF (lAlphaFieldBlanks(4)) THEN
+          Fan(FanNum)%AvailSchedPtrNum =0
+        ELSE
+          Fan(FanNum)%AvailSchedPtrNum =GetScheduleIndex(cAlphaArgs(4))
+          IF (Fan(FanNum)%AvailSchedPtrNum == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(4))//  &
                ' entered ='//TRIM(cAlphaArgs(4))// &
                ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
         ENDIF
 
         Fan(FanNum)%FanType_Num=FanType_ComponentModel
@@ -929,11 +1003,19 @@ SUBROUTINE GetFanInput
 
       Do FanNum=1,NumFans
              ! Setup Report variables for the Fans  CurrentModuleObject='Fans'
-       CALL SetupOutputVariable('Fan Electric Power[W]', Fan(FanNum)%FanPower, 'System','Average',Fan(FanNum)%FanName)
-       CALL SetupOutputVariable('Fan Delta Temp[deltaC]', Fan(FanNum)%DeltaTemp, 'System','Average',Fan(FanNum)%FanName)
-       CALL SetupOutputVariable('Fan Electric Consumption[J]', Fan(FanNum)%FanEnergy, 'System','Sum',Fan(FanNum)%FanName, &
+       CALL SetupOutputVariable('Fan Electric Power [W]', Fan(FanNum)%FanPower, 'System','Average',Fan(FanNum)%FanName)
+       CALL SetupOutputVariable('Fan Rise in Air Temperature [deltaC]', Fan(FanNum)%DeltaTemp,  &
+                                'System','Average',Fan(FanNum)%FanName)
+       CALL SetupOutputVariable('Fan Electric Energy [J]', Fan(FanNum)%FanEnergy, 'System','Sum',Fan(FanNum)%FanName, &
                                  ResourceTypeKey='Electric',GroupKey='System', &
                                  EndUseKey='Fans',EndUseSubKey=Fan(FanNum)%EndUseSubcategoryName)
+
+       IF ((Fan(FanNum)%FanType_Num == FanType_ZoneExhaust) .and.  (Fan(FanNum)%BalancedFractSchedNum > 0)) THEN
+         CALL SetupOutputVariable('Fan Unbalanced Air Mass Flow Rate [kg/s]',   &
+                  Fan(FanNum)%UnbalancedOutletMassFlowRate, 'System','Average',Fan(FanNum)%FanName)
+         CALL SetupOutputVariable('Fan Balanced Air Mass Flow Rate [kg/s]',   &
+                  Fan(FanNum)%BalancedOutletMassFlowRate, 'System','Average',Fan(FanNum)%FanName)
+       ENDIF
 
        IF (AnyEnergyManagementSystemInModel) THEN
 
@@ -957,7 +1039,7 @@ SUBROUTINE GetFanInput
 
       DO OnOffFanNum = 1,  NumOnOff
        FanNum = NumSimpFan + NumVarVolFan + NumZoneExhFan + OnOffFanNum
-       CALL SetupOutputVariable('On/Off Fan Runtime Fraction []', Fan(FanNum)%FanRuntimeFraction, 'System','Average', &
+       CALL SetupOutputVariable('Fan Runtime Fraction []', Fan(FanNum)%FanRuntimeFraction, 'System','Average', &
                                  Fan(FanNum)%FanName)
       END DO
 
@@ -1132,10 +1214,16 @@ SUBROUTINE InitFan(FanNum,FirstHVACIteration)
                                            Fan(FanNum)%MassFlowRateMaxAvail)
     Fan(FanNum)%InletAirMassFlowRate = Max(Fan(FanNum)%InletAirMassFlowRate, &
                                            Fan(FanNum)%MassFlowRateMinAvail)
-  ELSE  ! zone exhaust fans - always run at the max
+  ELSE  ! zone exhaust fans
     Fan(FanNum)%MassFlowRateMaxAvail = Fan(FanNum)%MaxAirMassFlowRate
     Fan(FanNum)%MassFlowRateMinAvail = 0.0
-    Fan(FanNum)%InletAirMassFlowRate = Fan(FanNum)%MassFlowRateMaxAvail
+    IF (Fan(FanNum)%FlowFractSchedNum > 0) THEN ! modulate flow
+      Fan(FanNum)%InletAirMassFlowRate = Fan(FanNum)%MassFlowRateMaxAvail  &
+                                * GetCurrentScheduleValue(Fan(FanNum)%FlowFractSchedNum)
+      Fan(FanNum)%InletAirMassFlowRate = MAX(0.d0, Fan(FanNum)%InletAirMassFlowRate)
+    ELSE ! always run at max
+      Fan(FanNum)%InletAirMassFlowRate = Fan(FanNum)%MassFlowRateMaxAvail
+    ENDIF
     IF (Fan(FanNum)%EMSMaxMassFlowOverrideOn) Fan(FanNum)%InletAirMassFlowRate = &
        MIN(Fan(FanNum)%EMSAirMassFlowValue,Fan(FanNum)%MassFlowRateMaxAvail)
   END IF
@@ -1646,7 +1734,7 @@ SUBROUTINE SimSimpleFan(FanNum)
    MassFlow   = MAX(MassFlow,Fan(FanNum)%MinAirMassFlowRate)
    !
    !Determine the Fan Schedule for the Time step
-  If( ( GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. LocalTurnFansOn) &
+  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
         .and. .NOT.LocalTurnFansOff  .and. Massflow>0.0) Then
    !Fan is operating
    Fan(FanNum)%FanPower = MassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
@@ -1780,7 +1868,7 @@ SUBROUTINE SimVariableVolumeFan(FanNum, PressureRise)
   MassFlow    = MIN(MassFlow,Fan(FanNum)%MaxAirMassFlowRate)
 
    !Determine the Fan Schedule for the Time step
-  If( ( GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. LocalTurnFansOn) &
+  If( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
         .and. .NOT. LocalTurnFansOff .and. Massflow>0.0) Then
     !Fan is operating - calculate power loss and enthalpy rise
     !  Fan(FanNum)%FanPower = PartLoadFrac*FullMassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
@@ -1933,7 +2021,7 @@ SUBROUTINE SimOnOffFan(FanNum, SpeedRatio)
    Fan(FanNum)%FanRuntimeFraction = 0.0
 
   ! Determine the Fan Schedule for the Time step
-  IF( ( GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. LocalTurnFansOn) &
+  IF( ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
         .and. .NOT. LocalTurnFansOff .and. Massflow>0.0 .and. Fan(FanNum)%MaxAirMassFlowRate > 0.0) THEN
     ! The actual flow fraction is calculated from MassFlow and the MaxVolumeFlow * AirDensity
    FlowFrac = MassFlow/(Fan(FanNum)%MaxAirMassFlowRate)
@@ -2041,6 +2129,7 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
           !       AUTHOR         Fred Buhl
           !       DATE WRITTEN   Jan 2000
           !       MODIFIED       Brent Griffith, May 2009 for EMS
+          !                      Brent Griffith, Feb 2013 controls upgrade
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -2059,7 +2148,7 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-   Integer, Intent(IN) :: FanNum
+  Integer, Intent(IN) :: FanNum
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -2071,67 +2160,93 @@ SUBROUTINE SimZoneExhaustFan(FanNum)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-      REAL(r64) RhoAir
-      REAL(r64) DeltaPress  ! [N/m2]
-      REAL(r64) FanEff
-      REAL(r64) MassFlow    ! [kg/sec]
-!unused0909      REAL(r64) Tin         ! [C]
-!unused0909      REAL(r64) Win
-      REAL(r64) PowerLossToAir ! fan and motor loss to air stream (watts)
+  REAL(r64) :: RhoAir
+  REAL(r64) :: DeltaPress  ! [N/m2]
+  REAL(r64) :: FanEff
+  REAL(r64) :: MassFlow    ! [kg/sec]
+  REAL(r64) :: Tin         ! [C]
+  REAL(r64) :: PowerLossToAir ! fan and motor loss to air stream (watts)
+  LOGICAL   :: FanIsRunning
 
-   DeltaPress = Fan(FanNum)%DeltaPress
-   IF (Fan(FanNum)%EMSFanPressureOverrideOn) DeltaPress = Fan(FanNum)%EMSFanPressureValue
+  DeltaPress = Fan(FanNum)%DeltaPress
+  IF (Fan(FanNum)%EMSFanPressureOverrideOn) DeltaPress = Fan(FanNum)%EMSFanPressureValue
 
-   FanEff     = Fan(FanNum)%FanEff
-   IF (Fan(FanNum)%EMSFanEffOverrideOn) FanEff = Fan(FanNum)%EMSFanEffValue
+  FanEff     = Fan(FanNum)%FanEff
+  IF (Fan(FanNum)%EMSFanEffOverrideOn) FanEff = Fan(FanNum)%EMSFanEffValue
 
    ! For a Constant Volume Simple Fan the Max Flow Rate is the Flow Rate for the fan
-!unused0909   Tin        = Fan(FanNum)%InletAirTemp
-!unused0909   Win        = Fan(FanNum)%InletAirHumRat
-   RhoAir     = Fan(FanNum)%RhoAirStdInit
-   MassFlow   = Fan(FanNum)%InletAirMassFlowRate
+  Tin        = Fan(FanNum)%InletAirTemp
+  RhoAir     = Fan(FanNum)%RhoAirStdInit
+  MassFlow   = Fan(FanNum)%InletAirMassFlowRate
 
-!  CR8224, moved to Init
-!   IF (Fan(FanNum)%EMSMaxMassFlowOverrideOn) MassFlow   = Fan(FanNum)%EMSAirMassFlowValue
-
-   !Determine the Fan Schedule for the Time step
-
-!  IF( ( GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. LocalTurnFansOn ) &
-!        .and. .NOT.LocalTurnFansOff .and. MassFlow > 0.0) THEN
-!
-!  Exhaust Fan is currently interlocked with air loop availability via global TurnFansOn and TurnFansOff variables.
-!  Carefully consider if you want to decouple air loop operation and exhaust fan operation in the future
-!  (zone air mass balance issues). If so, the optional arguments ZoneCompTurnFansOn and ZoneCompTurnFansOff will need
+!  When the AvailManagerMode == ExhaustFanCoupledToAvailManagers then the
+!  Exhaust Fan is  interlocked with air loop availability via global TurnFansOn and TurnFansOff variables.
+!  There is now the option to control if user wants to decouple air loop operation and exhaust fan operation
+!  (zone air mass balance issues). If in the future want to allow for zone level local availability manager
+!  then the optional arguments ZoneCompTurnFansOn and ZoneCompTurnFansOff will need
 !  to be passed to SimulateFanComponents, and TurnFansOn must be changed to LocalTurnFansOn
 !  and TurnFansOff to LocalTurnFansOff in the IF statement below.
 
-  If( ( GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. TurnFansOn ) &
-        .and. .NOT.TurnFansOff .and. MassFlow > 0.0) Then
-   !Fan is operating
-   Fan(FanNum)%FanPower = MassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
-   PowerLossToAir = Fan(FanNum)%FanPower
-   Fan(FanNum)%OutletAirEnthalpy = Fan(FanNum)%InletAirEnthalpy + PowerLossToAir/MassFlow
-   ! This fan does not change the moisture or Mass Flow across the component
-   Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
-   Fan(FanNum)%OutletAirMassFlowRate = MassFlow
-   Fan(FanNum)%OutletAirTemp = PsyTdbFnHW(Fan(FanNum)%OutletAirEnthalpy,Fan(FanNum)%OutletAirHumRat)
+! apply controls to determine if operating
+  IF (Fan(FanNum)%AvailManagerMode == ExhaustFanCoupledToAvailManagers) THEN
+    IF ( (( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0) .OR. TurnFansOn ) &
+            .AND. .NOT. TurnFansOff .AND. MassFlow > 0.0 ) THEN ! available
+      IF (Fan(FanNum)%MinTempLimitSchedNum > 0) THEN
+        IF (Tin >= GetCurrentScheduleValue(Fan(FanNum)%MinTempLimitSchedNum)) THEN
+          FanIsRunning = .TRUE.
+        ELSE
+          FanIsRunning = .FALSE.
+        ENDIF
+      ELSE
+        FanIsRunning = .TRUE.
+      ENDIF
+    ELSE
+      FanIsRunning = .FALSE.
+    ENDIF
 
- Else
-   !Fan is off and not operating no power consumed and mass flow rate.
-   Fan(FanNum)%FanPower = 0.0
-   PowerLossToAir = 0.0
-   Fan(FanNum)%OutletAirMassFlowRate = 0.0
-   Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
-   Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
-   Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
+  ELSEIF (Fan(FanNum)%AvailManagerMode == ExhaustFanDecoupledFromAvailManagers) THEN
+    IF ( GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum) > 0.0 .AND. MassFlow > 0.0 ) THEN
+      IF (Fan(FanNum)%MinTempLimitSchedNum > 0) THEN
+        IF (Tin >= GetCurrentScheduleValue(Fan(FanNum)%MinTempLimitSchedNum)) THEN
+          FanIsRunning = .TRUE.
+        ELSE
+          FanIsRunning = .FALSE.
+        ENDIF
+      ELSE
+        FanIsRunning = .TRUE.
+      ENDIF
+    ELSE
+      FanIsRunning = .FALSE.
+    ENDIF
+  ENDIF
+
+
+  IF ( FanIsRunning ) THEN
+    !Fan is operating
+    Fan(FanNum)%FanPower = MassFlow*DeltaPress/(FanEff*RhoAir) ! total fan power
+    PowerLossToAir = Fan(FanNum)%FanPower
+    Fan(FanNum)%OutletAirEnthalpy = Fan(FanNum)%InletAirEnthalpy + PowerLossToAir/MassFlow
+    ! This fan does not change the moisture or Mass Flow across the component
+    Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
+    Fan(FanNum)%OutletAirMassFlowRate = MassFlow
+    Fan(FanNum)%OutletAirTemp = PsyTdbFnHW(Fan(FanNum)%OutletAirEnthalpy,Fan(FanNum)%OutletAirHumRat)
+
+  ELSE
+    !Fan is off and not operating no power consumed and mass flow rate.
+    Fan(FanNum)%FanPower = 0.0
+    PowerLossToAir = 0.0
+    Fan(FanNum)%OutletAirMassFlowRate = 0.0
+    Fan(FanNum)%OutletAirHumRat       = Fan(FanNum)%InletAirHumRat
+    Fan(FanNum)%OutletAirEnthalpy     = Fan(FanNum)%InletAirEnthalpy
+    Fan(FanNum)%OutletAirTemp = Fan(FanNum)%InletAirTemp
    ! Set the Control Flow variables to 0.0 flow when OFF.
-   Fan(FanNum)%MassFlowRateMaxAvail = 0.0
-   Fan(FanNum)%MassFlowRateMinAvail = 0.0
-   Fan(FanNum)%InletAirMassFlowRate = 0.0
+    Fan(FanNum)%MassFlowRateMaxAvail = 0.0
+    Fan(FanNum)%MassFlowRateMinAvail = 0.0
+    Fan(FanNum)%InletAirMassFlowRate = 0.0
 
- End If
+   END IF
 
- RETURN
+   RETURN
 END SUBROUTINE SimZoneExhaustFan
 
 !cpw22Aug2010 Added Component Model fan algorithm
@@ -2258,7 +2373,7 @@ SUBROUTINE SimComponentModelFan(FanNum)
 !  IF (Fan(FanNum)%EMSMaxMassFlowOverrideOn) MassFlow   = Fan(FanNum)%EMSAirMassFlowValue
 
   !Determine the Fan Schedule for the Time step
-  If((GetCurrentScheduleValue(Fan(FanNum)%SchedPtr)>0.0 .or. LocalTurnFansOn) &
+  If((GetCurrentScheduleValue(Fan(FanNum)%AvailSchedPtrNum)>0.0 .or. LocalTurnFansOn) &
         .and. .NOT.LocalTurnFansOff .and. Massflow>0.0) Then
     !Fan is operating - calculate fan pressure rise, component efficiencies and power, and also air enthalpy rise
 
@@ -2491,11 +2606,19 @@ SUBROUTINE UpdateFan(FanNum)
 
    IF (Fan(FanNum)%FanType_Num == FanType_ZoneExhaust) THEN
      Node(InletNode)%MassFlowRate = Fan(FanNum)%InletAirMassFlowRate
-     If (AirflowNetworkNumOfExhFan .EQ. 0) then
+     IF (AirflowNetworkNumOfExhFan .EQ. 0) THEN
        UnbalExhMassFlow = Fan(FanNum)%InletAirMassFlowRate
-     Else
-       UnbalExhMassFlow = 0.0
-     End If
+       IF (Fan(FanNum)%BalancedFractSchedNum > 0) THEN
+         BalancedExhMassFlow = UnbalExhMassFlow * GetCurrentScheduleValue(Fan(FanNum)%BalancedFractSchedNum)
+       ELSE
+         BalancedExhMassFlow = 0.d0
+       ENDIF
+     ELSE
+       UnbalExhMassFlow = 0.d0
+       BalancedExhMassFlow = 0.d0
+     END IF
+     Fan(FanNum)%UnbalancedOutletMassFlowRate = UnbalExhMassFlow - BalancedExhMassFlow
+     Fan(FanNum)%BalancedOutletMassFlowRate   = BalancedExhMassFlow
    END IF
 
   IF (Contaminant%CO2Simulation) Then
@@ -2689,7 +2812,7 @@ SUBROUTINE GetFanPower(FanIndex, FanPower)
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! This subroutine gets the fan power draw
-          
+
           ! METHODOLOGY EMPLOYED:
           ! na
 
@@ -3034,7 +3157,7 @@ FUNCTION GetFanAvailSchPtr(FanType,FanName,ErrorsFound) RESULT(FanAvailSchPtr)
 
   WhichFan=FindItemInList(FanName,Fan%FanName,NumFans)
   IF (WhichFan /= 0) THEN
-    FanAvailSchPtr=Fan(WhichFan)%SchedPtr
+    FanAvailSchPtr=Fan(WhichFan)%AvailSchedPtrNum
   ELSE
     CALL ShowSevereError('GetFanAvailSchPtr: Could not find Fan, Type="'//TRIM(FanType)//'" Name="'//TRIM(FanName)//'"')
     ErrorsFound=.true.
@@ -3196,7 +3319,7 @@ END SUBROUTINE SetFanData
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

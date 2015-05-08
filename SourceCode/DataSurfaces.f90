@@ -1019,7 +1019,7 @@ REAL(r64), ALLOCATABLE, DIMENSION(:,:)   :: AWinCFOverlap   ! Time step value of
                                                             ! absorbed in window glass layers which comes from other windows
                                                             ! It happens sometimes that beam enters one window and hits back of
                                                             ! second window. It is used in complex fenestration only
-                                                     
+
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: AirSkyRadSplit ! Fractional split between the air and
                                                        ! the sky for radiation from the surface
                                          ! Fraction of sky IR coming from sky itself; 1-AirSkyRadSplit comes from the atmosphere.
@@ -1182,7 +1182,7 @@ END FUNCTION cSurfaceClass
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

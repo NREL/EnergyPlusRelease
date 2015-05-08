@@ -212,14 +212,14 @@ SUBROUTINE GetThermalChimney(ErrorsFound)
 ALLOCATE (ZnRptThermChim (NumOfZones))
 
 cCurrentModuleObject='ZoneThermalChimney'
-TotThermalChimney=GetNumObjectsFound(trim(cCurrentModuleObject))
+TotThermalChimney=GetNumObjectsFound(cCurrentModuleObject)
 
 ALLOCATE (ThermalChimneySys(TotThermalChimney))
 ALLOCATE (ThermalChimneyReport(TotThermalChimney))
 
 DO Loop=1, TotThermalChimney
 
-    CALL GetObjectItem(trim(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -247,16 +247,15 @@ DO Loop=1, TotThermalChimney
     ThermalChimneySys(Loop)%RealZoneName = cAlphaArgs(2)
 
     ThermalChimneySys(Loop)%SchedName = cAlphaArgs(3)
-    ThermalChimneySys(Loop)%SchedPtr  = GetScheduleIndex(cAlphaArgs(3))
-    IF (ThermalChimneySys(Loop)%SchedPtr == 0) THEN
-      IF (lAlphaFieldBlanks(3)) THEN
-        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
-           trim(cAlphaFieldNames(3))//' is required but input is blank.')
-      ELSE
-        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
-           trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'" not found.')
+    IF (lAlphaFieldBlanks(3)) THEN
+      ThermalChimneySys(Loop)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      ThermalChimneySys(Loop)%SchedPtr  = GetScheduleIndex(cAlphaArgs(3))
+      IF (ThermalChimneySys(Loop)%SchedPtr == 0) THEN
+        CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+        CALL ShowContinueError('Invalid-not found '//trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'".')
+        ErrorsFound = .TRUE.
       END IF
-      ErrorsFound = .TRUE.
     END IF
 
     ThermalChimneySys(Loop)%AbsorberWallWidth = rNumericArgs(1)
@@ -348,21 +347,21 @@ END DO     ! DO Loop=1, TotThermalChimney
 
 ! Set up the output variables for thermal chimneys
   DO Loop=1, TotThermalChimney
-    CALL SetupOutputVariable('Thermal Chimney Total Volume Flow Rate [m3/s]',   &
+    CALL SetupOutputVariable('Zone Thermal Chimney Volume Flow Rate [m3/s]',   &
                               ThermalChimneyReport(Loop)%OverallTCVolumeFlow,'System','Average',  &
                               ThermalChimneySys(Loop)%Name)
-    CALL SetupOutputVariable('Thermal Chimney Total Mass Flow Rate [kg/s]',   &
+    CALL SetupOutputVariable('Zone Thermal Chimney Mass Flow Rate [kg/s]',   &
                               ThermalChimneyReport(Loop)%OverallTCMassFlow,'System','Average',  &
                               ThermalChimneySys(Loop)%Name)
-    CALL SetupOutputVariable('Thermal Chimney Air Outlet Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Thermal Chimney Outlet Temperature [C]',   &
                               ThermalChimneyReport(Loop)%OutletAirTempThermalChim,'System','Average',  &
                               ThermalChimneySys(Loop)%Name)
 
     DO TCZoneNum = 1, ThermalChimneySys(Loop)%TotZoneToDistrib
-      CALL SetupOutputVariable('Zone Thermal Chimney Heat Loss [J]',   &
+      CALL SetupOutputVariable('Zone Thermal Chimney Heat Loss Energy [J]',   &
                                ZnRptThermChim(ThermalChimneySys(Loop)%ZonePtr(TCZoneNum))%ThermalChimneyHeatLoss,   &
                               'System','Sum',Zone(ThermalChimneySys(Loop)%ZonePtr(TCZoneNum))%Name)
-      CALL SetupOutputVariable('Zone Thermal Chimney Heat Gain [J]',   &
+      CALL SetupOutputVariable('Zone Thermal Chimney Heat Gain Energy [J]',   &
                                ZnRptThermChim(ThermalChimneySys(Loop)%ZonePtr(TCZoneNum))%ThermalChimneyHeatGain,   &
                               'System','Sum',Zone(ThermalChimneySys(Loop)%ZonePtr(TCZoneNum))%Name)
       CALL SetupOutputVariable('Zone Thermal Chimney Volume [m3]',   &
@@ -948,7 +947,7 @@ END SUBROUTINE ReportThermalChimney
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

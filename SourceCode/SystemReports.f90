@@ -100,52 +100,6 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: LastMaxOverheatingByVent
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: LastMaxNoLoadHeatingByVent
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: LastMaxNoLoadCoolingByVent
 
-! Sep 2011 - extracting code to separate area for
-! "Vent Energy" reporting.
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: CoolingDemandMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: CoolingDemandAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: HeatingDemandMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: HeatingDemandAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OvercoolingByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OverheatingByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: NoLoadHeatingByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: NoLoadCoolingByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentLoadNoSysEffectThisTimeStep
-!
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyElectricDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyGasDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyPurchasedDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyOtherDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyElectricIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyGasIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyPurchasedIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyOtherIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyCostReducedBySysOp
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergyCostofOverHeatOverCool
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: VentEnergySavingsReducedBySysOp
-!
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: TotVentEnergyCoolingIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: TotVentEnergyCoolingDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: TotVentEnergyHeatingIncrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: TotVentEnergyHeatingDecrease
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: ElecCoolingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: GasCoolingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: PurchCoolingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OtherCoolingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: ElecCoolingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: GasCoolingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: PurchCoolingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OtherCoolingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: ElecheatingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: GasHeatingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: PurchHeatingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OtherHeatingEnergyAddedByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: ElecHeatingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: GasHeatingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: PurchHeatingEnergyMetByVent
-!REAL(r64), ALLOCATABLE, DIMENSION(:) :: OtherHeatingEnergyMetByVent
-
-
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysTotZoneLoadHTNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysTotZoneLoadCLNG
 REAL(r64), ALLOCATABLE, DIMENSION(:) :: SysOALoadHTNG
@@ -230,12 +184,9 @@ PRIVATE UpdateAirSysSubSubCompPtrArray
           ! Reporting routines for module
 PUBLIC  ReportAirLoopConnections
 PUBLIC  ReportMaxVentilationLoads
-PUBLIC  ReportVentilationEnergyUse
 PUBLIC  ReportSystemEnergyUse
-!PRIVATE CalcSystemEnergyUse
-!PRIVATE SumEnergyUse
+PRIVATE CalcSystemEnergyUse
 PRIVATE FindDemandSideMatch     ! a routine that assists report initialization
-!PRIVATE FindPlantEnergyUse
 PRIVATE FindFirstLastPtr
 PRIVATE MatchPlantSys
 
@@ -2297,104 +2248,106 @@ IF (AirLoopLoadsReportEnabled) THEN
 
   !CurrentModuleObject='AirloopHVAC'
   !SYSTEM LOADS REPORT
-    CALL SetupOutputVariable('Air Loop Total Heating Energy[J]', SysTotHTNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Total Heating Energy [J]', SysTotHTNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Cooling Energy[J]', SysTotCLNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Total Cooling Energy [J]', SysTotCLNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
 
   !SYSTEM ENERGY USE REPORT
-    CALL SetupOutputVariable('Air Loop Hot Water Consumption[J]', SysTotH2OHOT(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Hot Water Energy [J]', SysTotH2OHOT(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Steam Consumption[J]', SysTotSteam(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Steam Energy [J]', SysTotSteam(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Chilled Water Consumption[J]', SysTotH2OCOLD(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Chilled Water Energy [J]', SysTotH2OCOLD(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Electric Consumption[J]', SysTotElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Electric Energy [J]', SysTotElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Gas Consumption[J]', SysTotGas(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Gas Energy [J]', SysTotGas(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Water Consumption[m3]', SysDomesticH20(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Water Volume [m3]', SysDomesticH20(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
 
   !SYSTEM COMPONENT LOAD REPORT
-    CALL SetupOutputVariable('Air Loop Fan Heating Energy[J]', SysFANCompHTNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Fan Air Heating Energy [J]', SysFANCompHTNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Cooling Coil Energy[J]', SysCCCompCLNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Cooling Coil Total Cooling Energy [J]', SysCCCompCLNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Heating Coil Energy[J]', SysHCCompHTNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heating Coil Total Heating Energy [J]', SysHCCompHTNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Heat Exchanger Heating Energy[J]', SysHeatExHTNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heat Exchanger Total Heating Energy [J]', SysHeatExHTNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Heat Exchanger Cooling Energy[J]', SysHeatExCLNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heat Exchanger Total Cooling Energy [J]', SysHeatExCLNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Solar Collector Heating Energy[J]', SysSolarCollectHeating(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Solar Collector Total Heating Energy [J]', SysSolarCollectHeating(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Solar Collector Cooling Energy[J]', SysSolarCollectCooling(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Solar Collector Total Cooling Energy [J]', SysSolarCollectCooling(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total User Defined Terminal Heating Energy[J]', SysUserDefinedTerminalHeating(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System User Defined Air Terminal Total Heating Energy [J]', &
+                              SysUserDefinedTerminalHeating(SysIndex), &
+                             'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total User Defined Terminal Cooling Energy[J]', SysUserDefinedTerminalCooling(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System User Defined Air Terminal Total Cooling Energy [J]', &
+                              SysUserDefinedTerminalCooling(SysIndex), &
+                             'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Humidifier Heating Energy[J]', SysHumidHTNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Humidifier Total Heating Energy [J]', SysHumidHTNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Evap Cooler Cooling Energy[J]', SysEvapCLNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Evaporative Cooler Total Cooling Energy [J]', SysEvapCLNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Total Desiccant Dehumidifier Cooling Energy[J]', DesDehumidCLNG(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Desiccant Dehumidifier Total Cooling Energy [J]', DesDehumidCLNG(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
 
   !SYSTEM COMPONENT ENERGY REPORT
-    CALL SetupOutputVariable('Air Loop Fan Electric Consumption[J]', SysFANCompElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Fan Electric Energy [J]', SysFANCompElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Heating Coil Hot Water Consumption[J]', SysHCCompH2OHOT(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heating Coil Hot Water Energy [J]', SysHCCompH2OHOT(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Cooling Coil Chilled Water Consumption[J]', SysCCCompH2OCOLD(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Cooling Coil Chilled Water Energy [J]', SysCCCompH2OCOLD(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop DX Heating Coil Electric Consumption[J]', SysHCCompElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System DX Heating Coil Electric Energy [J]', SysHCCompElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop DX Cooling Coil Electric Consumption[J]', SysCCCompElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System DX Cooling Coil Electric Energy [J]', SysCCCompElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Heating Coil Electric Consumption[J]', SysHCCompElecRes(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heating Coil Electric Energy [J]', SysHCCompElecRes(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Heating Coil Gas Consumption[J]', SysHCCompGas(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heating Coil Gas Energy [J]', SysHCCompGas(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Heating Coil Steam Consumption[J]', SysHCCompSteam(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Heating Coil Steam Energy [J]', SysHCCompSteam(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Humidifier Electric Consumption[J]', SysHumidElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Humidifier Electric Energy [J]', SysHumidElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Evap Cooler Electric Consumption[J]', SysEvapElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Evaporative Cooler Electric Energy [J]', SysEvapElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
-    CALL SetupOutputVariable('Air Loop Desiccant Dehumidifier Electric Consumption[J]', DesDehumidElec(SysIndex), &
-                           'HVAC','Sum', TRIM(PrimaryAirSystem(SysIndex)%Name))
+    CALL SetupOutputVariable('Air System Desiccant Dehumidifier Electric Energy [J]', DesDehumidElec(SysIndex), &
+                           'HVAC','Sum', PrimaryAirSystem(SysIndex)%Name)
 
   ENDDO
 ENDIF
@@ -2404,28 +2357,32 @@ ENDIF
     ! CurrentModuleObject='Zones(Controlled)'
     IF (VentLoadsReportEnabled) THEN
 !Cooling Loads
-      CALL SetupOutputVariable('Zone Mechanical Ventilation No Load Heat Removal [J]', MaxNoLoadCoolingByVent(ZoneIndex), &
+      CALL SetupOutputVariable('Zone Mechanical Ventilation No Load Heat Removal Energy [J]', MaxNoLoadCoolingByVent(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mechanical Ventilation Cooling Load Increase [J]', MaxCoolingLoadAddedByVent(ZoneIndex), &
-                           'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Cooling Load Increase Energy [J]', &
+                                MaxCoolingLoadAddedByVent(ZoneIndex), &
+                               'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mech Ventilation Cooling Load Increase: OverHeating [J]', MaxOverheatingByVent(ZoneIndex), &
-                           'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Cooling Load Increase Due to Overheating Energy [J]', &
+                               MaxOverheatingByVent(ZoneIndex), &
+                              'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mechanical Ventilation Cooling Load Decrease [J]', MaxCoolingLoadMetByVent(ZoneIndex), &
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Cooling Load Decrease Energy [J]', MaxCoolingLoadMetByVent(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 !Heating Loads
-      CALL SetupOutputVariable('Zone Mechanical Ventilation No Load Heat Addition [J]', MaxNoLoadHeatingByVent(ZoneIndex), &
+      CALL SetupOutputVariable('Zone Mechanical Ventilation No Load Heat Addition Energy [J]', MaxNoLoadHeatingByVent(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mechanical Ventilation Heating Load Increase [J]', MaxHeatingLoadAddedByVent(ZoneIndex), &
-                           'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Heating Load Increase Energy [J]', &
+                                MaxHeatingLoadAddedByVent(ZoneIndex), &
+                               'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mech Ventilation Heating Load Increase: OverCooling[J]', MaxOvercoolingByVent(ZoneIndex), &
-                           'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Heating Load Increase Due to Overcooling Energy [J]', &
+                                MaxOvercoolingByVent(ZoneIndex), &
+                               'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-      CALL SetupOutputVariable('Zone Mechanical Ventilation Heating Load Decrease [J]', MaxHeatingLoadMetByVent(ZoneIndex), &
+      CALL SetupOutputVariable('Zone Mechanical Ventilation Heating Load Decrease Energy [J]', MaxHeatingLoadMetByVent(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
     ENDIF
 
@@ -2435,23 +2392,23 @@ ENDIF
     CALL SetupOutputVariable('Zone Mechanical Ventilation Mass [kg]', ZoneOAMass(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-    CALL SetupOutputVariable('Zone Mechanical Ventilation Volume Flow Rate Standard Density [m3/s]', &
+    CALL SetupOutputVariable('Zone Mechanical Ventilation Standard Density Volume Flow Rate [m3/s]', &
                             ZoneOAVolFlowStdRho(ZoneIndex), &
                            'HVAC','Average', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-    CALL SetupOutputVariable('Zone Mechanical Ventilation Volume Standard Density [m3]', &
+    CALL SetupOutputVariable('Zone Mechanical Ventilation Standard Density Volume [m3]', &
                             ZoneOAVolStdRho(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-    CALL SetupOutputVariable('Zone Mechanical Ventilation Volume Flow Rate Current Density [m3/s]', &
+    CALL SetupOutputVariable('Zone Mechanical Ventilation Current Density Volume Flow Rate [m3/s]', &
                             ZoneOAVolFlowCrntRho(ZoneIndex), &
                            'HVAC','Average', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-    CALL SetupOutputVariable('Zone Mechanical Ventilation Volume Current Density [m3]', &
+    CALL SetupOutputVariable('Zone Mechanical Ventilation Current Density Volume [m3]', &
                             ZoneOAVolCrntRho(ZoneIndex), &
                            'HVAC','Sum', ZoneEquipConfig(ZoneIndex)%ZoneName)
 
-    CALL SetupOutputVariable('Zone Mechanical Ventilation Air Change Rate [ach]', ZoneMechACH(ZoneIndex), &
+    CALL SetupOutputVariable('Zone Mechanical Ventilation Air Changes per Hour [ach]', ZoneMechACH(ZoneIndex), &
                            'HVAC','Average', ZoneEquipConfig(ZoneIndex)%ZoneName)
   END DO
 
@@ -2566,6 +2523,10 @@ SUBROUTINE CreateEnergyReportStructure
   INTEGER         :: NumFound       ! Number Found
   INTEGER         :: NumVariables
   INTEGER         :: NumLeft     ! Counter for deeper components
+
+    ! some variables for setting up the plant data structures
+  INTEGER :: LoopSideNum
+  TYPE (ReportLoopData), POINTER :: ThisReportData
 
   VentReportStructureCreated=.true.
 
@@ -3198,956 +3159,302 @@ SUBROUTINE CreateEnergyReportStructure
     END DO
   END DO
 
+!***Plant Loops
 
-!***Plant Loop Supply Side
-  DO PlantLoopNum = 1, NumPlantLoops
-    DO BranchNum =1, VentRepPlantSupplySide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-        TypeOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-      ! Get complete list of components for complex branches
-        IF (IsParentObject(TypeOfComp,NameOfComp))THEN
+  ! previously, four separate huge DO loops all looking very very similar were used here
+  ! each individual block would operate on a single type of loop-side (plant demand, cond supply, etc.)
+  ! now, a bigger DO loop is applied iterating over all loops
+  ! a pointer (ThisReportData) is then directed to a particular item in the appropriate array
+  ! by operating on the pointer directly, we are actually operating on the item in the TARGET array item
+  ! in making this change, over 700 lines of code were dropped down to a single block
 
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .TRUE.
-          NumChildren = GetNumChildren(TypeOfComp, NameOfComp)
+  DO PlantLoopNum = 1, NumPlantLoops+NumCondLoops
+    DO LoopSideNum = DemandSide, SupplySide
 
-          ALLOCATE (SubCompTypes(NumChildren))
-          ALLOCATE (SubCompNames(NumChildren))
-          ALLOCATE (InletNodeNames(NumChildren))
-          ALLOCATE (InletNodeNumbers(NumChildren))
-          ALLOCATE (OutletNodeNames(NumChildren))
-          ALLOCATE (OutletNodeNumbers(NumChildren))
-          ALLOCATE (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(NumChildren))
-
-          CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                               NumChildren, &
-                               SubCompTypes,SubCompNames, &
-                               InletNodeNames,InletNodeNumbers, &
-                               OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-          DO SubCompNum = 1, NumChildren
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf      =   &
-               SubCompTypes(SubCompNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name        =   &
-               SubCompNames(SubCompNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameIn  =   &
-               InletNodeNames(SubCompNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameOut =   &
-               OutletNodeNames(SubCompNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn   =   &
-               InletNodeNumbers(SubCompNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut  =   &
-               OutletNodeNumbers(SubCompNum)
-          END DO
-
-          DEALLOCATE (SubCompTypes)
-          DEALLOCATE (SubCompNames)
-          DEALLOCATE (InletNodeNames)
-          DEALLOCATE (InletNodeNumbers)
-          DEALLOCATE (OutletNodeNames)
-          DEALLOCATE (OutletNodeNumbers)
-
-       ELSE
-         NumChildren =0
-         VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .FALSE.
-       END IF
-       VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps = NumChildren
-
-
-
-              !check for 'grandchildren'
-       DO SubCompNum = 1, NumChildren
-         TypeOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-         NameOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-         IF (IsParentObject(TypeOfComp, NameOfComp))THEN
-           NumGrandChildren = GetNumChildren(TypeOfComp, NameOfComp)
-           ALLOCATE (SubCompTypes(NumGrandChildren))
-           ALLOCATE (SubCompNames(NumGrandChildren))
-           ALLOCATE (InletNodeNames(NumGrandChildren))
-           ALLOCATE (InletNodeNumbers(NumGrandChildren))
-           ALLOCATE (OutletNodeNames(NumGrandChildren))
-           ALLOCATE (OutletNodeNumbers(NumGrandChildren))
-           ALLOCATE (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-              SubSubComp(NumGrandChildren))
-
-           CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                          NumGrandChildren, &
-                          SubCompTypes,SubCompNames, &
-                          InletNodeNames,InletNodeNumbers, &
-                          OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-           DO SubSubCompNum = 1, NumGrandChildren
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%TypeOf        = SubCompTypes(SubSubCompNum)
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%Name        = SubCompNames(SubSubCompNum)
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%NodeNameIn  = InletNodeNames(SubSubCompNum)
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%NodeNameOut = OutletNodeNames(SubSubCompNum)
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%NodeNumIn   = InletNodeNumbers(SubSubCompNum)
-               VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                  SubSubComp(SubSubCompNum)%NodeNumOut  = OutletNodeNumbers(SubSubCompNum)
-           END DO
-
-           DEALLOCATE (SubCompTypes)
-           DEALLOCATE (SubCompNames)
-           DEALLOCATE (InletNodeNames)
-           DEALLOCATE (InletNodeNumbers)
-           DEALLOCATE (OutletNodeNames)
-           DEALLOCATE (OutletNodeNumbers)
-         ELSE
-           NumGrandChildren =0
-           VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Parent = .FALSE.
-         END IF
-
-         VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubComps = NumGrandChildren
-
-       END DO
-     END DO
-   END DO
- END DO
-
-
-
-  DO PlantLoopNum = 1, NumPlantLoops
-    DO BranchNum =1, VentRepPlantSupplySide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-      ! Get complete list of components for complex branches
-        TypeOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-        NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-        ALLOCATE (VarIndexes(NumVariables))
-        ALLOCATE (VarTypes(NumVariables))
-        ALLOCATE (IndexTypes(NumVariables))
-        ALLOCATE (UnitsStrings(NumVariables))
-        ALLOCATE (ResourceTypes(NumVariables))
-        ALLOCATE (EndUses(NumVariables))
-        ALLOCATE (Groups(NumVariables))
-        ALLOCATE (Names(NumVariables))
-        ALLOCATE (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(NumVariables))
-
-        VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumMeteredVars = NumVariables
-        CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                 VarIndexes, VarTypes, &
-                                 IndexTypes, UnitsStrings, &
-                                 ResourceTypes, EndUses, Groups, Names, NumFound)
-
-        ModeFlagOn = .TRUE.
-        DO VarNum = 1, NumVariables
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarName   =   &
-             Names(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarUnits  =   &
-             UnitsStrings(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndex  =   &
-             VarIndexes(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndexType  =   &
-             IndexTypes(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarType   =   &
-             VarTypes(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ResourceType    =   &
-             ResourceTypes(VarNum)
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse          =   &
-             EndUses(VarNum)
-          IF (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
-            DO VarNum1 = 1, NumVariables
-              VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-                 MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
-            END DO
-            ModeFlagOn = .FALSE.
-          ELSEIF (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
-            DO VarNum1 = 1, NumVariables
-              VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
-            END DO
-            ModeFlagOn = .FALSE.
-          ELSEIF(ModeFlagOn)THEN
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
-          ENDIF
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%Group           = Groups(VarNum)
-        END DO
-
-        DEALLOCATE (VarIndexes)
-        DEALLOCATE (VarTypes)
-        DEALLOCATE (IndexTypes)
-        DEALLOCATE (UnitsStrings)
-        DEALLOCATE (ResourceTypes)
-        DEALLOCATE (EndUses)
-        DEALLOCATE (Groups)
-        DEALLOCATE (Names)
-
-
-        DO SubCompNum =1, VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps
-              ! Get complete list of components for complex branches
-          TypeOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-          ALLOCATE (VarIndexes(NumVariables))
-          ALLOCATE (VarTypes(NumVariables))
-          ALLOCATE (IndexTypes(NumVariables))
-          ALLOCATE (UnitsStrings(NumVariables))
-          ALLOCATE (ResourceTypes(NumVariables))
-          ALLOCATE (EndUses(NumVariables))
-          ALLOCATE (Groups(NumVariables))
-          ALLOCATE (Names(NumVariables))
-          ALLOCATE   &
-             (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%MeteredVar(NumVariables))
-
-          CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                   VarIndexes, VarTypes, &
-                                   IndexTypes, UnitsStrings, &
-                                   ResourceTypes, EndUses, Groups, Names, NumFound)
-
-         ModeFlagOn = .TRUE.
-          DO VarNum = 1, NumVariables
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
-            IF (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
-              DO VarNum1 = 1, NumVariables
-                VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                   MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
-              END DO
-              ModeFlagOn = .FALSE.
-            ELSEIF (VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
-              DO VarNum1 = 1, NumVariables
-                VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                   MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
-              END DO
-              ModeFlagOn = .FALSE.
-            ELSEIF(ModeFlagOn)THEN
-              VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
-            ENDIF
-            VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%Group           = Groups(VarNum)
-          END DO
-
-          DEALLOCATE (VarIndexes)
-          DEALLOCATE (VarTypes)
-          DEALLOCATE (IndexTypes)
-          DEALLOCATE (UnitsStrings)
-          DEALLOCATE (ResourceTypes)
-          DEALLOCATE (EndUses)
-          DEALLOCATE (Groups)
-          DEALLOCATE (Names)
-
-          VentRepPlantSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars = NumVariables
-        END DO
-      END DO
-    END DO
-  END DO
-
-!***Plant Loop Demand Side
-
-  DO PlantLoopNum = 1, NumPlantLoops
-    DO BranchNum =1, VentRepPlantDemandSide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-        TypeOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-      ! Get complete list of components for complex branches
-        IF (IsParentObject(TypeOfComp,NameOfComp))THEN
-
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .TRUE.
-          NumChildren = GetNumChildren(TypeOfComp, NameOfComp)
-
-          ALLOCATE (SubCompTypes(NumChildren))
-          ALLOCATE (SubCompNames(NumChildren))
-          ALLOCATE (InletNodeNames(NumChildren))
-          ALLOCATE (InletNodeNumbers(NumChildren))
-          ALLOCATE (OutletNodeNames(NumChildren))
-          ALLOCATE (OutletNodeNumbers(NumChildren))
-          ALLOCATE (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(NumChildren))
-
-          CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                              NumChildren, &
-                              SubCompTypes,SubCompNames, &
-                              InletNodeNames,InletNodeNumbers, &
-                              OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-          DO SubCompNum = 1, NumChildren
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf      =   &
-               SubCompTypes(SubCompNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name        =   &
-               SubCompNames(SubCompNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameIn  =   &
-               InletNodeNames(SubCompNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameOut =   &
-               OutletNodeNames(SubCompNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn   =   &
-               InletNodeNumbers(SubCompNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut  =   &
-               OutletNodeNumbers(SubCompNum)
-          END DO
-
-          DEALLOCATE (SubCompTypes)
-          DEALLOCATE (SubCompNames)
-          DEALLOCATE (InletNodeNames)
-          DEALLOCATE (InletNodeNumbers)
-          DEALLOCATE (OutletNodeNames)
-          DEALLOCATE (OutletNodeNumbers)
-
-        ELSE
-          NumChildren =0
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .FALSE.
+        IF (PlantLoopNum <= NumPlantLoops) THEN
+            SELECT CASE (LoopSideNum)
+            CASE (DemandSide)
+                ThisReportData => VentRepPlantDemandSide(PlantLoopNum)
+            CASE (SupplySide)
+                ThisReportData => VentRepPlantSupplySide(PlantLoopNum)
+            END SELECT
+        ELSE ! CondLoop
+            SELECT CASE (LoopSideNum)
+            CASE (DemandSide)
+                ThisReportData => VentRepCondDemandSide(PlantLoopNum-NumPlantLoops)
+            CASE (SupplySide)
+                ThisReportData => VentRepCondSupplySide(PlantLoopNum-NumPlantLoops)
+            END SELECT
         END IF
 
-        VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps = NumChildren
+        DO BranchNum =1, ThisReportData%TotalBranches
+          DO CompNum =1, ThisReportData%Branch(BranchNum)%TotalComponents
+            TypeOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%TypeOf
+            NameOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%Name
+          ! Get complete list of components for complex branches
+            IF (IsParentObject(TypeOfComp,NameOfComp))THEN
+
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%Parent = .TRUE.
+              NumChildren = GetNumChildren(TypeOfComp, NameOfComp)
+
+              ALLOCATE (SubCompTypes(NumChildren))
+              ALLOCATE (SubCompNames(NumChildren))
+              ALLOCATE (InletNodeNames(NumChildren))
+              ALLOCATE (InletNodeNumbers(NumChildren))
+              ALLOCATE (OutletNodeNames(NumChildren))
+              ALLOCATE (OutletNodeNumbers(NumChildren))
+              ALLOCATE (ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(NumChildren))
+
+              CALL GetChildrenData(TypeOfComp, NameOfComp, &
+                                   NumChildren, &
+                                   SubCompTypes,SubCompNames, &
+                                   InletNodeNames,InletNodeNumbers, &
+                                   OutletNodeNames,OutletNodeNumbers,ErrorsFound)
+
+              DO SubCompNum = 1, NumChildren
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf      =   &
+                   SubCompTypes(SubCompNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name        =   &
+                   SubCompNames(SubCompNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameIn  =   &
+                   InletNodeNames(SubCompNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameOut =   &
+                   OutletNodeNames(SubCompNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn   =   &
+                   InletNodeNumbers(SubCompNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut  =   &
+                   OutletNodeNumbers(SubCompNum)
+              END DO
+
+              DEALLOCATE (SubCompTypes)
+              DEALLOCATE (SubCompNames)
+              DEALLOCATE (InletNodeNames)
+              DEALLOCATE (InletNodeNumbers)
+              DEALLOCATE (OutletNodeNames)
+              DEALLOCATE (OutletNodeNumbers)
+
+           ELSE
+             NumChildren =0
+             ThisReportData%Branch(BranchNum)%Comp(CompNum)%Parent = .FALSE.
+           END IF
+           ThisReportData%Branch(BranchNum)%Comp(CompNum)%NumSubComps = NumChildren
 
 
 
                   !check for 'grandchildren'
-        DO SubCompNum = 1, NumChildren
-          TypeOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          IF (IsParentObject(TypeOfComp, NameOfComp))THEN
-            NumGrandChildren = GetNumChildren(TypeOfComp, NameOfComp)
-            ALLOCATE (SubCompTypes(NumGrandChildren))
-            ALLOCATE (SubCompNames(NumGrandChildren))
-            ALLOCATE (InletNodeNames(NumGrandChildren))
-            ALLOCATE (InletNodeNumbers(NumGrandChildren))
-            ALLOCATE (OutletNodeNames(NumGrandChildren))
-            ALLOCATE (OutletNodeNumbers(NumGrandChildren))
-            ALLOCATE (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               SubSubComp(NumGrandChildren))
-
-            CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                           NumGrandChildren, &
-                           SubCompTypes,SubCompNames, &
-                           InletNodeNames,InletNodeNumbers, &
-                           OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-            DO SubSubCompNum = 1, NumGrandChildren
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%TypeOf        = SubCompTypes(SubSubCompNum)
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%Name        = SubCompNames(SubSubCompNum)
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameIn  = InletNodeNames(SubSubCompNum)
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameOut = OutletNodeNames(SubSubCompNum)
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumIn   = InletNodeNumbers(SubSubCompNum)
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumOut  = OutletNodeNumbers(SubSubCompNum)
-            END DO
-
-            DEALLOCATE (SubCompTypes)
-            DEALLOCATE (SubCompNames)
-            DEALLOCATE (InletNodeNames)
-            DEALLOCATE (InletNodeNumbers)
-            DEALLOCATE (OutletNodeNames)
-            DEALLOCATE (OutletNodeNumbers)
-          ELSE
-            NumGrandChildren =0
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Parent = .FALSE.
-          END IF
-
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubComps =   &
-             NumGrandChildren
-
-        END DO
-      END DO
-    END DO
-  END DO
-
-
-
-  DO PlantLoopNum = 1, NumPlantLoops
-    DO BranchNum =1, VentRepPlantDemandSide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-      ! Get complete list of components for complex branches
-        TypeOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-        NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-        ALLOCATE (VarIndexes(NumVariables))
-        ALLOCATE (VarTypes(NumVariables))
-        ALLOCATE (IndexTypes(NumVariables))
-        ALLOCATE (UnitsStrings(NumVariables))
-        ALLOCATE (ResourceTypes(NumVariables))
-        ALLOCATE (EndUses(NumVariables))
-        ALLOCATE (Groups(NumVariables))
-        ALLOCATE (Names(NumVariables))
-        ALLOCATE (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(NumVariables))
-
-        VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumMeteredVars = NumVariables
-        CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                 VarIndexes, VarTypes, &
-                                 IndexTypes, UnitsStrings, &
-                                 ResourceTypes, EndUses, Groups, Names, NumFound)
-
-        ModeFlagOn = .TRUE.
-        DO VarNum = 1, NumVariables
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarName   =   &
-             Names(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarUnits  =   &
-             UnitsStrings(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndex  =   &
-             VarIndexes(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndexType  =   &
-             IndexTypes(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarType   =   &
-             VarTypes(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ResourceType    =   &
-             ResourceTypes(VarNum)
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse          =   &
-             EndUses(VarNum)
-          IF (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
-            DO VarNum1 = 1, NumVariables
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-                 MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
-            END DO
-            ModeFlagOn = .FALSE.
-          ELSEIF (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
-            DO VarNum1 = 1, NumVariables
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-                 MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
-            END DO
-            ModeFlagOn = .FALSE.
-          ELSEIF(ModeFlagOn)THEN
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-               MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
-          ENDIF
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%Group           = Groups(VarNum)
-        END DO
-
-        DEALLOCATE (VarIndexes)
-        DEALLOCATE (VarTypes)
-        DEALLOCATE (IndexTypes)
-        DEALLOCATE (UnitsStrings)
-        DEALLOCATE (ResourceTypes)
-        DEALLOCATE (EndUses)
-        DEALLOCATE (Groups)
-        DEALLOCATE (Names)
-
-
-        DO SubCompNum =1, VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps
-              ! Get complete list of components for complex branches
-          TypeOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-          ALLOCATE (VarIndexes(NumVariables))
-          ALLOCATE (VarTypes(NumVariables))
-          ALLOCATE (IndexTypes(NumVariables))
-          ALLOCATE (UnitsStrings(NumVariables))
-          ALLOCATE (ResourceTypes(NumVariables))
-          ALLOCATE (EndUses(NumVariables))
-          ALLOCATE (Groups(NumVariables))
-          ALLOCATE (Names(NumVariables))
-          ALLOCATE   &
-             (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%MeteredVar(NumVariables))
-
-          CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                   VarIndexes, VarTypes, &
-                                   IndexTypes, UnitsStrings, &
-                                   ResourceTypes, EndUses, Groups, Names, NumFound)
-
-          ModeFlagOn = .TRUE.
-          DO VarNum = 1, NumVariables
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
-            IF (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
-              DO VarNum1 = 1, NumVariables
-                VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                   MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
-              END DO
-              ModeFlagOn = .FALSE.
-            ELSEIF (VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
-              DO VarNum1 = 1, NumVariables
-                VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                   MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
-              END DO
-              ModeFlagOn = .FALSE.
-            ELSEIF(ModeFlagOn)THEN
-              VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
-            ENDIF
-            VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%Group           = Groups(VarNum)
-          END DO
-
-          DEALLOCATE (VarIndexes)
-          DEALLOCATE (VarTypes)
-          DEALLOCATE (IndexTypes)
-          DEALLOCATE (UnitsStrings)
-          DEALLOCATE (ResourceTypes)
-          DEALLOCATE (EndUses)
-          DEALLOCATE (Groups)
-          DEALLOCATE (Names)
-
-          VentRepPlantDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars = NumVariables
-        END DO
-      END DO
-    END DO
-  END DO
-
-!***Condenser Loop Supply Side
-  DO PlantLoopNum = 1, NumCondLoops
-    DO BranchNum =1, VentRepCondSupplySide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-        TypeOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-      ! Get complete list of components for complex branches
-        IF (IsParentObject(TypeOfComp,NameOfComp))THEN
-
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .TRUE.
-          NumChildren = GetNumChildren(TypeOfComp, NameOfComp)
-
-          ALLOCATE (SubCompTypes(NumChildren))
-          ALLOCATE (SubCompNames(NumChildren))
-          ALLOCATE (InletNodeNames(NumChildren))
-          ALLOCATE (InletNodeNumbers(NumChildren))
-          ALLOCATE (OutletNodeNames(NumChildren))
-          ALLOCATE (OutletNodeNumbers(NumChildren))
-          ALLOCATE (VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(NumChildren))
-
-          CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                              NumChildren, &
-                              SubCompTypes,SubCompNames, &
-                              InletNodeNames,InletNodeNumbers, &
-                              OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
            DO SubCompNum = 1, NumChildren
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf      =   &
-                SubCompTypes(SubCompNum)
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name        =   &
-                SubCompNames(SubCompNum)
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameIn  =   &
-                InletNodeNames(SubCompNum)
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameOut =   &
-                OutletNodeNames(SubCompNum)
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn   =   &
-                InletNodeNumbers(SubCompNum)
-             VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut  =   &
-                OutletNodeNumbers(SubCompNum)
-           END DO
-
-           DEALLOCATE (SubCompTypes)
-           DEALLOCATE (SubCompNames)
-           DEALLOCATE (InletNodeNames)
-           DEALLOCATE (InletNodeNumbers)
-           DEALLOCATE (OutletNodeNames)
-           DEALLOCATE (OutletNodeNumbers)
-
-        ELSE
-          NumChildren =0
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .FALSE.
-        END IF
-        VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps = NumChildren
-
-
-
-                 !check for 'grandchildren'
-        DO SubCompNum = 1, NumChildren
-          TypeOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          IF (IsParentObject(TypeOfComp, NameOfComp))THEN
-            NumGrandChildren = GetNumChildren(TypeOfComp, NameOfComp)
-            ALLOCATE (SubCompTypes(NumGrandChildren))
-            ALLOCATE (SubCompNames(NumGrandChildren))
-            ALLOCATE (InletNodeNames(NumGrandChildren))
-            ALLOCATE (InletNodeNumbers(NumGrandChildren))
-            ALLOCATE (OutletNodeNames(NumGrandChildren))
-            ALLOCATE (OutletNodeNumbers(NumGrandChildren))
-            ALLOCATE (VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               SubSubComp(NumGrandChildren))
-
-            CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                           NumGrandChildren, &
-                           SubCompTypes,SubCompNames, &
-                           InletNodeNames,InletNodeNumbers, &
-                           OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-            DO SubSubCompNum = 1, NumGrandChildren
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%TypeOf        = SubCompTypes(SubSubCompNum)
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%Name        = SubCompNames(SubSubCompNum)
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameIn  = InletNodeNames(SubSubCompNum)
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameOut = OutletNodeNames(SubSubCompNum)
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumIn   = InletNodeNumbers(SubSubCompNum)
-              VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumOut  = OutletNodeNumbers(SubSubCompNum)
-            END DO
-
-            DEALLOCATE (SubCompTypes)
-            DEALLOCATE (SubCompNames)
-            DEALLOCATE (InletNodeNames)
-            DEALLOCATE (InletNodeNumbers)
-            DEALLOCATE (OutletNodeNames)
-            DEALLOCATE (OutletNodeNumbers)
-          ELSE
-            NumGrandChildren =0
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Parent = .FALSE.
-          END IF
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubComps = NumGrandChildren
-
-
-        END DO
-      END DO
-    END DO
-  END DO
-
-
-
-  DO PlantLoopNum = 1, NumCondLoops
-    DO BranchNum =1, VentRepCondSupplySide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-      ! Get complete list of components for complex branches
-        TypeOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-        NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-        ALLOCATE (VarIndexes(NumVariables))
-        ALLOCATE (VarTypes(NumVariables))
-        ALLOCATE (IndexTypes(NumVariables))
-        ALLOCATE (UnitsStrings(NumVariables))
-        ALLOCATE (ResourceTypes(NumVariables))
-        ALLOCATE (EndUses(NumVariables))
-        ALLOCATE (Groups(NumVariables))
-        ALLOCATE (Names(NumVariables))
-        ALLOCATE (VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(NumVariables))
-
-        VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumMeteredVars = NumVariables
-        CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                 VarIndexes, VarTypes, &
-                                 IndexTypes, UnitsStrings, &
-                                 ResourceTypes, EndUses, Groups, Names, NumFound)
-
-        DO VarNum = 1, NumVariables
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarName   =   &
-             Names(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarUnits  =   &
-             UnitsStrings(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndex  =   &
-             VarIndexes(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndexType  =   &
-             IndexTypes(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarType   =   &
-             VarTypes(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ResourceType    =   &
-             ResourceTypes(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse          =   &
-             EndUses(VarNum)
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%Group           =   &
-             Groups(VarNum)
-        END DO
-
-        DEALLOCATE (VarIndexes)
-        DEALLOCATE (VarTypes)
-        DEALLOCATE (IndexTypes)
-        DEALLOCATE (UnitsStrings)
-        DEALLOCATE (ResourceTypes)
-        DEALLOCATE (EndUses)
-        DEALLOCATE (Groups)
-        DEALLOCATE (Names)
-
-
-        DO SubCompNum =1, VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps
-          ! Get complete list of components for complex branches
-          TypeOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-          ALLOCATE (VarIndexes(NumVariables))
-          ALLOCATE (VarTypes(NumVariables))
-          ALLOCATE (IndexTypes(NumVariables))
-          ALLOCATE (UnitsStrings(NumVariables))
-          ALLOCATE (ResourceTypes(NumVariables))
-          ALLOCATE (EndUses(NumVariables))
-          ALLOCATE (Groups(NumVariables))
-          ALLOCATE (Names(NumVariables))
-          ALLOCATE (VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-             MeteredVar(NumVariables))
-
-          CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                   VarIndexes, VarTypes, &
-                                   IndexTypes, UnitsStrings, &
-                                   ResourceTypes, EndUses, Groups, Names, NumFound)
-
-          DO VarNum = 1, NumVariables
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
-            VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%Group           = Groups(VarNum)
-          END DO
-
-          DEALLOCATE (VarIndexes)
-          DEALLOCATE (VarTypes)
-          DEALLOCATE (IndexTypes)
-          DEALLOCATE (UnitsStrings)
-          DEALLOCATE (ResourceTypes)
-          DEALLOCATE (EndUses)
-          DEALLOCATE (Groups)
-          DEALLOCATE (Names)
-
-          VentRepCondSupplySide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars = NumVariables
-        END DO
-      END DO
-    END DO
-  END DO
-
-!***Condenser Loop Demand Side
-  DO PlantLoopNum = 1, NumCondLoops
-    DO BranchNum =1, VentRepCondDemandSide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-        TypeOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-      ! Get complete list of components for complex branches
-        IF (IsParentObject(TypeOfComp,NameOfComp))THEN
-
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .TRUE.
-          NumChildren = GetNumChildren(TypeOfComp, NameOfComp)
-
-          ALLOCATE (SubCompTypes(NumChildren))
-          ALLOCATE (SubCompNames(NumChildren))
-          ALLOCATE (InletNodeNames(NumChildren))
-          ALLOCATE (InletNodeNumbers(NumChildren))
-          ALLOCATE (OutletNodeNames(NumChildren))
-          ALLOCATE (OutletNodeNumbers(NumChildren))
-          ALLOCATE (VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(NumChildren))
-
-          CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                              NumChildren, &
-                              SubCompTypes,SubCompNames, &
-                              InletNodeNames,InletNodeNumbers, &
-                              OutletNodeNames,OutletNodeNumbers,ErrorsFound)
-
-          DO SubCompNum = 1, NumChildren
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf      =   &
-               SubCompTypes(SubCompNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name        =   &
-               SubCompNames(SubCompNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameIn  =   &
-               InletNodeNames(SubCompNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNameOut =   &
-               OutletNodeNames(SubCompNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn   =   &
-               InletNodeNumbers(SubCompNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut  =   &
-               OutletNodeNumbers(SubCompNum)
-          END DO
-
-          DEALLOCATE (SubCompTypes)
-          DEALLOCATE (SubCompNames)
-          DEALLOCATE (InletNodeNames)
-          DEALLOCATE (InletNodeNumbers)
-          DEALLOCATE (OutletNodeNames)
-          DEALLOCATE (OutletNodeNumbers)
-
-        ELSE
-          NumChildren =0
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Parent = .FALSE.
-        END IF
-        VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps = NumChildren
-
-
-
-                 !check for 'grandchildren'
-        DO SubCompNum = 1, NumChildren
-          TypeOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          IF (IsParentObject(TypeOfComp, NameOfComp))THEN
-            NumGrandChildren = GetNumChildren(TypeOfComp, NameOfComp)
-            ALLOCATE (SubCompTypes(NumGrandChildren))
-            ALLOCATE (SubCompNames(NumGrandChildren))
-            ALLOCATE (InletNodeNames(NumGrandChildren))
-            ALLOCATE (InletNodeNumbers(NumGrandChildren))
-            ALLOCATE (OutletNodeNames(NumGrandChildren))
-            ALLOCATE (OutletNodeNumbers(NumGrandChildren))
-            ALLOCATE   &
-               (VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+             TypeOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
+             NameOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
+             IF (IsParentObject(TypeOfComp, NameOfComp))THEN
+               NumGrandChildren = GetNumChildren(TypeOfComp, NameOfComp)
+               ALLOCATE (SubCompTypes(NumGrandChildren))
+               ALLOCATE (SubCompNames(NumGrandChildren))
+               ALLOCATE (InletNodeNames(NumGrandChildren))
+               ALLOCATE (InletNodeNumbers(NumGrandChildren))
+               ALLOCATE (OutletNodeNames(NumGrandChildren))
+               ALLOCATE (OutletNodeNumbers(NumGrandChildren))
+               ALLOCATE (ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
                   SubSubComp(NumGrandChildren))
 
-            CALL GetChildrenData(TypeOfComp, NameOfComp, &
-                           NumGrandChildren, &
-                           SubCompTypes,SubCompNames, &
-                           InletNodeNames,InletNodeNumbers, &
-                           OutletNodeNames,OutletNodeNumbers,ErrorsFound)
+               CALL GetChildrenData(TypeOfComp, NameOfComp, &
+                              NumGrandChildren, &
+                              SubCompTypes,SubCompNames, &
+                              InletNodeNames,InletNodeNumbers, &
+                              OutletNodeNames,OutletNodeNumbers,ErrorsFound)
 
-            DO SubSubCompNum = 1, NumGrandChildren
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%TypeOf        = SubCompTypes(SubSubCompNum)
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%Name        = SubCompNames(SubSubCompNum)
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameIn  = InletNodeNames(SubSubCompNum)
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNameOut = OutletNodeNames(SubSubCompNum)
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumIn   = InletNodeNumbers(SubSubCompNum)
-              VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-                 SubSubComp(SubSubCompNum)%NodeNumOut  = OutletNodeNumbers(SubSubCompNum)
+               DO SubSubCompNum = 1, NumGrandChildren
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%TypeOf        = SubCompTypes(SubSubCompNum)
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%Name        = SubCompNames(SubSubCompNum)
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%NodeNameIn  = InletNodeNames(SubSubCompNum)
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%NodeNameOut = OutletNodeNames(SubSubCompNum)
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%NodeNumIn   = InletNodeNumbers(SubSubCompNum)
+                   ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                      SubSubComp(SubSubCompNum)%NodeNumOut  = OutletNodeNumbers(SubSubCompNum)
+               END DO
+
+               DEALLOCATE (SubCompTypes)
+               DEALLOCATE (SubCompNames)
+               DEALLOCATE (InletNodeNames)
+               DEALLOCATE (InletNodeNumbers)
+               DEALLOCATE (OutletNodeNames)
+               DEALLOCATE (OutletNodeNumbers)
+             ELSE
+               NumGrandChildren =0
+               ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Parent = .FALSE.
+             END IF
+
+             ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubComps = NumGrandChildren
+
+           END DO
+         END DO
+       END DO
+   END DO
+ END DO
+
+  DO PlantLoopNum = 1, NumPlantLoops + NumCondLoops
+
+    DO LoopSideNum = DemandSide, SupplySide
+
+        IF (PlantLoopNum <= NumPlantLoops) THEN
+            SELECT CASE (LoopSideNum)
+            CASE (DemandSide)
+                ThisReportData => VentRepPlantDemandSide(PlantLoopNum)
+            CASE (SupplySide)
+                ThisReportData => VentRepPlantSupplySide(PlantLoopNum)
+            END SELECT
+        ELSE ! CondLoop
+            SELECT CASE (LoopSideNum)
+            CASE (DemandSide)
+                ThisReportData => VentRepCondDemandSide(PlantLoopNum - NumPlantLoops)
+            CASE (SupplySide)
+                ThisReportData => VentRepCondSupplySide(PlantLoopNum - NumPlantLoops)
+            END SELECT
+        END IF
+
+        DO BranchNum =1, ThisReportData%TotalBranches
+          DO CompNum =1, ThisReportData%Branch(BranchNum)%TotalComponents
+          ! Get complete list of components for complex branches
+            TypeOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%TypeOf
+            NameOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%Name
+            NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
+            ALLOCATE (VarIndexes(NumVariables))
+            ALLOCATE (VarTypes(NumVariables))
+            ALLOCATE (IndexTypes(NumVariables))
+            ALLOCATE (UnitsStrings(NumVariables))
+            ALLOCATE (ResourceTypes(NumVariables))
+            ALLOCATE (EndUses(NumVariables))
+            ALLOCATE (Groups(NumVariables))
+            ALLOCATE (Names(NumVariables))
+            ALLOCATE (ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(NumVariables))
+
+            ThisReportData%Branch(BranchNum)%Comp(CompNum)%NumMeteredVars = NumVariables
+            CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
+                                     VarIndexes, VarTypes, &
+                                     IndexTypes, UnitsStrings, &
+                                     ResourceTypes, EndUses, Groups, Names, NumFound)
+
+            ModeFlagOn = .TRUE.
+            DO VarNum = 1, NumVariables
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarName   =   &
+                 Names(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarUnits  =   &
+                 UnitsStrings(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndex  =   &
+                 VarIndexes(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarIndexType  =   &
+                 IndexTypes(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ReportVarType   =   &
+                 VarTypes(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%ResourceType    =   &
+                 ResourceTypes(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse          =   &
+                 EndUses(VarNum)
+              IF (ThisReportData%Branch(BranchNum)%Comp(CompNum)%  &
+                 MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
+                DO VarNum1 = 1, NumVariables
+                  ThisReportData%Branch(BranchNum)%Comp(CompNum)%  &
+                     MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
+                END DO
+                ModeFlagOn = .FALSE.
+              ELSEIF (ThisReportData%Branch(BranchNum)%Comp(CompNum)%  &
+                 MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
+                DO VarNum1 = 1, NumVariables
+                  ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
+                END DO
+                ModeFlagOn = .FALSE.
+              ELSEIF(ModeFlagOn)THEN
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
+              ENDIF
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%MeteredVar(VarNum)%Group           = Groups(VarNum)
             END DO
 
-            DEALLOCATE (SubCompTypes)
-            DEALLOCATE (SubCompNames)
-            DEALLOCATE (InletNodeNames)
-            DEALLOCATE (InletNodeNumbers)
-            DEALLOCATE (OutletNodeNames)
-            DEALLOCATE (OutletNodeNumbers)
-          ELSE
-            NumGrandChildren =0
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Parent = .FALSE.
-          END IF
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumSubSubComps = NumGrandChildren
-
-        END DO
-      END DO
-    END DO
-  END DO
+            DEALLOCATE (VarIndexes)
+            DEALLOCATE (VarTypes)
+            DEALLOCATE (IndexTypes)
+            DEALLOCATE (UnitsStrings)
+            DEALLOCATE (ResourceTypes)
+            DEALLOCATE (EndUses)
+            DEALLOCATE (Groups)
+            DEALLOCATE (Names)
 
 
+            DO SubCompNum =1, ThisReportData%Branch(BranchNum)%Comp(CompNum)%NumSubComps
+                  ! Get complete list of components for complex branches
+              TypeOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
+              NameOfComp = ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
+              NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
+              ALLOCATE (VarIndexes(NumVariables))
+              ALLOCATE (VarTypes(NumVariables))
+              ALLOCATE (IndexTypes(NumVariables))
+              ALLOCATE (UnitsStrings(NumVariables))
+              ALLOCATE (ResourceTypes(NumVariables))
+              ALLOCATE (EndUses(NumVariables))
+              ALLOCATE (Groups(NumVariables))
+              ALLOCATE (Names(NumVariables))
+              ALLOCATE   &
+                 (ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%MeteredVar(NumVariables))
 
-  DO PlantLoopNum = 1, NumCondLoops
-    DO BranchNum =1, VentRepCondDemandSide(PlantLoopNum)%TotalBranches
-      DO CompNum =1, VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%TotalComponents
-      ! Get complete list of components for complex branches
-        TypeOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
-        NameOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
-        NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-        ALLOCATE (VarIndexes(NumVariables))
-        ALLOCATE (VarTypes(NumVariables))
-        ALLOCATE (IndexTypes(NumVariables))
-        ALLOCATE (UnitsStrings(NumVariables))
-        ALLOCATE (ResourceTypes(NumVariables))
-        ALLOCATE (EndUses(NumVariables))
-        ALLOCATE (Groups(NumVariables))
-        ALLOCATE (Names(NumVariables))
-        ALLOCATE (VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%MeteredVar(NumVariables))
+              CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
+                                       VarIndexes, VarTypes, &
+                                       IndexTypes, UnitsStrings, &
+                                       ResourceTypes, EndUses, Groups, Names, NumFound)
 
-        VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumMeteredVars = NumVariables
-        CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                 VarIndexes, VarTypes, &
-                                 IndexTypes, UnitsStrings, &
-                                 ResourceTypes, EndUses, Groups, Names, NumFound)
+             ModeFlagOn = .TRUE.
+              DO VarNum = 1, NumVariables
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
+                IF (ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%EndUse == 'HEATINGCOILS' .AND. ModeFlagOn) THEN
+                  DO VarNum1 = 1, NumVariables
+                    ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                       MeteredVar(VarNum1)%EndUse_CompMode = HeatingOnly
+                  END DO
+                  ModeFlagOn = .FALSE.
+                ELSEIF (ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%EndUse == 'COOLINGCOILS' .AND. ModeFlagOn) THEN
+                  DO VarNum1 = 1, NumVariables
+                    ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                       MeteredVar(VarNum1)%EndUse_CompMode = CoolingOnly
+                  END DO
+                  ModeFlagOn = .FALSE.
+                ELSEIF(ModeFlagOn)THEN
+                  ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                     MeteredVar(VarNum)%EndUse_CompMode = NoHeatNoCool
+                ENDIF
+                ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
+                   MeteredVar(VarNum)%Group           = Groups(VarNum)
+              END DO
 
-        DO VarNum = 1, NumVariables
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%  &
-             MeteredVar(VarNum)%Group           = Groups(VarNum)
-        END DO
+              DEALLOCATE (VarIndexes)
+              DEALLOCATE (VarTypes)
+              DEALLOCATE (IndexTypes)
+              DEALLOCATE (UnitsStrings)
+              DEALLOCATE (ResourceTypes)
+              DEALLOCATE (EndUses)
+              DEALLOCATE (Groups)
+              DEALLOCATE (Names)
 
-        DEALLOCATE (VarIndexes)
-        DEALLOCATE (VarTypes)
-        DEALLOCATE (IndexTypes)
-        DEALLOCATE (UnitsStrings)
-        DEALLOCATE (ResourceTypes)
-        DEALLOCATE (EndUses)
-        DEALLOCATE (Groups)
-        DEALLOCATE (Names)
-
-
-        DO SubCompNum =1, VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%NumSubComps
-          ! Get complete list of components for complex branches
-          TypeOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%TypeOf
-          NameOfComp = VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%Name
-          NumVariables=GetNumMeteredVariables(TypeOfComp,NameOfComp)
-          ALLOCATE (VarIndexes(NumVariables))
-          ALLOCATE (VarTypes(NumVariables))
-          ALLOCATE (IndexTypes(NumVariables))
-          ALLOCATE (UnitsStrings(NumVariables))
-          ALLOCATE (ResourceTypes(NumVariables))
-          ALLOCATE (EndUses(NumVariables))
-          ALLOCATE (Groups(NumVariables))
-          ALLOCATE (Names(NumVariables))
-          ALLOCATE   &
-             (VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%MeteredVar(NumVariables))
-
-          CALL GetMeteredVariables(TypeOfComp, NameOfComp, &
-                                   VarIndexes, VarTypes, &
-                                   IndexTypes, UnitsStrings, &
-                                   ResourceTypes, EndUses, Groups, Names, NumFound)
-
-          DO VarNum = 1, NumVariables
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarName   = Names(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarUnits  = UnitsStrings(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndex  = VarIndexes(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarIndexType  = IndexTypes(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ReportVarType   = VarTypes(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%ResourceType    = ResourceTypes(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%EndUse          = EndUses(VarNum)
-            VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
-               MeteredVar(VarNum)%Group           = Groups(VarNum)
+              ThisReportData%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars = NumVariables
+            END DO
           END DO
-
-          DEALLOCATE (VarIndexes)
-          DEALLOCATE (VarTypes)
-          DEALLOCATE (IndexTypes)
-          DEALLOCATE (UnitsStrings)
-          DEALLOCATE (ResourceTypes)
-          DEALLOCATE (EndUses)
-          DEALLOCATE (Groups)
-          DEALLOCATE (Names)
-
-          VentRepCondDemandSide(PlantLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NumMeteredVars = NumVariables
         END DO
-      END DO
     END DO
   END DO
 
@@ -4279,14 +3586,14 @@ SysEvapElec         = 0.0
 
   DO AirLoopNum = 1, NumPrimaryAirSys
     DO BranchNum = 1, PrimaryAirSystem(AirLoopNum)%NumBranches
-      IF(Node(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%NodeNumIn)%massflowrate <= 0.0)CYCLE
+      IF(Node(PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%NodeNumOut)%massflowrate <= 0.0)CYCLE
       DO CompNum = 1, PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%TotalComponents
         CompName = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%Name
         CompType = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf
         InletNodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumIn
         OutletNodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%NodeNumOut
         IF (InletNodeNum <= 0 .OR. OutletNodeNum <= 0) CYCLE
-        CompLoad = Node(InletNodeNum)%massflowrate*  &
+        CompLoad = Node(OutletNodeNum)%massflowrate*  &
                    (PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) -   &
                        PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
         CompLoad = CompLoad * TimeStepSys * SecInHour
@@ -4308,7 +3615,7 @@ SysEvapElec         = 0.0
           InletNodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumIn
           IF (InletNodeNum <= 0 .OR. OutletNodeNum <= 0) CYCLE
           OutletNodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%NodeNumOut
-          CompLoad = Node(InletNodeNum)%massflowrate*  &
+          CompLoad = Node(OutletNodeNum)%massflowrate*  &
              (PsyHFnTdbW(Node(InletNodeNum)%Temp, Node(InletNodeNum)%HumRat) -   &
                  PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
           CompLoad = CompLoad * TimeStepSys * SecInHour
@@ -4337,7 +3644,7 @@ SysEvapElec         = 0.0
             OutletNodeNum = PrimaryAirSystem(AirLoopNum)%Branch(BranchNum)%Comp(CompNum)%SubComp(SubCompNum)%  &
                SubSubComp(SubSubCompNum)%NodeNumOut
             IF (InletNodeNum <= 0 .OR. OutletNodeNum <= 0) CYCLE
-            CompLoad = Node(InletNodeNum)%massflowrate*(PsyHFnTdbW(Node(InletNodeNum)%Temp,   &
+            CompLoad = Node(OutletNodeNum)%massflowrate*(PsyHFnTdbW(Node(InletNodeNum)%Temp,   &
                Node(InletNodeNum)%HumRat) - PsyHFnTdbW(Node(outletNodeNum)%Temp, Node(outletNodeNum)%HumRat))
             CompLoad = CompLoad * TimeStepSys * SecInHour
             CompEnergyUse = 0.0
@@ -4642,6 +3949,7 @@ SELECT CASE(CompType)
        'COIL:HEATING:DX:VARIABLESPEED', &
        'COIL:HEATING:STEAM', &
        'COIL:HEATING:GAS', &
+       'COIL:HEATING:GAS:MULTISTAGE', &
        'COIL:HEATING:DESUPERHEATER')
 
         IF(CompLoadFlag)SysHCCompHTNG(AirLoopNum) = SysHCCompHTNG(AirLoopNum) + ABS(CompLoad)
@@ -4656,7 +3964,8 @@ SELECT CASE(CompType)
                  SysHCCompGas(AirLoopNum)       = SysHCCompGas(AirLoopNum) + CompEnergy
         END SELECT
 
-  CASE('COIL:HEATING:ELECTRIC')
+  CASE('COIL:HEATING:ELECTRIC', &
+       'COIL:HEATING:ELECTRIC:MULTISTAGE')
 
        IF(CompLoadFlag)SysHCCompHTNG(AirLoopNum) = SysHCCompHTNG(AirLoopNum) + ABS(CompLoad)
        SELECT CASE(EnergyType)
@@ -4690,7 +3999,7 @@ SELECT CASE(CompType)
       CASE (iRT_Natural_Gas, iRT_Propane)
              SysHCCompGas(AirLoopNum)       = SysHCCompGas(AirLoopNum) + CompEnergy
     END SELECT
-    
+
 !DX Systems
   CASE('AIRLOOPHVAC:UNITARYHEATPUMP:AIRTOAIR')
        CONTINUE !All energy transfers accounted for in subcomponent models
@@ -5272,133 +4581,6 @@ SUBROUTINE ReportMaxVentilationLoads
 END Subroutine ReportMaxVentilationLoads
 
 
-SUBROUTINE ReportVentilationEnergyUse(InitVentReportFlag)
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Dan Fisher
-          !       DATE WRITTEN   August 2004
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          ! calculate and report zone ventilation loads
-
-          ! METHODOLOGY EMPLOYED:
-
-            ! The system ventilation load will be assigned to the branch coils as follows:
-            !   1.  The net branch coil demand will determine branch use (heating or cooling).  The system
-            !       ventilation load will be assigned to either heating or cooling coils as determined by
-            !       the branch use.  Apportionment to each coil will be on the basis the relative coil demand.
-            !   2.  The equation used to determine the VLF for a cooling branch is as follows:
-            !           VLF= CoilEnergyUse/NetBranchCoilCoolDemand * SysVentLoad
-            !   3.  The equation used to determine the VLF for a heating branch is as follows:
-            !           VLF= CoilEnergyUse/NetBranchCoilHeatDemand * SysVentLoad
-
-          ! REFERENCES:
-          ! na
-
-         ! USE STATEMENTS:
-  USE  DataZoneEnergyDemands
-  USE  Psychrometrics, ONLY: PsyHFnTdbW
-  USE  DataGlobalConstants
-  USE  DataHVACGlobals, ONLY: NumPrimaryAirSys
-  USE  DataEnvironment, ONLY: OutDryBulbTemp
-  USE  GlobalNames, ONLY: DetermineIfCoilIsOn
-  USE  InputProcessor, ONLY: SameString
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-    LOGICAL, INTENT(INOUT) ::  InitVentReportFlag
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-!    REAL(r64), PARAMETER     :: SmallLoad = 0.1d0  !(W)
-!    REAL(r64), PARAMETER     :: KJperJ = 0.001d0   !kilojoules per joules
-!    REAL(r64), PARAMETER     :: smallflow = 0.00001d0 !(kg/s)
-!    INTEGER, PARAMETER  :: EnergyTransParam = 1
-!    INTEGER, PARAMETER  :: ZoneEquipListParam = 2
-!    INTEGER, PARAMETER  :: MainBranch       = 1
-!    INTEGER, PARAMETER  :: SupplyCoolBranch = 2
-!    INTEGER, PARAMETER  :: SupplyHeatBranch = 3
-!    INTEGER, PARAMETER  :: ADUCool          = 4
-!    INTEGER, PARAMETER  :: ADUHeat          = 5
-!    INTEGER, PARAMETER  :: EffArraySize     = 10
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-!    CHARACTER(len=MaxNameLength)    :: CompType
-!    CHARACTER(len=MaxNameLength)    :: CompName
-!    INTEGER     ::  Index    !loop counter
-!    INTEGER     ::  nodes    !loop counter
-!    INTEGER     ::  BranchType         !ZONE counter
-!    INTEGER     ::  CtrlZoneNum         !ZONE counter
-!    INTEGER     ::  ZoneInNum           !counter for zone air distribution inlets
-!    INTEGER     ::  AirLoopNum           !counter for zone air distribution inlets
-!    INTEGER     ::  MainBranchNum           !counter for zone air distribution inlets
-!    INTEGER     ::  BranchNum           !counter for zone air distribution inlets
-!    INTEGER     ::  SupplyCoolBranchNum           !counter for zone air distribution inlets
-!    INTEGER     ::  SupplyHeatBranchNum           !counter for zone air distribution inlets
-!    INTEGER     ::  EquipListNum           !counter for zone air distribution inlets
-!!    INTEGER     ::  SubEquipNum           !counter for zone air distribution inlets
-!!    INTEGER     ::  SubSubEquipNum           !counter for zone air distribution inlets
-!    INTEGER     ::  VarNum           !counter for zone air distribution inlets
-!    INTEGER     ::  CompNum
-!    INTEGER     ::  SubCompNum
-!    INTEGER     ::  SubSubCompNum
-!    INTEGER     ::  CompMode
-!    INTEGER     ::  InletNodeNum
-!    INTEGER     ::  OutletNodeNum
-!    INTEGER     ::  MixedAirNode
-!    INTEGER     ::  ReturnAirNode
-!    INTEGER     ::  ADUNum
-!    INTEGER     ::  ADUCoolNum
-!    INTEGER     ::  ADUHeatNum
-!    INTEGER     ::  ADUHeatInNode
-!    INTEGER     ::  ADUCoolInNode
-!    INTEGER     ::  EnergyType
-!!    INTEGER     ::  ActualZoneNum
-!    REAL(r64)   ::  TotSysDemand
-!    REAL(r64)   ::  SystemMdot
-!    REAL(r64)   ::  CompEnergyUse
-!    REAL(r64)   ::  AvailEnergyTrans
-!    REAL(r64)   ::  CompLoad
-!    REAL(r64)   ::  Eff
-!    REAL(r64)   ::  PeakEff
-!    REAL(r64)   ::  ElecEff
-!    REAL(r64)   ::  GasEff
-!    REAL(r64)   ::  PurchEff
-!    REAL(r64)   ::  OtherEff
-!    REAL(r64)   ::  PeakElecEff
-!    REAL(r64)   ::  PeakGasEff
-!    REAL(r64)   ::  PeakPurchEff
-!    REAL(r64)   ::  PeakOtherEff
-!    LOGICAL     ::  DecSysVentLoad = .TRUE.
-!    LOGICAL,SAVE::  AirLoopAllocDone = .FALSE.
-!    LOGICAL     ::  ReportFlag
-!    LOGICAL     ::  FirstCall
-!    LOGICAL     ::  PlantCall
-!    LOGICAL     ::  CoolOnFlag
-!    LOGICAL     ::  HeatOnFlag
-!    LOGICAL     ::  PlantConnection
-!    LOGICAL     ::  ScheduledOnFlag = .TRUE.
-!    LOGICAL,SAVE,ALLOCATABLE,DIMENSION(:) ::  SetFirstTimeFlag
-    !***********************************************************************************
-
-
-    IF (.not. VentReportStructureCreated) RETURN
-    IF (.not. VentEnergyReportEnabled) RETURN
-
-    InitVentReportFlag=.true.
-    CALL ShowSevereError('ReportVentilationEnergyUse: This report is not enabled. Contact EnergyPlus Support.')
-
-
-  RETURN
-END SUBROUTINE ReportVentilationEnergyUse
-
 SUBROUTINE MatchPlantSys(AirLoopNum,BranchNum)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher
@@ -5897,7 +5079,7 @@ END SUBROUTINE ReportAirLoopConnections
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

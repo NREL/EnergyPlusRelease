@@ -251,7 +251,7 @@ CONTAINS
         END SELECT
 
         PowerMet = SteamBaseboard(BaseboardNum)%TotPower
-      ELSE 
+      ELSE
       ! baseboard is off, don't bother going into ControlCompOutput
         mdot = 0.d0
         CALL SetComponentFlowRate(mdot, &
@@ -370,18 +370,16 @@ CONTAINS
 
        ! Get schedule
     SteamBaseboard(BaseboardNum)%Schedule  = cAlphaArgs(2)
-    SteamBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-
-    IF (SteamBaseboard(BaseboardNum)%SchedPtr == 0) THEN
-        IF (lAlphaFieldBlanks(2)) THEN
-          CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
-           '", '//TRIM(cAlphaFieldNames(2))//' is required, but is missing.')
-        ELSE
-          CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
+    IF (lAlphaFieldBlanks(2)) THEN
+      SteamBaseboard(BaseboardNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      SteamBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+      IF (SteamBaseboard(BaseboardNum)%SchedPtr == 0) THEN
+        CALL ShowSevereError(RoutineName//cCMO_BBRadiator_Steam//'="'//trim(cAlphaArgs(1))// &
            '", '//TRIM(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
-        END IF
         ErrorsFound=.true.
       ENDIF
+    ENDIF
 
        ! Get inlet node number
     SteamBaseboard(BaseboardNum)%SteamInletNode = &
@@ -546,31 +544,30 @@ CONTAINS
        ! Setup Report variables for the Coils
     DO BaseboardNum = 1, NumSteamBaseboards
       ! CurrentModuleObject='ZoneHVAC:Baseboard:RadiantConvective:Steam'
-      CALL SetupOutputVariable('Baseboard Convective System Impact Rate[W]', SteamBaseboard(BaseboardNum)%TotPower, &
+      CALL SetupOutputVariable('Baseboard Total Heating Rate [W]', SteamBaseboard(BaseboardNum)%TotPower, &
                                'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Heating Rate[W]', SteamBaseboard(BaseboardNum)%Power, &
+
+      CALL SetupOutputVariable('Baseboard Convective Heating Rate [W]', SteamBaseboard(BaseboardNum)%ConvPower, &
                                'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Convective Heating Rate[W]', SteamBaseboard(BaseboardNum)%ConvPower, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Rate [W]', SteamBaseboard(BaseboardNum)%RadPower, &
                                'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Rate[W]', SteamBaseboard(BaseboardNum)%RadPower, &
-                               'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Convective System Impact Energy[J]', SteamBaseboard(BaseboardNum)%TotEnergy, &
+      CALL SetupOutputVariable('Baseboard Total Heating Energy [J]', SteamBaseboard(BaseboardNum)%TotEnergy, &
                                'System','Sum',SteamBaseboard(BaseboardNum)%EquipID, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BASEBOARD',GroupKey='System')
-      CALL SetupOutputVariable('Baseboard Heating Energy[J]', SteamBaseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Convective Heating Energy [J]', SteamBaseboard(BaseboardNum)%ConvEnergy, &
                                'System','Sum',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Convective Heating Energy[J]', SteamBaseboard(BaseboardNum)%ConvEnergy, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Energy [J]', SteamBaseboard(BaseboardNum)%RadEnergy, &
                                'System','Sum',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Energy[J]', SteamBaseboard(BaseboardNum)%RadEnergy, &
-                               'System','Sum',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Steam Consumption[J]', SteamBaseboard(BaseboardNum)%Energy, &
+      CALL SetupOutputVariable('Baseboard Steam Energy [J]', SteamBaseboard(BaseboardNum)%Energy, &
                                'System','Sum',SteamBaseboard(BaseboardNum)%EquipID, &
                                 ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='BASEBOARD',GroupKey='System')
-      CALL SetupOutputVariable('Baseboard Steam Mass Flow Rate[kg/s]', SteamBaseboard(BaseboardNum)%SteamMassFlowRate, &
+      CALL SetupOutputVariable('Baseboard Steam Rate [W]', SteamBaseboard(BaseboardNum)%Power, &
                                'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard Steam Inlet Temperature[C]', SteamBaseboard(BaseboardNum)%SteamInletTemp, &
+      CALL SetupOutputVariable('Baseboard Steam Mass Flow Rate [kg/s]', SteamBaseboard(BaseboardNum)%SteamMassFlowRate, &
+                               'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
+      CALL SetupOutputVariable('Baseboard Steam Inlet Temperature [C]', SteamBaseboard(BaseboardNum)%SteamInletTemp, &
                                 'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
-      CALL SetupOutputVariable('Baseboard steam Outlet Temperature[C]', SteamBaseboard(BaseboardNum)%SteamOutletTemp, &
+      CALL SetupOutputVariable('Baseboard Steam Outlet Temperature [C]', SteamBaseboard(BaseboardNum)%SteamOutletTemp, &
                               'System','Average',SteamBaseboard(BaseboardNum)%EquipID)
     END DO
 
@@ -1477,7 +1474,7 @@ END SUBROUTINE UpdateSteamBaseboardPlantConnection
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

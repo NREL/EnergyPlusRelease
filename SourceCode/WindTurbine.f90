@@ -26,7 +26,7 @@ MODULE WindTurbine
   ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataGenerators
-USE DataGlobals,   ONLY : MaxNameLength, Pi, SecInHour, BeginEnvrnFlag, DegToRadians
+USE DataGlobals,   ONLY : MaxNameLength, Pi, SecInHour, BeginEnvrnFlag, DegToRadians, ScheduleAlwaysOn
 USE DataInterfaces,   ONLY : ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, SetupOutputVariable
 
 IMPLICIT NONE
@@ -297,7 +297,7 @@ REAL(r64), PARAMETER :: DefaultH       = 50.0d0   ! Default of height for local 
   LOGICAL, ALLOCATABLE, DIMENSION(:)   :: lNumericBlanks    ! Logical array, numeric field input BLANK = .true.
 
             ! Initializations and allocations
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumArgs,NumAlphas,NumNumbers)
   ALLOCATE(cAlphaArgs(NumAlphas))
   cAlphaArgs=' '
   ALLOCATE(cAlphaFields(NumAlphas))
@@ -332,16 +332,15 @@ DO WindTurbineNum = 1, NumWindTurbines
     WindTurbineSys(WindTurbineNum)%Name = cAlphaArgs(1)       ! Name of wind turbine
 
     WindTurbineSys(WindTurbineNum)%Schedule = cAlphaArgs(2)   ! Get schedule
-    WindTurbineSys(WindTurbineNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-    IF (WindTurbineSys(WindTurbineNum)%SchedPtr == 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
-           trim(cAlphaFields(2))//' is required but input is blank.')
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      WindTurbineSys(WindTurbineNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      WindTurbineSys(WindTurbineNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+      IF (WindTurbineSys(WindTurbineNum)%SchedPtr == 0) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cAlphaFields(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+        ErrorsFound = .TRUE.
       ENDIF
-      ErrorsFound = .TRUE.
     ENDIF
         ! Select rotor type
     SELECT CASE (cAlphaArgs(3))
@@ -637,29 +636,29 @@ DEALLOCATE(lNumericBlanks)
 IF (ErrorsFound) Call ShowFatalError(CurrentModuleObject//' errors occurred in input.  Program terminates.')
 
 DO WindTurbineNum = 1, NumWindTurbines
-    CALL SetupOutputVariable('Wind Turbine Electric Power Produced [W]',WindTurbineSys(WindTurbineNum)%Power, &
+    CALL SetupOutputVariable('Generator Produced Electric Power [W]',WindTurbineSys(WindTurbineNum)%Power, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-    CALL SetupOutputVariable('Wind Turbine Electric Energy Produced [J]',WindTurbineSys(WindTurbineNum)%Energy, &
+    CALL SetupOutputVariable('Generator Produced Electric Energy [J]',WindTurbineSys(WindTurbineNum)%Energy, &
                               'System','Sum',WindTurbineSys(WindTurbineNum)%Name, &
                               ResourceTypeKey='ElectricityProduced',EndUseKey='WINDTURBINE',GroupKey='Plant')
-    CALL SetupOutputVariable('Wind Turbine Ambient Wind Speed [m/s]',WindTurbineSys(WindTurbineNum)%LocalWindSpeed, &
+    CALL SetupOutputVariable('Generator Turbine Local Wind Speed [m/s]',WindTurbineSys(WindTurbineNum)%LocalWindSpeed, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-    CALL SetupOutputVariable('Wind Turbine Ambient Air Density [kg/m3]',WindTurbineSys(WindTurbineNum)%LocalAirDensity, &
+    CALL SetupOutputVariable('Generator Turbine Local Air Density [kg/m3]',WindTurbineSys(WindTurbineNum)%LocalAirDensity, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-    CALL SetupOutputVariable('Wind Turbine Tip Speed Ratio',WindTurbineSys(WindTurbineNum)%TipSpeedRatio, &
+    CALL SetupOutputVariable('Generator Turbine Tip Speed Ratio []',WindTurbineSys(WindTurbineNum)%TipSpeedRatio, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
     SELECT CASE (WindTurbineSys(WindTurbineNum)%RotorType)
       CASE (HAWT)
-        CALL SetupOutputVariable('Wind Turbine Power Coefficient',WindTurbineSys(WindTurbineNum)%PowerCoeff, &
+        CALL SetupOutputVariable('Generator Turbine Power Coefficient []',WindTurbineSys(WindTurbineNum)%PowerCoeff, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
       CASE (VAWT)
-        CALL SetupOutputVariable('Wind Turbine Chordal Velocity Component [m/s]',WindTurbineSys(WindTurbineNum)%ChordalVel, &
+        CALL SetupOutputVariable('Generator Turbine Chordal Component Velocity [m/s]',WindTurbineSys(WindTurbineNum)%ChordalVel, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-        CALL SetupOutputVariable('Wind Turbine Normal Velocity Component [m/s]',WindTurbineSys(WindTurbineNum)%NormalVel, &
+        CALL SetupOutputVariable('Generator Turbine Normal Component Velocity [m/s]',WindTurbineSys(WindTurbineNum)%NormalVel, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-        CALL SetupOutputVariable('Wind Turbine Relative Flow Velocity [m/s]',WindTurbineSys(WindTurbineNum)%RelFlowVel, &
+        CALL SetupOutputVariable('Generator Turbine Relative Flow Velocity [m/s]',WindTurbineSys(WindTurbineNum)%RelFlowVel, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
-        CALL SetupOutputVariable('Wind Turbine Angle of Attack [deg]',WindTurbineSys(WindTurbineNum)%AngOfAttack, &
+        CALL SetupOutputVariable('Generator Turbine Attack Angle [deg]',WindTurbineSys(WindTurbineNum)%AngOfAttack, &
                              'System','Average',WindTurbineSys(WindTurbineNum)%Name)
     END SELECT
 END DO
@@ -1115,7 +1114,7 @@ END SUBROUTINE ReportWindTurbine
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

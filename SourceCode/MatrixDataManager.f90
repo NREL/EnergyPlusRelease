@@ -10,7 +10,7 @@ MODULE MatrixDataManager
 
           ! PURPOSE OF THIS MODULE:
           ! Process user input for Matrix: input data objects
-          ! Provide central services for other routines to access 
+          ! Provide central services for other routines to access
           ! matrix input data.
 
           ! METHODOLOGY EMPLOYED:
@@ -48,16 +48,16 @@ TYPE MatrixDataStruct
   !REAL(r64), DIMENSION(:), ALLOCATABLE     :: Mat1D ! hold data if one dimensional
   REAL(r64), DIMENSION(:,:), ALLOCATABLE   :: Mat2D ! hold data if two dimensional
   !REAL(r64), DIMENSION(:,:,:), Allocatable :: Mat3D ! hold data if three dimensional
- 
+
 END TYPE MatrixDataStruct
-          
+
 TYPE(MatrixDataStruct), ALLOCATABLE, DIMENSION(:) :: MatData
 
 INTEGER   :: NumMats ! number of matracies in input file
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE <module_name>:
 
-  
+
 ! todo, flush out the following routines, see CurveManager for patterns
 PRIVATE GetMatrixInput  !read in Matrix:TwoDimensional
 PUBLIC MatrixIndex
@@ -124,17 +124,17 @@ SUBROUTINE GetMatrixInput
   INTEGER :: ElementNum
   INTEGER :: RowIndex
   INTEGER :: ColIndex
-  
+
   cCurrentModuleObject = 'Matrix:TwoDimension'
   NumTwoDimMatrix = GetNumObjectsFound(cCurrentModuleObject)
-  
+
   NumMats = NumTwoDimMatrix
-  
+
   ALLOCATE(MatData(NumMats))
-  
+
   MatNum = 0
   DO MatIndex=1, NumTwoDimMatrix
-    CALL GetObjectItem(TRIM(cCurrentModuleObject), MatIndex, cAlphaArgs, NumAlphas, rNumericArgs,NumNumbers, IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject, MatIndex, cAlphaArgs, NumAlphas, rNumericArgs,NumNumbers, IOStatus, &
              NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     MatNum = MatNum + 1
     IsNotOK=.FALSE.
@@ -148,8 +148,8 @@ SUBROUTINE GetMatrixInput
     NumRows = Floor(rNumericArgs(1))
     NumCols = Floor(rNumericArgs(2))
     NumElements = NumRows * NumCols
-    
-    ! test 
+
+    ! test
     IF (NumElements < 1) THEN
       CALL ShowSevereError('GetMatrixInput: for '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
       CALL ShowContinueError('Check '//TRIM(cNumericFieldNames(1))//' and '//TRIM(cNumericFieldNames(2))// &
@@ -175,7 +175,7 @@ SUBROUTINE GetMatrixInput
       MatData(MatNum)%Mat2D(RowIndex, ColIndex) = rNumericArgs(ElementNum + 2)  !Matrix is read in row-by-row
                     !Note: this is opposite to usual FORTRAN array storage
     ENDDO
-    
+
   ENDDO
 
 
@@ -196,7 +196,7 @@ FUNCTION MatrixIndex(MatrixName) RESULT (MatrixIndexPtr)
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS FUNCTION:
-          ! Return integer index or pointer to MatData structure array 
+          ! Return integer index or pointer to MatData structure array
 
           ! METHODOLOGY EMPLOYED:
           ! inputs name of matrix and returns integer index
@@ -224,12 +224,12 @@ FUNCTION MatrixIndex(MatrixName) RESULT (MatrixIndexPtr)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
   LOGICAL,SAVE  :: GetInputFlag = .true.  ! First time, input is "gotten"
-  
+
   IF (GetInputFlag) THEN
     CALL GetMatrixInput
     GetInputFlag = .FALSE.
   ENDIF
-  
+
   IF (NumMats > 0) THEN
     MatrixIndexPtr = FindItemInList(MatrixName, MatData(1:NumMats)%Name, NumMats)
   ELSE
@@ -276,12 +276,12 @@ SUBROUTINE Get2DMatrix(Index, Mat2D)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          
+
   IF (Index > 0) THEN ! protect hard crash
     Mat2D = MatData(Index)%Mat2D
   ELSE
     ! do nothing (?) throw dev error
-    
+
   ENDIF
 
   RETURN
@@ -329,7 +329,7 @@ SUBROUTINE Get2DMatrixDimensions(Index, NumRows, NumCols)
     NumCols = MatData(Index)%Dim(2)
   ELSE
     ! do nothing (?) throw dev error?
-  
+
   ENDIF
 
   RETURN
@@ -337,7 +337,7 @@ SUBROUTINE Get2DMatrixDimensions(Index, NumRows, NumCols)
 END SUBROUTINE Get2DMatrixDimensions
 
 
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -100,8 +100,9 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE Pipes,                         ONLY: SimPipes
   USE PipeHeatTransfer,              ONLY: SimPipesHeatTransfer
   USE Pumps,                         ONLY: SimPumps
-  USE FreeCoolingHeatExchanger,      ONLY: SimFreeCoolingHeatExchanger
-  USE EconomizerHeatExchanger,       ONLY: SimEconHeatExchanger
+
+
+  USE PlantHeatExchangerFluidToFluid,ONLY: SimFluidHeatExchanger
   USE CondenserLoopTowers,           ONLY: SimTowers
   USE FluidCoolers,                  ONLY: SimFluidCoolers
   USE EvaporativeFluidCoolers,       ONLY: SimEvapFluidCoolers
@@ -116,7 +117,7 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE GroundHeatExchangers ,         ONLY: SimGroundHeatExchangers
   USE SurfaceGroundHeatExchanger,    ONLY: SimSurfaceGroundHeatExchanger
   USE PondGroundHeatExchanger,       ONLY: SimPondGroundHeatExchanger
-  USE PlateCoolingHeatExchanger,     ONLY: SimPlateCoolingHeatExchanger
+
   USE PlantLoadProfile,              ONLY: SimulatePlantProfile
   USE WaterCoils,                    ONLY: UpdateWaterToAirCoilPlantConnection
   USE WaterUse,                      ONLY: SimulateWaterUseConnection
@@ -129,6 +130,8 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
   USE PlantPipingSystemsManager,     ONLY: SimPipingSystemCircuit
   USE UserDefinedComponents,         ONLY: SimUserDefinedPlantComponent
   USE HVACVariableRefrigerantFlow,   ONLY: SimVRFCondenserPlant
+  USE PlantComponentTemperatureSources, ONLY: SimWaterSource
+  USE PlantCentralGSHP,              ONLY: SimCentralGroundSourceHeatPump
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -715,23 +718,11 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
     CASE (GenEquipTypes_HeatExchanger)
 
             SELECT CASE (EquipTypeNum)
-                  ! free cooling heat exchanger
-              CASE(TypeOf_FreeCoolingHtExchg)
-                CALL SimFreeCoolingHeatExchanger(EquipName, EquipNum, FirstHVACIteration,InitLoopEquip)    !DSU
-                IF (InitLoopEquip) THEN
-                  PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
-                ENDIF
 
-              CASE (TypeOf_HtExchgPlateFreeClng) ! 'HeatExchanger:Plate'
-                CALL SimPlateCoolingHeatExchanger(EquipName, EquipNum, FirstHVACIteration, Runflag, InitLoopEquip)    !DSU
+            CASE(TypeOf_FluidToFluidPlantHtExchg)
+              CALL SimFluidHeatExchanger(LoopNum, LoopSideNum, EquipType, EquipName, EquipNum, &
+                                          InitLoopEquip, CurLoad, MaxLoad, MinLoad, OptLoad)
                 IF (InitLoopEquip)THEN
-                  PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
-                END IF
-
-              CASE(TypeOf_WaterSideEconHtExchg)
-                CALL SimEconHeatExchanger(LoopNum,EquipType,EquipName,EquipFlowCtrl,EquipNum,RunFlag, &
-                                           InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,FirstHVACIteration)    !DSU
-                IF (InitLoopEquip) THEN
                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
@@ -774,6 +765,14 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
             PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
 
+          END IF
+
+        CASE (TypeOf_GrndHtExchgHorizTrench)
+            CALL SimPipingSystemCircuit(EquipName, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum, &
+                           InitLoopEquip, FirstHVACIteration)
+
+          IF (InitLoopEquip)THEN
+            PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum = Equipnum
           END IF
 
       END SELECT
@@ -1126,15 +1125,53 @@ SUBROUTINE SimPlantEquip(LoopNum,LoopSideNum,BranchNum,Num,FirstHVACIteration,In
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
         END IF
 
+      CASE(TypeOf_WaterSource)
+
+        CALL SimWaterSource(EquipName,EquipFlowCtrl,EquipNum,RunFlag, FirstHVACIteration, &
+                                   InitLoopEquip,CurLoad,MaxLoad,MinLoad,OptLoad,GetCompSizFac,SizingFac)    !DSU
+        IF (InitLoopEquip) THEN
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
+          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+        ENDIF
+
       CASE DEFAULT
+!        CALL ShowSevereError('SimPlantEquip: Invalid Component Equipment Type='//TRIM(EquipType))
+!        CALL ShowContinueError('Occurs in Plant Loop='//TRIM(PlantLoop(LoopNum)%Name))
+!        CALL ShowFatalError('Preceding condition causes termination.')
 
       END SELECT
 
+    CASE (GenEquipTypes_CentralHeatPumpSystem)
+
+      SELECT CASE(EquipTypeNum)
+
+      CASE (TypeOf_CentralGroundSourceHeatPump)
+
+         CALL SimCentralGroundSourceHeatPump(EquipName,EquipFlowCtrl,EquipNum,LoopNum, RunFlag,FirstHVACIteration, &
+                         InitLoopEquip,CurLoad,Maxload,MinLoad,OptLoad,GetCompSizFac,SizingFac)
+         IF (InitLoopEquip) THEN
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MaxLoad =  MaxLoad
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%MinLoad =  MinLoad
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%OptLoad =  OptLoad
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%CompNum =  EquipNum
+         ENDIF
+
+         IF (GetCompSizFac) THEN
+           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(Num)%SizFac =  SizingFac
+         END IF
+
+      CASE DEFAULT
+        CALL ShowSevereError('SimPlantEquip: Invalid Central Heat Pump System Type='//TRIM(EquipType))
+        CALL ShowContinueError('Occurs in Plant Loop='//TRIM(PlantLoop(LoopNum)%Name))
+        CALL ShowFatalError('Preceding condition causes termination.')
+      END SELECT
+
     CASE DEFAULT
-      CALL ShowSevereError('SimPlantEquip: Invalid Equipment type='//TRIM(EquipType))
+      CALL ShowSevereError('SimPlantEquip: Invalid Equipment Type='//TRIM(EquipType))
       CALL ShowContinueError('Occurs in Plant Loop='//TRIM(PlantLoop(LoopNum)%Name))
       CALL ShowFatalError('Preceding condition causes termination.')
-
   END SELECT TypeOfEquip
 
   RETURN
@@ -1142,7 +1179,7 @@ END SUBROUTINE SimPlantEquip
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

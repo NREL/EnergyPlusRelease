@@ -257,6 +257,9 @@ SUBROUTINE InitConductionTransferFunctions
   REAL(r64)             :: SumYi      ! Summation of all of the Xi terms (cross CTFs) for a construction
   REAL(r64)             :: SumZi      ! Summation of all of the Xi terms (outside CTFs) for a construction
   LOGICAL :: DoCTFErrorReport
+  REAL(r64) :: Alpha ! thermal diffusivity in m2/s, for local check of properties
+  REAL(r64) :: DeltaTimestep      ! zone timestep in seconds, for local check of properties
+  REAL(r64) :: ThicknessThreshold ! min thickness consistent with other thermal properties, for local check
 
           ! FLOW:
           ! Subroutine initializations
@@ -312,6 +315,32 @@ SUBROUTINE InitConductionTransferFunctions
         cp(Layer)  = Material(CurrentLayer)%SpecHeat ! Must convert
                                         ! from kJ/kg-K to J/kg-k due to rk units
 
+        IF (Construct(ConstrNum)%SourceSinkPresent .AND. .Not. Material(CurrentLayer)%WarnedForHighDiffusivity) THEN 
+          ! check for materials that are too conductive or thin
+          IF ((rho(Layer) *  cp(Layer)) > 0.d0) THEN
+            Alpha = rk(Layer) / (rho(Layer) *  cp(Layer))
+            IF (Alpha > HighDiffusivityThreshold ) THEN
+              DeltaTimestep      = TimeStepZone * SecInHour
+              ThicknessThreshold = SQRT(Alpha * DeltaTimestep * 3.d0)
+              IF (Material(CurrentLayer)%Thickness < ThicknessThreshold) THEN
+                CALL ShowSevereError('InitConductionTransferFunctions: Found Material that is too thin and/or too ' &
+                                       //'highly conductive, material name = '  // TRIM(Material(CurrentLayer)%Name))
+                CALL ShowContinueError('High conductivity Material layers are not well supported for internal source ' &
+                                        //'constructions, material conductivity = ' &
+                                        //TRIM(RoundSigDigits(Material(CurrentLayer)%Conductivity, 3)) //' [W/m-K]')
+                CALL ShowContinueError('Material thermal diffusivity = ' //TRIM(RoundSigDigits(Alpha, 3)) //' [m2/s]')
+                IF (Material(CurrentLayer)%Thickness < ThinMaterialLayerThreshold) THEN
+                  CALL ShowContinueError('Material may be too thin to be modeled well, thickness = ' &
+                                          // TRIM(RoundSigDigits(Material(currentLayer)%Thickness, 5 ))//' [m]')
+                  CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
+                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
+                ENDIF
+                Material(CurrentLayer)%WarnedForHighDiffusivity = .TRUE. 
+              ENDIF
+            ENDIF
+          ENDIF
+        ENDIF
+
         IF (rk(Layer) <= PhysPropLimit) THEN  ! Thermal conductivity too small,
                             ! thus this must be handled as a resistive layer
 
@@ -345,7 +374,8 @@ SUBROUTINE InitConductionTransferFunctions
                     ! parameters to calculate CTFs for a building element
                     ! containing this layer.
 
-            CALL ShowSevereError('R Value below lowest allowed value for material '//TRIM(Material(CurrentLayer)%Name))
+            CALL ShowSevereError('InitConductionTransferFunctions: Material='//TRIM(Material(CurrentLayer)%Name)//  &
+               'R Value below lowest allowed value')
             CALL ShowContinueError('Lowest allowed value=['//trim(RoundSigDigits(RValueLowLimit,3))//  &
                           '], Material R Value=['//trim(RoundSigDigits(lr(Layer),3))//'].')
             ErrorsFound=.true.
@@ -2206,7 +2236,7 @@ END SUBROUTINE ReportCTFs
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

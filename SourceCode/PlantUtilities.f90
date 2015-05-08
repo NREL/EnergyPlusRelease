@@ -198,6 +198,10 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
   INTEGER       :: CompOutletNodeNum
   INTEGER       :: CompNum
   REAL(r64)     :: SeriesBranchHighFlowRequest ! local temporary used for sweeping across components on a branch
+  REAL(r64)     :: SeriesBranchHardwareMaxLim
+  REAL(r64)     :: SeriesBranchHardwareMinLim
+  REAL(r64)     :: SeriesBranchMaxAvail
+  REAL(r64)     :: SeriesBranchMinAvail
 
   IF (OneTimeDiagSetup) THEN
     ALLOCATE(NodeErrorMsgIssued(NumOfNodes) )
@@ -268,23 +272,30 @@ SUBROUTINE SetComponentFlowRate(CompFlow,InletNode,OutletNode,LoopNum,LoopSideNu
       IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompIndex)%FlowCtrl == ControlType_SeriesActive) THEN
         ! determine highest flow request for all the components on the branch
         SeriesBranchHighFlowRequest = 0.d0
+        SeriesBranchHardwareMaxLim  = Node(InletNode)%MassFlowRateMax
+        SeriesBranchHardwareMinLim  = 0.d0
+        SeriesBranchMaxAvail        = Node(InletNode)%MassFlowRateMaxAvail
+        SeriesBranchMinAvail        = 0.d0
         DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
           CompInletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumIn
           SeriesBranchHighFlowRequest = MAX(Node(CompInletNodeNum)%MassFlowRateRequest, SeriesBranchHighFlowRequest)
+          SeriesBranchHardwareMaxLim  = MIN(Node(CompInletNodeNum)%MassFlowRateMax, SeriesBranchHardwareMaxLim)
+          SeriesBranchHardwareMinLim  = MAX(Node(CompInletNodeNum)%MassFlowRateMin, SeriesBranchHardwareMinLim)
+          SeriesBranchMaxAvail        = MIN(Node(CompInletNodeNum)%MassFlowRateMaxAvail, SeriesBranchMaxAvail)
+          SeriesBranchMinAvail        = MAX(Node(CompInletNodeNum)%MassFlowRateMinAvail, SeriesBranchMinAvail)
         ENDDO
+
         !take higher of branch max flow request and this new flow request
         CompFlow = MAX(CompFlow, SeriesBranchHighFlowRequest)
-        ! multiple components on the branch
-        DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
-          CompInletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumIn
-          CompOutletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumOut
-          Node(OutletNode)%MassFlowRate = MAX(Node(CompOutletNodeNum)%MassFlowRateMinAvail, CompFlow)
-          Node(OutletNode)%MassFlowRate = MAX(Node(CompInletNodeNum)%MassFlowRateMin,       Node(OutletNode)%MassFlowRate)
-          Node(OutletNode)%MassFlowRate = MIN(Node(CompOutletNodeNum)%MassFlowRateMaxAvail, Node(OutletNode)%MassFlowRate)
-          Node(OutletNode)%MassFlowRate = MIN(Node(CompInletNodeNum)%MassFlowRateMax,       Node(OutletNode)%MassFlowRate)
-        ENDDO
-        IF (Node(OutletNode)%MassFlowRate < MassFlowTolerance) Node(OutletNode)%MassFlowRate = 0.d0
-        CompFlow =  Node(OutletNode)%MassFlowRate
+
+        ! apply constraints on component flow
+        CompFlow = MAX(CompFlow, SeriesBranchHardwareMinLim)
+        CompFlow = MAX(CompFlow, SeriesBranchMinAvail)
+        CompFlow = MIN(CompFlow, SeriesBranchHardwareMaxLim)
+        CompFlow = MIN(CompFlow, SeriesBranchMaxAvail)
+
+        IF (CompFlow < MassFlowTolerance) CompFlow = 0.d0
+        Node(OutletNode)%MassFlowRate = CompFlow
         Node(InletNode)%MassFlowRate = Node(OutletNode)%MassFlowRate
         DO CompNum = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%TotalComponents
           CompInletNodeNum = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchIndex)%Comp(CompNum)%NodeNumIn
@@ -2511,7 +2522,7 @@ END FUNCTION CheckPlantConvergence
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

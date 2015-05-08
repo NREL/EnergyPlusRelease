@@ -167,7 +167,7 @@ SUBROUTINE GetCostEstimateInput
   cCurrentModuleObject = 'ComponentCost:LineItem'
 
   DO Item=1,NumLineItems
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
     CostLineItem(item)%LineName           = cAlphaArgs(1)
     CostLineItem(item)%LineType           = cAlphaArgs(2)
     CostLineItem(item)%ParentObjType      = cAlphaArgs(3)
@@ -196,9 +196,9 @@ SUBROUTINE GetCostEstimateInput
   NumRefAdjust  = 0
 
   cCurrentModuleObject = 'ComponentCost:Adjustments'
-  NumCostAdjust = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumCostAdjust = GetNumObjectsFound(cCurrentModuleObject)
   If (NumCostAdjust == 1) then
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
     CurntBldg%MiscCostperSqMeter  = rNumericArgs(1)
     CurntBldg%DesignFeeFrac       = rNumericArgs(2)
     CurntBldg%ContractorFeeFrac   = rNumericArgs(3)
@@ -213,9 +213,9 @@ SUBROUTINE GetCostEstimateInput
   END IF
 
   cCurrentModuleObject = 'ComponentCost:Reference'
-  NumRefAdjust = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumRefAdjust = GetNumObjectsFound(cCurrentModuleObject)
   If (NumRefAdjust == 1) then
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
     RefrncBldg%LineItemTot         = rNumericArgs(1)
     RefrncBldg%MiscCostperSqMeter  = rNumericArgs(2)
     RefrncBldg%DesignFeeFrac       = rNumericArgs(3)
@@ -869,7 +869,7 @@ END SUBROUTINE CalcCostEstimate
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -37,7 +37,7 @@ MODULE HVACUnitaryBypassVAV
   ! Use statements for data only modules
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, SysSizingCalc, WarmupFlag, DoingSizing, SecInHour
+USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, SysSizingCalc, WarmupFlag, DoingSizing, SecInHour, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: SetupOutputVariable, ShowWarningError, ShowFatalError, ShowSevereError, &
                            ShowContinueError, ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd, &
                            ShowWarningMessage
@@ -590,7 +590,7 @@ SUBROUTINE GetCBVAV
 
   ! find the number of each type of CBVAV unit
   CurrentModuleObject = 'AirLoopHVAC:UnitaryHeatCool:VAVChangeoverBypass'
-  NumCBVAV = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCBVAV = GetNumObjectsFound(CurrentModuleObject)
 
   ! allocate the data structures
   ALLOCATE(CBVAV(NumCBVAV))
@@ -601,7 +601,7 @@ SUBROUTINE GetCBVAV
   DO CBVAVIndex = 1,NumCBVAV
     HeatCoilInletNodeNum = 0
     HeatCoilOutletNodeNum = 0
-    CALL GetObjectItem(TRIM(CurrentModuleObject),CBVAVIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,CBVAVIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -616,12 +616,16 @@ SUBROUTINE GetCBVAV
     CBVAV(CBVAVNum)%Name = Alphas(1)
     CBVAV(CBVAVNum)%UnitType = CurrentModuleObject
     CBVAV(CBVAVNum)%Sched = Alphas(2)
-    CBVAV(CBVAVNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
-    IF (CBVAV(CBVAVNum)%SchedPtr .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(CBVAV(CBVAVNum)%Name))
-      ErrorsFound=.TRUE.
-    END IF
+    IF (lAlphaBlanks(2)) THEN
+      CBVAV(CBVAVNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      CBVAV(CBVAVNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer (index number)
+      IF (CBVAV(CBVAVNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(CurrentModuleObject)//' '//TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
+        CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(CBVAV(CBVAVNum)%Name))
+        ErrorsFound=.TRUE.
+      END IF
+    ENDIF
 
     CBVAV(CBVAVNum)%MaxCoolAirVolFlow       = Numbers(1)
     IF (CBVAV(CBVAVNum)%MaxCoolAirVolFlow .LE. 0.0d0 .AND. CBVAV(CBVAVNum)%MaxCoolAirVolFlow .NE. AutoSize) THEN
@@ -1319,41 +1323,41 @@ SUBROUTINE GetCBVAV
 
   DO CBVAVNum=1,NumCBVAV
     ! Setup Report variables for the Fan Coils
-    CALL SetupOutputVariable('Changeover-bypass VAV Total Heating Rate[W]',CBVAV(CBVAVNum)%TotHeatEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Total Heating Rate [W]',CBVAV(CBVAVNum)%TotHeatEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Total Heating Energy[J]',CBVAV(CBVAVNum)%TotHeatEnergy,&
+    CALL SetupOutputVariable('Unitary System Total Heating Energy [J]',CBVAV(CBVAVNum)%TotHeatEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Total Cooling Rate[W]',CBVAV(CBVAVNum)%TotCoolEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Total Cooling Rate [W]',CBVAV(CBVAVNum)%TotCoolEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Total Cooling Energy[J]',CBVAV(CBVAVNum)%TotCoolEnergy,&
+    CALL SetupOutputVariable('Unitary System Total Cooling Energy [J]',CBVAV(CBVAVNum)%TotCoolEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Sensible Heating Rate[W]',CBVAV(CBVAVNum)%SensHeatEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Sensible Heating Rate [W]',CBVAV(CBVAVNum)%SensHeatEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Sensible Heating Energy[J]',CBVAV(CBVAVNum)%SensHeatEnergy,&
+    CALL SetupOutputVariable('Unitary System Sensible Heating Energy [J]',CBVAV(CBVAVNum)%SensHeatEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Sensible Cooling Rate[W]',CBVAV(CBVAVNum)%SensCoolEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Sensible Cooling Rate [W]',CBVAV(CBVAVNum)%SensCoolEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Sensible Cooling Energy[J]',CBVAV(CBVAVNum)%SensCoolEnergy,&
+    CALL SetupOutputVariable('Unitary System Sensible Cooling Energy [J]',CBVAV(CBVAVNum)%SensCoolEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Latent Heating Rate[W]',CBVAV(CBVAVNum)%LatHeatEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Latent Heating Rate [W]',CBVAV(CBVAVNum)%LatHeatEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Latent Heating Energy[J]',CBVAV(CBVAVNum)%LatHeatEnergy,&
+    CALL SetupOutputVariable('Unitary System Latent Heating Energy [J]',CBVAV(CBVAVNum)%LatHeatEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Latent Cooling Rate[W]',CBVAV(CBVAVNum)%LatCoolEnergyRate,&
+    CALL SetupOutputVariable('Unitary System Latent Cooling Rate [W]',CBVAV(CBVAVNum)%LatCoolEnergyRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Latent Cooling Energy[J]',CBVAV(CBVAVNum)%LatCoolEnergy,&
+    CALL SetupOutputVariable('Unitary System Latent Cooling Energy [J]',CBVAV(CBVAVNum)%LatCoolEnergy,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Electric Power[W]',CBVAV(CBVAVNum)%ElecPower,&
+    CALL SetupOutputVariable('Unitary System Electric Power [W]',CBVAV(CBVAVNum)%ElecPower,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Electric Consumption[J]',CBVAV(CBVAVNum)%ElecConsumption,&
+    CALL SetupOutputVariable('Unitary System Electric Energy [J]',CBVAV(CBVAVNum)%ElecConsumption,&
                              'System','Sum',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Fan Part-Load Ratio',CBVAV(CBVAVNum)%FanPartLoadRatio,&
+    CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',CBVAV(CBVAVNum)%FanPartLoadRatio,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Compressor Part-Load Ratio',CBVAV(CBVAVNum)%CompPartLoadRatio,&
+    CALL SetupOutputVariable('Unitary System Compressor Part Load Ratio []',CBVAV(CBVAVNum)%CompPartLoadRatio,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Bypass Mass Flow Rate[kg/s]',CBVAV(CBVAVNum)%BypassMassFlowRate,&
+    CALL SetupOutputVariable('Unitary System Bypass Air Mass Flow Rate [kg/s]',CBVAV(CBVAVNum)%BypassMassFlowRate,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
-    CALL SetupOutputVariable('Changeover-bypass VAV Outlet Air Set Point Temp [C]',CBVAV(CBVAVNum)%OutletTempSetpoint,&
+    CALL SetupOutputVariable('Unitary System Air Outlet Setpoint Temperature [C]',CBVAV(CBVAVNum)%OutletTempSetpoint,&
                              'System','Average',CBVAV(CBVAVNum)%Name)
   END DO
 
@@ -3665,7 +3669,7 @@ END FUNCTION HotWaterCoilResidual
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

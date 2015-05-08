@@ -414,8 +414,8 @@ SUBROUTINE UpdateSQLiteErrorRecord (errorMessage)
     !       RE-ENGINEERED  na
     ! PURPOSE OF THIS SUBROUTINE:
     ! This subroutine updates error records in the Errors table.
-    ! This is used to append text to an error that continues on 
-    ! to the next line.  The errorMessage is always appended to the 
+    ! This is used to append text to an error that continues on
+    ! to the next line.  The errorMessage is always appended to the
     ! last record inserted into the Errors table.
     !
     ! METHODOLOGY EMPLOYED:
@@ -436,7 +436,7 @@ SUBROUTINE UpdateSQLiteSimulationRecord (completed, completedSuccessfully)
     !       RE-ENGINEERED  na
     ! PURPOSE OF THIS SUBROUTINE:
     ! This subroutine updates simulation records in the Simulations table.
-    ! A simulation record is first inserted as 
+    ! A simulation record is first inserted as
     ! completed = false and
     ! completedSuccessfully = false
     ! This subroutine updates those records.
@@ -454,7 +454,7 @@ SUBROUTINE UpdateSQLiteSimulationRecord (completed, completedSuccessfully)
 END SUBROUTINE UpdateSQLiteSimulationRecord
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

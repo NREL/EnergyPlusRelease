@@ -113,6 +113,8 @@ SUBROUTINE ManageSurfaceHeatBalance
   USE HeatBalanceAirManager,  ONLY : ManageAirHeatBalance
   USE ThermalComfort,         ONLY : ManageThermalComfort
   USE HeatBalFiniteDiffManager,   ONLY :  UpdateMoistureBalanceFD
+  USE OutputReportTabular,    ONLY : GatherComponentLoadsSurface !for writing tabular compoonent loads output reports
+  USE DataSystemVariables, ONLY: DeveloperFlag
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -166,9 +168,10 @@ SUBROUTINE ManageSurfaceHeatBalance
     ENDDO
   ENDIF
 
-  CALL ManageThermalComfort ! "Record keeping" for the zone
+  CALL ManageThermalComfort(InitializeOnly=.false.) ! "Record keeping" for the zone
 
   CALL ReportSurfaceHeatBalance
+  IF (ZoneSizingCalc) CALL GatherComponentLoadsSurface
 
   firsttime=.false.
 
@@ -504,7 +507,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
     END IF
   END DO
 
-  CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf)
+  CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf,calledfrom='Main')
 
   IF(AirflowWindows) CALL WindowGapAirflowControl
 
@@ -627,6 +630,8 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   QHWBaseboardSurf = 0.0D0
   QSteamBaseboardSurf = 0.0D0
   QElecBaseboardSurf = 0.0D0
+
+  IF (ZoneSizingCalc) CALL GatherComponentLoadsSurfAbsFact
 
   if (firsttime) CALL DisplayString('Completed Initializing Surface Heat Balance')
   firsttime=.false.
@@ -1310,6 +1315,8 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
   ALLOCATE(HAirFD(TotSurfaces))
   HAirFD=0.0
 
+  CALL DisplayString('Setting up Surface Reporting Variables')
+
   ! Setup surface report variables CurrentModuleObject='Opaque Surfaces'
   DO Loop=1,TotSurfaces
     IF (.not. Surface(Loop)%HeatTransSurf) CYCLE
@@ -1364,11 +1371,11 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
                                Surface(Loop)%Name)
 
     IF (Surface(Loop)%ExtBoundCond == ExternalEnvironment .or. DisplayAdvancedReportVariables) THEN
-      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Dry Bulb Temperature [C]',Surface(Loop)%OutDryBulbTemp,&
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Drybulb Temperature [C]',Surface(Loop)%OutDryBulbTemp,&
                                 'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Wet Bulb Temperature [C]',Surface(Loop)%OutWetBulbTemp,&
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Wetbulb Temperature [C]',Surface(Loop)%OutWetBulbTemp,&
                                 'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Outside Face Outdoor Wind Velocity [m/s]',Surface(Loop)%WindSpeed,&
+      CALL SetupOutputVariable('Surface Outside Face Outdoor Air Wind Speed [m/s]',Surface(Loop)%WindSpeed,&
                                 'Zone','State',Surface(Loop)%Name)
       CALL SetupOutputVariable('Surface Outside Face Convection Heat Gain Rate [W]', QdotConvOutRep(loop), &
                                 'Zone', 'State', Surface(Loop)%Name)
@@ -1406,7 +1413,7 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
     IF(Surface(Loop)%Class==SurfaceClass_Floor .OR. Surface(Loop)%Class==SurfaceClass_Wall .OR.  &
        Surface(Loop)%Class==SurfaceClass_IntMass .or.  &
        Surface(Loop)%Class==SurfaceClass_Roof  .OR. Surface(Loop)%Class==SurfaceClass_Door) THEN
-      IF (DisplayAdvancedReportVariables) THEN  !CurrentModuleObject='Opaque Surfaces(Advanced)'
+!      IF (DisplayAdvancedReportVariables) THEN  !CurrentModuleObject='Opaque Surfaces(Advanced)'
         CALL SetupOutputVariable('Surface Inside Face Conduction Heat Transfer Rate [W]',OpaqSurfInsFaceConduction(Loop), &
                                   'Zone','State',Surface(Loop)%Name)
         CALL SetupOutputVariable('Surface Inside Face Conduction Heat Gain Rate [W]',OpaqSurfInsFaceCondGainRep(Loop), &
@@ -1454,38 +1461,47 @@ SUBROUTINE AllocateSurfaceHeatBalArrays  ! Heat Balance Array Allocation done at
         CALL SetupOutputVariable('Surface Heat Storage Energy [J]', &
                                    OpaqSurfStorageConductionEnergy(Loop), 'Zone', 'Sum', Surface(Loop)%Name)
 
-      ENDIF
+!      ENDIF
         !CurrentModuleObject='Opaque Surfaces'
 
-      CALL SetupOutputVariable('Opaque Surface Inside Face Beam Solar Absorbed [W]',OpaqSurfInsFaceBeamSolAbsorbed(Loop), &
+      CALL SetupOutputVariable('Surface Inside Face Beam Solar Radiation Heat Gain Rate [W]',OpaqSurfInsFaceBeamSolAbsorbed(Loop), &
                         'Zone','State',Surface(Loop)%Name)
     END IF
     IF (Construct(Surface(Loop)%Construction)%SourceSinkPresent) &
-      CALL SetupOutputVariable('Source Location Temperature [C]',TempSource(Loop),'Zone','State',Surface(Loop)%Name)
+      CALL SetupOutputVariable('Surface Internal Source Location Temperature [C]',  &
+                               TempSource(Loop),'Zone','State',Surface(Loop)%Name)
     IF(Surface(Loop)%Class == SurfaceClass_Window) THEN  ! CurrentModuleObject='Windows'
-      CALL SetupOutputVariable('Fraction of Time Shading Device Is On []',SurfaceWindow(Loop)%FracTimeShadingDeviceOn, &
+      CALL SetupOutputVariable('Surface Shading Device Is On Time Fraction []',SurfaceWindow(Loop)%FracTimeShadingDeviceOn, &
                                           'Zone','Average',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Storm Window On/Off Flag []',SurfaceWindow(Loop)%StormWinFlag, &
+      CALL SetupOutputVariable('Surface Storm Window On Off Status []',SurfaceWindow(Loop)%StormWinFlag, &
                                           'Zone','State',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Window Blind Slat Angle [deg]',SurfaceWindow(Loop)%SlatAngThisTSDeg,  &
+      CALL SetupOutputVariable('Surface Window Blind Slat Angle [deg]',SurfaceWindow(Loop)%SlatAngThisTSDeg,  &
                                'Zone','State',Surface(Loop)%Name)
     END IF
-    IF (DisplayAdvancedReportVariables) THEN  !CurrentModuleObject='Opaque Surfaces(Advanced)'
-      CALL SetupOutputVariable('Surface Inside Convection Classification Code [ ]', Surface(Loop)%IntConvClassification, &
+!    IF (DisplayAdvancedReportVariables) THEN  !CurrentModuleObject='Opaque Surfaces(Advanced)'
+      CALL SetupOutputVariable('Surface Inside Face Convection Classification Index [ ]',   &
+                              Surface(Loop)%IntConvClassification, &
                               'Zone','Average',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Inside Convection Model Equation Code [ ]', Surface(Loop)%IntConvHcModelEq, &
+      CALL SetupOutputVariable('Surface Inside Face Convection Model Equation Index [ ]',   &
+                               Surface(Loop)%IntConvHcModelEq, &
                               'Zone','Average',Surface(Loop)%Name)
-      CALL SetupOutputVariable('Surface Inside Convection Reference Air Code [ ]', Surface(Loop)%TairRef, &
+      CALL SetupOutputVariable('Surface Inside Face Convection Reference Air Index [ ]',   &
+                               Surface(Loop)%TairRef, &
                               'Zone','Average',Surface(Loop)%Name)
       IF (Surface(Loop)%ExtBoundCond == ExternalEnvironment) THEN
-        CALL SetupOutputVariable('Surface Outside Convection Classification Code [ ]', Surface(Loop)%OutConvClassification, &
+        CALL SetupOutputVariable('Surface Outside Face Convection Classification Index [ ]',   &
+                              Surface(Loop)%OutConvClassification, &
                               'Zone','Average',Surface(Loop)%Name)
-        CALL SetupOutputVariable('Surface Outside Forced Convection Model Equation Code [ ]', Surface(Loop)%OutConvHfModelEq, &
+        CALL SetupOutputVariable('Surface Outside Face Forced Convection Model Equation Index [ ]',   &
+                              Surface(Loop)%OutConvHfModelEq, &
                               'Zone','Average',Surface(Loop)%Name)
-        CALL SetupOutputVariable('Surface Outside Natural Convection Model Equation Code [ ]', Surface(Loop)%OutConvHnModelEq, &
+        CALL SetupOutputVariable('Surface Outside Face Natural Convection Model Equation Index [ ]',   &
+                              Surface(Loop)%OutConvHnModelEq, &
                               'Zone','Average',Surface(Loop)%Name)
       ENDIF
-      CALL SetupOutputVariable('Surface Construction Index', Surface(Loop)%Construction, &
+!     ENDIF
+    IF (DisplayAdvancedReportVariables) THEN
+      CALL SetupOutputVariable('Surface Construction Index []', Surface(Loop)%Construction, &
                                'Zone','Average',Surface(Loop)%Name)
     ENDIF
 
@@ -2023,11 +2039,7 @@ SUBROUTINE InitSolarHeatGains
       SurfaceWindow(SurfNum)%BmGndSolarInc =0.
       !
       IF(CalcSolRefl) THEN
-        SurfaceWindow(SurfNum)%SkySolarInc = SurfaceWindow(SurfNum)%SkySolarInc + &
-                    BeamSolarRad * (BmToBmReflFacObs(SurfNum) + BmToDiffReflFacObs(SurfNum))  +  &
-                    DifSolarRad * ReflFacSkySolObs(SurfNum)
-        SurfaceWindow(SurfNum)%GndSolarInc = BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum) +  &
-                    DifSolarRad * GndReflectance * ReflFacSkySolGnd(SurfNum)
+
         !For Complex Fenestrations:
         SurfaceWindow(SurfNum)%SkyGndSolarInc = DifSolarRad * GndReflectance * ReflFacSkySolGnd(SurfNum)
         SurfaceWindow(SurfNum)%BmGndSolarInc =BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum)
@@ -2038,6 +2050,14 @@ SUBROUTINE InitSolarHeatGains
                    WeightPreviousHour * ReflFacBmToDiffSolObs(SurfNum,PreviousHour))
         BmToDiffReflFacGnd(SurfNum) = (WeightNow * ReflFacBmToDiffSolGnd(SurfNum,HourOfDay) + &
                    WeightPreviousHour * ReflFacBmToDiffSolGnd(SurfNum,PreviousHour))
+        
+        ! TH2 CR 9056
+        SurfaceWindow(SurfNum)%SkySolarInc = SurfaceWindow(SurfNum)%SkySolarInc + &
+                    BeamSolarRad * (BmToBmReflFacObs(SurfNum) + BmToDiffReflFacObs(SurfNum))  +  &
+                    DifSolarRad * ReflFacSkySolObs(SurfNum)
+        SurfaceWindow(SurfNum)%GndSolarInc = BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum) +  &
+                    DifSolarRad * GndReflectance * ReflFacSkySolGnd(SurfNum)
+
       END IF
     END DO
 
@@ -2185,8 +2205,12 @@ SUBROUTINE InitSolarHeatGains
 
         ! Incident direct (unreflected) beam
         QRadSWOutIncidentBeam(SurfNum) = BeamSolar * SunlitFrac(SurfNum2,HourOfDay,TimeStep) * CosInc ! NOTE: SurfNum2
-        ! Incident (unreflected) diffuse solar from sky
-        QRadSWOutIncidentSkyDiffuse(SurfNum) = DifSolarRad * AnisoSkyMult(SurfNum)
+        ! Incident (unreflected) diffuse solar from sky -- TDD_Diffuser calculated differently
+        IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
+          QRadSWOutIncidentSkyDiffuse(SurfNum) = SkySolarInc
+        ELSE
+          QRadSWOutIncidentSkyDiffuse(SurfNum) = DifSolarRad * AnisoSkyMult(SurfNum)
+        END IF
         ! Incident diffuse solar from sky diffuse reflected from ground plus beam reflected from ground
         QRadSWOutIncidentGndDiffuse(SurfNum) = GndSolarInc
         ! Incident diffuse solar from beam-to-diffuse reflection from ground
@@ -2205,7 +2229,11 @@ SUBROUTINE InitSolarHeatGains
         END IF
         ! Total incident solar. Beam and sky reflection from obstructions, if calculated, is included
         ! in SkySolarInc.
-        QRadSWOutIncident(SurfNum) = QRadSWOutIncidentBeam(SurfNum) +  SkySolarInc + GndSolarInc
+        ! QRadSWOutIncident(SurfNum) = QRadSWOutIncidentBeam(SurfNum) + SkySolarInc + GndSolarInc
+        
+        ! TH2 CR 9056
+        QRadSWOutIncident(SurfNum) = QRadSWOutIncidentBeam(SurfNum) +  QRadSWOutIncidentSkyDiffuse(SurfNum) + &
+                                     QRadSWOutIncBmToDiffReflGnd(SurfNum) + QRadSWOutIncSkyDiffReflGnd(SurfNum)
 
         IF(CalcSolRefl) THEN
           ! Incident beam solar from beam-to-beam (specular) reflection from obstructions
@@ -2214,8 +2242,9 @@ SUBROUTINE InitSolarHeatGains
           QRadSWOutIncBmToDiffReflObs(SurfNum) = BmToDiffReflFacObs(SurfNum) * BeamSolarRad
           ! Incident diffuse solar from sky diffuse reflection from obstructions
           QRadSWOutIncSkyDiffReflObs(SurfNum) = DifSolarRad * ReflFacSkySolObs(SurfNum)
-          ! Incident diffuse solar from beam-to-diffuse reflection from ground
-          QRadSWOutIncBmToDiffReflGnd(SurfNum) = BeamSolarRad * SOLCOS(3) * GndReflectance * BmToDiffReflFacGnd(SurfNum)
+          ! TH2 CR 9056: Add reflections from obstructions to the total incident
+          QRadSWOutIncident(SurfNum) =  QRadSWOutIncident(SurfNum) + QRadSWOutIncBmToBmReflObs(SurfNum) + &
+                                        QRadSWOutIncBmToDiffReflObs(SurfNum) + QRadSWOutIncSkyDiffReflObs(SurfNum)
         END IF
 
         IF (Surface(SurfNum)%HeatTransSurf) THEN ! Exclude special shading surfaces which required QRadSWOut calculations above
@@ -2643,6 +2672,9 @@ SUBROUTINE InitIntSolarDistribution
   REAL(r64)    :: BlAbsDiffBk        ! Glass layer back diffuse solar absorptance when blind in place
   REAL(r64)    :: AbsDiffBkBl        ! Blind diffuse back solar absorptance as part of glazing system
   REAL(r64)    :: EffBlEmiss         ! Blind emissivity (thermal absorptance) as part of glazing system
+  REAL(r64) :: pulseMultipler     ! use to create a pulse for the load component report computations
+  REAL(r64) :: curQL = 0.0        ! radiant value prior to adjustment for pulse for load component report
+  REAL(r64) :: adjQL = 0.0        ! radiant value including adjustment for pulse for load component report
 
           ! FLOW:
 
@@ -2732,7 +2764,21 @@ SUBROUTINE InitIntSolarDistribution
       END IF
       TotGlassLayers = Construct(ConstrNum)%TotGlassLayers
       ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
-      QRadThermInAbs(SurfNum) = QL(ZoneNum)*TMULT(ZoneNum)*ITABSF(SurfNum)
+
+      ! These calculations are repeated from InitInternalHeatGains for the Zone Component Loads Report
+      pulseMultipler = 0.01d0   ! the W/sqft pulse for the zone
+      IF (.NOT. doLoadComponentPulseNow) THEN
+        QRadThermInAbs(SurfNum) = QL(ZoneNum) * TMULT(ZoneNum) * ITABSF(SurfNum)
+      ELSE
+        curQL = QL(ZoneNum)
+        ! for the loads component report during the special sizing run increase the radiant portion
+        ! a small amount to create a "pulse" of heat that is used for the
+        adjQL = curQL + Zone(ZoneNum)%FloorArea * pulseMultipler
+        ! ITABSF is the Inside Thermal Absorptance
+        ! TMULT is a mulipliter for each zone
+        ! QRadThermInAbs is the thermal radiation absorbed on inside surfaces
+        QRadThermInAbs(SurfNum) = adjQL * TMULT(ZoneNum) * ITABSF(SurfNum)
+      END IF
 
       IF(ShadeFlag <= 0) THEN  ! No window shading
         DO IGlass = 1,TotGlassLayers
@@ -3091,7 +3137,7 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
 
                          ! Window frame and divider effects
       IF(SurfaceWindow(SurfNum)%FrameArea > 0.0) SUM1 = SUM1 + SurfaceWindow(SurfNum)%FrameArea * &
-          (1.+0.5*SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameEmis
+          (1.d0+0.5d0*SurfaceWindow(SurfNum)%ProjCorrFrIn) * SurfaceWindow(SurfNum)%FrameEmis
       IF(SurfaceWindow(SurfNum)%DividerArea > 0.0) THEN
         DividerThermAbs = SurfaceWindow(SurfNum)%DividerEmis
         IF(SurfaceWindow(SurfNum)%DividerType == Suspended) &
@@ -3111,7 +3157,7 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
           END IF
           SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * (EffShDevEmiss + DividerThermAbs * TauShIR)
         ELSE
-          SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * (1.+SurfaceWindow(SurfNum)%ProjCorrDivIn) * &
+          SUM1 = SUM1 + SurfaceWindow(SurfNum)%DividerArea * (1.d0+SurfaceWindow(SurfNum)%ProjCorrDivIn) * &
                             DividerThermAbs
         END IF
 
@@ -3119,7 +3165,7 @@ SUBROUTINE ComputeIntThermalAbsorpFactors
 
     END DO  ! End of loop over surfaces in zone
 
-    TMULT(ZoneNum) = 1.0/SUM1
+    TMULT(ZoneNum) = 1.0d0/SUM1
     TCONV(ZoneNum) = SUM2/SUM1
 
   END DO  ! End of loop over zones
@@ -3399,6 +3445,9 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
       DO NZ=1,NumberOfZones
         D(NZ,NZ)=1.0
       ENDDO
+
+!      IF (.not. ANY(Zone%IntZWindow)) RETURN  ! this caused massive diffs
+      IF (KickOffSimulation .or. KickOffSizing) RETURN
 !            Compute fraction transmitted in one pass.
 
       DO SurfNum=1,TotSurfaces
@@ -3590,7 +3639,7 @@ SUBROUTINE InitEMSControlledConstructions
           ! change construction on surface if overriden by EMS
 
           ! METHODOLOGY EMPLOYED:
-          ! <description>
+          ! na
 
           ! REFERENCES:
           ! na
@@ -4230,6 +4279,9 @@ SUBROUTINE ReportSurfaceHeatBalance
 
           ! USE STATEMENTS:
   USE SolarShading, ONLY: ReportSurfaceShading
+  USE OutputReportTabular, ONLY: lightSWRadSeq,feneSolarRadSeq
+  USE DataGlobals, ONLY: NumOfTimeStepInHour, CompLoadReportIsReq, isPulseZoneSizing
+  USE DataSizing, ONLY: CurOverallSimDay
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4248,6 +4300,7 @@ SUBROUTINE ReportSurfaceHeatBalance
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: SurfNum
   INTEGER :: ZoneNum
+  INTEGER :: TimeStepInDay = 0
 
   ZoneMRT(1:NumOfZones) = MRT(1:NumOfZones)
 
@@ -4267,6 +4320,12 @@ SUBROUTINE ReportSurfaceHeatBalance
       QdotRadLightsInRepPerArea(SurfNum)  = QRadSWLightsInAbs(SurfNum)
       QdotRadLightsInRep(SurfNum)         = QdotRadLightsInRepPerArea(SurfNum) * Surface(SurfNum)%Area
       QRadLightsInReport(SurfNum)         = QdotRadLightsInRep(SurfNum) * SecInHour * TimeStepZone
+
+      IF (ZoneSizingCalc .AND. CompLoadReportIsReq) THEN
+       TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+       lightSWRadSeq(SurfNum,TimeStepInDay,CurOverallSimDay) = QdotRadLightsInRep(SurfNum)
+       feneSolarRadSeq(SurfNum,TimeStepInDay,CurOverallSimDay) = QdotRadSolarInRep(SurfNum)
+      END IF
     ELSE ! can we fill these for windows?
 
 
@@ -4299,7 +4358,7 @@ SUBROUTINE ReportSurfaceHeatBalance
       END IF
 
       ! outside face conduction updates
-      OpaqSurfOutsideFaceConductionEnergy   = OpaqSurfOutsideFaceConduction(SurfNum) * SecInHour * TimeStepZone
+      OpaqSurfOutsideFaceConductionEnergy(SurfNum)   = OpaqSurfOutsideFaceConduction(SurfNum) * SecInHour * TimeStepZone
       ZoneOpaqSurfExtFaceCond(Surface(SurfNum)%Zone) = ZoneOpaqSurfExtFaceCond(Surface(SurfNum)%Zone) + &
               OpaqSurfOutsideFaceConduction(SurfNum)
       OpaqSurfExtFaceCondGainRep(SurfNum) = 0.d0
@@ -4473,9 +4532,9 @@ SUBROUTINE CalcHeatBalanceOutsideSurf(ZoneToResimulate)
   END DO
 
   IF (PRESENT(ZoneToResimulate)) THEN
-    CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf, ZoneToResimulate)
+    CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf, ZoneToResimulate,calledfrom='Outside')
   ELSE
-    CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf)
+    CALL CalcInteriorRadExchange(TH(:,1,2),0,NetLWRadToSurf,calledfrom='Outside')
   ENDIF
 
   DO SurfNum = 1, TotSurfaces   ! Loop through all surfaces...
@@ -4986,6 +5045,9 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   USE DataLoopNode,                 ONLY : Node
   USE HeatBalanceSurfaceManager,    ONLY : CalculateZoneMRT
   USE Psychrometrics
+  USE OutputReportTabular, ONLY: loadConvectedNormal,loadConvectedWithPulse,netSurfRadSeq
+  USE DataSizing, ONLY: CurOverallSimDay
+  USE DataTimings
 
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -5054,6 +5116,7 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
   INTEGER :: OtherSideZoneNum ! Zone Number index for other side of an interzone partition HAMT
   INTEGER,SAVE :: WarmupSurfTemp
   LOGICAL :: PartialResimulate
+  INTEGER          :: TimeStepInDay=0 ! time step number
 
           ! FLOW:
   IF (FirstTime) THEN
@@ -5065,8 +5128,8 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       MinIterations = 1
     END IF
     IF (DisplayAdvancedReportVariables) THEN
-      CALL SetupOutputVariable('Heat Balance Inside Surfaces Calculation Iterations []',InsideSurfIterations, &
-                            'ZONE','Sum','CalcHeatBalanceInsideSurf')
+      CALL SetupOutputVariable('Surface Inside Face Heat Balance Calculation Iteration Count []',InsideSurfIterations, &
+                            'ZONE','Sum','Simulation')
     ENDIF
   ENDIF
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
@@ -5178,9 +5241,11 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
     TempInsOld = TempSurfIn ! Keep track of last iteration's temperature values
 
     IF (PRESENT(ZoneToResimulate)) THEN
-      CALL CalcInteriorRadExchange(TempSurfIn,InsideSurfIterations,NetLWRadToSurf, ZoneToResimulate) ! Update the radiation balance
+      CALL CalcInteriorRadExchange(TempSurfIn,InsideSurfIterations,NetLWRadToSurf,  &
+         ZoneToResimulate,calledfrom='Inside') ! Update the radiation balance
     ELSE
-      CALL CalcInteriorRadExchange(TempSurfIn,InsideSurfIterations,NetLWRadToSurf) ! Update the radiation balance
+      CALL CalcInteriorRadExchange(TempSurfIn,InsideSurfIterations,NetLWRadToSurf,  &
+         calledfrom='Inside') ! Update the radiation balance
     ENDIF
 
           ! Every 30 iterations, recalculate the inside convection coefficients in case
@@ -5607,6 +5672,20 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       QdotConvInRepPerArea(surfNum) = - HConvIn(SurfNum) * (TempSurfIn(SurfNum)-RefAirTemp(SurfNum))
       QConvInReport(surfNum)          =  QdotConvInRep(surfNum)* SecInHour * TimeStepZone
 
+      ! The QdotConvInRep which is called "Surface Inside Face Convection Heat Gain" is stored during
+      ! sizing for both the normal and pulse cases so that load components can be derived later.
+      IF (ZoneSizingCalc .AND. CompLoadReportIsReq) THEN
+        IF (.NOT. WarmupFlag) THEN
+          TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+          IF (isPulseZoneSizing) THEN
+            loadConvectedWithPulse(surfNum,TimeStepInDay,CurOverallSimDay) = QdotConvInRep(surfNum)
+          ELSE
+            loadConvectedNormal(surfNum,TimeStepInDay,CurOverallSimDay) = QdotConvInRep(surfNum)
+            netSurfRadSeq(surfNum,TimeStepInDay,CurOverallSimDay) = QdotRadNetSurfInRep(surfNum)
+          END IF
+        END IF
+      END IF
+
       IF (SurfaceWindow(SurfNum)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN ! Tubular daylighting device
         ! Tubular daylighting devices are treated as one big object with an effective R value.
         ! The outside face temperature of the TDD:DOME and the inside face temperature of the
@@ -5862,6 +5941,10 @@ SUBROUTINE CalcHeatBalanceInsideSurf(ZoneToResimulate)
       ENDIF
 
     ENDIF
+
+#ifdef EP_Count_Calls
+    NumMaxInsideSurfIterations=MAX(NumMaxInsideSurfIterations,InsideSurfIterations)
+#endif
 
     IF (InsideSurfIterations < MinIterations) Converged = .FALSE.
 
@@ -6425,6 +6508,63 @@ SUBROUTINE CalcExteriorVentedCavity(SurfNum)
 
 END SUBROUTINE CalcExteriorVentedCavity
 
+SUBROUTINE GatherComponentLoadsSurfAbsFact
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Gather values during sizing used for surface absorption factors
+
+          ! METHODOLOGY EMPLOYED:
+          !   Save sequence of values for report during sizing.
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+USE DataGlobals, ONLY: HourOfDay, TimeStep, NumOfZones, NumOfTimeStepInHour, CompLoadReportIsReq, isPulseZoneSizing
+USE DataSizing, ONLY: CurOverallSimDay
+USE DataHeatBalance, ONLY: TMULT,ITABSF
+USE DataSurfaces, ONLY: TotSurfaces,Surface,SurfaceClass_TDD_Dome
+USE OutputReportTabular, ONLY: ITABSFseq, TMULTseq
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER :: iZone = 0
+INTEGER :: jSurf = 0
+INTEGER :: TimeStepInDay = 0
+
+IF (CompLoadReportIsReq .AND. .NOT. isPulseZoneSizing) THEN
+  TimeStepInDay = (HourOfDay-1)*NumOfTimeStepInHour + TimeStep
+  DO iZone = 1, NumOfZones
+    TMULTseq(iZone,TimeStepInDay,CurOverallSimDay) = TMULT(iZone)
+  END DO
+  DO jSurf = 1, TotSurfaces
+    iZone = Surface(jSurf)%Zone
+    IF (.NOT. Surface(jSurf)%HeatTransSurf .OR. iZone == 0) CYCLE  ! Skip non-heat transfer surfaces
+    IF (Surface(jSurf)%Class == SurfaceClass_TDD_Dome) CYCLE  ! Skip tubular daylighting device domes
+    ITABSFseq(jSurf,TimeStepInDay,CurOverallSimDay) = ITABSF(jSurf)
+  END DO
+END IF
+END SUBROUTINE GatherComponentLoadsSurfAbsFact
+
 
 ! *****************************************************************************
 ! *****************************************************************************
@@ -6433,7 +6573,7 @@ END SUBROUTINE CalcExteriorVentedCavity
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

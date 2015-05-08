@@ -599,7 +599,7 @@ TYPE GeneratorDynamicsManagerStruct
     REAL(r64)                     :: PelLastTimeStep = 0.0
     INTEGER                       :: NumCycles =0
     REAL(r64)                     :: PLRforSubtimestepStartUp = 0.0
-    REAL(r64)                     :: PLRforSubtimestepShutDown = 0.0
+    REAL(r64)                     :: PLRforSubtimestepShutDown = 0.0 ! part load for not in shut down, shut down part is (1 - PLR)
     REAL(r64)                     :: ElectEffNom = 0.0 ! efficiency to use for control decisions
     REAL(r64)                     :: ThermEffNom = 0.0 ! thermal efficiency to use fo control decisions
     REAL(r64)                     :: QdotHXMax = 0.0 ! Thermal power max
@@ -774,7 +774,7 @@ INTEGER  :: NumGensWDynamics =0 ! number of dynamics controls for generators
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -355,7 +355,7 @@ SUBROUTINE GetHXAssistedCoolingCoilInput
       CurrentModuleObject = 'CoilSystem:Cooling:DX:HeatExchangerAssisted'
 
       DO HXAssistedCoilNum = 1, NumHXAssistedDXCoils
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HXAssistedCoilNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,HXAssistedCoilNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
         IsNotOK=.false.
@@ -522,7 +522,7 @@ SUBROUTINE GetHXAssistedCoolingCoilInput
 
       DO HXAssistedCoilNum = NumHXAssistedDXCoils + 1, NumHXAssistedWaterCoils
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HXAssistedCoilNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,HXAssistedCoilNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
         IsNotOK=.false.
@@ -1935,7 +1935,7 @@ END FUNCTION VerifyHeatExchangerParent
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -223,12 +223,12 @@ SUBROUTINE GetEarthTube(ErrorsFound)
 ALLOCATE (ZnRptET (NumOfZones))
 
 cCurrentModuleObject='ZoneEarthtube'
-TotEarthTube=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+TotEarthTube=GetNumObjectsFound(cCurrentModuleObject)
 
 ALLOCATE (EarthTubeSys(TotEarthTube))
 
 DO Loop=1, TotEarthTube
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -410,31 +410,31 @@ DO Loop=1, TotEarthTube
     IF (EarthTubeSys(Loop)%ZonePtr > 0) THEN
       IF (RepVarSet(EarthTubeSys(Loop)%ZonePtr)) THEN
         RepVarSet(EarthTubeSys(Loop)%ZonePtr)=.false.
-        CALL SetupOutputVariable('Earth Tube Zone Sensible Cooling [J]',  &
+        CALL SetupOutputVariable('Earth Tube Zone Sensible Cooling Energy [J]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeHeatLoss,  &
           'System','NonState',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Earth Tube Zone Sensible Cooling Rate [W]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeHeatLossRate,  &
            'System','State',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Earth Tube Zone Sensible Heating [J]',  &
+        CALL SetupOutputVariable('Earth Tube Zone Sensible Heating Energy [J]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeHeatGain,  &
            'System','NonState',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Earth Tube Zone Sensible Heating Rate [W]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeHeatGainRate,  &
            'System','State',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Earth Tube Air Volume Flow [m3]',  &
+        CALL SetupOutputVariable('Earth Tube Air Flow Volume [m3]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeVolume,  &
            'System','NonState',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Earth Tube Air Volume Flow Rate [m3/s]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeVolFlowRate, &
            'System','State',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Earth Tube Air Mass Flow [kg]',  &
+        CALL SetupOutputVariable('Earth Tube Air Flow Mass [kg]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeMass,  &
            'System','NonState',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Earth Tube Air Mass Flow Rate [kg/s]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeMassFlowRate, &
            'System','State',Zone(EarthTubeSys(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Earth Tube Fan Electric Consumption [J]',  &
+        CALL SetupOutputVariable('Earth Tube Fan Electric Energy [J]',  &
            ZnRptET(EarthTubeSys(Loop)%ZonePtr)%EarthTubeFanElec,  &
            'System','NonState',Zone(EarthTubeSys(Loop)%ZonePtr)%Name,  &
            ResourceTypeKey='Electricity',GroupKey='Building')
@@ -611,14 +611,16 @@ IF (AirMassFlowRate*AirSpecHeat == 0.0) THEN
 ELSE
 
 !Calculation of Pipe Outlet Air Temperature
-Process1=(LOG(ABS(OutDryBulbTemp-GroundTempz1z2t))*AirMassFlowRate*AirSpecHeat-OverallHeatTransCoef*  &
-           EarthTubeSys(Loop)%PipeLength)/(AirMassFlowRate*AirSpecHeat)
 IF (OutDryBulbTemp>GroundTempz1z2t) THEN
- EarthTubeSys(Loop)%InsideAirTemp=EXP(Process1)+GroundTempz1z2t
+  Process1=(LOG(ABS(OutDryBulbTemp-GroundTempz1z2t))*AirMassFlowRate*AirSpecHeat-OverallHeatTransCoef*  &
+           EarthTubeSys(Loop)%PipeLength)/(AirMassFlowRate*AirSpecHeat)
+  EarthTubeSys(Loop)%InsideAirTemp=EXP(Process1)+GroundTempz1z2t
 ELSE IF (OutDryBulbTemp==GroundTempz1z2t) THEN
- EarthTubeSys(Loop)%InsideAirTemp=GroundTempz1z2t
+  EarthTubeSys(Loop)%InsideAirTemp=GroundTempz1z2t
 ELSE
- EarthTubeSys(Loop)%InsideAirTemp=GroundTempz1z2t-EXP(Process1)
+  Process1=(LOG(ABS(OutDryBulbTemp-GroundTempz1z2t))*AirMassFlowRate*AirSpecHeat-OverallHeatTransCoef*  &
+           EarthTubeSys(Loop)%PipeLength)/(AirMassFlowRate*AirSpecHeat)
+  EarthTubeSys(Loop)%InsideAirTemp=GroundTempz1z2t-EXP(Process1)
 END IF
 
 END IF
@@ -763,7 +765,7 @@ END SUBROUTINE ReportEarthTube
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

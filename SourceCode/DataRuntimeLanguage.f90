@@ -302,15 +302,18 @@ INTEGER :: NumErlTrendVariables        = 0 ! count of EMS trend variables in mod
 INTEGER :: NumEMSCurveIndices          = 0 ! count of EMS curve index variables in model
 INTEGER :: NumEMSConstructionIndices   = 0 ! count of EMS construction index variables in model
 
-!#####################################################################
+!######################################################################################################################################
 !code for ExternalInterface
 INTEGER :: NumExternalInterfaceGlobalVariables = 0 ! count of ExternalInterface runtime variable
-INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMU
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMUImport
+                                                   ! will be updated with values from ExternalInterface
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitExportGlobalVariables = 0 ! count of ExternalInterface runtime variable for FMUExport
                                                    ! will be updated with values from ExternalInterface
 INTEGER :: NumExternalInterfaceActuatorsUsed   = 0 ! count of ExternalInterface Actuators
-INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMU
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMUImport
+INTEGER :: NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed   = 0 ! count of ExternalInterface Actuators for FMUExport
 
-!#####################################################################
+!######################################################################################################################################
 
 INTEGER :: OutputEMSFileUnitNum        = 0 ! file lun handle for open EMS output file
 LOGICAL :: OutputEDDFile               = .FALSE. ! set to true if user requests EDD output file be written
@@ -475,7 +478,7 @@ END SUBROUTINE ValidateEMSProgramName
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

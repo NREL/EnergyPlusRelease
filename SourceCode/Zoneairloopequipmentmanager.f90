@@ -205,14 +205,14 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
 
     CurrentModuleObject = 'ZoneHVAC:AirDistributionUnit'
 
-    NumAirDistUnits = GetNumObjectsFound(TRIM(CurrentModuleObject))
+    NumAirDistUnits = GetNumObjectsFound(CurrentModuleObject)
 
     ALLOCATE (AirDistUnit(NumAirDistUnits))       !
 
     IF (NumAirDistUnits .GT. 0)THEN
 
       DO AirDistUnitNum = 1,  NumAirDistUnits
-        CALL GetObjectItem(TRIM(CurrentModuleObject),AirDistUnitNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,AirDistUnitNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT,NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields) !  data for one zone
 
@@ -366,7 +366,7 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
                              TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum))//':COOL', &
                              AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompUnitNum), &
                              'UNDEFINED',AlphArray(2))
-        !  For dual duct units with decoupled OA and RA, set up two component sets, one for OA (Outdoor Air) 
+        !  For dual duct units with decoupled OA and RA, set up two component sets, one for OA (Outdoor Air)
         !  and one for RA (Recirculated Air)
         ELSEIF ((AirDistUnit(AirDistUnitNum)%EquipType_Num(AirDistCompUnitNum) == DualDuctVAVOutdoorAir)) THEN
           CALL SetUpCompSets(TRIM(CurrentModuleObject), AirDistUnit(AirDistUnitNum)%Name, &
@@ -376,7 +376,7 @@ CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirLoopEquipment: ' ! include
           CALL GetDualDuctOutdoorAirRecircUse( AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum) , &
                                                AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompUnitNum) , &
                                                DualDuctRecircIsUsed )
-          IF ( DualDuctRecircIsUsed ) THEN 
+          IF ( DualDuctRecircIsUsed ) THEN
             CALL SetUpCompSets(TRIM(CurrentModuleObject), AirDistUnit(AirDistUnitNum)%Name, &
                              TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompUnitNum))//':RecirculatedAir', &
                              AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompUnitNum), &
@@ -567,7 +567,7 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
             CALL SimulateDualDuct(AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompNum),FirstHVACIteration, &
                                            ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
                                            AirDistUnit(AirDistUnitNum)%EquipIndex(AirDistCompNum))
-                                           
+
           CASE (DualDuctVAVOutdoorAir)
             CALL SimulateDualDuct(AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompNum),FirstHVACIteration, &
                                            ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
@@ -627,7 +627,7 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
             CALL SimAirTerminalUserDefined(AirDistUnit(AirDistUnitNum)%EquipName(AirDistCompNum),FirstHVACIteration, &
                                     ActualZoneNum, ZoneEquipConfig(ControlledZoneNum)%ZoneNode,      &
                                            AirDistUnit(AirDistUnitNum)%EquipIndex(AirDistCompNum))
-            
+
           CASE DEFAULT
             CALL ShowSevereError('Error found in ZoneHVAC:AirDistributionUnit='//TRIM(AirDistUnit(AirDistUnitNum)%Name))
             CALL ShowContinueError('Invalid Component='//TRIM(AirDistUnit(AirDistUnitNum)%EquipType(AirDistCompNum)))
@@ -676,10 +676,9 @@ SUBROUTINE SimZoneAirLoopEquipment(AirDistUnitNum, SysOutputProvided, NonAirSysO
 
       ! Sign convention: LatOutputProvided <0 Zone is dehumidified
       !                  LatOutputProvided >0 Zone is humidified
-      SpecHumOut = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%HumRat / &
-                   (1.0d0 + Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%HumRat)
-      SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat / &
-                   (1.0d0 + Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat)
+      ! CR9155 Remove specific humidity calculations
+      SpecHumOut = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%HumRat 
+      SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat 
       LatOutputProvided = Node(AirDistUnit(AirDistUnitNum)%OutletNodeNum)%MassFlowRate * &
                           (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
@@ -767,7 +766,7 @@ END SUBROUTINE ReportZoneAirLoopEquipment
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -238,13 +238,13 @@ SUBROUTINE GetMixerInput
 
           ! Flow
     CurrentModuleObject = 'AirLoopHVAC:ZoneMixer'
-    NumMixers = GetNumObjectsFound(TRIM(CurrentModuleObject))
+    NumMixers = GetNumObjectsFound(CurrentModuleObject)
 
     IF (NumMixers.GT.0) ALLOCATE(MixerCond(NumMixers))
     ALLOCATE(CheckEquipName(NumMixers))
     CheckEquipName=.true.
 
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     ALLOCATE(AlphArray(NumAlphas))
     AlphArray=' '
     ALLOCATE(cAlphaFields(NumAlphas))
@@ -259,7 +259,7 @@ SUBROUTINE GetMixerInput
     NumArray=0.0
 
     DO MixerNum = 1,  NumMixers
-      CALL GetObjectItem(TRIM(CurrentModuleObject),MixerNum,AlphArray,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,MixerNum,AlphArray,NumAlphas, &
                          NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -698,7 +698,7 @@ END Subroutine ReportMixer
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

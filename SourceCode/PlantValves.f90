@@ -165,7 +165,7 @@ SUBROUTINE SimPlantValves(CompTypeNum,CompName,CompNum,RunFlag,InitLoopEquip,  &
     RETURN
   ENDIF
 
-  CALL InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
+  CALL InitPlantValves(CompTypeNum,CompNum)
 
   CALL CalcPlantValves(CompTypeNum,CompNum)
 
@@ -227,7 +227,7 @@ SUBROUTINE GetPlantValvesInput
   CHARACTER(len=MaxNameLength)   :: CurrentModuleObject  ! for ease in renaming.
 
  CurrentModuleObject = 'TemperingValve'
- NumTemperingValves = GetNumObjectsFound(TRIM(CurrentModuleObject))
+ NumTemperingValves = GetNumObjectsFound(CurrentModuleObject)
 
  ALLOCATE(TemperValve(NumTemperingValves))
  ALLOCATE(CheckEquipName(NumTemperingValves))
@@ -235,7 +235,7 @@ SUBROUTINE GetPlantValvesInput
 
   DO Item=1,NumTemperingValves
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Item,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus)
+    CALL GetObjectItem(CurrentModuleObject,Item,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus)
   !  <process, noting errors>
      TemperValve(Item)%Name = Alphas(1)
   ! Get Plant Inlet Node
@@ -282,7 +282,7 @@ SUBROUTINE GetPlantValvesInput
 
 END SUBROUTINE GetPlantValvesInput
 
-SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
+SUBROUTINE InitPlantValves(CompTypeNum,CompNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         B. Griffith, NREL
@@ -315,7 +315,6 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)          :: CompTypeNum
   INTEGER , INTENT(IN)         :: CompNum
-  LOGICAL, INTENT(IN)          :: FirstHVACIteration ! TRUE if First iteration of simulation
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -351,7 +350,7 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
   INTEGER :: numLoopSides ! set to SIZE(PlantLoop(i)%LoopSide)
 
   LOGICAL, SAVE :: MyOneTimeFlag = .true. ! first pass log
-  LOGICAL, SAVE :: MyTwoTimeFlag = .true. ! second pass do input check
+  LOGICAL, ALLOCATABLE, DIMENSION(:), SAVE :: MyTwoTimeFlag ! second pass do input check
   LOGICAL :: errFlag
 
 
@@ -361,9 +360,11 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
 
   IF (MyOneTimeFlag) THEN
      MyOneTimeFlag = .false.
+     ALLOCATE(MyTwoTimeFlag(NumTemperingValves))
+     MyTwoTimeFlag=.true.
   ELSE
     ! delay checks one pass so more of plant data structure gets filled in
-    IF (MyTwoTimeFlag) THEN
+    IF (MyTwoTimeFlag(CompNum)) THEN
     ! do some checks on input data
      ! Search thru PlantLoop Data Structure to check some things.
        ! Locate the component on the plant loops for later usage
@@ -506,7 +507,7 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
       IF (ErrorsFound) THEN
         CALL ShowFatalError('Errors found in input, TemperingValve object '// trim(TemperValve(CompNum)%Name))
       ENDIF
-      MyTwoTimeFlag = .false.
+      MyTwoTimeFlag(CompNum) = .false.
     ENDIF ! my two time flag for input checking
 
   ENDIF ! my one time flag for input checking
@@ -547,10 +548,6 @@ SUBROUTINE InitPlantValves(CompTypeNum,CompNum, FirstHVACIteration)
 
   IF (PumpOutNode > 0) THEN
     TemperValve(CompNum)%MixedMassFlowRate = Node(PumpOutNode)%MassFlowRate
-  ENDIF
-
-  IF (FirstHVACIteration) THEN
-    ! nothing special needed here
   ENDIF
 
   CASE DEFAULT
@@ -770,7 +767,7 @@ END SUBROUTINE ReportPlantValves
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

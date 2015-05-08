@@ -52,12 +52,19 @@ INTEGER, PARAMETER :: AirCooled         = 1
 INTEGER, PARAMETER :: WaterCooled       = 2
 INTEGER, PARAMETER :: EvapCooled        = 3
 
+!chiller flow modes
+INTEGER, PARAMETER :: FlowModeNotSet           = 200
+INTEGER, PARAMETER :: ConstantFlow             = 201
+INTEGER, PARAMETER :: NotModulated             = 202
+INTEGER, PARAMETER :: LeavingSetpointModulated = 203
+
           ! MODULE VARIABLE DECLARATIONS:
 PRIVATE
 INTEGER        :: NumElectricEIRChillers         = 0   ! Number of electric EIR chillers specified in input
 REAL(r64)      :: CondMassFlowRate               = 0.0 ! Condenser mass flow rate [kg/s]
 REAL(r64)      :: EvapMassFlowRate               = 0.0 ! Evaporator mass flow rate [kg/s]
 REAL(r64)      :: CondOutletTemp                 = 0.0 ! Condenser outlet temperature [C]
+REAL(r64)      :: CondOutletHumRat               = 0.0 ! Condenser outlet humidity ratio [kg/kg]
 REAL(r64)      :: EvapOutletTemp                 = 0.0 ! Evaporator outlet temperature [C]
 REAL(r64)      :: Power                          = 0.0 ! Rate of chiller electric energy use [W]
 REAL(r64)      :: QEvaporator                    = 0.0 ! Rate of heat transfer to the evaporator coil [W]
@@ -72,6 +79,7 @@ REAL(r64)      :: ChillerPartLoadRatio           = 0.0 ! Chiller part-load ratio
 REAL(r64)      :: ChillerCyclingRatio            = 0.0 ! Chiller cycling ratio
 REAL(r64)      :: BasinHeaterPower               = 0.0 ! Basin heater power (W)
 REAL(r64)      :: ChillerFalseLoadRate           = 0.0 ! Chiller false load over and above the water-side load [W]
+REAL(r64)      :: AvgCondSinkTemp                = 0.d0!  condenser temperature value for use in curves [C]
 
 TYPE ElectricEIRChillerSpecs
   CHARACTER(len=MaxNameLength) :: Name           =' '  ! User identifier
@@ -80,16 +88,16 @@ TYPE ElectricEIRChillerSpecs
   INTEGER           :: CondenserType             = 0   ! Type of Condenser - Air Cooled, Water Cooled or Evap Cooled
   REAL(r64)         :: RefCap                    = 0.0 ! Reference capacity of chiller [W]
   REAL(r64)         :: RefCOP                    = 0.0 ! Reference coefficient of performance [W/W]
-  LOGICAL           :: ConstantFlow           =.False. ! True if this is a Constant Flow Chiller
-  LOGICAL           :: VariableFlow           =.False. ! True if this is a Variable Flow Chiller
-  LOGICAL           :: VariableFlowSetToLoop  =.FALSE. ! True if the setpoint is missing at the outlet node
-  LOGICAL           :: VariableFlowErrDone    =.FALSE. ! true if setpoint warning issued
+  INTEGER           :: FlowMode          = FlowModeNotSet ! one of 3 modes for componet flow during operation
+  LOGICAL           :: ModulatedFlowSetToLoop  =.FALSE. ! True if the setpoint is missing at the outlet node
+  LOGICAL           :: ModulatedFlowErrDone    =.FALSE. ! true if setpoint warning issued
+  LOGICAL           :: HRSPErrDone            =.FALSE. ! TRUE if set point warning issued for heat recovery loop
   REAL(r64)         :: EvapVolFlowRate           = 0.0 ! Reference water volumetric flow rate through the evaporator [m3/s]
   REAL(r64)         :: EvapMassFlowRateMax       = 0.0 ! Reference water mass flow rate through evaporator [kg/s]
   REAL(r64)         :: CondVolFlowRate           = 0.0 ! Reference water volumetric flow rate through the condenser [m3/s]
   REAL(r64)         :: CondMassFlowRateMax       = 0.0 ! Reference water mass flow rate through condenser [kg/s]
   REAL(r64)         :: CondenserFanPowerRatio    = 0.0 ! Reference power of condenser fan to capacity ratio, W/W
-  REAL(r64)         :: OpenMotorEff              = 0.0 ! Open chiller motor efficiency [fraction, 0 to 1]
+  REAL(r64)         :: CompPowerToCondenserFrac  = 0.0 ! Fraction of compressor electric power rejected by condenser [0 to 1]
   INTEGER           :: EvapInletNodeNum          = 0   ! Node number on the inlet side of the plant (evaporator side)
   INTEGER           :: EvapOutletNodeNum         = 0   ! Node number on the outlet side of the plant (evaporator side)
   INTEGER           :: CondInletNodeNum          = 0   ! Node number on the inlet side of the condenser
@@ -111,6 +119,10 @@ TYPE ElectricEIRChillerSpecs
   LOGICAL           :: HeatRecActive         = .False. ! True when entered Heat Rec Vol Flow Rate > 0
   INTEGER           :: HeatRecInletNodeNum       = 0   ! Node number for the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum      = 0   ! Node number for the heat recovery outlet side of the condenser
+  REAL(r64)         :: HeatRecCapacityFraction   = 0.d0 ! user input for heat recovery capacity fraction []
+  REAL(r64)         :: HeatRecMaxCapacityLimit   = 0.d0 ! Capacity limit for Heat recovery, one time calc [W]
+  INTEGER           :: HeatRecSetpointNodeNum    = 0    ! index for system node with the heat recover leaving setpoint
+  INTEGER           :: HeatRecInletLimitSchedNum = 0    ! index for schedule for the inlet high limit for heat recovery operation
   INTEGER           :: ChillerCapFT              = 0   ! Index for the total cooling capacity modifier curve
                                                        ! (function of leaving chilled water temperature and
                                                        !  entering condenser fluid temperature)
@@ -175,6 +187,7 @@ TYPE ReportEIRVars
   REAL(r64)    :: HeatRecInletTemp      = 0.0 ! reporting: Heat reclaim inlet temperature [C]
   REAL(r64)    :: HeatRecOutletTemp     = 0.0 ! reporting: Heat reclaim outlet temperature [C]
   REAL(r64)    :: HeatRecMassFlow       = 0.0 ! reporting: Heat reclaim mass flow rate [kg/s]
+  REAL(r64)    :: ChillerCondAvgTemp    = 0.d0  ! reporting: average condenser temp for curves with Heat recovery [C]
   REAL(r64)    :: ChillerCapFT          = 0.0 ! reporting: Chiller capacity curve output value
   REAL(r64)    :: ChillerEIRFT          = 0.0 ! reporting: Chiller EIRFT curve output value
   REAL(r64)    :: ChillerEIRFPLR        = 0.0 ! reporting: Chiller EIRFPLR curve output value
@@ -300,7 +313,7 @@ SUBROUTINE SimElectricEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, Co
   IF (InitLoopEquip) THEN
     TempEvapOutDesign  = ElectricEIRChiller(EIRChillNum)%TempRefEvapOut
     TempCondInDesign   = ElectricEIRChiller(EIRChillNum)%TempRefCondIn
-    CALL InitElectricEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
+    CALL InitElectricEIRChiller(EIRChillNum,RunFlag,MyLoad)
     CALL SizeElectricEIRChiller(EIRChillNum)
     IF (LoopNum == ElectricEIRChiller(EIRChillNum)%CWLoopNum) THEN
       MinCap = ElectricEIRChiller(EIRChillNum)%RefCap*ElectricEIRChiller(EIRChillNum)%MinPartLoadRat
@@ -318,7 +331,7 @@ SUBROUTINE SimElectricEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl, Co
   END IF
 
   IF (LoopNum == ElectricEIRChiller(EIRChillNum)%CWLoopNum) THEN
-    CALL InitElectricEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
+    CALL InitElectricEIRChiller(EIRChillNum,RunFlag,MyLoad)
     CALL CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,EquipFlowCtrl)
     CALL UpdateElectricEIRChillerRecords(MyLoad,RunFlag,EIRChillNum)
 
@@ -378,11 +391,12 @@ SUBROUTINE GetElectricEIRChillerInput
   USE OutAirNodeManager,     ONLY: CheckAndAddAirNodeNumber
   USE PlantUtilities,        ONLY: RegisterPlantCompDesignFlow
   USE ScheduleManager,       ONLY: GetScheduleIndex
+  USE DataSizing,            ONLY: Autosize
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
             ! PARAMETERS
-            ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetElectricEIRChillerInput: ' ! include trailing blank space
 
             ! LOCAL VARIABLES
   INTEGER             :: EIRChillerNum           ! Chiller counter
@@ -408,7 +422,7 @@ SUBROUTINE GetElectricEIRChillerInput
 
   IF (AllocatedFlag) RETURN
   cCurrentModuleObject = 'Chiller:Electric:EIR'
-  NumElectricEIRChillers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumElectricEIRChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumElectricEIRChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -425,7 +439,7 @@ SUBROUTINE GetElectricEIRChillerInput
 
   ! Load arrays with electric EIR chiller data
   DO EIRChillerNum = 1 , NumElectricEIRChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),EIRChillerNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,EIRChillerNum,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -445,22 +459,22 @@ SUBROUTINE GetElectricEIRChillerInput
 !   Performance curves
     ElectricEIRChiller(EIRChillerNum)%ChillerCapFT          = GetCurveIndex(cAlphaArgs(2))
     IF (ElectricEIRChiller(EIRChillerNum)%ChillerCapFT .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//' "'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
       ErrorsFound = .TRUE.
     END IF
 
     ElectricEIRChiller(EIRChillerNum)%ChillerEIRFT          = GetCurveIndex(cAlphaArgs(3))
     IF (ElectricEIRChiller(EIRChillerNum)%ChillerEIRFT .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
       ErrorsFound = .TRUE.
     END IF
 
     ElectricEIRChiller(EIRChillerNum)%ChillerEIRFPLR        = GetCurveIndex(cAlphaArgs(4))
     IF (ElectricEIRChiller(EIRChillerNum)%ChillerEIRFPLR .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
       ErrorsFound = .TRUE.
     END IF
 
@@ -479,8 +493,8 @@ SUBROUTINE GetElectricEIRChillerInput
     ELSEIF(SameString(cAlphaArgs(9),'EvaporativelyCooled')) THEN
             ElectricEIRChiller(EIRChillerNum)%CondenserType = EvapCooled
     ELSE
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
       CALL ShowContinueError('Valid entries are AirCooled, WaterCooled, or EvaporativelyCooled')
       ErrorsFound=.true.
     END IF
@@ -509,7 +523,8 @@ SUBROUTINE GetElectricEIRChillerInput
                TRIM(cCurrentModuleObject),cAlphaArgs(1), NodeType_Air,NodeConnectionType_OutsideAirReference, 2, ObjectIsNotParent)
       CALL CheckAndAddAirNodeNumber(ElectricEIRChiller(EIRChillerNum)%CondInletNodeNum,Okay)
       IF (.not. Okay) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//', Adding OutdoorAir:Node='//TRIM(cAlphaArgs(7)))
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Adding OutdoorAir:Node='//TRIM(cAlphaArgs(7)))
       ENDIF
 
       ElectricEIRChiller(EIRChillerNum)%CondOutletNodeNum   = GetOnlySingleNode(cAlphaArgs(8),ErrorsFound,  &
@@ -518,8 +533,8 @@ SUBROUTINE GetElectricEIRChillerInput
     ELSEIF (ElectricEIRChiller(EIRChillerNum)%CondenserType == WaterCooled) THEN
       ! Condenser inlet node name is necessary for water-cooled condenser
       IF (lAlphaFieldBlanks(7)  .or. lAlphaFieldBlanks(8) ) THEN
-        CALL ShowSevereError(' Condenser Inlet or Outlet Node Name is blank, in '// &
-                               TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Condenser Inlet or Outlet Node Name is blank.')
         ErrorsFound=.true.
       END IF
 
@@ -534,8 +549,8 @@ SUBROUTINE GetElectricEIRChillerInput
     ELSE
       ! Condenser inlet node name is necessary (never should reach this part of code)
       IF (lAlphaFieldBlanks(7) .or. lAlphaFieldBlanks(8) ) THEN
-        CALL ShowSevereError(' Condenser Inlet or Outlet Node Name is blank, in '// &
-                               TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Condenser Inlet or Outlet Node Name is blank.')
         ErrorsFound=.true.
       END IF
       ElectricEIRChiller(EIRChillerNum)%CondInletNodeNum    = GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,  &
@@ -548,31 +563,37 @@ SUBROUTINE GetElectricEIRChillerInput
 
     END IF
 
-    IF(cAlphaArgs(10) == 'CONSTANTFLOW') THEN
-       ElectricEIRChiller(EIRChillerNum)%ConstantFlow = .True.
-       ElectricEIRChiller(EIRChillerNum)%VariableFlow = .False.
-    ELSEIF(cAlphaArgs(10) == 'VARIABLEFLOW') THEN
-       ElectricEIRChiller(EIRChillerNum)%ConstantFlow = .False.
-       ElectricEIRChiller(EIRChillerNum)%VariableFlow = .True.
-    ELSE  ! We will assume a constant flow chiller if none is specified
-       ElectricEIRChiller(EIRChillerNum)%ConstantFlow = .True.
-       ElectricEIRChiller(EIRChillerNum)%VariableFlow = .False.
-       CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
-       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-       CALL ShowContinueError('simulation assumes CONSTANTFLOW and continues...')
-    END IF
+    SELECT CASE (TRIM(cAlphaArgs(10)))
+    CASE ( 'CONSTANTFLOW' )
+      ElectricEIRChiller(EIRChillerNum)%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      ElectricEIRChiller(EIRChillerNum)%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      ElectricEIRChiller(EIRChillerNum)%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      ElectricEIRChiller(EIRChillerNum)%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      ElectricEIRChiller(EIRChillerNum)%FlowMode = NotModulated
+    END SELECT
 
 !   Chiller rated performance data
     ElectricEIRChiller(EIRChillerNum)%RefCap                 = rNumericArgs(1)
     IF (rNumericArgs(1) == 0.0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       ErrorsFound=.true.
     END IF
     ElectricEIRChiller(EIRChillerNum)%RefCOP                 = rNumericArgs(2)
     IF (rNumericArgs(2) == 0.0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       ErrorsFound=.true.
     END IF
     ElectricEIRChiller(EIRChillerNum)%TempRefEvapOut         = rNumericArgs(3)
@@ -594,7 +615,7 @@ SUBROUTINE GetElectricEIRChillerInput
     IF (ElectricEIRChiller(EIRChillerNum)%SizFac <= 0.0) ElectricEIRChiller(EIRChillerNum)%SizFac = 1.0d0
 
     IF(ElectricEIRChiller(EIRChillerNum)%MinPartLoadRat .GT. ElectricEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' ['//TRIM(RoundSigDigits(rNumericArgs(7),3))//'] > '//  &
                               TRIM(cNumericFieldNames(8))//' ['//TRIM(RoundSigDigits(rNumericArgs(8),3))//']')
        CALL ShowContinueError('Minimum part load ratio must be less than or equal to the '// &
@@ -604,7 +625,7 @@ SUBROUTINE GetElectricEIRChillerInput
 
     IF(ElectricEIRChiller(EIRChillerNum)%MinUnLoadRat .LT. ElectricEIRChiller(EIRChillerNum)%MinPartLoadRat .OR. &
        ElectricEIRChiller(EIRChillerNum)%MinUnLoadRat .GT. ElectricEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' = '//TRIM(RoundSigDigits(rNumericArgs(10),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' must be greater than or equal to the '// &
                               TRIM(cNumericFieldNames(7)))
@@ -615,7 +636,7 @@ SUBROUTINE GetElectricEIRChillerInput
 
     IF(ElectricEIRChiller(EIRChillerNum)%OptPartLoadRat .LT. ElectricEIRChiller(EIRChillerNum)%MinPartLoadRat .OR. &
        ElectricEIRChiller(EIRChillerNum)%OptPartLoadRat .GT. ElectricEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' = '//TRIM(RoundSigDigits(rNumericArgs(9),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' must be greater than or equal to the '// &
                               TRIM(cNumericFieldNames(7)))
@@ -625,11 +646,11 @@ SUBROUTINE GetElectricEIRChillerInput
     END IF
 
     ElectricEIRChiller(EIRChillerNum)%CondenserFanPowerRatio = rNumericArgs(11)
-    ElectricEIRChiller(EIRChillerNum)%OpenMotorEff           = rNumericArgs(12)
+    ElectricEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac = rNumericArgs(12)
 
-    IF(ElectricEIRChiller(EIRChillerNum)%OpenMotorEff .LT. 0.0 .OR. &
-       ElectricEIRChiller(EIRChillerNum)%OpenMotorEff .GT. 1.0) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+    IF(ElectricEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac .LT. 0.0 .OR. &
+       ElectricEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac .GT. 1.0) THEN
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' = '//TRIM(RoundSigDigits(rNumericArgs(12),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' must be greater than or equal to zero' )
        CALL ShowContinueError(TRIM(cNumericFieldNames(12))//' must be less than or equal to one' )
@@ -640,34 +661,73 @@ SUBROUTINE GetElectricEIRChillerInput
 
    ! These are the heat recovery inputs
     ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(14)
-    IF (ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF ((ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.0)  &
+        .OR. (ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate == Autosize) )THEN
       ElectricEIRChiller(EIRChillerNum)%HeatRecActive=.True.
       ElectricEIRChiller(EIRChillerNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Water,NodeConnectionType_Inlet, 3, ObjectIsNotParent)
       IF (ElectricEIRChiller(EIRChillerNum)%HeatRecInletNodeNum == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
         ErrorsFound=.True.
       END IF
       ElectricEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(12),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Water,NodeConnectionType_Outlet, 3, ObjectIsNotParent)
       IF (ElectricEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
         ErrorsFound=.True.
       END IF
       IF (ElectricEIRChiller(EIRChillerNum)%CondenserType .NE. WaterCooled) THEN
-        CALL ShowSevereError('Heat Recovery requires a Water Cooled Condenser, for '//&
-                    TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Heat Recovery requires a Water Cooled Condenser.')
         ErrorsFound=.True.
       END IF
 
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(11),cAlphaArgs(12),'Heat Recovery Nodes')
       !store heat recovery volume flow for plant sizing
-      Call RegisterPlantCompDesignFlow(ElectricEIRChiller(EIRChillerNum)%HeatRecInletNodeNum, &  !CR 6953
+      IF (ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.d0) THEN
+        Call RegisterPlantCompDesignFlow(ElectricEIRChiller(EIRChillerNum)%HeatRecInletNodeNum, &  !CR 6953
                                ElectricEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate)
+      ENDIF
+      IF (NumNums > 17 ) THEN
+        IF (.NOT. lNumericFieldBlanks(18)) THEN
+          ElectricEIRChiller(EIRChillerNum)%HeatRecCapacityFraction =  rNumericArgs(18)
+        ELSE
+          ElectricEIRChiller(EIRChillerNum)%HeatRecCapacityFraction = 1.d0
+        ENDIF
+      ELSE
+        ElectricEIRChiller(EIRChillerNum)%HeatRecCapacityFraction = 1.d0
+      ENDIF
+
+      IF (NumAlphas > 13) THEN
+        IF ( .NOT. lAlphaFieldBlanks(14)) THEN
+          ElectricEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = GetScheduleIndex(cAlphaArgs(14))
+          IF (ElectricEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(14))//'='//TRIM(cAlphaArgs(14)))
+            ErrorsFound=.True.
+          ENDIF
+        ELSE
+          ElectricEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = 0
+        ENDIF
+      ELSE
+        ElectricEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = 0
+      ENDIF
+
+      If (NumAlphas > 14) THEN
+        IF ( .NOT. lAlphaFieldBlanks(15)) THEN
+          ElectricEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = &
+              GetOnlySingleNode(cAlphaArgs(15), ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                             NodeType_Water,NodeConnectionType_Sensor, 1, ObjectIsNotParent)
+        ELSE
+          ElectricEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = 0
+        ENDIF
+      ELSE
+        ElectricEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = 0
+      ENDIF
 
     ELSE
       ElectricEIRChiller(EIRChillerNum)%HeatRecActive=.False.
@@ -676,8 +736,8 @@ SUBROUTINE GetElectricEIRChillerInput
       ElectricEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum   = 0
       IF (.not. lAlphaFieldBlanks(11) .or. .not. lAlphaFieldBlanks(12) ) THEN
     !  IF (cAlphaArgs(11) /= ' ' .or. cAlphaArgs(12) /= ' ') THEN
-        CALL ShowWarningError('Since Reference Heat Reclaim Volume Flow Rate = 0.0, heat recovery is inactive for '//&
-                    TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Since Reference Heat Reclaim Volume Flow Rate = 0.0, heat recovery is inactive.')
         CALL ShowContinueError('However, node names were specified for heat recovery inlet or outlet nodes.')
       END IF
     END IF
@@ -688,8 +748,9 @@ SUBROUTINE GetElectricEIRChillerInput
       CurveVal = CurveValue(ElectricEIRChiller(EIRChillerNum)%ChillerCAPFT, &
                           ElectricEIRChiller(EIRChillerNum)%TempRefEvapOut,ElectricEIRChiller(EIRChillerNum)%TempRefCondIn)
       IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
-        CALL ShowWarningError('Capacity ratio as a function of temperature curve output is not equal to 1.0')
-        CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Capacity ratio as a function of temperature curve output is not equal to 1.0' // &
+                              ' (+ or - 10%) at reference conditions.')
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
       END IF
     END IF
@@ -698,8 +759,9 @@ SUBROUTINE GetElectricEIRChillerInput
       CurveVal = CurveValue(ElectricEIRChiller(EIRChillerNum)%ChillerEIRFT, &
                           ElectricEIRChiller(EIRChillerNum)%TempRefEvapOut,ElectricEIRChiller(EIRChillerNum)%TempRefCondIn)
       IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
-        CALL ShowWarningError('Energy input ratio as a function of temperature curve output is not equal to 1.0')
-        CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Energy input ratio as a function of temperature curve output is not equal to 1.0' // &
+                              ' (+ or - 10%) at reference conditions.')
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
       END IF
     END IF
@@ -708,8 +770,9 @@ SUBROUTINE GetElectricEIRChillerInput
       CurveVal = CurveValue(ElectricEIRChiller(EIRChillerNum)%ChillerEIRFPLR, 1.0d0)
 
       IF(CurveVal .GT. 1.10 .OR. CurveVal .LT. 0.90)THEN
-        CALL ShowWarningError('Energy input ratio as a function of part-load ratio curve output is not equal to 1.0')
-        CALL ShowContinueError('(+ or - 10%) at reference conditions for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Energy input ratio as a function of part-load ratio curve output is not equal to 1.0' // &
+                              ' (+ or - 10%) at reference conditions.')
         CALL ShowContinueError('Curve output at reference conditions = '//TRIM(TrimSigDigits(CurveVal,3)))
       END IF
     END IF
@@ -722,8 +785,8 @@ SUBROUTINE GetElectricEIRChillerInput
         CurveValArray(CurveCheck+1) = INT(CurveValTmp*100.0d0)/100.0d0
       END DO
       IF(FoundNegValue)THEN
-        CALL ShowWarningError('Energy input ratio as a function of part-load ratio curve shows negative values ')
-        CALL ShowContinueError('for '//TRIM(cCurrentModuleObject)//'= '//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Energy input ratio as a function of part-load ratio curve shows negative values.')
         CALL ShowContinueError('EIR as a function of PLR curve output at various part-load ratios shown below:')
         CALL ShowContinueError('PLR          =    0.00   0.10   0.20   0.30   0.40   0.50   0.60   0.70   0.80   0.90   1.00')
         WRITE(StringVar,530)(CurveValArray(CurveValPtr), CurveValPtr = 1, 11)
@@ -735,8 +798,8 @@ SUBROUTINE GetElectricEIRChillerInput
     !   Basin heater power as a function of temperature must be greater than or equal to 0
     ElectricEIRChiller(EIRChillerNum)%BasinHeaterPowerFTempDiff = rNumericArgs(16)
     IF(rNumericArgs(16) .LT. 0.0d0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', "'//TRIM(ElectricEIRChiller(EIRChillerNum)%Name)//&
-                     '" TRIM(cNumericFieldNames(16)) must be >= 0')
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cNumericFieldNames(16))//' must be >= 0')
       ErrorsFound = .TRUE.
     END IF
 
@@ -747,16 +810,16 @@ SUBROUTINE GetElectricEIRChillerInput
         ElectricEIRChiller(EIRChillerNum)%BasinHeaterSetPointTemp = 2.0d0
       ENDIF
       IF(ElectricEIRChiller(EIRChillerNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//':"'//TRIM(ElectricEIRChiller(EIRChillerNum)%Name)//&
-           '", '//TRIM(cNumericFieldNames(17))//' is less than 2 deg C. Freezing could occur.')
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//' "'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError(TRIM(cNumericFieldNames(17))//' is less than 2 deg C. Freezing could occur.')
       END IF
     END IF
 
     IF(.NOT. lAlphaFieldBlanks(13))THEN
       ElectricEIRChiller(EIRChillerNum)%BasinHeaterSchedulePtr   = GetScheduleIndex(cAlphaArgs(13))
       IF(ElectricEIRChiller(EIRChillerNum)%BasinHeaterSchedulePtr .EQ. 0)THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//', "'//TRIM(ElectricEIRChiller(EIRChillerNum)%Name)//&
-                       '" TRIM(cAlphaFieldNames(13)) "'//TRIM(cAlphaArgs(13)) &
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowWarningError(TRIM(cAlphaFieldNames(13))//' "'//TRIM(cAlphaArgs(13)) &
                        //'" was not found. Basin heater operation will not be modeled and the simulation continues')
       END IF
     END IF
@@ -768,83 +831,86 @@ SUBROUTINE GetElectricEIRChillerInput
   END IF
 
   DO EIRChillerNum = 1, NumElectricEIRChillers
-     CALL SetupOutputVariable('Chiller Part Load Ratio', &
+     CALL SetupOutputVariable('Chiller Part Load Ratio []', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerPartLoadRatio,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cycling Ratio', &
+     CALL SetupOutputVariable('Chiller Cycling Ratio []', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerCyclingRatio,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
      CALL SetupOutputVariable('Chiller Electric Power [W]', &
           ElectricEIRChillerReport(EIRChillerNum)%Power,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Electric Consumption [J]', &
+     CALL SetupOutputVariable('Chiller Electric Energy [J]', &
           ElectricEIRChillerReport(EIRChillerNum)%Energy,'System','Sum',ElectricEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           ElectricEIRChillerReport(EIRChillerNum)%QEvap,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           ElectricEIRChillerReport(EIRChillerNum)%EvapEnergy,'System','Sum',ElectricEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller False Load Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller False Load Heat Transfer Rate [W]', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerFalseLoadRate,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller False Load Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller False Load Heat Transfer Energy [J]', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerFalseLoad,'System','Sum',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           ElectricEIRChillerReport(EIRChillerNum)%EvapInletTemp,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           ElectricEIRChillerReport(EIRChillerNum)%EvapOutletTemp,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           ElectricEIRChillerReport(EIRChillerNum)%Evapmdot,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           ElectricEIRChillerReport(EIRChillerNum)%QCond,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           ElectricEIRChillerReport(EIRChillerNum)%CondEnergy,'System','Sum',ElectricEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
      CALL SetupOutputVariable('Chiller COP [W/W]', &
           ElectricEIRChillerReport(EIRChillerNum)%ActualCOP,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
 
-     CALL SetupOutputVariable('Chiller CapFTemp', &
+     CALL SetupOutputVariable('Chiller Capacity Temperature Modifier Multiplier []', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerCapFT,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller EIRFTemp', &
+     CALL SetupOutputVariable('Chiller EIR Temperature Modifier Multiplier []', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerEIRFT,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller EIRFPLR', &
+     CALL SetupOutputVariable('Chiller EIR Part Load Modifier Multiplier []', &
           ElectricEIRChillerReport(EIRChillerNum)%ChillerEIRFPLR,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
 
      ! Condenser mass flow and outlet temp are valid for water cooled
      IF (ElectricEIRChiller(EIRChillerNum)%CondenserType == WaterCooled)THEN
-       CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             ElectricEIRChillerReport(EIRChillerNum)%CondInletTemp,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
             ElectricEIRChillerReport(EIRChillerNum)%CondOutletTemp,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+       CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
             ElectricEIRChillerReport(EIRChillerNum)%Condmdot,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
 
        ! If heat recovery is active then setup report variables
        IF (ElectricEIRChiller(EIRChillerNum)%HeatRecActive) THEN
-           CALL SetupOutputVariable('Chiller Heat Recovery Rate [W]', &
-             ElectricEIRChillerReport(EIRChillerNum)%QHeatRecovery,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-           CALL SetupOutputVariable('Chiller Heat Recovery [J]', &
-             ElectricEIRChillerReport(EIRChillerNum)%EnergyHeatRecovery,'System','Sum', &
-             ElectricEIRChiller(EIRChillerNum)%Name, &
-             ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
-           CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temp [C]', &
-             ElectricEIRChillerReport(EIRChillerNum)%HeatRecInletTemp,'System','Average', &
-             ElectricEIRChiller(EIRChillerNum)%Name)
-           CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temp [C]', &
-             ElectricEIRChillerReport(EIRChillerNum)%HeatRecOutletTemp,'System','Average', &
-             ElectricEIRChiller(EIRChillerNum)%Name)
-           CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
-             ElectricEIRChillerReport(EIRChillerNum)%HeatRecMassFlow,'System','Average', &
-             ElectricEIRChiller(EIRChillerNum)%Name)
+          CALL SetupOutputVariable('Chiller Total Recovered Heat Rate [W]', &
+            ElectricEIRChillerReport(EIRChillerNum)%QHeatRecovery,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
+          CALL SetupOutputVariable('Chiller Total Recovered Heat Energy [J]', &
+            ElectricEIRChillerReport(EIRChillerNum)%EnergyHeatRecovery,'System','Sum', &
+            ElectricEIRChiller(EIRChillerNum)%Name, &
+            ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
+          CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temperature [C]', &
+            ElectricEIRChillerReport(EIRChillerNum)%HeatRecInletTemp,'System','Average', &
+            ElectricEIRChiller(EIRChillerNum)%Name)
+          CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temperature [C]', &
+            ElectricEIRChillerReport(EIRChillerNum)%HeatRecOutletTemp,'System','Average', &
+            ElectricEIRChiller(EIRChillerNum)%Name)
+          CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
+            ElectricEIRChillerReport(EIRChillerNum)%HeatRecMassFlow,'System','Average', &
+            ElectricEIRChiller(EIRChillerNum)%Name)
+          CALL SetupOutputVariable('Chiller Effective Heat Rejection Temperature [C]', &
+            ElectricEIRChillerReport(EIRChillerNum)%ChillerCondAvgTemp,'System','Average', &
+            ElectricEIRChiller(EIRChillerNum)%Name)
        END IF
 
      ELSE
-       CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             ElectricEIRChillerReport(EIRChillerNum)%CondInletTemp,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
        IF(ElectricEIRChiller(EIRChillerNum)%CondenserFanPowerRatio > 0) THEN
-          CALL SetupOutputVariable('Chiller Cond Fan Electric Power [W]', &
+          CALL SetupOutputVariable('Chiller Condenser Fan Electric Power [W]', &
                ElectricEIRChillerReport(EIRChillerNum)%CondenserFanPowerUse,'System','Average' &
                ,ElectricEIRChiller(EIRChillerNum)%Name)
-          CALL SetupOutputVariable('Chiller Cond Fan Electric Consumption [J]', &
+          CALL SetupOutputVariable('Chiller Condenser Fan Electric Energy [J]', &
                ElectricEIRChillerReport(EIRChillerNum)%CondenserFanEnergyConsumption,'System','Sum', &
                ElectricEIRChiller(EIRChillerNum)%Name, &
                ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
@@ -853,7 +919,7 @@ SUBROUTINE GetElectricEIRChillerInput
          IF(ElectricEIRChiller(EIRChillerNum)%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
            CALL SetupOutputVariable('Chiller Basin Heater Electric Power [W]', &
                 ElectricEIRChillerReport(EIRChillerNum)%BasinHeaterPower,'System','Average',ElectricEIRChiller(EIRChillerNum)%Name)
-           CALL SetupOutputVariable('Chiller Basin Heater Electric Consumption [J]', &
+           CALL SetupOutputVariable('Chiller Basin Heater Electric Energy [J]', &
                 ElectricEIRChillerReport(EIRChillerNum)%BasinHeaterConsumption,'System','Sum',  &
                 ElectricEIRChiller(EIRChillerNum)%Name, &
                 ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
@@ -867,7 +933,7 @@ SUBROUTINE GetElectricEIRChillerInput
 
 END SUBROUTINE GetElectricEIRChillerInput
 
-SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteration)
+SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad)
 
 
           ! SUBROUTINE INFORMATION:
@@ -888,7 +954,8 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
           ! USE STATEMENTS:
   USE DataGlobals,     ONLY : BeginEnvrnFlag, AnyEnergyManagementSystemInModel
   USE DataPlant,       ONLY : PlantLoop, TypeOf_Chiller_ElectricEIR, ScanPlantLoopsForObject, &
-                              PlantSizesOkayToFinalize, PlantSizeNotComplete, LoopFlowStatus_NeedyIfLoopOn
+                              PlantSizesOkayToFinalize, PlantSizeNotComplete, LoopFlowStatus_NeedyIfLoopOn, &
+                              SingleSetpoint, DualSetpointDeadband
   USE PlantUtilities,  ONLY : InterConnectTwoPlantLoopSides, InitComponentNodes, SetComponentFlowRate
   USE DataEnvironment, ONLY : StdBaroPress
   USE EMSManager,      ONLY : iTemperatureSetpoint, CheckIfNodeSetpointManagedByEMS
@@ -900,7 +967,6 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
   INTEGER, INTENT (IN) :: EIRChillNum         ! Number of the current electric EIR chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag             ! TRUE when chiller operating
   REAL(r64),INTENT(IN) :: MyLoad              ! current load put on chiller
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration  ! Initialize variables when TRUE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -924,6 +990,7 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
   REAL(r64)                               :: rho                    ! local fluid density
   REAL(r64)                               :: mdot                   ! local fluid mass flow rate
   REAL(r64)                               :: mdotCond               ! local fluid mass flow rate for condenser
+  REAL(r64)                               :: THeatRecSetpoint       ! tests set point node for proper set point value
   INTEGER                                 :: LoopNum
   INTEGER                                 :: LoopSideNum
   INTEGER                                 :: BranchIndex
@@ -1010,7 +1077,14 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
       CALL ShowFatalError('InitElectricEIRChiller: Program terminated due to previous condition(s).')
     ENDIF
 
-    IF (ElectricEIRChiller(EIRChillNum)%VariableFlow) Then
+    IF (ElectricEIRChiller(EIRChillNum)%FlowMode == ConstantFlow) THEN
+      ! reset flow priority
+      PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElectricEIRChiller(EIRChillNum)%CWLoopSideNum)% &
+          Branch(ElectricEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElectricEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
+
+    IF (ElectricEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) THEN
       ! reset flow priority
       PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElectricEIRChiller(EIRChillNum)%CWLoopSideNum)% &
           Branch(ElectricEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElectricEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
@@ -1019,34 +1093,34 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
       IF ((Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue) ) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. ElectricEIRChiller(EIRChillNum)%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElectricEIRChiller(EIRChillNum)%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
+            ElectricEIRChiller(EIRChillNum)%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. ElectricEIRChiller(EIRChillNum)%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElectricEIRChiller(EIRChillNum)%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              ElectricEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
+              ElectricEIRChiller(EIRChillNum)%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
 
 
         ENDIF
-        ElectricEIRChiller(EIRChillNum)%VariableFlowSetToLoop = .TRUE.
+        ElectricEIRChiller(EIRChillNum)%ModulatedFlowSetToLoop = .TRUE.
         Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
         Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
@@ -1091,8 +1165,10 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
       Node(CondInletNode)%Temp = ElectricEIRChiller(EIRChillNum)%TempRefCondIn
     ELSE ! air or evap air condenser
      ! Initialize maximum available condenser flow rate
-      Node(CondInletNode)%MassFlowRate          = ElectricEIRChiller(EIRChillNum)%CondVolFlowRate * &
-        PsyRhoAirFnPbTdbW(StdBaroPress,ElectricEIRChiller(EIRChillNum)%TempRefCondIn,0.0D0,'InitElectricEIRChiller')
+      rho = PsyRhoAirFnPbTdbW(StdBaroPress,ElectricEIRChiller(EIRChillNum)%TempRefCondIn,0.0D0,'InitElectricEIRChiller')
+      ElectricEIRChiller(EIRChillNum)%CondMassFlowRateMax = rho * ElectricEIRChiller(EIRChillNum)%CondVolFlowRate
+
+      Node(CondInletNode)%MassFlowRate          = ElectricEIRChiller(EIRChillNum)%CondMassFlowRateMax
       Node(CondOutletNode)%MassFlowRate         = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
@@ -1120,7 +1196,53 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
                          ElectricEIRChiller(EIRChillNum)%HRLoopSideNum,           &
                          ElectricEIRChiller(EIRChillNum)%HRBranchNum,             &
                          ElectricEIRChiller(EIRChillNum)%HRCompNum)
-    ENDIF
+      ! overall capacity limit
+      ElectricEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit = ElectricEIRChiller(EIRChillNum)%HeatRecCapacityFraction &
+                              *  (ElectricEIRChiller(EIRChillNum)%RefCap + ElectricEIRChiller(EIRChillNum)%RefCap &
+                                                                              /ElectricEIRChiller(EIRChillNum)%RefCOP)
+
+      IF(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum > 0)THEN
+        SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%HRLoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetPoint)
+            THeatRecSetpoint = Node(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPoint
+          CASE (DualSetPointDeadBand)
+            THeatRecSetpoint = Node(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPointHi
+        END SELECT
+        IF(THeatRecSetpoint == SensedNodeFlagValue)THEN
+          IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+            IF (.NOT. ElectricEIRChiller(EIRChillNum)%HRSPErrDone) THEN
+              CALL ShowWarningError('Missing heat recovery temperature setpoint for chiller named ' // &
+                                          TRIM(ElectricEIRChiller(EIRChillNum)%Name) )
+              CALL ShowContinueError('  A temperature setpoint is needed at the heat recovery leaving temperature ' // &
+                                             'setpoint node specified, use a SetpointManager')
+              CALL ShowContinueError('  The overall loop setpoint will be assumed for heat recovery. '//  &
+                 'The simulation continues ...')
+              ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum =   &
+                 PlantLoop(ElectricEIRChiller(EIRChillNum)%HRLoopNum)%TempSetPointNodeNum
+              ElectricEIRChiller(EIRChillNum)%HRSPErrDone = .TRUE.
+            ENDIF
+          ELSE
+           ! need call to EMS to check node
+            FatalError = .FALSE. ! but not really fatal yet, but should be.
+            CALL CheckIfNodeSetpointManagedByEMS(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
+            IF (FatalError) THEN
+              IF (.NOT. ElectricEIRChiller(EIRChillNum)%HRSPErrDone) THEN
+                CALL ShowWarningError('Missing heat recovery temperature setpoint for chiller named ' // &
+                                          TRIM(ElectricEIRChiller(EIRChillNum)%Name) )
+                CALL ShowContinueError('  A temperature setpoint is needed at the heat recovery leaving temperature ' // &
+                                     'setpoint node specified, use a SetpointManager to establish a setpoint')
+                CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at this node ')
+                CALL ShowContinueError('  The overall loop setpoint will be assumed for heat recovery. '//  &
+                   'The simulation continues ...')
+                ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum =   &
+                   PlantLoop(ElectricEIRChiller(EIRChillNum)%HRLoopNum)%TempSetPointNodeNum
+                ElectricEIRChiller(EIRChillNum)%HRSPErrDone = .TRUE.
+              ENDIF
+            ENDIF
+          END IF ! IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+        END IF ! IF(THeatRecSetpoint == SensedNodeFlagValue)THEN
+      END IF ! IF(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum > 0)THEN
+    ENDIF ! IF (ElectricEIRChiller(EIRChillNum)%HeatRecActive) THEN
 
     MyEnvrnFlag(EIRChillNum) = .FALSE.
   END IF
@@ -1128,7 +1250,8 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
     MyEnvrnFlag(EIRChillNum)=.true.
   END IF
 
-  IF (ElectricEIRChiller(EIRChillNum)%VariableFlow .AND. ElectricEIRChiller(EIRChillNum)%VariableFlowSetToLoop) THEN
+  IF ((ElectricEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) &
+      .AND. ElectricEIRChiller(EIRChillNum)%ModulatedFlowSetToLoop) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -1137,22 +1260,12 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
          Node(PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
-  IF (FirstHVACIteration) THEN
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = ElectricEIRChiller(EIRChillNum)%EvapMassFlowRateMax
-      mdotCond = ElectricEIRChiller(EIRChillNum)%CondMassFlowRateMax
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+  IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
+    mdot     = ElectricEIRChiller(EIRChillNum)%EvapMassFlowRateMax
+    mdotCond = ElectricEIRChiller(EIRChillNum)%CondMassFlowRateMax
   ELSE
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = ElectricEIRChillerReport(EIRChillNum)%Evapmdot
-      mdotCond = ElectricEIRChillerReport(EIRChillNum)%Condmdot
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+    mdot     = 0.d0
+    mdotCond = 0.d0
   ENDIF
 
   CALL SetComponentFlowRate( mdot, EvapInletNode, EvapOutletNode,            &
@@ -1174,14 +1287,10 @@ SUBROUTINE InitElectricEIRChiller(EIRChillNum,RunFlag, MyLoad, FirstHVACIteratio
     LoopSideNum  =  ElectricEIRChiller(EIRChillNum)%HRLoopSideNum
     BranchIndex  =  ElectricEIRChiller(EIRChillNum)%HRBranchNum
     CompIndex    =  ElectricEIRChiller(EIRChillNum)%HRCompNum
-    If (FirstHVACIteration .AND. RunFlag) Then
+    If (RunFlag) Then
       mdot          = ElectricEIRChiller(EIRChillNum)%DesignHeatRecMassFlowRate
-    ELSEIF (FirstHVACIteration .AND. (.NOT. RunFlag)) Then
+    ELSE
       mdot          = 0.0D0
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. RunFlag) THEN
-      mdot = ElectricEIRChillerReport(EIRChillNum)%HeatRecMassFlow
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. (.NOT. RunFlag)) THEN
-      mdot = 0.d0
     ENDIF
 
     CALL SetComponentFlowRate(mdot,HeatRecInNode,HeatRecOutNode,LoopNum,LoopSideNum,BranchIndex,CompIndex)
@@ -1337,7 +1446,7 @@ SUBROUTINE SizeElectricEIRChiller(EIRChillNum)
                                  PlantLoop(ElectricEIRChiller(EIRChillNum)%CDLoopNum)%FluidIndex, &
                                  'SizeElectricEIRChiller')
         tmpCondVolFlowRate = tmpNomCap * &
-          (1. + (1./ElectricEIRChiller(EIRChillNum)%RefCOP) * ElectricEIRChiller(EIRChillNum)%OpenMotorEff) / &
+          (1. + (1./ElectricEIRChiller(EIRChillNum)%RefCOP) * ElectricEIRChiller(EIRChillNum)%CompPowerToCondenserFrac) / &
           ( PlantSizData(PltSizCondNum)%DeltaT * Cp * rho )
         IF (PlantSizesOkayToFinalize) ElectricEIRChiller(EIRChillNum)%CondVolFlowRate = tmpCondVolFlowRate
       ELSE
@@ -1412,6 +1521,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
   USE DataBranchAirLoopPlant, ONLY: ControlType_SeriesActive, MassFlowTolerance
   USE DataEnvironment, ONLY : EnvironmentName, CurMnDy
   USE PlantUtilities,  ONLY : SetComponentFlowRate, PullCompInterconnectTrigger
+  USE Psychrometrics,  ONLY : PsyCpAirFnWTdb, PsyWFnTdbTwbPb
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1546,12 +1656,15 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
     RETURN
    END IF
 
+! initialize outlet air humidity ratio of air or evap cooled chillers
+  CondOutletHumRat = Node(CondInletNode)%HumRat
+
   IF (ElectricEIRChiller(EIRChillNum)%CondenserType == AirCooled) THEN ! Condenser inlet temp = outdoor temp
 !    Node(CondInletNode)%Temp = OutDryBulbTemp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
 
 ! Warn user if entering condenser dry-bulb temperature falls below 0 C
-      IF(Node(CondInletNode)%Temp .LT. 0.0 .AND. ABS(MyLoad) .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 0.0d0 .AND. ABS(MyLoad) .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
         ElectricEIRChiller(EIRChillNum)%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         ElectricEIRChiller(EIRChillNum)%MsgBuffer1 = 'ElectricEIRChillerModel - CHILLER:ELECTRIC:EIR "' &
@@ -1567,9 +1680,11 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
   ELSE IF (ElectricEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN ! Condenser inlet temp = (outdoor wet bulb)
 !    Node(CondInletNode)%Temp = OutWetBulbTemp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirWetBulb
+!  line above assumes evaporation pushes condenser inlet air humidity ratio to saturation
+    CondOutletHumRat = PsyWFnTdbTwbPb(Node(CondInletNode)%Temp,Node(CondInletNode)%Temp,Node(CondInletNode)%Press)
 
 ! Warn user if evap condenser wet-bulb temperature falls below 10 C
-      IF(Node(CondInletNode)%Temp .LT. 10.0 .AND. ABS(MyLoad) .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 10.0d0 .AND. ABS(MyLoad) .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
         ElectricEIRChiller(EIRChillNum)%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         ElectricEIRChiller(EIRChillNum)%MsgBuffer1 = 'ElectricEIRChillerModel - CHILLER:ELECTRIC:EIR "' &
@@ -1621,7 +1736,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
 
   SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
   CASE (SingleSetpoint)
-    IF ((ElectricEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElectricEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
@@ -1631,7 +1746,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
       EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
     ENDIF
   CASE (DualSetpointDeadband)
-    IF ((ElectricEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElectricEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElectricEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
@@ -1641,9 +1756,28 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
       EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPointHi
     ENDIF
   END SELECT
+
+  ! correct temperature if using heat recovery
+  ! use report values for latest valid calculation, lagged somewhat
+  IF ( ElectricEIRChiller(EIRChillNum)%HeatRecActive ) THEN
+    If ( (ElectricEIRChillerReport(EIRChillNum)%QHeatRecovery &
+           +  ElectricEIRChillerReport(EIRChillNum)%QCond) > 0.d0) THEN ! protect div by zero
+      AvgCondSinkTemp = (ElectricEIRChillerReport(EIRChillNum)%QHeatRecovery &
+                            * ElectricEIRChillerReport(EIRChillNum)%HeatRecInletTemp &
+                          + ElectricEIRChillerReport(EIRChillNum)%QCond  &
+                            * ElectricEIRChillerReport(EIRChillNum)%CondInletTemp) &
+                          / (ElectricEIRChillerReport(EIRChillNum)%QHeatRecovery   &
+                                 + ElectricEIRChillerReport(EIRChillNum)%QCond)
+    ELSE
+      AvgCondSinkTemp = CondInletTemp
+    ENDIF
+  ELSE
+    AvgCondSinkTemp = CondInletTemp
+  ENDIF
+
   ! Get capacity curve info with respect to CW setpoint and entering condenser water temps
   ChillerCapFT = CurveValue(ElectricEIRChiller(EIRChillNum)%ChillerCapFT, &
-                            EvapOutletTempSetpoint,CondInletTemp)
+                            EvapOutletTempSetpoint,AvgCondSinkTemp)
 
   IF(ChillerCapFT .LT. 0)THEN
     IF(ElectricEIRChiller(EIRChillNum)%ChillerCapFTError .LT. 1 .AND. &
@@ -1721,7 +1855,8 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
    QEvaporator = AvailChillerCap * PartLoadRat
 
    ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-   IF(ElectricEIRChiller(EIRChillNum)%ConstantFlow)THEN
+   IF ((ElectricEIRChiller(EIRChillNum)%FlowMode == ConstantFlow)   &
+      .OR. (ElectricEIRChiller(EIRChillNum)%FlowMode == NotModulated )) THEN
       ! Set the evaporator mass flow rate to design
       ! Start by assuming max (design) flow
       EvapMassFlowRate = EvapMassFlowRateMax
@@ -1740,7 +1875,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
       ! Evaluate outlet temp based on delta
       EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
 
-   ELSEIF(ElectricEIRChiller(EIRChillNum)%VariableFlow)THEN
+   ELSEIF(ElectricEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) THEN
 
       ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
       SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%CWLoopNum)%LoopDemandCalcScheme)
@@ -1749,7 +1884,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
       CASE (DualSetpointDeadband)
         EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPointHi
       END SELECT
-      
+
       IF (EvapDeltaTemp /= 0) THEN
         ! Calculate desired flow to request based on load
         EvapMassFlowRate = ABS(QEvaporator/Cp/EvapDeltaTemp)
@@ -1905,7 +2040,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
                                ElectricEIRChiller(EIRChillNum)%BasinHeaterSetPointTemp,BasinHeaterPower)
   END IF
 
-  ChillerEIRFT   = CurveValue(ElectricEIRChiller(EIRChillNum)%ChillerEIRFT,EvapOutletTemp,CondInletTemp)
+  ChillerEIRFT   = CurveValue(ElectricEIRChiller(EIRChillNum)%ChillerEIRFT,EvapOutletTemp,AvgCondSinkTemp)
   IF(ChillerEIRFT .LT. 0.0)THEN
     IF(ElectricEIRChiller(EIRChillNum)%ChillerEIRFTError .LT. 1 .AND. PlantLoop(PlantLoopNum)%Loopside(LoopSideNum)%FlowLock &
      .NE. 0 .AND. .NOT. WarmupFlag)THEN
@@ -1951,7 +2086,7 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
 
   Power = (AvailChillerCap/ReferenceCOP) * ChillerEIRFPLR * ChillerEIRFT * FRAC
 
-  QCondenser = Power*ElectricEIRChiller(EIRChillNum)%OpenMotorEff + QEvaporator + ChillerFalseLoadRate
+  QCondenser = Power*ElectricEIRChiller(EIRChillNum)%CompPowerToCondenserFrac + QEvaporator + ChillerFalseLoadRate
 
   IF (ElectricEIRChiller(EIRChillNum)%CondenserType == WaterCooled) THEN
     IF (CondMassFlowRate > MassFlowTolerance) THEN
@@ -1974,12 +2109,23 @@ SUBROUTINE CalcElectricEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration
        !CALL ShowFatalError('Program Terminates due to previous error condition.')
     END IF
   ELSE !Air Cooled or Evap Cooled
-    !don't care about outlet temp for Air-Cooled or Evap Cooled and there is no CondMassFlowRate and would divide by zero
+
+    IF(QCondenser > 0.0d0) THEN
+      CondMassFlowRate = ElectricEIRChiller(EIRChillNum)%CondMassFlowRateMax * PartLoadRat
+    ELSE
+      CondMassFlowRate = 0.0d0
+    END IF
+
      ! If Heat Recovery specified for this vapor compression chiller, then Qcondenser will be adjusted by this subroutine
     IF(ElectricEIRChiller(EIRChillNum)%HeatRecActive) CALL EIRChillerHeatRecovery(EIRChillNum,QCondenser, &
                                                              CondMassFlowRate,CondInletTemp,QHeatRecovered)
 
-    CondOutletTemp = CondInletTemp
+    IF(CondMassFlowRate .GT. 0.0d0)THEN
+      Cp = PsyCpAirFnWTdb(Node(CondInletNode)%HumRat,CondInletTemp,'CalcElectricEIRChillerModel')
+      CondOutletTemp = CondInletTemp + QCondenser/CondMassFlowRate/Cp
+    ELSE
+      CondOutletTemp = CondInletTemp
+    END IF
   END IF
 
   ! Calculate condenser fan power
@@ -2010,7 +2156,8 @@ SUBROUTINE EIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInletTemp,Q
             !  na
 
             ! USE STATEMENTS:
-            !  na
+  USE DataPlant,       ONLY: SingleSetpoint, DualSetpointDeadband, PlantLoop
+  USE ScheduleManager, ONLY: GetCurrentScheduleValue
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2041,6 +2188,9 @@ SUBROUTINE EIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInletTemp,Q
   REAL(r64)    :: TAvgOut             ! Average outlet temperature [C]
   REAL(r64)    :: CpHeatRec           ! Heat reclaim water inlet specific heat [J/kg-K]
   REAL(r64)    :: CpCond              ! Condenser water inlet specific heat [J/kg-K]
+  REAL(r64)    :: THeatRecSetpoint    ! local value for heat recovery leaving setpoint [C]
+  REAL(r64)    :: QHeatRecToSetpoint  ! load to heat recovery setpoint
+  REAL(r64)    :: HeatRecHighInletLimit ! local value for inlet limit for heat recovery [C]
 
 
   ! Begin routine
@@ -2051,13 +2201,6 @@ SUBROUTINE EIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInletTemp,Q
 
    ! Inlet node to the heat recovery heat exchanger
   HeatRecInletTemp  = Node(HeatRecInNode)%Temp
-
-   ! Set heat recovery mass flow rates
-!  HeatRecMassFlowRate = MIN(Node(HeatRecInNode)%MassFlowRateMaxAvail, &
-!                         Node(HeatRecInNode)%MassFlowRateMax)
-!  HeatRecMassFlowRate = MIN(Node(HeatRecInNode)%MassFlowRate, &
-!                         HeatRecMassFlowRate)
-!  HeatRecMassFlowRate = MAX(Node(HeatRecInNode)%MassFlowRateMinAvail,HeatRecMassFlowRate)
   HeatRecMassFlowRate = Node(HeatRecInNode)%MassFlowRate
 
   CpHeatRec =  GetSpecificHeatGlycol(PlantLoop(ElectricEIRChiller(EIRChillNum)%HRLoopNum)%FluidName,  &
@@ -2072,29 +2215,41 @@ SUBROUTINE EIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInletTemp,Q
   ! Before we modify the QCondenser, the total or original value is transferred to QTot
   QTotal = QCond
 
-  TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
-             (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
+  IF (ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum == 0) THEN ! use original algorithm that blends temps
+    TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
+               (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
 
-  TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
+    TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
 
-  QCondTmp = CondMassFlow*CpCond*(TAvgOut-CondInletTemp)
+    QHeatRec = HeatRecMassFlowRate * CpHeatRec * (TAvgOut - HeatRecInletTemp)
+    QHeatRec = MAX(QHeatRec, 0.d0) ! ensure non negative
+   !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElectricEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit)
+  ELSE ! use new algorithm to meet setpoint
+    SELECT CASE (PlantLoop(ElectricEIRChiller(EIRChillNum)%HRLoopNum)%LoopDemandCalcScheme)
 
-  IF(QCondTmp <= 0.0)THEN
-    FracHeatRec = 1.0
-  ELSE
-    FracHeatRec = (HeatRecMassFlowRate*CpHeatRec*(TAvgOut-HeatRecInletTemp))/QCondTmp
-  END IF
+    CASE (SingleSetPoint)
+      THeatRecSetpoint = Node(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPoint
+    CASE (DualSetPointDeadBand)
+      THeatRecSetpoint = Node(ElectricEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPointHi
+    END SELECT
 
-  IF(FracHeatRec <= 0.0) FracHeatRec = 0.0
-  IF(FracHeatRec > 1.0) FracHeatRec = 1.0
+    QHeatRecToSetpoint = HeatRecMassFlowRate *  CpHeatRec * (THeatRecSetpoint - HeatRecInletTemp)
+    QHeatRecToSetpoint = MAX(QHeatRecToSetpoint, 0.d0)
+    QHeatRec = MIN(QTotal,QHeatRecToSetpoint)
+     !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElectricEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit)
+  ENDIF
 
-  QCond = QTotal*(1.0 - FracHeatRec)
+   ! check if limit on inlet is present and exceeded.
+  IF (ElectricEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum > 0) THEN
+    HeatRecHighInletLimit =  GetCurrentScheduleValue(ElectricEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum)
+    IF ( HeatRecInletTemp > HeatRecHighInletLimit) THEN ! shut down heat recovery
+      QHeatRec = 0.d0
+    ENDIF
+  ENDIF
 
-  IF(FracHeatRec == 0.0) THEN
-    QHeatRec = 0.0
-  ELSE
-    QHeatRec = QTotal*FracHeatRec
-  END IF
+  QCond = QTotal - QHeatRec
 
   ! Calculate a new Heat Recovery Coil Outlet Temp
   IF (HeatRecMassFlowRate > 0.0) THEN
@@ -2126,6 +2281,7 @@ SUBROUTINE UpdateElectricEIRChillerRecords(MyLoad,RunFlag,Num)
   USE DataGlobals,     ONLY : SecInHour
   USE DataHVACGlobals, ONLY : TimeStepSys
   USE PlantUtilities,  ONLY : SafeCopyPlantNode
+  USE Psychrometrics,  ONLY : PsyHFnTdbW
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2159,9 +2315,13 @@ SUBROUTINE UpdateElectricEIRChillerRecords(MyLoad,RunFlag,Num)
   HeatRecOutNode = ElectricEIRChiller(Num)%HeatRecOutletNodeNum
 
   IF (MyLoad>=0 .OR. .NOT. RunFlag) THEN ! Chiller not running so pass inlet states to outlet states
-    ! Set node temperatures
+    ! Set node conditions
     Node(EvapOutletNode)%Temp     = Node(EvapInletNode)%Temp
     Node(CondOutletNode)%Temp     = Node(CondInletNode)%Temp
+    IF(ElectricEIRChiller(Num)%CondenserType /= WaterCooled) THEN
+      Node(CondOutletNode)%HumRat   = Node(CondInletNode)%HumRat
+      Node(CondOutletNode)%Enthalpy = Node(CondInletNode)%Enthalpy
+    END IF
 
 
     ElectricEIRChillerReport(Num)%ChillerPartLoadRatio  = 0.0
@@ -2203,6 +2363,11 @@ SUBROUTINE UpdateElectricEIRChillerRecords(MyLoad,RunFlag,Num)
     ! Set node temperatures
     Node(EvapOutletNode)%Temp     = EvapOutletTemp
     Node(CondOutletNode)%Temp     = CondOutletTemp
+    IF(ElectricEIRChiller(Num)%CondenserType /= WaterCooled) THEN
+      Node(CondOutletNode)%HumRat   = CondOutletHumRat
+      Node(CondOutletNode)%Enthalpy = PsyHFnTdbW(CondOutletTemp, CondOutletHumRat)
+    END IF
+
     ! Set node flow rates;  for these load based models
     ! assume that sufficient evaporator flow rate is available
     ElectricEIRChillerReport(Num)%ChillerPartLoadRatio  = ChillerPartLoadRatio
@@ -2310,6 +2475,13 @@ INTEGER, PARAMETER :: EvapCooled        = 3 ! Evap-cooled condenser currently no
 ! Performance curve variable parameters
 INTEGER, PARAMETER :: LeavingCondenser  = 5
 
+
+!chiller flow modes
+INTEGER, PARAMETER :: FlowModeNotSet           = 200
+INTEGER, PARAMETER :: ConstantFlow             = 201
+INTEGER, PARAMETER :: NotModulated             = 202
+INTEGER, PARAMETER :: LeavingSetpointModulated = 203
+
           ! MODULE VARIABLE DECLARATIONS:
 PRIVATE
 INTEGER        :: NumElecReformEIRChillers =0   ! Number of electric reformulated EIR chillers specified in input
@@ -2329,7 +2501,7 @@ REAL(r64)      :: ChillerEIRFPLR           =0.0 ! Chiller EIR as a function of p
 REAL(r64)      :: ChillerPartLoadRatio     =0.0 ! Chiller part-load ratio (PLR)
 REAL(r64)      :: ChillerCyclingRatio      =0.0 ! Chiller cycling ratio
 REAL(r64)      :: ChillerFalseLoadRate     =0.0 ! Chiller false load over and above the water-side load [W]
-
+REAL(r64)      :: AvgCondSinkTemp          =0.d0!  condenser temperature value for use in curves [C]
 
 TYPE ReformulatedEIRChillerSpecs
   CHARACTER(len=MaxNameLength) :: Name           = ' ' ! User identifier
@@ -2340,15 +2512,14 @@ TYPE ReformulatedEIRChillerSpecs
   INTEGER           :: CondenserType             = 0   ! Type of Condenser. Water Cooled is the only available option for now
   REAL(r64)         :: RefCap                    = 0.0 ! Reference capacity of the chiller [W]
   REAL(r64)         :: RefCOP                    = 0.0 ! Reference coefficient of performance [W/W]
-  LOGICAL           :: ConstantFlow           =.False. ! True if this is a Constant Flow Chiller
-  LOGICAL           :: VariableFlow           =.False. ! True if this is a Variable Flow Chiller
-  LOGICAL           :: VariableFlowSetToLoop  =.FALSE. ! True if the setpoint is missing at the outlet node
-  LOGICAL           :: VariableFlowErrDone    =.FALSE. ! true if setpoint warning issued
+  INTEGER           :: FlowMode          = FlowModeNotSet ! one of 3 modes for componet flow during operation
+  LOGICAL           :: ModulatedFlowSetToLoop  =.FALSE. ! True if the setpoint is missing at the outlet node
+  LOGICAL           :: ModulatedFlowErrDone    =.FALSE. ! true if setpoint warning issued
   REAL(r64)         :: EvapVolFlowRate           = 0.0 ! Reference water volumetric flow rate through the evaporator [m3/s]
   REAL(r64)         :: EvapMassFlowRateMax       = 0.0 ! Reference water mass flow rate through evaporator [kg/s]
   REAL(r64)         :: CondVolFlowRate           = 0.0 ! Reference water volumetric flow rate through the condenser [m3/s]
   REAL(r64)         :: CondMassFlowRateMax       = 0.0 ! Reference water mass flow rate through condenser [kg/s]
-  REAL(r64)         :: OpenMotorEff              = 0.0 ! Open chiller motor efficiency [fraction, 0 to 1]
+  REAL(r64)         :: CompPowerToCondenserFrac  = 0.0 ! Fraction of compressor electric power rejected by condenser [0 to 1]
   INTEGER           :: EvapInletNodeNum          = 0   ! Node number on the inlet side of the plant (evaporator side)
   INTEGER           :: EvapOutletNodeNum         = 0   ! Node number on the outlet side of the plant (evaporator side)
   INTEGER           :: CondInletNodeNum          = 0   ! Node number on the inlet side of the condenser
@@ -2370,6 +2541,10 @@ TYPE ReformulatedEIRChillerSpecs
   LOGICAL           :: HeatRecActive         = .False. ! True when entered Heat Rec Vol Flow Rate > 0
   INTEGER           :: HeatRecInletNodeNum       = 0   ! Node number for the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum      = 0   ! Node number for the heat recovery outlet side of the condenser
+  REAL(r64)         :: HeatRecCapacityFraction   = 0.d0 ! user input for heat recovery capacity fraction []
+  REAL(r64)         :: HeatRecMaxCapacityLimit   = 0.d0 ! Capacity limit for Heat recovery, one time calc [W]
+  INTEGER           :: HeatRecSetpointNodeNum    = 0    ! index for system node with the heat recover leaving setpoint
+  INTEGER           :: HeatRecInletLimitSchedNum = 0    ! index for schedule for the inlet high limit for heat recovery operation
   INTEGER           :: ChillerCapFT              = 0   ! Index for the total cooling capacity modifier curve
                                                        ! (function of leaving evaporator and condenser water temperatures)
   INTEGER           :: ChillerEIRFT              = 0   ! Index for the energy input ratio modifier curve
@@ -2464,6 +2639,7 @@ TYPE ReportVars
   REAL(r64)    :: ChillerEIRFPLR        = 0.0 ! reporting: Chiller EIRFPLR curve output value
 !  REAL(r64)    :: CondenserFanPowerUse  = 0.0 ! reporting: Air-cooled condenser fan power [W]
 !  REAL(r64)    :: CondenserFanEnergyConsumption = 0.0 ! reporting: Air-cooled condenser fan energy [J]
+  REAL(r64)    :: ChillerCondAvgTemp    = 0.d0  ! reporting: average condenser temp for curves with Heat recovery [C]
 END TYPE ReportVars
 
 
@@ -2584,7 +2760,7 @@ SUBROUTINE SimReformulatedEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl
   IF (InitLoopEquip) THEN
     TempEvapOutDesign  = ElecReformEIRChiller(EIRChillNum)%TempRefEvapOut
     TempCondInDesign   = ElecReformEIRChiller(EIRChillNum)%TempRefCondIn
-    CALL InitElecReformEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
+    CALL InitElecReformEIRChiller(EIRChillNum,RunFlag,MyLoad)
     CALL SizeElecReformEIRChiller(EIRChillNum)
     IF (LoopNum == ElecReformEIRChiller(EIRChillNum)%CWLoopNum) THEN
       MinCap = ElecReformEIRChiller(EIRChillNum)%RefCap*ElecReformEIRChiller(EIRChillNum)%MinPartLoadRat
@@ -2602,7 +2778,7 @@ SUBROUTINE SimReformulatedEIRChiller(EIRChillerType,EIRChillerName,EquipFlowCtrl
   END IF
 
   IF (LoopNum == ElecReformEIRChiller(EIRChillNum)%CWLoopNum) THEN
-    CALL InitElecReformEIRChiller(EIRChillNum,RunFlag,MyLoad,FirstIteration)
+    CALL InitElecReformEIRChiller(EIRChillNum,RunFlag,MyLoad)
     CALL ControlReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,EquipFlowCtrl)
     CALL UpdateReformEIRChillerRecords(MyLoad,RunFlag,EIRChillNum)
   ELSEIF (LoopNum == ElecReformEIRChiller(EIRChillNum)%CDLoopNum) THEN
@@ -2659,10 +2835,11 @@ SUBROUTINE GetElecReformEIRChillerInput
   USE GlobalNames,           ONLY: VerifyUniqueChillerName
   USE DataSizing,            ONLY: Autosize
 
+  USE ScheduleManager,       ONLY: GetScheduleIndex
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
             ! PARAMETERS
-            ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetElecReformEIRChillerInput: ' ! include trailing blank space
 
             ! LOCAL VARIABLES
   INTEGER                     :: EIRChillerNum             ! Chiller counter
@@ -2680,7 +2857,7 @@ SUBROUTINE GetElecReformEIRChillerInput
   If (AllocatedFlag) RETURN
 
   cCurrentModuleObject =  'Chiller:Electric:ReformulatedEIR'
-  NumElecReformEIRChillers = GetNumObjectsFound( TRIM(cCurrentModuleObject) )
+  NumElecReformEIRChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumElecReformEIRChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -2694,9 +2871,11 @@ SUBROUTINE GetElecReformEIRChillerInput
 
   ! Load arrays with reformulated electric EIR chiller data
   DO EIRChillerNum = 1 , NumElecReformEIRChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),EIRChillerNum,cAlphaArgs,NumAlphas, &
-                    rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks,AlphaFieldnames=cAlphaFieldNames, &
-                    NumericFieldNames=cNumericFieldNames  )
+    CALL GetObjectItem(cCurrentModuleObject,EIRChillerNum,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks, &
+                    AlphaFieldnames=cAlphaFieldNames, &
+                    NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
     IsBlank=.false.
     CALL VerifyName(cAlphaArgs(1),ElecReformEIRChiller%Name,EIRChillerNum-1,IsNotOK,IsBlank, &
@@ -2714,36 +2893,36 @@ SUBROUTINE GetElecReformEIRChillerInput
     ElecReformEIRChiller(EIRChillerNum)%ChillerCapFT        = GetCurveIndex(cAlphaArgs(2))
     ElecReformEIRChiller(EIRChillerNum)%CAPFTName           = cAlphaArgs(2)
     IF (ElecReformEIRChiller(EIRChillerNum)%ChillerCapFT .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
       ErrorsFound = .TRUE.
     END IF
 
     ElecReformEIRChiller(EIRChillerNum)%ChillerEIRFT        = GetCurveIndex(cAlphaArgs(3))
     ElecReformEIRChiller(EIRChillerNum)%EIRFTName           = cAlphaArgs(3)
     IF (ElecReformEIRChiller(EIRChillerNum)%ChillerEIRFT .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//'='//TRIM(cAlphaArgs(3)))
       ErrorsFound = .TRUE.
     END IF
 
     ElecReformEIRChiller(EIRChillerNum)%EIRFPLRName         = cAlphaArgs(4)
     ElecReformEIRChiller(EIRChillerNum)%ChillerEIRFPLR      = GetCurveIndex(cAlphaArgs(4))
     IF (ElecReformEIRChiller(EIRChillerNum)%ChillerEIRFPLR .EQ. 0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(4))//'='//TRIM(cAlphaArgs(4)))
       ErrorsFound = .TRUE.
     END IF
 
    ! Chilled water inlet/outlet node names are necessary
     IF (lAlphaFieldBlanks(5) ) THEN
-      CALL ShowSevereError(TRIM(cAlphaFieldNames(5))//' is blank for '// &
-                           TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(5))//' is blank.')
       ErrorsFound=.true.
     END IF
     IF (lAlphaFieldBlanks(6) ) THEN
-      CALL ShowSevereError(TRIM(cAlphaFieldNames(6))//' is blank for '// &
-                           TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(6))//' is blank.')
       ErrorsFound=.true.
     END IF
 
@@ -2759,13 +2938,13 @@ SUBROUTINE GetElecReformEIRChillerInput
 
     ! Condenser inlet/outlet node names are necessary
     IF (lAlphaFieldBlanks(7) ) THEN
-      CALL ShowSevereError(TRIM(cAlphaFieldNames(7))//' is blank for '// &
-                           TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(7))//' is blank.')
       ErrorsFound=.true.
     END IF
     IF (lAlphaFieldBlanks(8) ) THEN
-      CALL ShowSevereError(TRIM(cAlphaFieldNames(8))//' is blank for '// &
-                           TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError(TRIM(cAlphaFieldNames(8))//' is blank.')
       ErrorsFound=.true.
     END IF
 
@@ -2776,31 +2955,38 @@ SUBROUTINE GetElecReformEIRChillerInput
 
     CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(7),cAlphaArgs(8),'Condenser Water Nodes')
 
-    IF(cAlphaArgs(9)== 'CONSTANTFLOW') THEN
-       ElecReformEIRChiller(EIRChillerNum)%ConstantFlow = .True.
-       ElecReformEIRChiller(EIRChillerNum)%VariableFlow = .False.
-    ELSEIF(cAlphaArgs(9)== 'VARIABLEFLOW') THEN
-       ElecReformEIRChiller(EIRChillerNum)%ConstantFlow = .False.
-       ElecReformEIRChiller(EIRChillerNum)%VariableFlow = .True.
-    ELSE  ! Assume a constant flow chiller if none is specified
-       ElecReformEIRChiller(EIRChillerNum)%ConstantFlow = .True.
-       ElecReformEIRChiller(EIRChillerNum)%VariableFlow = .False.
-       CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
-       CALL showContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1))// &
-                               ', simulation assumes ConstantFlow and continues...')
-    END IF
+    SELECT CASE (TRIM(cAlphaArgs(9)))
+    CASE ( 'CONSTANTFLOW' )
+      ElecReformEIRChiller(EIRChillerNum)%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      ElecReformEIRChiller(EIRChillerNum)%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      ElecReformEIRChiller(EIRChillerNum)%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      ElecReformEIRChiller(EIRChillerNum)%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      ElecReformEIRChiller(EIRChillerNum)%FlowMode = NotModulated
+    END SELECT
+
 
 !   Chiller rated performance data
     ElecReformEIRChiller(EIRChillerNum)%RefCap                 = rNumericArgs(1)
     IF (rNumericArgs(1) == 0.0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(1))//'='//TRIM(RoundSigDigits(rNumericArgs(1),2)))
       ErrorsFound=.true.
     END IF
     ElecReformEIRChiller(EIRChillerNum)%RefCOP                 = rNumericArgs(2)
     IF (rNumericArgs(2) == 0.0) THEN
-      CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
-      CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+      CALL ShowContinueError('Invalid '//TRIM(cNumericFieldNames(2))//'='//TRIM(RoundSigDigits(rNumericArgs(2),2)))
       ErrorsFound=.true.
     END IF
     ElecReformEIRChiller(EIRChillerNum)%TempRefEvapOut         = rNumericArgs(3)
@@ -2815,7 +3001,7 @@ SUBROUTINE GetElecReformEIRChillerInput
     IF (ElecReformEIRChiller(EIRChillerNum)%SizFac <= 0.0) ElecReformEIRChiller(EIRChillerNum)%SizFac = 1.0d0
 
     IF(ElecReformEIRChiller(EIRChillerNum)%MinPartLoadRat .GT. ElecReformEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(7))//' ['//TRIM(RoundSigDigits(rNumericArgs(7),3))//'] > '//  &
                               TRIM(cNumericFieldNames(8))//' ['//TRIM(RoundSigDigits(rNumericArgs(8),3))//']')
        CALL ShowContinueError('Minimum part load ratio must be less than or equal to the '// &
@@ -2825,7 +3011,7 @@ SUBROUTINE GetElecReformEIRChillerInput
 
     IF(ElecReformEIRChiller(EIRChillerNum)%MinUnLoadRat .LT. ElecReformEIRChiller(EIRChillerNum)%MinPartLoadRat .OR. &
        ElecReformEIRChiller(EIRChillerNum)%MinUnLoadRat .GT. ElecReformEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' = '//TRIM(RoundSigDigits(rNumericArgs(10),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(10))//' must be greater than or equal to the '// &
                               TRIM(cNumericFieldNames(7)))
@@ -2836,7 +3022,7 @@ SUBROUTINE GetElecReformEIRChillerInput
 
     IF(ElecReformEIRChiller(EIRChillerNum)%OptPartLoadRat .LT. ElecReformEIRChiller(EIRChillerNum)%MinPartLoadRat .OR. &
        ElecReformEIRChiller(EIRChillerNum)%OptPartLoadRat .GT. ElecReformEIRChiller(EIRChillerNum)%MaxPartLoadRat) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' = '//TRIM(RoundSigDigits(rNumericArgs(9),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(9))//' must be greater than or equal to the '// &
                               TRIM(cNumericFieldNames(7)))
@@ -2845,11 +3031,11 @@ SUBROUTINE GetElecReformEIRChillerInput
        ErrorsFound=.true.
     END IF
 
-    ElecReformEIRChiller(EIRChillerNum)%OpenMotorEff           = rNumericArgs(11)
+    ElecReformEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac = rNumericArgs(11)
 
-    IF(ElecReformEIRChiller(EIRChillerNum)%OpenMotorEff .LT. 0.0 .OR. &
-       ElecReformEIRChiller(EIRChillerNum)%OpenMotorEff .GT. 1.0) THEN
-       CALL ShowSevereError('GetCurveInput: For '//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaArgs(1)))
+    IF(ElecReformEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac .LT. 0.0 .OR. &
+       ElecReformEIRChiller(EIRChillerNum)%CompPowerToCondenserFrac .GT. 1.0) THEN
+       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
        CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' = '//TRIM(RoundSigDigits(rNumericArgs(11),3)) )
        CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' must be greater than or equal to zero' )
        CALL ShowContinueError(TRIM(cNumericFieldNames(11))//' must be less than or equal to one' )
@@ -2860,34 +3046,73 @@ SUBROUTINE GetElecReformEIRChillerInput
 
    ! These are the optional heat recovery inputs
     ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(13)
-    IF (ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF ((ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.0) &
+        .OR. (ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate == Autosize)) THEN
       ElecReformEIRChiller(EIRChillerNum)%HeatRecActive=.True.
       ElecReformEIRChiller(EIRChillerNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(10),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Water,NodeConnectionType_Inlet, 3, ObjectIsNotParent)
       IF (ElecReformEIRChiller(EIRChillerNum)%HeatRecInletNodeNum == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
         ErrorsFound=.True.
       END IF
       ElecReformEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Water,NodeConnectionType_Outlet, 3, ObjectIsNotParent)
       IF (ElecReformEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum == 0) THEN
-        CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
-        CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
         ErrorsFound=.True.
       END IF
       IF (ElecReformEIRChiller(EIRChillerNum)%CondenserType .NE. WaterCooled) THEN
-        CALL ShowSevereError('Heat Recovery requires a Water Cooled Condenser, for '// &
-                    TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowContinueError('Heat Recovery requires a Water Cooled Condenser.')
         ErrorsFound=.True.
       END IF
 
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(10),cAlphaArgs(11),'Heat Recovery Nodes')
 
-      Call RegisterPlantCompDesignFlow(ElecReformEIRChiller(EIRChillerNum)%HeatRecInletNodeNum, &
+      If (ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate > 0.d0) THEN
+        Call RegisterPlantCompDesignFlow(ElecReformEIRChiller(EIRChillerNum)%HeatRecInletNodeNum, &
                                   ElecReformEIRChiller(EIRChillerNum)%DesignHeatRecVolFlowRate )
+      ENDIF
+      IF (NumNums > 14) THEN
+        IF (.NOT. lNumericFieldBlanks(15)) THEN
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecCapacityFraction =  rNumericArgs(15)
+        ELSE
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecCapacityFraction = 1.d0
+        ENDIf
+      ELSE
+        ElecReformEIRChiller(EIRChillerNum)%HeatRecCapacityFraction = 1.d0
+      ENDIF
+
+      If (NumAlphas > 11) THEN
+        IF (.NOT. lAlphaFieldBlanks(12)) THEN
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = GetScheduleIndex(cAlphaArgs(12))
+          IF (ElecReformEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
+            ErrorsFound=.True.
+          ENDIF
+        ELSE
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = 0
+        ENDIF
+      ELSE
+        ElecReformEIRChiller(EIRChillerNum)%HeatRecInletLimitSchedNum = 0
+      ENDIF
+
+      IF (NumAlphas > 12) THEN
+        IF ( .NOT. lAlphaFieldBlanks(13)) THEN
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = &
+              GetOnlySingleNode(cAlphaArgs(13), ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                             NodeType_Water,NodeConnectionType_Sensor, 1, ObjectIsNotParent)
+        ELSE
+          ElecReformEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = 0
+        ENDIF
+      ELSE
+        ElecReformEIRChiller(EIRChillerNum)%HeatRecSetpointNodeNum = 0
+      ENDIF
 
     ELSE
       ElecReformEIRChiller(EIRChillerNum)%HeatRecActive=.False.
@@ -2895,8 +3120,8 @@ SUBROUTINE GetElecReformEIRChillerInput
       ElecReformEIRChiller(EIRChillerNum)%HeatRecInletNodeNum   = 0
       ElecReformEIRChiller(EIRChillerNum)%HeatRecOutletNodeNum   = 0
       IF ((.NOT. lAlphaFieldBlanks(10)) .OR. (.NOT. lAlphaFieldBlanks(11)) ) THEN
-        CALL ShowWarningError('Since Reference Heat Reclaim Volume Flow Rate = 0.0, heat recovery is inactive for '// &
-                    TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)) )
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+        CALL ShowWarningError('Since Reference Heat Reclaim Volume Flow Rate = 0.0, heat recovery is inactive.')
         CALL ShowContinueError('However, node names were specified for heat recovery inlet or outlet nodes.')
       END IF
     END IF
@@ -2908,73 +3133,76 @@ SUBROUTINE GetElecReformEIRChillerInput
   END IF
 
   DO EIRChillerNum = 1, NumElecReformEIRChillers
-     CALL SetupOutputVariable('Chiller Part Load Ratio', &
+     CALL SetupOutputVariable('Chiller Part Load Ratio []', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerPartLoadRatio,'System','Average', &
                 ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cycling Ratio', &
+     CALL SetupOutputVariable('Chiller Cycling Ratio []', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerCyclingRatio,'System','Average', &
                 ElecReformEIRChiller(EIRChillerNum)%Name)
      CALL SetupOutputVariable('Chiller Electric Power [W]', &
           ElecReformEIRChillerReport(EIRChillerNum)%Power,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Electric Consumption [J]', &
+     CALL SetupOutputVariable('Chiller Electric Energy [J]', &
           ElecReformEIRChillerReport(EIRChillerNum)%Energy,'System','Sum',ElecReformEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           ElecReformEIRChillerReport(EIRChillerNum)%QEvap,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           ElecReformEIRChillerReport(EIRChillerNum)%EvapEnergy,'System','Sum',ElecReformEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller False Load Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller False Load Heat Transfer Rate [W]', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerFalseLoadRate,'System','Average', &
                 ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller False Load Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller False Load Heat Transfer Energy [J]', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerFalseLoad,'System','Sum',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           ElecReformEIRChillerReport(EIRChillerNum)%EvapInletTemp,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           ElecReformEIRChillerReport(EIRChillerNum)%EvapOutletTemp,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           ElecReformEIRChillerReport(EIRChillerNum)%Evapmdot,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           ElecReformEIRChillerReport(EIRChillerNum)%QCond,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           ElecReformEIRChillerReport(EIRChillerNum)%CondEnergy,'System','Sum',ElecReformEIRChiller(EIRChillerNum)%Name,  &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
      CALL SetupOutputVariable('Chiller COP [W/W]', &
           ElecReformEIRChillerReport(EIRChillerNum)%ActualCOP,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
 
-     CALL SetupOutputVariable('Chiller CapFTemp', &
+     CALL SetupOutputVariable('Chiller Capacity Temperature Modifier Multiplier []', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerCapFT,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller EIRFTemp', &
+     CALL SetupOutputVariable('Chiller EIR Temperature Modifier Multiplier []', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerEIRFT,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller EIRFPLR', &
+     CALL SetupOutputVariable('Chiller EIR Part Load Modifier Multiplier []', &
           ElecReformEIRChillerReport(EIRChillerNum)%ChillerEIRFPLR,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
           ElecReformEIRChillerReport(EIRChillerNum)%CondInletTemp,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
           ElecReformEIRChillerReport(EIRChillerNum)%CondOutletTemp,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-     CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
           ElecReformEIRChillerReport(EIRChillerNum)%Condmdot,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
 
      ! If heat recovery is active then setup report variables
      IF (ElecReformEIRChiller(EIRChillerNum)%HeatRecActive) THEN
-         CALL SetupOutputVariable('Chiller Heat Recovery Rate [W]', &
+         CALL SetupOutputVariable('Chiller Total Recovered Heat Rate [W]', &
            ElecReformEIRChillerReport(EIRChillerNum)%QHeatRecovery,'System','Average',ElecReformEIRChiller(EIRChillerNum)%Name)
-         CALL SetupOutputVariable('Chiller Heat Recovery [J]', &
+         CALL SetupOutputVariable('Chiller Total Recovered Heat Energy [J]', &
            ElecReformEIRChillerReport(EIRChillerNum)%EnergyHeatRecovery,'System','Sum', &
            ElecReformEIRChiller(EIRChillerNum)%Name, &
            ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
-         CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temp [C]', &
+         CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temperature [C]', &
            ElecReformEIRChillerReport(EIRChillerNum)%HeatRecInletTemp,'System','Average', &
            ElecReformEIRChiller(EIRChillerNum)%Name)
-         CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temp [C]', &
+         CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temperature [C]', &
            ElecReformEIRChillerReport(EIRChillerNum)%HeatRecOutletTemp,'System','Average', &
            ElecReformEIRChiller(EIRChillerNum)%Name)
          CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
            ElecReformEIRChillerReport(EIRChillerNum)%HeatRecMassFlow,'System','Average', &
+           ElecReformEIRChiller(EIRChillerNum)%Name)
+         CALL SetupOutputVariable('Chiller Effective Heat Rejection Temperature [C]', &
+           ElecReformEIRChillerReport(EIRChillerNum)%ChillerCondAvgTemp,'System','Average', &
            ElecReformEIRChiller(EIRChillerNum)%Name)
      END IF
 
@@ -2984,7 +3212,7 @@ RETURN
 
 END SUBROUTINE GetElecReformEIRChillerInput
 
-SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACIteration)
+SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu, FSEC
@@ -3009,6 +3237,7 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
   USE DataEnvironment, ONLY : StdBaroPress
   USE EMSManager,      ONLY : iTemperatureSetpoint, CheckIfNodeSetpointManagedByEMS
   USE DataInterfaces,  ONLY : ShowFatalError, ShowSevereError, ShowContinueError
+  USE ScheduleManager, ONLY : GetCurrentScheduleValue
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3016,7 +3245,6 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
   INTEGER, INTENT (IN) :: EIRChillNum         ! Number of the current electric EIR chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag             ! TRUE when chiller operating
   REAL(r64),INTENT(IN) :: MyLoad              ! Current load put on chiller
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration  ! Initialize variables when TRUE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -3046,7 +3274,8 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
   INTEGER                                  :: CompIndex
   LOGICAL                                  :: FatalError
   LOGICAL                                  :: errFlag
-
+  LOGICAL                                  :: HeatRecRunFlag
+  REAL(r64)                                :: HeatRecHighInletLimit
           ! FLOW:
 
   ! Do the one time initializations
@@ -3126,9 +3355,14 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
       CALL ShowFatalError('InitElecReformEIRChiller: Program terminated due to previous condition(s).')
     ENDIF
 
+    IF (ElecReformEIRChiller(EIRChillNum)%FlowMode == ConstantFlow) Then
+      ! reset flow priority
+      PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElecReformEIRChiller(EIRChillNum)%CWLoopSideNum)% &
+          Branch(ElecReformEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElecReformEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
 
-
-    IF (ElecReformEIRChiller(EIRChillNum)%VariableFlow) Then
+    IF (ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) Then
       ! reset flow priority
       PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%LoopSide(ElecReformEIRChiller(EIRChillNum)%CWLoopSideNum)% &
           Branch(ElecReformEIRChiller(EIRChillNum)%CWBranchNum)%Comp(ElecReformEIRChiller(EIRChillNum)%CWCompNum)%FlowPriority &
@@ -3137,34 +3371,34 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
       IF ((Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. ElecReformEIRChiller(EIRChillNum)%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElecReformEIRChiller(EIRChillNum)%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
+            ElecReformEIRChiller(EIRChillNum)%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. ElecReformEIRChiller(EIRChillNum)%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElecReformEIRChiller(EIRChillNum)%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              ElecReformEIRChiller(EIRChillNum)%VariableFlowErrDone = .TRUE.
+              ElecReformEIRChiller(EIRChillNum)%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
 
 
         ENDIF
-        ElecReformEIRChiller(EIRChillNum)%VariableFlowSetToLoop = .TRUE.
+        ElecReformEIRChiller(EIRChillNum)%ModulatedFlowSetToLoop = .TRUE.
         Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
         Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi =                        &
@@ -3240,6 +3474,10 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
                          ElecReformEIRChiller(EIRChillNum)%HRLoopSideNum,           &
                          ElecReformEIRChiller(EIRChillNum)%HRBranchNum,             &
                          ElecReformEIRChiller(EIRChillNum)%HRCompNum)
+      ! overall capacity limit
+      ElecReformEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit = ElecReformEIRChiller(EIRChillNum)%HeatRecCapacityFraction &
+                              *  (ElecReformEIRChiller(EIRChillNum)%RefCap + ElecReformEIRChiller(EIRChillNum)%RefCap &
+                                                                              /ElecReformEIRChiller(EIRChillNum)%RefCOP)
     ENDIF
 
     MyEnvrnFlag(EIRChillNum) = .FALSE.
@@ -3248,7 +3486,8 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
     MyEnvrnFlag(EIRChillNum)=.true.
   END IF
 
-  IF (ElecReformEIRChiller(EIRChillNum)%VariableFlow .AND. ElecReformEIRChiller(EIRChillNum)%VariableFlowSetToLoop) THEN
+  IF ((ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) &
+       .AND. ElecReformEIRChiller(EIRChillNum)%ModulatedFlowSetToLoop) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -3257,22 +3496,12 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
          Node(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
-  IF (FirstHVACIteration) THEN
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = ElecReformEIRChiller(EIRChillNum)%EvapMassFlowRateMax
-      mdotCond = ElecReformEIRChiller(EIRChillNum)%CondMassFlowRateMax
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+  IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
+    mdot     = ElecReformEIRChiller(EIRChillNum)%EvapMassFlowRateMax
+    mdotCond = ElecReformEIRChiller(EIRChillNum)%CondMassFlowRateMax
   ELSE
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = ElecReformEIRChillerReport(EIRChillNum)%Evapmdot
-      mdotCond = ElecReformEIRChillerReport(EIRChillNum)%Condmdot
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+    mdot     = 0.d0
+    mdotCond = 0.d0
   ENDIF
 
   CALL SetComponentFlowRate( mdot, EvapInletNode, EvapOutletNode,            &
@@ -3294,13 +3523,22 @@ SUBROUTINE InitElecReformEIRChiller(EIRChillNum, RunFlag, MyLoad, FirstHVACItera
     LoopSideNum  =  ElecReformEIRChiller(EIRChillNum)%HRLoopSideNum
     BranchIndex  =  ElecReformEIRChiller(EIRChillNum)%HRBranchNum
     CompIndex    =  ElecReformEIRChiller(EIRChillNum)%HRCompNum
-    If (FirstHVACIteration .AND. RunFlag) Then
-      mdot          = ElecReformEIRChiller(EIRChillNum)%DesignHeatRecMassFlowRate
-    ELSEIF (FirstHVACIteration .AND. (.NOT. RunFlag)) Then
-      mdot          = 0.0D0
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. RunFlag) THEN
-      mdot = ElecReformEIRChillerReport(EIRChillNum)%HeatRecMassFlow
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. (.NOT. RunFlag)) THEN
+
+    ! check if inlet limit active and if exceeded.
+    IF (ElecReformEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum > 0) THEN
+      HeatRecHighInletLimit =  GetCurrentScheduleValue(ElecReformEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum)
+      IF ( Node(HeatRecInNode)%Temp > HeatRecHighInletLimit) THEN ! shut down heat recovery
+        HeatRecRunFlag = .FALSE.
+      ELSE
+        HeatRecRunFlag = RunFlag
+      ENDIF
+    ELSE
+        HeatRecRunFlag = RunFlag
+    ENDIF
+
+    If ( HeatRecRunFlag) Then
+      mdot = ElecReformEIRChiller(EIRChillNum)%DesignHeatRecMassFlowRate
+    ELSE
       mdot = 0.d0
     ENDIF
 
@@ -3384,6 +3622,7 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
   REAL(r64)           :: tmpNomCap ! local nominal capacity cooling power
   REAL(r64)           :: tmpEvapVolFlowRate ! local evaporator design volume flow rate
   REAL(r64)           :: tmpCondVolFlowRate ! local condenser design volume flow rate
+  REAL(r64)           :: tmpHeatRecVolFlowRate ! local heat recovery design volume flow rate
   LOGICAL, SAVE       :: MyOneTimeFlag = .TRUE.
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyFlag   ! TRUE in order to calculate IPLV
 
@@ -3481,7 +3720,7 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
                                     PlantLoop(ElecReformEIRChiller(EIRChillNum)%CDLoopNum)%FluidIndex, &
                                     'SizeElecReformEIRChiller')
         tmpCondVolFlowRate = tmpNomCap * &
-            (1. + (1./ElecReformEIRChiller(EIRChillNum)%RefCOP) * ElecReformEIRChiller(EIRChillNum)%OpenMotorEff) / &
+            (1. + (1./ElecReformEIRChiller(EIRChillNum)%RefCOP) * ElecReformEIRChiller(EIRChillNum)%CompPowerToCondenserFrac) / &
             ( PlantSizData(PltSizCondNum)%DeltaT * Cp * rho)
         IF (PlantSizesOkayToFinalize) ElecReformEIRChiller(EIRChillNum)%CondVolFlowRate = tmpCondVolFlowRate
 
@@ -3504,6 +3743,23 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
   ! save the reference condenser water volumetric flow rate for use by the condenser water loop sizing algorithms
   CALL RegisterPlantCompDesignFlow(ElecReformEIRChiller(EIRChillNum)%CondInletNodeNum,tmpCondVolFlowRate)
 
+  IF (ElecReformEIRChiller(EIRChillNum)%HeatRecActive) THEN
+    tmpHeatRecVolFlowRate = ElecReformEIRChiller(EIRChillNum)%DesignHeatRecVolFlowRate
+    IF (ElecReformEIRChiller(EIRChillNum)%DesignHeatRecVolFlowRate == Autosize) THEN
+      tmpHeatRecVolFlowRate = tmpCondVolFlowRate * ElecReformEIRChiller(EIRChillNum)%HeatRecCapacityFraction
+      IF (PlantSizesOkayToFinalize) THEN
+        ElecReformEIRChiller(EIRChillNum)%DesignHeatRecVolFlowRate = tmpHeatRecVolFlowRate
+        CALL ReportSizingOutput('Chiller:Electric:ReformulatedEIR', ElecReformEIRChiller(EIRChillNum)%Name, &
+                              'Design Heat Recovery Fluid Flow Rate [m3/s]', &
+                              ElecReformEIRChiller(EIRChillNum)%DesignHeatRecVolFlowRate)
+      ENDIF
+    ENDIF
+
+    ! save the reference heat recovery fluid volumetric flow rate
+    CALL RegisterPlantCompDesignFlow(ElecReformEIRChiller(EIRChillNum)%HeatRecInletNodeNum,tmpHeatRecVolFlowRate)
+  ENDIF
+
+
   IF (PlantSizesOkayToFinalize) THEN
     IF (MyFlag(EIRChillNum)) THEN
       CALL CalcChillerIPLV(ElecReformEIRChiller(EIRChillNum)%Name, &
@@ -3517,7 +3773,7 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
                            ElecReformEIRChiller(EIRChillNum)%MinUnLoadRat, &
                            ElecReformEIRChiller(EIRChillNum)%EvapVolFlowRate, &
                            ElecReformEIRChiller(EIRChillNum)%CDLoopNum, &
-                           ElecReformEIRChiller(EIRChillNum)%OpenMotorEff)
+                           ElecReformEIRChiller(EIRChillNum)%CompPowerToCondenserFrac)
      MyFlag(EIRChillNum) = .FALSE.
    ENDIF
    !create predefined report
@@ -3607,7 +3863,7 @@ SUBROUTINE SizeElecReformEIRChiller(EIRChillNum)
                                  PlantLoop(ElecReformEIRChiller(EIRChillNum)%CDLoopNum)%FluidIndex, &
                                  'SizeElecReformEIRChiller')
     CondenserCapacity = ElecReformEIRChiller(EIRChillNum)%RefCap * &
-                      (1. + (1./ElecReformEIRChiller(EIRChillNum)%RefCOP)*ElecReformEIRChiller(EIRChillNum)%OpenMotorEff)
+                (1. + (1./ElecReformEIRChiller(EIRChillNum)%RefCOP)*ElecReformEIRChiller(EIRChillNum)%CompPowerToCondenserFrac)
     DeltaTCond = (CondenserCapacity) / &
                 (ElecReformEIRChiller(EIRChillNum)%CondVolFlowRate * Density * SpecificHeat)
     ElecReformEIRChiller(EIRChillNum)%TempRefCondIn = ElecReformEIRChiller(EIRChillNum)%TempRefCondOut - DeltaTCond
@@ -3841,7 +4097,8 @@ SUBROUTINE ReformEIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInlet
             !  na
 
             ! USE STATEMENTS:
-            !  na
+  USE DataPlant, ONLY: SingleSetPoint, DualSetPointDeadBand, PlantLoop
+  USE ScheduleManager, ONLY: GetCurrentScheduleValue
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3864,7 +4121,7 @@ SUBROUTINE ReformEIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInlet
   INTEGER :: HeatRecInNode       ! Node number for heat recovery water inlet node
   INTEGER :: HeatRecOutNode      ! Node number for heat recovery water outlet node
   REAL(r64)    :: QTotal              ! Total condenser heat [W]
-  REAL(r64)    :: QCondTmp            ! Total condenser heat based on average temperatures [W]
+!  REAL(r64)    :: QCondTmp            ! Total condenser heat based on average temperatures [W]
   REAL(r64)    :: HeatRecInletTemp    ! Heat reclaim inlet temp [C]
   REAL(r64)    :: HeatRecMassFlowRate ! Heat reclaim mass flow rate [m3/s]
   REAL(r64)    :: FracHeatRec         ! Fraction of condenser heat reclaimed
@@ -3872,6 +4129,9 @@ SUBROUTINE ReformEIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInlet
   REAL(r64)    :: TAvgOut             ! Average outlet temperature [C]
   REAL(r64)    :: CpHeatRec           ! Heat reclaim water inlet specific heat [J/kg-K]
   REAL(r64)    :: CpCond              ! Condenser water inlet specific heat [J/kg-K]
+  REAL(r64)    :: QHeatRecToSetpoint
+  REAL(r64)    :: THeatRecSetpoint
+  REAL(r64)    :: HeatRecHighInletLimit
 
 
   ! Begin routine
@@ -3882,13 +4142,6 @@ SUBROUTINE ReformEIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInlet
 
    ! inlet node to the heat recovery heat exchanger
   HeatRecInletTemp  = Node(HeatRecInNode)%Temp
-
-   ! Set heat recovery mass flow rates
-!  HeatRecMassFlowRate = MIN(Node(HeatRecInNode)%MassFlowRateMaxAvail, &
-!                         Node(HeatRecInNode)%MassFlowRateMax)
-!  HeatRecMassFlowRate = MIN(Node(HeatRecInNode)%MassFlowRate, &
-!                         HeatRecMassFlowRate)
-!  HeatRecMassFlowRate = MAX(Node(HeatRecInNode)%MassFlowRateMinAvail,HeatRecMassFlowRate)
   HeatRecMassFlowRate = Node(HeatRecInNode)%MassFlowRate
 
   CpHeatRec =  GetSpecificHeatGlycol(PlantLoop(ElecReformEIRChiller(EIRChillNum)%HRLoopNum)%FluidName,  &
@@ -3899,32 +4152,47 @@ SUBROUTINE ReformEIRChillerHeatRecovery(EIRChillNum,QCond,CondMassFlow,CondInlet
                                   CondInletTemp,                      &
                                   PlantLoop(ElecReformEIRChiller(EIRChillNum)%CDLoopNum)%FluidIndex, &
                                   'EIRChillerHeatRecovery')
+
+
   ! Before we modify the QCondenser, the total or original value is transferred to QTot
   QTotal = QCond
 
-  TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
-             (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
 
-  TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
+  IF (ElecReformEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum == 0) THEN ! use original algorithm that blends temps
+    TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
+               (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
 
-  QCondTmp = CondMassFlow*CpCond*(TAvgOut-CondInletTemp)
+    TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
 
-  IF(QCondTmp <= 0.0)THEN
-    FracHeatRec = 1.0
-  ELSE
-    FracHeatRec = (HeatRecMassFlowRate*CpHeatRec*(TAvgOut-HeatRecInletTemp))/QCondTmp
-  END IF
+    QHeatRec = HeatRecMassFlowRate * CpHeatRec * (TAvgOut - HeatRecInletTemp)
+    QHeatRec = MAX(QHeatRec, 0.d0) ! ensure non negative
+   !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElecReformEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit)
+  ELSE ! use new algorithm to meet setpoint
+    SELECT CASE (PlantLoop(ElecReformEIRChiller(EIRChillNum)%HRLoopNum)%LoopDemandCalcScheme)
 
-  IF(FracHeatRec <= 0.0) FracHeatRec = 0.0
-  IF(FracHeatRec > 1.0) FracHeatRec = 1.0
+    CASE (SingleSetPoint)
+      THeatRecSetpoint = Node(ElecReformEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPoint
+    CASE (DualSetPointDeadBand)
+      THeatRecSetpoint = Node(ElecReformEIRChiller(EIRChillNum)%HeatRecSetpointNodeNum)%TempSetPointHi
+    END SELECT
 
-  QCond = QTotal*(1.0 - FracHeatRec)
+    QHeatRecToSetpoint = HeatRecMassFlowRate *  CpHeatRec * (THeatRecSetpoint - HeatRecInletTemp)
+    QHeatRecToSetpoint = MAX(QHeatRecToSetpoint, 0.d0)
+    QHeatRec = MIN(QTotal, QHeatRecToSetpoint)
+     !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElecReformEIRChiller(EIRChillNum)%HeatRecMaxCapacityLimit)
+  ENDIF
 
-  IF(FracHeatRec == 0.0) THEN
-    QHeatRec = 0.0
-  ELSE
-    QHeatRec = QTotal*FracHeatRec
-  END IF
+   ! check if limit on inlet is present and exceeded.
+  IF (ElecReformEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum > 0) THEN
+    HeatRecHighInletLimit =  GetCurrentScheduleValue(ElecReformEIRChiller(EIRChillNum)%HeatRecInletLimitSchedNum)
+    IF ( HeatRecInletTemp > HeatRecHighInletLimit) THEN ! shut down heat recovery
+      QHeatRec = 0.d0
+    ENDIF
+  ENDIF
+
+  QCond = QTotal - QHeatRec
 
   ! Calculate a new Heat Recovery Coil Outlet Temp
   IF (HeatRecMassFlowRate > 0.0) THEN
@@ -4018,6 +4286,8 @@ SUBROUTINE UpdateReformEIRChillerRecords(MyLoad,RunFlag,Num)
        ElecReformEIRChillerReport(Num)%HeatRecInletTemp   = Node(HeatRecInNode)%Temp
        ElecReformEIRChillerReport(Num)%HeatRecOutletTemp  = Node(HeatRecOutNode)%Temp
        ElecReformEIRChillerReport(Num)%HeatRecMassFlow    = Node(HeatRecInNode)%MassFlowRate
+
+       ElecReformEIRChillerReport(Num)%ChillerCondAvgTemp = AvgCondSinkTemp
     END IF
 
   ELSE ! Chiller is running, so pass calculated values
@@ -4057,6 +4327,8 @@ SUBROUTINE UpdateReformEIRChillerRecords(MyLoad,RunFlag,Num)
        ElecReformEIRChillerReport(Num)%HeatRecInletTemp   = Node(HeatRecInNode)%Temp
        ElecReformEIRChillerReport(Num)%HeatRecOutletTemp  = Node(HeatRecOutNode)%Temp
        ElecReformEIRChillerReport(Num)%HeatRecMassFlow    = Node(HeatRecInNode)%MassFlowRate
+
+       ElecReformEIRChillerReport(Num)%ChillerCondAvgTemp = AvgCondSinkTemp
     END IF
 
   END IF
@@ -4224,6 +4496,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
   INTEGER                :: CompNum
   REAL(r64)              :: Cp                    ! Local fluid specific heat
 
+
 !  REAL(r64),SAVE         :: TimeStepSysLast=0.0     ! last system time step (used to check for downshifting)
 !  REAL(r64)              :: CurrentEndTime          ! end time of time step for current simulation time step
 !  REAL(r64),SAVE         :: CurrentEndTimeLast=0.0  ! end time of time step for last simulation time step
@@ -4344,7 +4617,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
 
   SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
   CASE (SingleSetpoint)
-    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
@@ -4354,7 +4627,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
       EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
     ENDIF
   CASE (DualSetpointDeadband)
-    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
@@ -4365,9 +4638,27 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
     ENDIF
   END SELECT
 
+  ! correct temperature if using heat recovery
+  ! use report values for latest valid calculation, lagged somewhat
+  IF ( ElecReformEIRChiller(EIRChillNum)%HeatRecActive ) THEN
+    If ( (ElecReformEIRChillerReport(EIRChillNum)%QHeatRecovery &
+           +  ElecReformEIRChillerReport(EIRChillNum)%QCond) > 0.d0) THEN ! protect div by zero
+      AvgCondSinkTemp = (ElecReformEIRChillerReport(EIRChillNum)%QHeatRecovery &
+                            * ElecReformEIRChillerReport(EIRChillNum)%HeatRecOutletTemp &
+                          + ElecReformEIRChillerReport(EIRChillNum)%QCond  &
+                            * ElecReformEIRChillerReport(EIRChillNum)%CondOutletTemp) &
+                          / (ElecReformEIRChillerReport(EIRChillNum)%QHeatRecovery   &
+                                 + ElecReformEIRChillerReport(EIRChillNum)%QCond)
+    ELSE
+      AvgCondSinkTemp = FalsiCondOutTemp
+    ENDIF
+  ELSE
+    AvgCondSinkTemp = FalsiCondOutTemp
+  ENDIF
+
   ! Get capacity curve info with respect to CW setpoint and leaving condenser water temps
   ChillerCapFT = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerCapFT, &
-                            EvapOutletTempSetpoint,FalsiCondOutTemp))
+                            EvapOutletTempSetpoint,AvgCondSinkTemp))
 
   ! Available chiller capacity as a function of temperature
   AvailChillerCap = ChillerRefCap*ChillerCapFT
@@ -4392,44 +4683,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
 !  END IF
 
 ! This chiller is currenlty has only a water-cooled condenser
-!
-!  IF (ElecReformEIRChiller(EIRChillNum)%CondenserType == AirCooled) THEN ! Condenser inlet temp = outdoor temp
-!!    Node(CondInletNode)%Temp = OutDryBulbTemp
-!    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
-!
-!! Warn user if entering condenser dry-bulb temperature falls below 0 C
-!      IF(Node(CondInletNode)%Temp .LT. 0.0 .AND. MyLoad .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
-!        ElecReformEIRChiller(EIRChillNum)%PrintMessage = .TRUE.
-!        WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
-!        ElecReformEIRChiller(EIRChillNum)%MsgBuffer1 = 'ElectricEIRChillerModel - CHILLER:ELECTRIC:EIR "' &
-!                             //TRIM(ElecReformEIRChiller(EIRChillNum)%Name)// &
-!                             '" - Air Cooled Condenser Inlet Temperature below 0C'
-!        ElecReformEIRChiller(EIRChillNum)%MsgBuffer2 = '... Outdoor Dry-bulb Condition = '//TRIM(OutputChar)// &
-!                   ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
-!                   //TRIM(CreateSysTimeIntervalString())
-!        ElecReformEIRChiller(EIRChillNum)%MsgDataLast = Node(CondInletNode)%Temp
-!      ELSE
-!        ElecReformEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
-!      END IF
-!  ELSE IF (ElecReformEIRChiller(EIRChillNum)%CondenserType == EvapCooled) THEN ! Condenser inlet temp = (outdoor wet bulb)
-!!    Node(CondInletNode)%Temp = OutWetBulbTemp
-!    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirWetBulb
-!
-!! Warn user if evap condenser wet-bulb temperature falls below 10 C
-!      IF(Node(CondInletNode)%Temp .LT. 10.0 .AND. MyLoad .GT. 0 .AND. RunFlag .AND. .NOT. WarmupFlag) THEN
-!        ElecReformEIRChiller(EIRChillNum)%PrintMessage = .TRUE.
-!        WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
-!        ElecReformEIRChiller(EIRChillNum)%MsgBuffer1 = 'ElectricEIRChillerModel - CHILLER:ELECTRIC:EIR "' &
-!                             //TRIM(ElecReformEIRChiller(EIRChillNum)%Name)// &
-!                             '" - Air Cooled Condenser Inlet Temperature below 10C'
-!        ElecReformEIRChiller(EIRChillNum)%MsgBuffer2 = '... Outdoor Wet-bulb Condition = '//TRIM(OutputChar)// &
-!                   ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
-!                   //TRIM(CreateSysTimeIntervalString())
-!        ElecReformEIRChiller(EIRChillNum)%MsgDataLast = Node(CondInletNode)%Temp
-!      ELSE
-!        ElecReformEIRChiller(EIRChillNum)%PrintMessage = .FALSE.
-!      END IF
-!  END IF ! End of the Air Cooled/Evap Cooled Logic block
+
 
   ! Calculate water side load
   Cp  = GetSpecificHeatGlycol(PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%FluidName,  &
@@ -4437,7 +4691,10 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
                               PlantLoop(ElecReformEIRChiller(EIRChillNum)%CWLoopNum)%FluidIndex, &
                               'CalcElecReformEIRChillerModel')
 ! problem here if no setpoint on outlet
-  TempLoad = EvapMassFlowRate * Cp * (Node(EvapInletNode)%Temp - EvapOutletTempSetpoint)
+! CR 9132 changed from actual node flow rate to maximum available to avoid issue of limiting capacity
+
+  TempLoad = Node(EvapInletNode)%MassFlowRateMaxAvail * Cp * (Node(EvapInletNode)%Temp - EvapOutletTempSetpoint)
+
   TempLoad = MAX(0.0d0,TempLoad)
 
   ! MyLoad is capped at minimum PLR * RefCap, adjust load to actual water side load because this chiller can cycle
@@ -4465,7 +4722,8 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
       ElecReformEIRChiller(EIRChillNum)%PossibleSubCooling = .TRUE.
     ENDIF
        ! Either set the flow to the Constant value or caluclate the flow for the variable volume case
-       IF(ElecReformEIRChiller(EIRChillNum)%ConstantFlow)THEN
+       IF(     (ElecReformEIRChiller(EIRChillNum)%FlowMode == ConstantFlow)  &
+          .OR. (ElecReformEIRChiller(EIRChillNum)%FlowMode == NotModulated )) THEN
           ! Set the evaporator mass flow rate to design
           ! Start by assuming max (design) flow
           EvapMassFlowRate = EvapMassFlowRateMax
@@ -4482,7 +4740,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
             EvapDeltaTemp = 0.0D0
           ENDIF
           EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
-       ELSEIF(ElecReformEIRChiller(EIRChillNum)%VariableFlow)THEN
+       ELSEIF (ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) THEN
           SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
           CASE (SingleSetpoint)
             ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
@@ -4490,7 +4748,7 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
           CASE (DualSetpointDeadband)
             EvapDeltaTemp = Node(EvapInletNode)%Temp - Node(EvapOutletNode)%TempSetPointHi
           END SELECT
-          
+
           IF (EvapDeltaTemp /= 0) THEN
             EvapMassFlowRate = MAX(0.0d0,(QEvaporator/Cp/EvapDeltaTemp))
             IF((EvapMassFlowRate - EvapMassFlowRateMax) .GT. MassFlowTolerance) &
@@ -4645,13 +4903,13 @@ SUBROUTINE CalcReformEIRChillerModel(EIRChillNum,MyLoad,Runflag,FirstIteration,E
 
   END IF  !This is the end of the FlowLock Block
 
-  ChillerEIRFT   = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerEIRFT,EvapOutletTemp,FalsiCondOutTemp))
+  ChillerEIRFT   = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerEIRFT,EvapOutletTemp,AvgCondSinkTemp))
 
-  ChillerEIRFPLR  = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerEIRFPLR,FalsiCondOutTemp,PartLoadRat))
+  ChillerEIRFPLR  = MAX(0.0d0, CurveValue(ElecReformEIRChiller(EIRChillNum)%ChillerEIRFPLR,AvgCondSinkTemp,PartLoadRat))
 
   Power = (AvailChillerCap/ReferenceCOP) * ChillerEIRFPLR * ChillerEIRFT * FRAC
 
-  QCondenser = Power*ElecReformEIRChiller(EIRChillNum)%OpenMotorEff + QEvaporator + ChillerFalseLoadRate
+  QCondenser = Power*ElecReformEIRChiller(EIRChillNum)%CompPowerToCondenserFrac + QEvaporator + ChillerFalseLoadRate
 
 !  Currently only water cooled chillers are allowed for the reformulated EIR chiller model
   IF (CondMassFlowRate > MassFlowTolerance) THEN
@@ -4877,7 +5135,7 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
 
   SELECT CASE (PlantLoop(PlantLoopNum)%LoopDemandCalcScheme)
   CASE (SingleSetpoint)
-    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPoint /= SensedNodeFlagValue) ) THEN
@@ -4887,7 +5145,7 @@ SUBROUTINE CheckMinMaxCurveBoundaries(EIRChillNum, FirstIteration)
       EvapOutletTempSetpoint= Node(PlantLoop(PlantLoopNum)%TempSetPointNodeNum)%TempSetPoint
     ENDIF
   CASE (DualSetpointDeadband)
-    IF ((ElecReformEIRChiller(EIRChillNum)%VariableFlow) .OR. &
+    IF ((ElecReformEIRChiller(EIRChillNum)%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(PlantLoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
         (Node(ElecReformEIRChiller(EIRChillNum)%EvapOutletNodeNum)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
@@ -4970,7 +5228,7 @@ END MODULE ChillerReformulatedEIR
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

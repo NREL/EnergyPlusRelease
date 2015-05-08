@@ -69,10 +69,14 @@ INTEGER :: TotPhiReflRays         = 0   ! Number of rays in altitude angle (-90 
 INTEGER :: TotThetaReflRays       = 0   ! Number of rays in azimuth angle (0 to 180 deg) for diffuse refl calc
 
           ! SUBROUTINE SPECIFICATIONS FOR MODULE ExteriorSolarReflectionManager
-PUBLIC InitSolReflRecSurf
-PUBLIC CalcBeamSolDiffuseReflFactors
-PUBLIC CalcBeamSolSpecularReflFactors
-PUBLIC CalcSkySolDiffuseReflFactors
+PUBLIC  InitSolReflRecSurf
+PUBLIC  CalcBeamSolDiffuseReflFactors
+PRIVATE FigureBeamSolDiffuseReflFactors
+PUBLIC  CalcBeamSolSpecularReflFactors
+PRIVATE FigureBeamSolSpecularReflFactors
+PUBLIC  CalcSkySolDiffuseReflFactors
+PRIVATE PierceSurface
+PRIVATE CrossProduct
 
 CONTAINS
 
@@ -566,17 +570,19 @@ SUBROUTINE CalcBeamSolDiffuseReflFactors
           !       AUTHOR         Fred Winkelmann
           !       DATE WRITTEN   September 2003
           !       MODIFIED       TH 4/6/2010, fixed CR 7872
-          !       RE-ENGINEERED  na
+          !       RE-ENGINEERED  B. Griffith, October 2012, for timestep integrated solar
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Calculates factors for irradiance on exterior heat transfer surfaces due to
+          ! manage calculations for factors for irradiance on exterior heat transfer surfaces due to
           ! beam-to-diffuse solar reflection from obstructions and ground.
 
-          ! METHODOLOGY EMPLOYED: na
+          ! METHODOLOGY EMPLOYED: call worker routine depending on solar calculation method
 
           ! REFERENCES: na
 
           ! USE STATEMENTS: na
+  USE DataGlobals,         ONLY: HourOfDay
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -586,7 +592,65 @@ SUBROUTINE CalcBeamSolDiffuseReflFactors
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER   :: IHr                  =0   ! Hour number
-!unused  INTEGER   :: loop                 =0   ! DO loop index
+
+          ! FLOW:
+
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    IF(BeginSimFlag) THEN
+      CALL DisplayString('Calculating Beam-to-Diffuse Exterior Solar Reflection Factors')
+    ELSE
+      CALL DisplayString('Updating Beam-to-Diffuse Exterior Solar Reflection Factors')
+    END IF
+    ReflFacBmToDiffSolObs = 0.d0
+    ReflFacBmToDiffSolGnd = 0.d0
+    DO IHr = 1,24
+      CALL FigureBeamSolDiffuseReflFactors(IHr)
+    ENDDO  ! End of IHr loop
+  ELSE ! timestep integrated solar, use current hour of day
+    ReflFacBmToDiffSolObs(1:TotSurfaces,HourOfDay) = 0.d0
+    ReflFacBmToDiffSolGnd(1:TotSurfaces,HourOfDay) = 0.d0
+    CALL FigureBeamSolDiffuseReflFactors(HourOfDay)
+  ENDIF
+
+  RETURN
+END SUBROUTINE CalcBeamSolDiffuseReflFactors
+
+SUBROUTINE FigureBeamSolDiffuseReflFactors(iHour)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Winkelmann, derived from original CalcBeamSolDiffuseReflFactors
+          !       DATE WRITTEN   September 2003
+          !       MODIFIED       na
+          !       RE-ENGINEERED  B. Griffith, October 2012, revised for timestep integrated solar
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Calculates factors for irradiance on exterior heat transfer surfaces due to
+          ! beam-to-diffuse solar reflection from obstructions and ground.
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)   :: iHour
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64) :: SunVec(3)            =0.0 ! Unit vector to sun
   INTEGER   :: RecSurfNum           =0   ! Receiving surface number
   INTEGER   :: SurfNum              =0   ! Heat transfer surface number corresponding to RecSurfNum
@@ -614,31 +678,12 @@ SUBROUTINE CalcBeamSolDiffuseReflFactors
   REAL(r64) :: dReflBeamToDiffSol   =0.0 ! Contribution to reflection factor at a receiving point
                                          !  from beam solar reflected from a hit point
   REAL(r64) :: SunLitFract          =0.0 ! Sunlit fraction
-          ! FLOW:
 
-IF(BeginSimFlag) THEN
-  CALL DisplayString('Calculating Beam-to-Diffuse Exterior Solar Reflection Factors')
-ELSE
-  CALL DisplayString('Updating Beam-to-Diffuse Exterior Solar Reflection Factors')
-END IF
-
-ReflFacBmToDiffSolObs=0.0d0
-ReflFacBmToDiffSolGnd=0.0d0
-!IF (BeginEnvrnFlag) THEN
-  ReflBmToDiffSolObs = 0.0d0
-  ReflBmToDiffSolGnd = 0.0d0
-!ENDIF
-
-
-DO IHr = 1,24
-  IF(SunCosHr(3,IHr) < SunIsUpValue) THEN
- !   ReflBmToDiffSolObs = 0.0d0
- !   ReflBmToDiffSolGnd = 0.0d0
-    CYCLE  ! Skip if sun is below horizon
-  ENDIF
+  ReflBmToDiffSolObs    = 0.d0
+  ReflBmToDiffSolGnd    = 0.d0
 
   ! Unit vector to sun
-  SunVec = SunCosHr(1:3,IHr)
+  SunVec = SunCosHr(1:3,iHour)
 
   ! loop through each surface that can receive beam solar reflected as diffuse solar from other surfaces
   DO RecSurfNum = 1,TotSolReflRecSurf
@@ -673,7 +718,7 @@ DO IHr = 1,24
              Surface(HitPtSurfNum)%Class == SurfaceClass_GLASSDOOR) CYCLE
 
           ! Skip rays that hit non-sunlit surface. Assume first time step of the hour.
-          SunlitFract = SunlitFrac(HitPtSurfNum,IHr,1)
+          SunlitFract = SunlitFrac(HitPtSurfNum,iHour,1)
 
           ! If hit point's surface is not sunlit go to next ray
           ! TH 3/25/2010. why limit to HeatTransSurf? shading surfaces should also apply
@@ -783,26 +828,27 @@ DO IHr = 1,24
     END DO  ! End of loop over receiving points
 
     ! Average over receiving points
-    ReflFacBmToDiffSolObs(SurfNum,IHr) = 0.0
-    ReflFacBmToDiffSolGnd(SurfNum,IHr) = 0.0
+    ReflFacBmToDiffSolObs(SurfNum,iHour) = 0.0
+    ReflFacBmToDiffSolGnd(SurfNum,iHour) = 0.0
     NumRecPts = SolReflRecSurf(RecSurfNum)%NumRecPts
     DO RecPtNum = 1, NumRecPts
-      ReflFacBmToDiffSolObs(SurfNum,IHr) = ReflFacBmToDiffSolObs(SurfNum,IHr) + ReflBmToDiffSolObs(RecPtNum)
-      ReflFacBmToDiffSolGnd(SurfNum,IHr) = ReflFacBmToDiffSolGnd(SurfNum,IHr) + ReflBmToDiffSolGnd(RecPtNum)
+      ReflFacBmToDiffSolObs(SurfNum,iHour) = ReflFacBmToDiffSolObs(SurfNum,iHour) + ReflBmToDiffSolObs(RecPtNum)
+      ReflFacBmToDiffSolGnd(SurfNum,iHour) = ReflFacBmToDiffSolGnd(SurfNum,iHour) + ReflBmToDiffSolGnd(RecPtNum)
     END DO
-    ReflFacBmToDiffSolObs(SurfNum,IHr) = ReflFacBmToDiffSolObs(SurfNum,IHr)/NumRecPts
-    ReflFacBmToDiffSolGnd(SurfNum,IHr) = ReflFacBmToDiffSolGnd(SurfNum,IHr)/NumRecPts
+    ReflFacBmToDiffSolObs(SurfNum,iHour) = ReflFacBmToDiffSolObs(SurfNum,iHour)/NumRecPts
+    ReflFacBmToDiffSolGnd(SurfNum,iHour) = ReflFacBmToDiffSolGnd(SurfNum,iHour)/NumRecPts
 
     ! Do not allow ReflFacBmToDiffSolGnd to exceed the surface's unobstructed ground view factor
-    ReflFacBmToDiffSolGnd(SurfNum,IHr) = MIN(0.5d0*(1.d0-Surface(SurfNum)%CosTilt),  &
-                                             ReflFacBmToDiffSolGnd(SurfNum,IHr))
+    ReflFacBmToDiffSolGnd(SurfNum,iHour) = MIN(0.5d0*(1.d0-Surface(SurfNum)%CosTilt),  &
+                                             ReflFacBmToDiffSolGnd(SurfNum,iHour))
     ! Note: the above factors are dimensionless; they are equal to
     ! (W/m2 reflected solar incident on SurfNum)/(W/m2 beam normal solar)
   END DO  ! End of loop over receiving surfaces
-END DO  ! End of IHr loop
 
-RETURN
-END SUBROUTINE CalcBeamSolDiffuseReflFactors
+  RETURN
+
+END SUBROUTINE FigureBeamSolDiffuseReflFactors
+
 
 !=================================================================================================
 
@@ -812,7 +858,59 @@ SUBROUTINE CalcBeamSolSpecularReflFactors
           !       AUTHOR         Fred Winkelmann
           !       DATE WRITTEN   September 2003
           !       MODIFIED       na
-          !       RE-ENGINEERED  na
+          !       RE-ENGINEERED  B. Griffith, October 2012, for timestep integrated solar
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Manage calculation of factors for beam solar irradiance on exterior heat transfer surfaces due to
+          ! specular (beam-to-beam) reflection from obstructions such as a highly-glazed neighboring
+          ! building.
+
+          ! METHODOLOGY EMPLOYED:
+          ! call worker routine as appropriate
+
+          ! REFERENCES: na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,         ONLY: HourOfDay
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE PARAMETER DEFINITIONS: na
+          ! INTERFACE BLOCK SPECIFICATIONS: na
+          ! DERIVED TYPE DEFINITIONS: na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER           :: IHr                  =0   ! Hour number
+
+          ! FLOW:
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    IF(BeginSimFlag) THEN
+      CALL DisplayString('Calculating Beam-to-Beam Exterior Solar Reflection Factors')
+    ELSE
+      CALL DisplayString('Updating Beam-to-Beam Exterior Solar Reflection Factors')
+    END IF
+    ReflFacBmToBmSolObs   = 0.d0
+    CosIncAveBmToBmSolObs = 0.d0
+    DO IHr = 1,24
+      CALL FigureBeamSolSpecularReflFactors(IHr)
+    END DO  ! End of IHr loop
+  ELSE ! timestep integrated solar, use current hour of day
+    ReflFacBmToBmSolObs(1:TotSurfaces,HourOfDay)   = 0.d0
+    CosIncAveBmToBmSolObs(1:TotSurfaces,HourOfDay) = 0.d0
+    CALL FigureBeamSolSpecularReflFactors(HourOfDay)
+  ENDIF
+
+  RETURN
+END SUBROUTINE CalcBeamSolSpecularReflFactors
+
+SUBROUTINE FigureBeamSolSpecularReflFactors(iHour)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Fred Winkelmann
+          !       DATE WRITTEN   September 2003
+          !       MODIFIED       na
+          !       RE-ENGINEERED  B. Griffith, October 2012, for timestep integrated solar
 
           ! PURPOSE OF THIS SUBROUTINE:
           ! Calculates factors for beam solar irradiance on exterior heat transfer surfaces due to
@@ -823,21 +921,30 @@ SUBROUTINE CalcBeamSolSpecularReflFactors
           ! Reflection from the ground and opaque building surfaces is assumed to be totally diffuse,
           ! i.e. these surfaces has no specular reflection component.
 
-          ! METHODOLOGY EMPLOYED: na
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
 
-          ! REFERENCES: na
+          ! REFERENCES:
+          ! na
 
           ! USE STATEMENTS:
-  USE General, ONLY: POLYF
+  USE General,             ONLY: POLYF
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
-          ! SUBROUTINE PARAMETER DEFINITIONS: na
-          ! INTERFACE BLOCK SPECIFICATIONS: na
-          ! DERIVED TYPE DEFINITIONS: na
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)   :: iHour
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER           :: IHr                  =0   ! Hour number
   INTEGER           :: loop                 =0   ! DO loop indices
   INTEGER           :: loop2                =0   ! DO loop indices
   REAL(r64)         :: SunVec(3)            =0.0 ! Unit vector to sun
@@ -873,23 +980,14 @@ SUBROUTINE CalcBeamSolSpecularReflFactors
   REAL(r64)         :: ReflFacTimesCosIncSum(MaxRecPts) ! Sum of ReflFac times CosIncAngRefl
   REAL(r64)         :: CosIncWeighted       =0.0 ! Cosine of incidence angle on receiving surf weighted by reflection factor
 
-          ! FLOW:
 
-ReflFacBmToBmSolObs   = 0.0d0
-ReflBmToDiffSolObs    = 0.0d0
-ReflFacTimesCosIncSum = 0.0d0
-CosIncAveBmToBmSolObs = 0.0d0
+  ReflBmToDiffSolObs    = 0.0d0
+  ReflFacTimesCosIncSum = 0.0d0
 
-IF(BeginSimFlag) THEN
-  CALL DisplayString('Calculating Beam-to-Beam Exterior Solar Reflection Factors')
-ELSE
-  CALL DisplayString('Updating Beam-to-Beam Exterior Solar Reflection Factors')
-END IF
+  IF(SunCosHr(3,iHour) < SunIsUpValue) RETURN  ! Skip if sun is below horizon
 
-DO IHr = 1,24
-  IF(SunCosHr(3,IHr) < SunIsUpValue) CYCLE  ! Skip if sun is below horizon
   ! Unit vector to sun
-  SunVec = SunCosHr(1:3,IHr)
+  SunVec = SunCosHr(1:3,iHour)
 
   DO RecSurfNum = 1,TotSolReflRecSurf
     SurfNum = SolReflRecSurf(RecSurfNum)%SurfNum
@@ -903,19 +1001,12 @@ DO IHr = 1,24
         IF((Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. Surface(ReflSurfNum)%ExtSolar) .OR. &
             (Surface(ReflSurfNum)%ShadowSurfGlazingFrac > 0.0d0 .AND. &
             Surface(ReflSurfNum)%ShadowingSurf)) THEN
-!cr8947          ReflBmToBmSolObs = 0.0d0
-!cr8947          ReflFacTimesCosIncSum = 0.0d0
           ! Skip if window and not sunlit
-          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. SunlitFrac(ReflSurfNum,IHr,1) < 0.01d0) CYCLE
+          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. SunlitFrac(ReflSurfNum,iHour,1) < 0.01d0) CYCLE
           ! Check if sun is in front of this reflecting surface.
           ReflNorm = Surface(ReflSurfNum)%OutNormVec(1:3)
           CosIncAngRefl = DOT_PRODUCT(SunVec,ReflNorm)
           IF(CosIncAngRefl < 0.0) CYCLE
-
-! TH2 CR8959
-!          IF(Surface(ReflSurfNum)%Class == SurfaceClass_Window .AND. CosIncAngRefl < 0.0) CYCLE
-!          ! The following gives the correct cosine of angle of incidence on shading surfaces
-!          CosIncAngRefl = ABS(CosIncAngRefl)
 
           ! Get sun position unit vector for mirror image of sun in reflecting surface
           SunVecMir = SunVec - 2.0d0*DOT_PRODUCT(SunVec,ReflNorm)*ReflNorm
@@ -1002,24 +1093,24 @@ DO IHr = 1,24
       END DO  ! End of loop over obstructing surfaces
       ! Average over receiving points
       NumRecPts = SolReflRecSurf(RecSurfNum)%NumRecPts
-!cr8947      DO RecPtNum = 1,MaxRecPts
+
       DO RecPtNum = 1,NumRecPts
         IF (ReflBmToBmSolObs(RecPtNum) /= 0.0d0) THEN
           CosIncWeighted = ReflFacTimesCosIncSum(RecPtNum) / ReflBmToBmSolObs(RecPtNum)
         ELSE
           CosIncWeighted = 0.0d0
         ENDIF
-        CosIncAveBmToBmSolObs(SurfNum,IHr) = CosIncAveBmToBmSolObs(SurfNum,IHr) + CosIncWeighted
-        ReflFacBmToBmSolObs(SurfNum,IHr) = ReflFacBmToBmSolObs(SurfNum,IHr) + ReflBmToBmSolObs(RecPtNum)
+        CosIncAveBmToBmSolObs(SurfNum,iHour) = CosIncAveBmToBmSolObs(SurfNum,iHour) + CosIncWeighted
+        ReflFacBmToBmSolObs(SurfNum,iHour) = ReflFacBmToBmSolObs(SurfNum,iHour) + ReflBmToBmSolObs(RecPtNum)
       END DO
-      ReflFacBmToBmSolObs(SurfNum,IHr) = ReflFacBmToBmSolObs(SurfNum,IHr) / REAL(NumRecPts,r64)
-      CosIncAveBmToBmSolObs(SurfNum,IHr) = CosIncAveBmToBmSolObs(SurfNum,IHr) / REAL(NumRecPts,r64)
+      ReflFacBmToBmSolObs(SurfNum,iHour) = ReflFacBmToBmSolObs(SurfNum,iHour) / REAL(NumRecPts,r64)
+      CosIncAveBmToBmSolObs(SurfNum,iHour) = CosIncAveBmToBmSolObs(SurfNum,iHour) / REAL(NumRecPts,r64)
     END IF ! End of check if number of possible obstructions > 0
   END DO  ! End of loop over receiving surfaces
-END DO  ! End of IHr loop
 
-RETURN
-END SUBROUTINE CalcBeamSolSpecularReflFactors
+  RETURN
+
+END SUBROUTINE FigureBeamSolSpecularReflFactors
 
 !=================================================================================================
 
@@ -1501,7 +1592,7 @@ END SUBROUTINE PierceSurface
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

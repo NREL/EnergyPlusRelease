@@ -30,7 +30,7 @@ MODULE HeatRecovery
   ! Use statements for data only modules
   USE DataPrecisionGlobals
   USE DataHVACGlobals
-  USE DataGlobals, ONLY: WarmupFlag, MaxNameLength, BeginEnvrnFlag, SysSizingCalc, SecInHour
+  USE DataGlobals, ONLY: WarmupFlag, MaxNameLength, BeginEnvrnFlag, SysSizingCalc, SecInHour, ScheduleAlwaysOn
   USE DataInterfaces, ONLY: SetupOutputVariable, ShowWarningError, ShowSevereError, ShowFatalError,  &
                          ShowRecurringWarningErrorAtEnd, ShowContinueError, ShowContinueErrorTimeStamp
   USE DataLoopNode
@@ -685,7 +685,7 @@ SUBROUTINE GetHeatRecoveryInput
   ! loop over the air to air plate heat exchangers and load their input data
   DO ExchIndex = 1,NumAirToAirPlateExchs
     cCurrentModuleObject='HeatExchanger:AirToAir:FlatPlate'
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ExchIndex,cAlphaArgs,NumAlphas,&
+    CALL GetObjectItem(cCurrentModuleObject,ExchIndex,cAlphaArgs,NumAlphas,&
                        rNumericArgs,NumNumbers,IOStatus,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ExchNum = ExchIndex
@@ -698,17 +698,16 @@ SUBROUTINE GetHeatRecoveryInput
     ENDIF
     ExchCond(ExchNum)%Name = cAlphaArgs(1)
     ExchCond(ExchNum)%ExchTypeNum = HX_AIRTOAIR_FLATPLATE
-    ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-    IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaFieldBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-           ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-      ELSE
+    IF (lAlphaFieldBlanks(2)) THEN
+      ExchCond(ExchNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
            ' entered ='//TRIM(cAlphaArgs(2))// &
            ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     SELECT CASE(TRIM(cAlphaArgs(3)))
       CASE('COUNTERFLOW')
@@ -762,7 +761,7 @@ SUBROUTINE GetHeatRecoveryInput
   ! loop over the air to air generic heat exchangers and load their input data
   DO ExchIndex = 1,NumAirToAirGenericExchs
     cCurrentModuleObject='HeatExchanger:AirToAir:SensibleAndLatent'
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ExchIndex,cAlphaArgs,NumAlphas,&
+    CALL GetObjectItem(cCurrentModuleObject,ExchIndex,cAlphaArgs,NumAlphas,&
                        rNumericArgs,NumNumbers,IOStatus,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ExchNum = ExchIndex+NumAirToAirPlateExchs
@@ -775,17 +774,16 @@ SUBROUTINE GetHeatRecoveryInput
     ENDIF
     ExchCond(ExchNum)%Name = cAlphaArgs(1)
     ExchCond(ExchNum)%ExchTypeNum = HX_AIRTOAIR_GENERIC
-    ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-    IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaFieldBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-           ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-      ELSE
+    IF (lAlphaFieldBlanks(2)) THEN
+      ExchCond(ExchNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
            ' entered ='//TRIM(cAlphaArgs(2))// &
            ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     ExchCond(ExchNum)%NomSupAirVolFlow      = rNumericArgs(1)
     ExchCond(ExchNum)%HeatEffectSensible100 = rNumericArgs(2)
@@ -891,7 +889,7 @@ SUBROUTINE GetHeatRecoveryInput
 ! loop over the desiccant balanced heat exchangers and load their input data
   DO ExchIndex = 1,NumDesiccantBalancedExchs
     cCurrentModuleObject = 'HeatExchanger:Desiccant:BalancedFlow'
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ExchIndex,cAlphaArgs,NumAlphas,&
+    CALL GetObjectItem(cCurrentModuleObject,ExchIndex,cAlphaArgs,NumAlphas,&
                        rNumericArgs,NumNumbers,IOStatus,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ExchNum = ExchIndex+NumAirToAirPlateExchs+NumAirToAirGenericExchs
@@ -904,17 +902,16 @@ SUBROUTINE GetHeatRecoveryInput
     ENDIF
     ExchCond(ExchNum)%Name = cAlphaArgs(1)
     ExchCond(ExchNum)%ExchTypeNum = HX_DESICCANT_BALANCED
-    ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-    IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaFieldBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-           ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-      ELSE
+    IF (lAlphaFieldBlanks(2)) THEN
+      ExchCond(ExchNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      ExchCond(ExchNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (ExchCond(ExchNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
            ' entered ='//TRIM(cAlphaArgs(2))// &
            ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     ! desiccant HX's usually refer to process and regeneration air streams
     ! In this module, Sup = Regeneration nodes and Sec = Process nodes
@@ -969,7 +966,7 @@ SUBROUTINE GetHeatRecoveryInput
 
     DO PerfDataIndex = 1,NumDesBalExchsPerfDataType1
       cCurrentModuleObject = 'HeatExchanger:Desiccant:BalancedFlow:PerformanceDataType1'
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),PerfDataIndex,cAlphaArgs,NumAlphas,&
+      CALL GetObjectItem(cCurrentModuleObject,PerfDataIndex,cAlphaArgs,NumAlphas,&
                          rNumericArgs,NumNumbers,IOStatus,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       PerfDataNum = PerfDataIndex
@@ -1417,36 +1414,36 @@ SUBROUTINE GetHeatRecoveryInput
   DO ExchIndex = 1,NumHeatExchangers
     ExchNum = ExchIndex
     ! CurrentModuleObject='HeatExchanger:AirToAir:FlatPlate/AirToAir:SensibleAndLatent/Desiccant:BalancedFlow')
-    CALL SetupOutputVariable('Heat Exchanger Sensible Heating Rate[W]',ExchCond(ExchNum)%SensHeatingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Sensible Heating Rate [W]',ExchCond(ExchNum)%SensHeatingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Sensible Heating Energy[J]',ExchCond(ExchNum)%SensHeatingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Sensible Heating Energy [J]',ExchCond(ExchNum)%SensHeatingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Latent Heating Rate[W]',ExchCond(ExchNum)%LatHeatingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Latent Gain Rate [W]',ExchCond(ExchNum)%LatHeatingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Latent Heating Energy[J]',ExchCond(ExchNum)%LatHeatingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Latent Gain Energy [J]',ExchCond(ExchNum)%LatHeatingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Total Heating Rate[W]',ExchCond(ExchNum)%TotHeatingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Total Heating Rate [W]',ExchCond(ExchNum)%TotHeatingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Total Heating Energy[J]',ExchCond(ExchNum)%TotHeatingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Total Heating Energy [J]',ExchCond(ExchNum)%TotHeatingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name, &
                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey = 'HEAT RECOVERY FOR HEATING',GroupKey = 'System')
-    CALL SetupOutputVariable('Heat Exchanger Sensible Cooling Rate[W]',ExchCond(ExchNum)%SensCoolingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Sensible Cooling Rate [W]',ExchCond(ExchNum)%SensCoolingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Sensible Cooling Energy[J]',ExchCond(ExchNum)%SensCoolingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Sensible Cooling Energy [J]',ExchCond(ExchNum)%SensCoolingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Latent Cooling Rate[W]',ExchCond(ExchNum)%LatCoolingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Latent Cooling Rate [W]',ExchCond(ExchNum)%LatCoolingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Latent Cooling Energy[J]',ExchCond(ExchNum)%LatCoolingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Latent Cooling Energy [J]',ExchCond(ExchNum)%LatCoolingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Total Cooling Rate[W]',ExchCond(ExchNum)%TotCoolingRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Total Cooling Rate [W]',ExchCond(ExchNum)%TotCoolingRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Exchanger Total Cooling Energy[J]',ExchCond(ExchNum)%TotCoolingEnergy,'System','Sum',&
+    CALL SetupOutputVariable('Heat Exchanger Total Cooling Energy [J]',ExchCond(ExchNum)%TotCoolingEnergy,'System','Sum',&
                              ExchCond(ExchNum)%Name, &
                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey = 'HEAT RECOVERY FOR COOLING',GroupKey = 'System')
 
-    CALL SetupOutputVariable('Heat Recovery Electric Power[W]',ExchCond(ExchNum)%ElecUseRate,'System','Average',&
+    CALL SetupOutputVariable('Heat Exchanger Electric Power [W]',ExchCond(ExchNum)%ElecUseRate,'System','Average',&
                              ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Recovery Electric Consumption[J]',ExchCond(ExchNum)%ElecUseEnergy,&
+    CALL SetupOutputVariable('Heat Exchanger Electric Energy [J]',ExchCond(ExchNum)%ElecUseEnergy,&
                              'System','Sum',ExchCond(ExchNum)%Name, &
                              ResourceTypeKey='ELECTRICITY',EndUseKey = 'HEATRECOVERY',GroupKey = 'System')
   END DO
@@ -1456,15 +1453,15 @@ SUBROUTINE GetHeatRecoveryInput
     ! generic heat exchangers are read in after flat plate heat exchanger objects (index needs to be set correctly)
     ! CurrentModuleObject=HeatExchanger:AirToAir:SensibleAndLatent
     ExchNum = ExchIndex + NumAirToAirPlateExchs
-    CALL SetupOutputVariable('Heat Recovery Sensible Effectiveness[-]',ExchCond(ExchNum)%SensEffectiveness,'System',&
+    CALL SetupOutputVariable('Heat Exchanger Sensible Effectiveness []',ExchCond(ExchNum)%SensEffectiveness,'System',&
                              'Average',ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Recovery Latent Effectiveness[-]',ExchCond(ExchNum)%LatEffectiveness,'System',&
+    CALL SetupOutputVariable('Heat Exchanger Latent Effectiveness []',ExchCond(ExchNum)%LatEffectiveness,'System',&
                              'Average',ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Recovery Supply Air Bypass Mass Flow [kg/s]',ExchCond(ExchNum)%SupBypassMassFlow,'System',&
+    CALL SetupOutputVariable('Heat Exchanger Supply Air Bypass Mass Flow Rate [kg/s]',ExchCond(ExchNum)%SupBypassMassFlow,'System',&
                              'Average',ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Recovery Exhaust Air Bypass Mass Flow [kg/s]',ExchCond(ExchNum)%SecBypassMassFlow, &
+    CALL SetupOutputVariable('Heat Exchanger Exhaust Air Bypass Mass Flow Rate [kg/s]',ExchCond(ExchNum)%SecBypassMassFlow, &
                              'System','Average',ExchCond(ExchNum)%Name)
-    CALL SetupOutputVariable('Heat Recovery Defrost Time Fraction[-]',ExchCond(ExchNum)%DefrostFraction, &
+    CALL SetupOutputVariable('Heat Exchanger Defrost Time Fraction []',ExchCond(ExchNum)%DefrostFraction, &
                              'System','Average',ExchCond(ExchNum)%Name)
 
   END DO
@@ -2382,6 +2379,10 @@ SUBROUTINE CalcAirToAirGenericHeatExch(ExNum, HXUnitOn, FirstHVACIteration, Econ
 !     Keep effectiveness between 0 and 1.0 ??
 !     HXOpSensEffect = MAX(MIN(HXOpSensEffect,1.0),0.0)
 !     HXOpLatEffect =  MAX(MIN(HXOpLatEffect,1.0),0.0)
+
+!   The model should at least guard against negative numbers
+    ExchCond(ExNum)%SensEffectiveness = MAX(0.d0,ExchCond(ExNum)%SensEffectiveness)
+    ExchCond(ExNum)%LatEffectiveness = MAX(0.d0,ExchCond(ExNum)%LatEffectiveness)
 
     ! Use the effectiveness to calculate the air conditions exiting the heat exchanger (all air flow through the HX)
     !
@@ -5730,7 +5731,7 @@ END SUBROUTINE SetHeatExchangerData
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

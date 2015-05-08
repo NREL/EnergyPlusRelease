@@ -159,6 +159,8 @@ TYPE FanCoilData
   REAL(r64)                    :: SensCoolEnergy      =0.0 ! unit sensible cooling energy output in joules
   REAL(r64)                    :: ElecPower           =0.0 ! unit electric power consumption in watts
   REAL(r64)                    :: ElecEnergy          =0.0 ! unit electiric energy consumption in joules
+  REAL(r64)                    :: DesCoolingLoad      =0.0 ! used for reporting in watts
+  REAL(r64)                    :: DesHeatingLoad      =0.0 ! used for reporting in watts
 END TYPE FanCoilData
 
   ! MODULE VARIABLE DECLARATIONS:
@@ -320,7 +322,7 @@ SUBROUTINE GetFanCoilUnits
                                    TypeOf_CoilWaterCooling
   USE MixedAir,              ONLY: GetOAMixerIndex, GetOAMixerNodeNumbers
   USE DataZoneEquipment,     ONLY: ZoneEquipConfig, FanCoil4Pipe_Num
-  USE DataGlobals,           ONLY: NumOfZones
+  USE DataGlobals,           ONLY: NumOfZones, ScheduleAlwaysOn
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -365,14 +367,14 @@ SUBROUTINE GetFanCoilUnits
 ! find the number of each type of fan coil unit
 
 CurrentModuleObject = cMO_FanCoil
-Num4PipeFanCoils = GetNumObjectsFound(TRIM(CurrentModuleObject))
+Num4PipeFanCoils = GetNumObjectsFound(CurrentModuleObject)
 NumFanCoils = Num4PipeFanCoils
 ! allocate the data structures
 ALLOCATE(FanCoil(NumFanCoils))
 ALLOCATE(CheckEquipName(NumFanCoils))
 CheckEquipName=.true.
 
-CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 ALLOCATE(Alphas(NumAlphas))
 Alphas=' '
 ALLOCATE(cAlphaFields(NumAlphas))
@@ -390,7 +392,7 @@ lNumericBlanks=.TRUE.
 ! loop over 4 pipe fan coil units; get and load the input data
 DO FanCoilIndex = 1,Num4PipeFanCoils
 
-  CALL GetObjectItem(TRIM(CurrentModuleObject),FanCoilIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+  CALL GetObjectItem(CurrentModuleObject,FanCoilIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                      NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -406,16 +408,15 @@ DO FanCoilIndex = 1,Num4PipeFanCoils
   FanCoil(FanCoilNum)%UnitType = TRIM(CurrentModuleObject)
   FanCoil(FanCoilNum)%UnitType_Num = FanCoilUnit_4Pipe
   FanCoil(FanCoilNum)%Sched = Alphas(2)
-  FanCoil(FanCoilNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-  IF (FanCoil(FanCoilNum)%SchedPtr .EQ. 0) THEN
-    IF (lAlphaBlanks(2)) THEN
-      CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", blank require field')
-      CALL ShowContinueError('required field: '//TRIM(cAlphaFields(2))//' is missing.')
-    ELSE
+  IF (lAlphaBlanks(2)) THEN
+    FanCoil(FanCoilNum)%SchedPtr = ScheduleAlwaysOn
+  ELSE
+    FanCoil(FanCoilNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+    IF (FanCoil(FanCoilNum)%SchedPtr .EQ. 0) THEN
       CALL ShowSevereError(RoutineName//trim(CurrentModuleObject)//'="'//trim(Alphas(1))//'", invalid')
-      CALL ShowContinueError('invalid value: '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+      CALL ShowContinueError('invalid-not found: '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+      ErrorsFound=.TRUE.
     END IF
-    ErrorsFound=.TRUE.
   END IF
 
 
@@ -725,33 +726,33 @@ END IF
 Do FanCoilNum=1,NumFanCoils
   ! Setup Report variables for the Fan Coils
   ! CurrentModuleObject='ZoneHVAC:FourPipeFanCoil'
-  CALL SetupOutputVariable('Fan Coil Heating Rate[W]',FanCoil(FanCoilNum)%HeatPower,'System','Average',&
+  CALL SetupOutputVariable('Fan Coil Heating Rate [W]',FanCoil(FanCoilNum)%HeatPower,'System','Average',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Heating Energy[J]',FanCoil(FanCoilNum)%HeatEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Fan Coil Heating Energy [J]',FanCoil(FanCoilNum)%HeatEnergy,'System','Sum',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Total Cooling Rate[W]',FanCoil(FanCoilNum)%TotCoolPower,'System','Average',&
+  CALL SetupOutputVariable('Fan Coil Total Cooling Rate [W]',FanCoil(FanCoilNum)%TotCoolPower,'System','Average',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Total Cooling Energy[J]',FanCoil(FanCoilNum)%TotCoolEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Fan Coil Total Cooling Energy [J]',FanCoil(FanCoilNum)%TotCoolEnergy,'System','Sum',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Sensible Cooling Rate[W]',FanCoil(FanCoilNum)%SensCoolPower,'System','Average',&
+  CALL SetupOutputVariable('Fan Coil Sensible Cooling Rate [W]',FanCoil(FanCoilNum)%SensCoolPower,'System','Average',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Sensible Cooling Energy[J]',FanCoil(FanCoilNum)%SensCoolEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Fan Coil Sensible Cooling Energy [J]',FanCoil(FanCoilNum)%SensCoolEnergy,'System','Sum',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Electric Power[W]',FanCoil(FanCoilNum)%ElecPower,'System','Average',&
+  CALL SetupOutputVariable('Fan Coil Fan Electric Power [W]',FanCoil(FanCoilNum)%ElecPower,'System','Average',&
                            FanCoil(FanCoilNum)%Name)
-  CALL SetupOutputVariable('Fan Coil Electric Consumption[J]',FanCoil(FanCoilNum)%ElecEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Fan Coil Fan Electric Energy [J]',FanCoil(FanCoilNum)%ElecEnergy,'System','Sum',&
                            FanCoil(FanCoilNum)%Name)
   IF (FanCoil(FanCoilNum)%CapCtrlMeth_Num == CCM_CycFan) THEN
-    CALL SetupOutputVariable('Fraction Of Timestep Fancoil is ON []',FanCoil(FanCoilNum)%PLR,'System','Average',&
+    CALL SetupOutputVariable('Fan Coil Runtime Fraction []',FanCoil(FanCoilNum)%PLR,'System','Average',&
                               FanCoil(FanCoilNum)%Name)
-    CALL SetupOutputVariable('Fan Speed []',FanCoil(FanCoilNum)%SpeedFanSel,'System','Average',&
+    CALL SetupOutputVariable('Fan Coil Fan Speed Level []',FanCoil(FanCoilNum)%SpeedFanSel,'System','Average',&
                            FanCoil(FanCoilNum)%Name)
   END IF
   IF (FanCoil(FanCoilNum)%CapCtrlMeth_Num == CCM_VarFanVarFlow .or. FanCoil(FanCoilNum)%CapCtrlMeth_Num == CCM_VarFanConsFlow) THEN
-    CALL SetupOutputVariable('Part Load Ratio []',FanCoil(FanCoilNum)%PLR,'System','Average',&
+    CALL SetupOutputVariable('Fan Coil Part Load Ratio []',FanCoil(FanCoilNum)%PLR,'System','Average',&
                               FanCoil(FanCoilNum)%Name)
   END IF
-  CALL SetupOutputVariable('Fan Coil Fan Availability Status',FanCoil(FanCoilNum)%AvailStatus,&
+  CALL SetupOutputVariable('Fan Coil Availability Status []',FanCoil(FanCoilNum)%AvailStatus,&
                              'System','Average',FanCoil(FanCoilNum)%Name)
 END DO
 
@@ -1043,7 +1044,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
   REAL(r64)           :: CoilInHumRat  ! design outlet air humidity ratio for coil [kg/kg]
   LOGICAL             :: ErrorsFound   ! TRUE if errors foind during sizing
   REAL(r64)           :: DesCoilLoad   ! coil load used for sizing [W]
-  REAL(r64)           :: FCOAFrac      ! design outside air fraction for the fan coil unit 
+  REAL(r64)           :: FCOAFrac      ! design outside air fraction for the fan coil unit
   INTEGER             :: CoilWaterInletNode=0
   INTEGER             :: CoilWaterOutletNode=0
   CHARACTER(len=MaxNameLength) :: CoolingCoilName
@@ -1142,10 +1143,11 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
         CoilInTemp = FCOAFrac*FinalZoneSizing(CurZoneEqNum)%OutTempAtHeatPeak + &
                      (1.0d0-FCOAFrac)*FinalZoneSizing(CurZoneEqNum)%ZoneTempAtHeatPeak
         CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%HeatDesTemp
-        CoilOutHumRat =FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat 
+        CoilOutHumRat =FinalZoneSizing(CurZoneEqNum)%HeatDesHumRat
         DesCoilLoad = PsyCpAirFnWTdb(CoilOutHumRat, 0.5*(CoilInTemp+CoilOutTemp)) &
                           * FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow &
                           * (CoilOutTemp-CoilInTemp)
+        FanCoil(FanCoilNum)%DesHeatingLoad = DesCoilLoad
         IF (DesCoilLoad >= SmallLoad) THEN
           rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%HWLoopNum)%FluidName, &
                          60.d0, &
@@ -1216,6 +1218,7 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
         END IF
         DesCoilLoad = FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow &
                       * (PsyHFnTdbW(CoilInTemp, CoilInHumRat)-PsyHFnTdbW(CoilOutTemp, CoilOutHumRat))
+        FanCoil(FanCoilNum)%DesCoolingLoad = DesCoilLoad
         IF (DesCoilLoad >= SmallLoad) THEN
 
           rho = GetDensityGlycol( PlantLoop(FanCoil(FanCoilNum)%CWLoopNum)%FluidName, &
@@ -1270,6 +1273,8 @@ SUBROUTINE SizeFanCoilUnit(FanCoilNum)
     ZoneEqSizing(CurZoneEqNum)%MaxCWVolFlow = FanCoil(FanCoilNum)%MaxColdWaterVolFlow
     ZoneEqSizing(CurZoneEqNum)%OAVolFlow = FanCoil(FanCoilNum)%OutAirVolFlow
     ZoneEqSizing(CurZoneEqNum)%AirVolFlow = FanCoil(FanCoilNum)%MaxAirVolFlow
+    ZoneEqSizing(CurZoneEqNum)%DesCoolingLoad = FanCoil(FanCoilNum)%DesCoolingLoad
+    ZoneEqSizing(CurZoneEqNum)%DesHeatingLoad = FanCoil(FanCoilNum)%DesHeatingLoad
   END IF
 
   IF (ErrorsFound) THEN
@@ -1494,8 +1499,9 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       QUnitOut = QUnitOutNoHC
     END IF
 
-    SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-    SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+    ! CR9155 Remove specific humidity calculations
+    SpecHumOut = Node(OutletNode)%HumRat 
+    SpecHumIn  = Node(InletNode)%HumRat
     LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
     QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
     ! report variables
@@ -1693,8 +1699,9 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
       END IF
 
       AirMassFlow = Node(InletNode)%MassFlowRate
-      SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-      SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+      ! CR9155 Remove specific humidity calculations
+      SpecHumOut = Node(OutletNode)%HumRat 
+      SpecHumIn  = Node(InletNode)%HumRat
       LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
       QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
       ! report variables
@@ -1845,8 +1852,9 @@ SELECT CASE (FanCoil(FanCoilNum)%CapCtrlMeth_Num)
     END IF
 
     AirMassFlow = Node(InletNode)%MassFlowRate
-    SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-    SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+    ! CR9155 Remove specific humidity calculations
+    SpecHumOut = Node(OutletNode)%HumRat
+    SpecHumIn  = Node(InletNode)%HumRat
     LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
     QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -2259,7 +2267,7 @@ END FUNCTION GetFanCoilMixedAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

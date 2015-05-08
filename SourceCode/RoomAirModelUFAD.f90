@@ -36,6 +36,7 @@ MODULE UFADManager
   USE ConvectionCoefficients, ONLY: CalcDetailedHcInForDVModel
   USE DataHVACGlobals, ONLY: SysTimeElapsed, PreviousTimeStep, ShortenTimeStepSysRoomAir
   USE DataUCSDSharedData
+  USE General, ONLY: RoundSigDigits
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
 
@@ -729,6 +730,14 @@ SUBROUTINE HcUCSDUF(ZoneNum,FractionHeight)
         HAT_OC = Surface(SurfNum)%Area*TempSurfIn(SurfNum)*HWall(Ctd) + HAT_OC
         HA_OC  = Surface(SurfNum)%Area*HWall(Ctd) + HA_OC
       ENDIF
+      
+      IF (ABS(ZInfSurf-ZSupSurf) < 1.d-10) THEN
+        CALL ShowSevereError('RoomAirModelUFAD:HcUCSDUF: Surface values will cause divide by zero.')
+        CALL ShowContinueError('Zone="'//trim(Zone(Surface(SurfNum)%Zone)%Name)//'", Surface="'//trim(Surface(SurfNum)%Name)//'".')
+        CALL ShowContinueError('ZInfSurf=['//trim(RoundSigDigits(ZInfSurf,4))//'], LayH=['//trim(RoundSigDigits(LayH,4))//'].')
+        CALL ShowContinueError('ZSupSurf=['//trim(RoundSigDigits(ZSupSurf,4))//'], LayH=['//trim(RoundSigDigits(LayH,4))//'].')
+        CALL ShowFatalError('...Previous condition causes termination.')
+      ENDIF
 
       ! The Wall surface is partially in upper and partially in lower subzone
       IF(ZInfSurf <= LayH .and. ZSupSurf >= LayH) THEN
@@ -1065,7 +1074,7 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
                                                     IntGainTypeOf_RefrigerationSecondaryReceiver, &
                                                     IntGainTypeOf_RefrigerationSecondaryPipe, &
                                                     IntGainTypeOf_RefrigerationWalkIn/)
-                                                    
+
   INTEGER, DIMENSION(2) :: IntGainTypesUpSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
                                                         IntGainTypeOf_Lights/)
   REAL(r64)    :: RetAirGains
@@ -1116,7 +1125,7 @@ SUBROUTINE CalcUCSDUI(ZoneNum)
   END IF
 
   ! gains from lights (ceiling), tubular daylighting devices, high temp radiant heaters
-  
+
   CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesUpSubzone, ConvGainsUpSubzone)
   ConvGainsUpSubzone = ConvGainsUpSubzone + SumConvHTRadSys(ZoneNum)
   IF (Zone(ZoneNum)%NoHeatToReturnAir) THEN
@@ -1532,7 +1541,7 @@ SUBROUTINE CalcUCSDUE(ZoneNum)
                                                     IntGainTypeOf_RefrigerationSecondaryReceiver, &
                                                     IntGainTypeOf_RefrigerationSecondaryPipe, &
                                                     IntGainTypeOf_RefrigerationWalkIn/)
-                                                    
+
   INTEGER, DIMENSION(2) :: IntGainTypesUpSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
                                                         IntGainTypeOf_Lights/)
   REAL(r64)   :: RetAirGains
@@ -1924,7 +1933,7 @@ END SUBROUTINE CalcUCSDUE
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

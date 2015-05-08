@@ -31,7 +31,7 @@ USE DataSurfaces  !, ONLY: TotSurfaces,TotWindows,Surface,SurfaceWindow   !updat
 USE DataEnvironment, ONLY: SunIsUpValue, SkyTempKelvin, IsRain, SunIsUp, CloudFraction, OutBaroPress, OutHumRat
 USE DataHeatBalance
 USE DataShadowingCombinations
-USE vectors 
+USE vectors
 USE DataHeatBalFanSys
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
@@ -39,8 +39,8 @@ IMPLICIT NONE ! Enforce explicit typing of all variables
 PRIVATE ! Everything private unless explicitly made public
 
           ! MODULE PARAMETER DEFINITIONS:
-          
-REAL(r64), PRIVATE, PARAMETER :: sigma=5.6697d-8    ! Stefan-Boltzmann constant  
+
+REAL(r64), PRIVATE, PARAMETER :: sigma=5.6697d-8    ! Stefan-Boltzmann constant
 REAL(r64), PRIVATE, PARAMETER :: PressureDefault = 101325
 
 INTEGER, PARAMETER :: Calculate_Geometry    =1
@@ -54,7 +54,7 @@ INTEGER, PARAMETER  ::  Front_Reflected    =3
 INTEGER, PARAMETER  ::  Back_Incident      =4
 INTEGER, PARAMETER  ::  Back_Transmitted    =5
 INTEGER, PARAMETER  ::  Back_Reflected      =6
- 
+
 
           ! DERIVED TYPE DEFINITIONS:
 TYPE WindowIndex
@@ -69,16 +69,16 @@ TYPE WindowStateIndex
     INTEGER  ::  IncBasisIndx  !Index of basis list entry for Incoming basis
     INTEGER  ::  CopyIncState  !Pointer to state from which geometry can be copied (Incident)
     INTEGER  ::  InitTrn    !Flag indicating initialization needed on Outgoing basis
-    INTEGER  ::  TrnBasisIndx  !Index of basis list entry for Outgoing basis 
-    INTEGER  ::  CopyTrnState  !Pointer to state from which geometry can be copied (Outgoing)  
+    INTEGER  ::  TrnBasisIndx  !Index of basis list entry for Outgoing basis
+    INTEGER  ::  CopyTrnState  !Pointer to state from which geometry can be copied (Outgoing)
     INTEGER  ::  Konst    !Index of state descript in Construct array
     !INTEGER  ::  ThermConst  !Index of state thermal description in Construct array
 END TYPE WindowStateIndex
 
           ! MODULE VARIABLE DECLARATIONS:
-          
+
 INTEGER                  ::  NumComplexWind  =0  !Total number of complex windows
-TYPE (BasisStruct), DIMENSION(:), ALLOCATABLE          ::  BasisList          
+TYPE (BasisStruct), DIMENSION(:), ALLOCATABLE          ::  BasisList
 TYPE (WindowIndex), DIMENSION(:), ALLOCATABLE        ::  WindowList
 TYPE (WindowStateIndex), DIMENSION(: , :), ALLOCATABLE        ::  WindowStateList
 !Debug
@@ -90,6 +90,7 @@ REAL(r64)                  ::  DdbgTheta,DdbgPhi
           ! SUBROUTINE SPECIFICATIONS FOR MODULE WindowComplexManager:
 PUBLIC CalcComplexWindowThermal
 PUBLIC CalculateBasisLength
+PUBLIC InitComplexWindows
 PUBLIC UpdateComplexWindows
 PUBLIC DetermineMaxBackSurfaces
 PRIVATE CalculateWindowBeamProperties
@@ -104,7 +105,6 @@ PRIVATE SkyGndWeight
 PRIVATE WorldVectFromW6
 PRIVATE W6CoordsFromWorldVect
 PRIVATE FindInBasis
-PRIVATE FindIntegerInList
 PRIVATE SearchAscTable
 PRIVATE PierceSurface
 PRIVATE CrossProduct
@@ -136,7 +136,7 @@ SUBROUTINE InitBSDFWindows
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
       ! na
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -144,7 +144,7 @@ SUBROUTINE InitBSDFWindows
           ! na
 
           ! DERIVED TYPE DEFINITIONS:
-   TYPE TempBasisIdx  
+   TYPE TempBasisIdx
        INTEGER    ::  Basis    !Basis no in basis table
        INTEGER    ::  State    !State in which basis first occurs
    END TYPE TempBasisIdx
@@ -168,7 +168,7 @@ SUBROUTINE InitBSDFWindows
    INTEGER    ::  NumBasis =0  !Number of unique bases (No. in BasisList)
    INTEGER    ::  NumElem  =0  !Number of elements in current basis
    INTEGER    ::  NBkSurf   =0  !Local variable for the number of back surfaces
-   INTEGER    ::  NumStates    !Local variable for the number of states   
+   INTEGER    ::  NumStates    !Local variable for the number of states
    INTEGER    ::  ElemNo  =0  !Current basis element number
    INTEGER    ::  ThConst  =0  !Construct array index of thermal construction of state
    REAL(r64)    ::  Theta  =0  !Current theta value
@@ -186,21 +186,21 @@ SUBROUTINE InitBSDFWindows
    INTEGER, DIMENSION(:), ALLOCATABLE    :: NPhis  !temp array holding number of phis for a given theta
    TYPE (BasisStruct), DIMENSION(:), ALLOCATABLE  :: TempList    !Temporary Basis List
    REAL(r64),DIMENSION(3)  ::     V    !vector array
-   REAL(r64)    ::     VLen    !Length of vector array 
+   REAL(r64)    ::     VLen    !Length of vector array
    TYPE (TempBasisIdx), DIMENSION(:), ALLOCATABLE  :: IHold    !Temporary array
    INTEGER          :: NHold  !No. values in the Temporary array
-   
-   
+
+
                   IF (TotComplexFenStates <= 0) RETURN  !Nothing to do if no complex fenestration states
     !
     !Construct Basis List
     !
                  ALLOCATE(TempList(TotComplexFenStates))
 
-    !Note:  Construction of the basis list contains the assumption of identical incoming and outgoing bases in 
-    !            that the complex fenestration state definition contains only one basis description, hence 
-    !            assumes square property matrices.  If this assumption were relaxed through change of the 
-    !            definition or additional definition of a state type with non-square matrices, then the loop 
+    !Note:  Construction of the basis list contains the assumption of identical incoming and outgoing bases in
+    !            that the complex fenestration state definition contains only one basis description, hence
+    !            assumes square property matrices.  If this assumption were relaxed through change of the
+    !            definition or additional definition of a state type with non-square matrices, then the loop
     !            below should be modified to enter both of the bases into the basis list.
 
   BsLoop:        DO IConst = FirstBSDF, FirstBSDF+TotComplexFenStates-1
@@ -219,21 +219,21 @@ SUBROUTINE InitBSDFWindows
                  ALLOCATE(BasisList(NumBasis))
                  BasisList=TempList(1:NumBasis)
                  DEALLOCATE(TempList)
-                   !  
+                   !
                    !  Proceed to set up geometry for complex fenestration states
-                   !        
-                 ALLOCATE(ComplexWind(TotSurfaces))  !Set up companion array to SurfaceWindow to hold window 
-                           !     geometry for each state.  This is an allocatable array of 
+                   !
+                 ALLOCATE(ComplexWind(TotSurfaces))  !Set up companion array to SurfaceWindow to hold window
+                           !     geometry for each state.  This is an allocatable array of
                            !     geometries for the window states but only the complex
                            !     fenestration surfaces will have the arrays allocated
       !
       !  Search Thru Surfaces for Complex Fenestration State references
       !  This will define the first complex fenestration state for that window, others will follow if there are
       !     control specifications
-      ! 
+      !
                   ALLOCATE(WindowList(TotSurfaces))  !Temporary allocation
                   ALLOCATE(WindowStateList(TotSurfaces, TotComplexFenStates))  !Temporary allocation
-  SfLoop:   DO ISurf = 1,TotSurfaces  
+  SfLoop:   DO ISurf = 1,TotSurfaces
                        IConst=Surface(ISurf)%Construction
                        IF (.NOT.(Construct(IConst)%TypeIsWindow.AND.(Construct(IConst)%WindowTypeBSDF))) CYCLE  !Only BSDF windows
                        !Simon Check: Thermal construction removed
@@ -241,9 +241,9 @@ SUBROUTINE InitBSDFWindows
                        SurfaceWindow(ISurf)%WindowModelType = WindowBSDFModel
                        NumComplexWind = NumComplexWind + 1
                        NumStates = 1
-                       WindowList(NumComplexWind)%NumStates = 1         !Having found the construction reference in 
+                       WindowList(NumComplexWind)%NumStates = 1         !Having found the construction reference in
                                  ! the Surface array defines the first state for this window
-                       WindowList(NumComplexWind)%SurfNo = ISurf 
+                       WindowList(NumComplexWind)%SurfNo = ISurf
                        WindowList(NumComplexWind)%Azimuth=DegToRadians*Surface(ISurf)%Azimuth
          WindowList(NumComplexWind)%Tilt=DegToRadians*Surface(ISurf)%Tilt
          WindowStateList(NumComplexWind, NumStates)%InitInc = Calculate_Geometry
@@ -255,7 +255,7 @@ SUBROUTINE InitBSDFWindows
         !WindowStateList(NumComplexWind, NumStates)%ThermConst = ThConst
          DO I = 1 , NumBasis    !Find basis in Basis List
                IF(Construct(IConst)%BSDFInput%BasisMatIndex == BasisList(I)%BasisMatIndex) THEN
-                     WindowStateList(NumComplexWind, NumStates)%IncBasisIndx = I    !Note: square property matrices 
+                     WindowStateList(NumComplexWind, NumStates)%IncBasisIndx = I    !Note: square property matrices
                      WindowStateList(NumComplexWind, NumStates)%TrnBasisIndx = I    !   assumption
                ENDIF
          END DO
@@ -263,7 +263,7 @@ SUBROUTINE InitBSDFWindows
                CALL ShowFatalError('Complex Window Init: Window Basis not in BasisList.')
          ENDIF
                  END DO SfLoop
-      !  
+      !
       !  Should now have a WindowList with NumComplexWind entries containing all the complex fenestrations
       !    with a first state defined for each.
       !
@@ -275,7 +275,7 @@ SUBROUTINE InitBSDFWindows
       !      Added states should have WindowStateList ( , )%InitInc set to Calculate_Geometry
       !
       !  *  *  *
-      
+
       ! At this point, we have a complete WindowList and WindowStateList, with NumComplexWind
       !   defined, and NumStates for each complex window defined
       !
@@ -285,24 +285,24 @@ SUBROUTINE InitBSDFWindows
       ! Note:  code below assumes identical incoming and outgoing bases; following code will
       !   need revision if this assumption relaxed
       !
-            
+
                  DO   IWind = 1,NumComplexWind     !Search window list for repeated bases
                        IF (WindowList(IWind)%NumStates > 1) THEN
                              ALLOCATE (IHold(WindowList(IWind)%NumStates))
                              NHold=1
                              IHold(1)%State = 1
                              IHold(1)%Basis = WindowStateList(IWind, 1)%IncBasisIndx
-                                  ! If the Mth new basis found is basis B in the basis list, and it  
+                                  ! If the Mth new basis found is basis B in the basis list, and it
                                   ! first occurs in the WindowStateList  in state N, then IHold(M)%Basis=B
                                   ! and IHold(M)%State=N
                              DO K = 1, NumBasis
                                  IF(K > NHold )  EXIT
-                                 KBasis = IHold(K)%Basis        
+                                 KBasis = IHold(K)%Basis
                                  J = IHold(K)%State
                                  Once = .TRUE.
                                  DO I = J+1 , WindowList(IWind)%NumStates    !See if subsequent states have the same basis
                                          IF(( WindowStateList(NumComplexWind, I)%InitInc == Calculate_Geometry) .AND. &
-     &                                       (WindowStateList(NumComplexWind, I)%IncBasisIndx == KBasis )) THEN  
+     &                                       (WindowStateList(NumComplexWind, I)%IncBasisIndx == KBasis )) THEN
            !Note:  square property matrices (same inc & trn bases) assumption
             !If same incident and outgoing basis assumption removed, following code will need to
             !  be extended to treat the two bases separately
@@ -311,7 +311,7 @@ SUBROUTINE InitBSDFWindows
                                              WindowStateList(NumComplexWind, I )%CopyIncState = J
                                              WindowStateList(NumComplexWind, I )%CopyTrnState = J
                                          ELSE IF (Once) THEN
-                                             Once = .FALSE.  !First occurrence of a different basis            
+                                             Once = .FALSE.  !First occurrence of a different basis
                                              NHold = NHold +1
                                              IHold(NHold)%State = I
                                              IHold(NHold)%Basis = WindowStateList(IWind, I )%IncBasisIndx
@@ -324,11 +324,11 @@ SUBROUTINE InitBSDFWindows
                              DEALLOCATE( IHold )
                        ENDIF
                  END DO
-               
+
       !
-      !  Now go through window list and window state list and calculate or copy the 
+      !  Now go through window list and window state list and calculate or copy the
       !   geometry information for each window, state
-                 DO  IWind = 1 , NumComplexWind 
+                 DO  IWind = 1 , NumComplexWind
                        ISurf = WindowList( IWind )%SurfNo
                        NumStates = WindowList( IWind )%NumStates
                        !ALLOCATE (SurfaceWindow( ISurf )%ComplexFen)    !activate the BSDF window description
@@ -353,16 +353,16 @@ SUBROUTINE InitBSDFWindows
                            V = Surface(JSurf)%Centroid - Surface(ISurf)%Centroid
                            VLen = SQRT( DOT_PRODUCT( V , V ) )
                            !Define the unit vector from the window center to the back
-                           ComplexWind (ISurf )%sWinSurf( KBkSurf ) = V / VLen 
+                           ComplexWind (ISurf )%sWinSurf( KBkSurf ) = V / VLen
                           !surface center
                           !Define the back surface cosine(incident angle)
                            ComplexWind (ISurf )%sdotN( KBkSurf ) = DOT_PRODUCT ( V , Surface(JSurf)%OutNormVec )/VLen
                        ENDDO
-                       DO  IState = 1, NumStates 
+                       DO  IState = 1, NumStates
                          !The following assumes identical incoming and outgoing bases.  The logic will need to be
                          !  redesigned if this assumption is relaxed
                              IConst = WindowStateList ( IWind , IState )%Konst
-                             !ThConst = WindowStateList ( IWind , IState )%ThermConst                             
+                             !ThConst = WindowStateList ( IWind , IState )%ThermConst
                              SurfaceWindow(ISurf)%ComplexFen%State(IState)%Konst = IConst
                              !SurfaceWindow(ISurf)%ComplexFen%State(IState)%ThermConst = ThConst
                              IF ( WindowStateList( IWind , IState )%InitInc == Calculate_Geometry ) THEN
@@ -372,30 +372,30 @@ SUBROUTINE InitBSDFWindows
      &      %TrnBasisIndx)
                                   SurfaceWindow(ISurf)%ComplexFen%State(IState)%NLayers = &
      &                               Construct(IConst)%BSDFInput%NumLayers
-                                  CALL SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,Tilt, &       
-     &                             ComplexWind(ISurf),ComplexWind( ISurf )%Geom(IState),&  
+                                  CALL SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,Tilt, &
+     &                             ComplexWind(ISurf),ComplexWind( ISurf )%Geom(IState),&
      &                             SurfaceWindow( ISurf )%ComplexFen%State(IState))
          !Note--setting up the state geometry will include constructing outgoing basis/surface
          !  maps and those incoming maps that will not depend on shading.
                              ELSE
                                   SurfaceWindow (ISurf )%ComplexFen%State(IState)=SurfaceWindow( ISurf )%ComplexFen &
-     &                                %State(WindowStateList( IWind , IState )%CopyIncState)   !Note this overwrites Konst     
+     &                                %State(WindowStateList( IWind , IState )%CopyIncState)   !Note this overwrites Konst
                                   SurfaceWindow (ISurf )%ComplexFen%State(IState)%Konst = IConst    !  so it has to be put back
                                   !SurfaceWindow (ISurf )%ComplexFen%State(IState)%ThermConst = ThConst  !same for ThermConst
                                   ComplexWind(ISurf)%Geom(IState) = ComplexWind(ISurf) &
      &                                %Geom(WindowStateList( IWind , IState )%CopyIncState)
                              ENDIF
-                             
+
                        END DO    !State loop
                  END DO       !Complex Window loop
                  !
                  !  Allocate all beam-dependent complex fenestration quantities
-                 DO  IWind = 1 , NumComplexWind 
+                 DO  IWind = 1 , NumComplexWind
                        ISurf = WindowList( IWind )%SurfNo
                        NumStates = WindowList( IWind )%NumStates
                        NBkSurf = ComplexWind (ISurf )%NBkSurf
-                       DO  IState = 1, NumStates 
-                           ALLOCATE( ComplexWind( ISurf )%Geom(IState)%SolBmGndWt (& 
+                       DO  IState = 1, NumStates
+                           ALLOCATE( ComplexWind( ISurf )%Geom(IState)%SolBmGndWt (&
      &                       ComplexWind( ISurf )%Geom(IState)%NGnd ,24 , NumOfTimeStepInHour ) )
                            ALLOCATE( ComplexWind( ISurf )%Geom(IState)%SolBmIndex ( 24 , &
      &                       NumOfTimeStepInHour ) )
@@ -424,27 +424,76 @@ SUBROUTINE InitBSDFWindows
                                ALLOCATE( SurfaceWindow( ISurf )%ComplexFen%State(IState)%BkSurf( KBkSurf )&
      &                          %WinDirBkAbs( SurfaceWindow(ISurf)%ComplexFen%State(IState)%NLayers , 24,&
      &                              NumOfTimeStepInHour) )
-                    
+
                            END DO  ! Back Surface Loop
-                           
+
 
                        END DO    !State loop
                  END DO       !Complex Window loop
-                 
 
 
-     
-  
+
+
+
   RETURN
 
 END SUBROUTINE InitBSDFWindows
+
+SUBROUTINE InitComplexWindows
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   November 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Extract simple init for Complex Windows
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  LOGICAL,SAVE    ::  Once  =.TRUE.  !Flag for insuring things happen once
+
+ !One-time initialization
+  IF (Once) THEN
+    ONCE = .FALSE.
+    CALL InitBSDFWindows
+    CALL CalcStaticProperties
+  ENDIF
+
+
+  RETURN
+
+END SUBROUTINE InitComplexWindows
 
 SUBROUTINE UpdateComplexWindows
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Joe Klems
           !       DATE WRITTEN   August 2011
-          !       MODIFIED       na
+          !       MODIFIED       B. Griffith, Nov. 2012 revised for detailed timestep integration mode
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -458,13 +507,15 @@ SUBROUTINE UpdateComplexWindows
           ! na
 
           ! USE STATEMENTS:
-   USE vectors
+  USE vectors
+  USE DataGlobals, ONLY: HourOfDay, TimeStep, KickoffSizing, KickoffSimulation
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
       ! na
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -477,116 +528,172 @@ SUBROUTINE UpdateComplexWindows
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL,SAVE    ::  Once  =.TRUE.  !Flag for insuring things happen once
   INTEGER    ::  NumStates    ! Number of states for a given complex fen
-   INTEGER     ::  ISurf    !Index for sorting thru Surface array
-   INTEGER    ::  IConst    !Index for accessing Construct array
-   INTEGER    ::  IState    !Index identifying the window state for a particular window
-   INTEGER    ::  IWind    !Index identifying a window in the WindowList
-   INTEGER    ::  I    !general purpose index
-   INTEGER    ::  IncRay    !Index of incident ray corresponding to beam direction
-   REAL(r64)  :: Theta  !Theta angle of incident ray correspongind to beam direction
-   REAL(r64)  :: Phi  !Phi angle of incident ray correspongind to beam direction
-   INTEGER    ::  IHit  =0    !hit flag
-   INTEGER    ::  J    !general purpose index
-   INTEGER    ::  JSurf    !general purpose surface number
-   INTEGER    ::  K    !general purpose index
-   INTEGER    ::  Hour    !hour of day
-   INTEGER    ::  TotHits    !hit counter
-   INTEGER    ::  TS    !time step
-   TYPE (vector)    ::  SunDir =vector(0.,0.,1.)    !unit vector pointing toward sun (world CS)
-   TYPE (vector)    ::  Posit  =vector(0.,0.,0.)    !vector location of current ground point
-   TYPE (vector)    ::  HitPt  =vector(0.,0.,0.)       !vector location of ray intersection with a surface
-   REAL(r64)            ::  DotProd =0.                     !temporary variable for testing dot products
+  INTEGER     ::  ISurf    !Index for sorting thru Surface array
+  INTEGER    ::  IConst    !Index for accessing Construct array
+  INTEGER    ::  IState    !Index identifying the window state for a particular window
+  INTEGER    ::  IWind    !Index identifying a window in the WindowList
+  INTEGER    ::  I    !general purpose index
+  INTEGER    ::  IncRay    !Index of incident ray corresponding to beam direction
+  REAL(r64)  :: Theta  !Theta angle of incident ray correspongind to beam direction
+  REAL(r64)  :: Phi  !Phi angle of incident ray correspongind to beam direction
+  INTEGER    ::  IHit  =0    !hit flag
+  INTEGER    ::  J    !general purpose index
+  INTEGER    ::  JSurf    !general purpose surface number
+  INTEGER    ::  K    !general purpose index
+  INTEGER    ::  Hour    !hour of day
+  INTEGER    ::  TotHits    !hit counter
+  INTEGER    ::  TS    !time step
+  TYPE (vector)    ::  SunDir =vector(0.,0.,1.)    !unit vector pointing toward sun (world CS)
+  TYPE (vector)    ::  Posit  =vector(0.,0.,0.)    !vector location of current ground point
+  TYPE (vector)    ::  HitPt  =vector(0.,0.,0.)       !vector location of ray intersection with a surface
+  REAL(r64)            ::  DotProd =0.                     !temporary variable for testing dot products
 !
-!                 
-                 !One-time initialization
-                 IF (Once) THEN
-                       ONCE = .FALSE.
-                       CALL InitBSDFWindows
-                       CALL CalcStaticProperties
-                 ENDIF    
-                 
-                 IF (NumComplexWind == 0) RETURN
-                 !WRITE(UNIT=OutputFileDebug,FMT=*) "UpdateComplexWindows entered"
-                 
-                 !Shading-dependent initialization; performed once for each shading period
-                 
-                 ! Initialize the geometric quantities
-                
-                 DO   IWind = 1 , NumComplexWind 
-                       ISurf = WindowList( IWind )%SurfNo
-                       NumStates = ComplexWind( ISurf )%NumStates
-                       DO  IState = 1 , NumStates 
-                           DO Hour =1 , 24
-                               DO TS = 1, NumOfTimeStepInHour
-                                   SunDir = SUNCOSTS(1:3,Hour,TS)
-                                   Theta = 0.0d0
-                                   Phi = 0.0d0
-                                   IF (SUNCOSTS(3 , Hour, TS ) > SunIsUpValue) THEN
-                                       IncRay = FindInBasis ( SunDir, Front_Incident,IWind,ISurf,IState,&
-     &                                   ComplexWind(ISurf)%Geom(IState)%Inc, Theta, Phi)
-                                       ComplexWind(ISurf)%Geom(IState)%ThetaBm(Hour,TS) = Theta
-                                       ComplexWind(ISurf)%Geom(IState)%PhiBm(Hour,TS) = Phi
-                                   ELSE
-                                       ComplexWind(ISurf)%Geom(IState)%ThetaBm(Hour,TS) = 0
-                                       ComplexWind(ISurf)%Geom(IState)%PhiBm(Hour,TS) = 0
-                                       IncRay = 0   !sundown can't have ray incident on window
-                                   ENDIF
-                                   
-                                   IF (IncRay > 0 ) THEN
-                                       !Sun may be incident on the window
-                                       ComplexWind(ISurf)%Geom(IState)%SolBmIndex(Hour,TS) = IncRay
-                                   ELSE
-                                       !Window can't be sunlit, set front incidence ray index to zero
-                                       ComplexWind(ISurf)%Geom(IState)%SolBmIndex(Hour,TS) = 0
-                                   ENDIF
-                                   DO   I = 1 , ComplexWind(ISurf)%Geom(IState)%NGnd   !Gnd pt loop
-                                       IHit = 0
-                                       TotHits = 0
-                                       DO JSurf = 1, TotSurfaces
-                                           ! the following test will cycle on anything except exterior surfaces and shading surfaces
-                                           IF( Surface(JSurf)%HeatTransSurf .AND. &
-     &                                       Surface(JSurf)%ExtBoundCond /= ExternalEnvironment) CYCLE      
-                                           !  skip surfaces that face away from the ground point
-                                            DotProd = SunDir .dot. Surface(JSurf)%NewellSurfaceNormalVector
-                                           IF (DotProd >= 0. ) CYCLE
-                                           CALL PierceSurface(JSurf, ComplexWind(ISurf)%Geom(IState)%GndPt(I), &
-     &                                       SunDir,IHit, HitPt)        !Looking for surfaces between GndPt and sun
-                                           IF (IHit == 0) CYCLE
-                                           !  Are not going into the details of whether a hit surface is transparent
-                                           !  Since this is ultimately simply weighting the transmittance, so great 
-                                           !  detail is not warranted
-                                           TotHits = TotHits +1
-                                           EXIT
-                                       END DO
-                                       IF ( TotHits > 0 ) THEN
-                                           ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , Hour, TS ) = 0.
-                                       ELSE
-                                           ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , Hour, TS ) = 1.
-                                       ENDIF
-                                   END DO  ! Gnd pt loop
-                               END DO  ! Timestep loop
-                           END DO     ! Hour loop
-                       END DO    !State loop
-                 END DO    !window loop
-                 !
-                 ! Calculate the fenestration optical properties
-                 DO  IWind = 1 , NumComplexWind  
-                       ISurf = WindowList( IWind )%SurfNo
-                       NumStates = ComplexWind( ISurf )%NumStates
-                       DO IState = 1 , NumStates 
-                           IConst = SurfaceWindow(ISurf)%ComplexFen%State(IState)%Konst
-                           DO Hour =1 , 24
-                               DO  TS = 1, NumOfTimeStepInHour
-                                   CALL CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,ComplexWind( ISurf ),&
-    &    ComplexWind( ISurf )%Geom(IState),SurfaceWindow( ISurf )%ComplexFen%State(IState) &
-    &       ,Hour, TS ) 
-                               END DO  ! Timestep loop
-                           END DO     ! Hour loop
-                       END DO    !State loop
-                 END DO    !window loop
+!
+! !One-time initialization
+!  IF (Once) THEN
+!    ONCE = .FALSE.
+!    CALL InitBSDFWindows
+!    CALL CalcStaticProperties
+!  ENDIF
 
-  
-   
+  IF (NumComplexWind == 0) RETURN
+
+  IF (KickoffSizing .or. KickoffSimulation) RETURN
+
+   !Shading-dependent initialization; performed once for each shading period
+
+   ! Initialize the geometric quantities
+
+  DO   IWind = 1 , NumComplexWind
+    ISurf = WindowList( IWind )%SurfNo
+    NumStates = ComplexWind( ISurf )%NumStates
+    DO  IState = 1 , NumStates
+
+      IF (.NOT. DetailedSolarTimestepIntegration) THEN
+
+        DO Hour =1 , 24
+          DO TS = 1, NumOfTimeStepInHour
+            SunDir = SUNCOSTS(1:3,Hour,TS)
+            Theta = 0.0d0
+            Phi = 0.0d0
+            IF (SUNCOSTS(3 , Hour, TS ) > SunIsUpValue) THEN
+              IncRay = FindInBasis ( SunDir, Front_Incident,IWind,ISurf,IState,&
+                                     ComplexWind(ISurf)%Geom(IState)%Inc, Theta, Phi)
+              ComplexWind(ISurf)%Geom(IState)%ThetaBm(Hour,TS) = Theta
+              ComplexWind(ISurf)%Geom(IState)%PhiBm(Hour,TS) = Phi
+            ELSE
+              ComplexWind(ISurf)%Geom(IState)%ThetaBm(Hour,TS) = 0
+              ComplexWind(ISurf)%Geom(IState)%PhiBm(Hour,TS) = 0
+              IncRay = 0   !sundown can't have ray incident on window
+            ENDIF
+            IF (IncRay > 0 ) THEN
+                !Sun may be incident on the window
+              ComplexWind(ISurf)%Geom(IState)%SolBmIndex(Hour,TS) = IncRay
+            ELSE
+               !Window can't be sunlit, set front incidence ray index to zero
+              ComplexWind(ISurf)%Geom(IState)%SolBmIndex(Hour,TS) = 0
+            ENDIF
+            DO   I = 1 , ComplexWind(ISurf)%Geom(IState)%NGnd   !Gnd pt loop
+              IHit = 0
+              TotHits = 0
+              DO JSurf = 1, TotSurfaces
+                 ! the following test will cycle on anything except exterior surfaces and shading surfaces
+                IF( Surface(JSurf)%HeatTransSurf .AND. &
+                    Surface(JSurf)%ExtBoundCond /= ExternalEnvironment) CYCLE
+                         !  skip surfaces that face away from the ground point
+                DotProd = SunDir .dot. Surface(JSurf)%NewellSurfaceNormalVector
+                IF (DotProd >= 0. ) CYCLE
+                CALL PierceSurface(JSurf, ComplexWind(ISurf)%Geom(IState)%GndPt(I), &
+                                                SunDir,IHit, HitPt)        !Looking for surfaces between GndPt and sun
+                IF (IHit == 0) CYCLE
+                             !  Are not going into the details of whether a hit surface is transparent
+                             !  Since this is ultimately simply weighting the transmittance, so great
+                             !  detail is not warranted
+                TotHits = TotHits +1
+                EXIT
+              END DO
+              IF ( TotHits > 0 ) THEN
+                ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , Hour, TS ) = 0.
+              ELSE
+                ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , Hour, TS ) = 1.
+              ENDIF
+            END DO  ! Gnd pt loop
+          END DO  ! Timestep loop
+        END DO     ! Hour loop
+      ELSE ! detailed timestep integration
+        SunDir = SUNCOSTS(1:3,HourOfDay,TimeStep)
+        Theta = 0.0d0
+        Phi = 0.0d0
+        IF (SUNCOSTS(3 , HourOfDay, TimeStep ) > SunIsUpValue) THEN
+          IncRay = FindInBasis ( SunDir, Front_Incident,IWind,ISurf,IState,&
+                                 ComplexWind(ISurf)%Geom(IState)%Inc, Theta, Phi)
+          ComplexWind(ISurf)%Geom(IState)%ThetaBm(HourOfDay,TimeStep) = Theta
+          ComplexWind(ISurf)%Geom(IState)%PhiBm(HourOfDay,TimeStep) = Phi
+        ELSE
+          ComplexWind(ISurf)%Geom(IState)%ThetaBm(HourOfDay,TimeStep) = 0
+          ComplexWind(ISurf)%Geom(IState)%PhiBm(HourOfDay,TimeStep) = 0
+          IncRay = 0   !sundown can't have ray incident on window
+        ENDIF
+
+        IF (IncRay > 0 ) THEN
+                   !Sun may be incident on the window
+          ComplexWind(ISurf)%Geom(IState)%SolBmIndex(HourOfDay,TimeStep) = IncRay
+        ELSE
+                   !Window can't be sunlit, set front incidence ray index to zero
+          ComplexWind(ISurf)%Geom(IState)%SolBmIndex(HourOfDay,TimeStep) = 0
+        ENDIF
+        DO   I = 1 , ComplexWind(ISurf)%Geom(IState)%NGnd   !Gnd pt loop
+          IHit = 0
+          TotHits = 0
+          DO JSurf = 1, TotSurfaces
+               ! the following test will cycle on anything except exterior surfaces and shading surfaces
+            IF( Surface(JSurf)%HeatTransSurf .AND. &
+                    Surface(JSurf)%ExtBoundCond /= ExternalEnvironment) CYCLE
+                       !  skip surfaces that face away from the ground point
+            DotProd = SunDir .dot. Surface(JSurf)%NewellSurfaceNormalVector
+            IF (DotProd >= 0. ) CYCLE
+            CALL PierceSurface(JSurf, ComplexWind(ISurf)%Geom(IState)%GndPt(I), &
+                                           SunDir,IHit, HitPt)        !Looking for surfaces between GndPt and sun
+            IF (IHit == 0) CYCLE
+                       !  Are not going into the details of whether a hit surface is transparent
+                       !  Since this is ultimately simply weighting the transmittance, so great
+                       !  detail is not warranted
+            TotHits = TotHits +1
+            EXIT
+          END DO
+          IF ( TotHits > 0 ) THEN
+            ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , HourOfDay, TimeStep ) = 0.
+          ELSE
+            ComplexWind(ISurf)%Geom(IState)%SolBmGndWt ( I , HourOfDay, TimeStep ) = 1.
+          ENDIF
+        END DO  ! Gnd pt loop
+      ENDIF ! solar calculation mode, average over days or detailed
+    END DO    !State loop
+  END DO    !window loop
+   !
+   ! Calculate the fenestration optical properties
+  DO  IWind = 1 , NumComplexWind
+    ISurf = WindowList( IWind )%SurfNo
+    NumStates = ComplexWind( ISurf )%NumStates
+    DO IState = 1 , NumStates
+      IConst = SurfaceWindow(ISurf)%ComplexFen%State(IState)%Konst
+      IF (.NOT. DetailedSolarTimestepIntegration) THEN
+        DO Hour =1 , 24
+          DO  TS = 1, NumOfTimeStepInHour
+            CALL CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,ComplexWind( ISurf ),&
+                                 ComplexWind( ISurf )%Geom(IState),SurfaceWindow( ISurf )%ComplexFen%State(IState) &
+                                 ,Hour, TS )
+          END DO  ! Timestep loop
+        END DO     ! Hour loop
+      ELSE
+        CALL CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,ComplexWind( ISurf ),&
+                                 ComplexWind( ISurf )%Geom(IState),SurfaceWindow( ISurf )%ComplexFen%State(IState) &
+                                 ,HourOfDay, TimeStep )
+      ENDIF
+    END DO    !State loop
+  END DO    !window loop
+
+
   RETURN
 
 END SUBROUTINE UpdateComplexWindows
@@ -625,7 +732,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
    TYPE (BSDFStateDescr), INTENT(INOUT)  ::  State    !State Description
    INTEGER, INTENT(IN)     ::  Hour    !Hour number
    INTEGER, INTENT(IN)     ::  TS    !Timestep number
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -643,7 +750,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
    REAL(r64)      ::  Theta
    REAL(r64)      ::  Phi
    INTEGER        ::  JSurf    !gen purpose surface no
-   INTEGER              ::  BaseSurf    !base surface no 
+   INTEGER              ::  BaseSurf    !base surface no
    INTEGER        ::  K    !general purpose index
    INTEGER        ::  M    !general purpose index--ray
    INTEGER        ::  L    !general purpose index--layer
@@ -663,7 +770,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
 
 !  Begin calculation
                  !  Calculate the Transmittance from a given beam direction to a given zone surface
-                 
+
                  IBm = Geom%SolBmIndex( Hour, TS )
                  IF(IBm <= 0. ) THEN    !Beam cannot be incident on window for this Hour, TS
                      State%WinToSurfBmTrans( 1 : Window%NBkSurf , Hour , TS ) = 0.
@@ -674,15 +781,15 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
                      DO  I = 1 , Window%NBkSurf   !Back surface loop
                          Sum1 = 0.
                          DO  J = 1 , Geom%NSurfInt ( I )   !Ray loop
-                             Sum1 = Sum1 + Geom%Trn%Lamda(Geom%SurfInt( I , J ))  * & 
-     &                          Construct(IConst)%BSDFInput%SolFrtTrans ( Geom%SurfInt( I , J ) , IBm )  
+                             Sum1 = Sum1 + Geom%Trn%Lamda(Geom%SurfInt( I , J ))  * &
+     &                          Construct(IConst)%BSDFInput%SolFrtTrans ( Geom%SurfInt( I , J ) , IBm )
                          END DO    !Ray loop
                          State%WinToSurfBmTrans( I , Hour , TS ) = Sum1
                      END DO    !Back surface loop
                      !
                      !Calculate the directional-hemispherical transmittance
                      Sum1 = 0.
-                     DO  J = 1 , Geom%Trn%NBasis 
+                     DO  J = 1 , Geom%Trn%NBasis
                          Sum1 = Sum1 + Geom%Trn%Lamda(J) * Construct(IConst)%BSDFInput%SolFrtTrans ( J , IBm )
                      END DO
                      State%WinDirHemiTrans( Hour, TS ) = Sum1
@@ -695,15 +802,15 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
                          State%WinBmFtAbs( L , Hour , TS ) = Construct(IConst)%BSDFInput%Layer(L)%FrtAbs( 1 , IBm)
                      END FORALL
                  ENDIF
-                 !Calculate,  for a given beam direction, the transmittance into the zone 
+                 !Calculate,  for a given beam direction, the transmittance into the zone
                  ! for ground-reflected radiation (transmitted radiation assumed uniformly diffuse)
-                 
+
                  Sum1 = 0.
                  Sum2 = 0.
                  DO   J  = 1 , Geom%NGnd   !Incident ray loop
                      JRay = Geom%GndIndex( J )
-                     IF ( Geom%SolBmGndWt( J , Hour, TS) > 0. )  THEN 
-                         Sum2 = Sum2 + Geom%SolBmGndWt( J ,Hour, TS) * & 
+                     IF ( Geom%SolBmGndWt( J , Hour, TS) > 0. )  THEN
+                         Sum2 = Sum2 + Geom%SolBmGndWt( J ,Hour, TS) * &
      &                     Geom%Inc%Lamda( JRay)
                          DO  M = 1 , Geom%Trn%NBasis     !Outgoing ray loop
                              Sum1 = Sum1 + Geom%SolBmGndWt( J ,Hour, TS) * &
@@ -717,17 +824,17 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
                  ELSE
                      State%WinBmGndTrans( Hour , TS ) = 0.  !No unshaded ground => no transmittance
                  ENDIF
-                 
-                 !Calculate,  for a given beam direction, the layer front absorptance 
-                 ! for ground-reflected radiation 
-                 
+
+                 !Calculate,  for a given beam direction, the layer front absorptance
+                 ! for ground-reflected radiation
+
                  DO L = 1 , State%NLayers     !layer loop
                      Sum1 = 0.
                      Sum2 = 0.
                      DO  J  = 1 , Geom%NGnd   !Incident ray loop
                          JRay = Geom%GndIndex( J )
                          IF ( Geom%SolBmGndWt( J , Hour, TS) > 0. ) THEN
-                             Sum2 = Sum2 + Geom%SolBmGndWt( J ,Hour, TS) * & 
+                             Sum2 = Sum2 + Geom%SolBmGndWt( J ,Hour, TS) * &
      &                         Geom%Inc%Lamda( JRay)
                               Sum1 = Sum1 + Geom%SolBmGndWt( J ,Hour, TS) * &
      &                         Geom%Inc%Lamda( JRay)  * Construct(IConst)%BSDFInput%Layer(L)%FrtAbs ( 1 , JRay )
@@ -756,7 +863,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
                      RegWindFnd = .TRUE.
                      NRegWin = NRegWin + 1
                      RegWinIndex(NRegWin) = KBkSurf
-                 END DO 
+                 END DO
                  IF (RegWindFnd) THEN
                      ALLOCATE(Absorb(State%NLayers) )
                      SunDir = SUNCOSTS(1:3,Hour,TS)
@@ -764,11 +871,11 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
      &                                   ComplexWind(ISurf)%Geom(IState)%Trn, Theta, Phi)
                      IF ( BkIncRay > 0 ) THEN
                          !Here calculate the back incidence properties for the solar ray
-                         !this does not say whether or not the ray can pass through the 
+                         !this does not say whether or not the ray can pass through the
                          !back surface window and hit this one!
                          Sum1 = 0.
-                         DO  J = 1 , Geom%Trn%NBasis 
-                             Sum1 = Sum1 + Geom%Trn%Lamda(J) * & 
+                         DO  J = 1 , Geom%Trn%NBasis
+                             Sum1 = Sum1 + Geom%Trn%Lamda(J) * &
      &                                 Construct(IConst)%BSDFInput%SolBkRefl( J, BkIncRay )
                          END DO
                          Refl = Sum1
@@ -786,7 +893,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
                          KBkSurf = RegWinIndex( KRegWin )
                          State%BkSurf(KBkSurf)%WinDHBkRefl( Hour, TS )= Refl
                          DO L = 1 , State%NLayers
-                             State%BkSurf(KBkSurf)%WinDirBkAbs (L , Hour, TS ) = Absorb(L)                         
+                             State%BkSurf(KBkSurf)%WinDirBkAbs (L , Hour, TS ) = Absorb(L)
                          END DO
                      ENDDO
                  ENDIF
@@ -795,7 +902,7 @@ SUBROUTINE CalculateWindowBeamProperties( IWind,ISurf,IState,IConst,Window,Geom,
 
 !
 !
-   
+
   RETURN
 
 END SUBROUTINE CalculateWindowBeamProperties
@@ -826,7 +933,7 @@ SUBROUTINE CalcStaticProperties
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
       ! na
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -859,7 +966,7 @@ SUBROUTINE CalcStaticProperties
     &    ComplexWind( ISurf )%Geom(IState),SurfaceWindow( ISurf )%ComplexFen%State(IState) )
                        END DO
                  END DO
-   
+
   RETURN
 
 END SUBROUTINE CalcStaticProperties
@@ -891,7 +998,7 @@ SUBROUTINE CalculateBasisLength ( Input,IConst,NBasis )
   TYPE (BSDFWindowInputStruct), INTENT(IN)       :: Input           ! BSDF data input struct for this construction
   INTEGER, INTENT(IN)                            :: IConst          !Construction number of input
   INTEGER, INTENT(OUT)                      :: NBasis     ! Calculated Basis length
- 
+
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -904,7 +1011,7 @@ SUBROUTINE CalculateBasisLength ( Input,IConst,NBasis )
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
           INTEGER     ::  I     !gen purpose index
-          
+
           IF (Input%BasisMatNcols == 1) THEN
               !Axisymmetric basis, No. rows is no. of thetas = basis length
               NBasis = Input%BasisMatNrows
@@ -943,7 +1050,7 @@ SUBROUTINE DetermineMaxBackSurfaces
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
           ! na
- 
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -959,7 +1066,7 @@ SUBROUTINE DetermineMaxBackSurfaces
           INTEGER     ::  SurfNum   !Surface Number
           INTEGER     ::  NumSurfInZone =0  !Number of zone surfaces
           LOGICAL     ::  ComplexFenInZone  = .FALSE.
-      
+
       DO ZoneNum = 1, NumOfZones
           ComplexFenInZone = .FALSE.
           DO SurfNum = Zone(ZoneNum)%SurfaceFirst , Zone(ZoneNum)%SurfaceLast
@@ -967,10 +1074,10 @@ SUBROUTINE DetermineMaxBackSurfaces
           END DO
           IF(ComplexFenInZone) THEN
               NumSurfInZone = Zone(ZoneNum)%SurfaceLast - Zone(ZoneNum)%SurfaceFirst + 1
-              IF(MaxBkSurf < NumSurfInZone) MaxBkSurf = NumSurfInZone 
+              IF(MaxBkSurf < NumSurfInZone) MaxBkSurf = NumSurfInZone
           END IF
-      END DO    
-          
+      END DO
+
   RETURN
 
 END SUBROUTINE DetermineMaxBackSurfaces
@@ -999,7 +1106,7 @@ SUBROUTINE ConstructBasis (IConst, Basis)
           ! SUBROUTINE ARGUMENT DEFINITIONS:
    INTEGER, INTENT(IN)    ::  IConst    !Index for accessing Construct array
    TYPE (BasisStruct), INTENT(OUT)  ::  Basis
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1010,7 +1117,7 @@ SUBROUTINE ConstructBasis (IConst, Basis)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          
+
    INTEGER    ::  I  =0  !general purpose index
    INTEGER    ::  J  =0  !general purpose index
    INTEGER    ::  NThetas  =0  !Current number of theta values
@@ -1058,16 +1165,16 @@ SUBROUTINE ConstructBasis (IConst, Basis)
             !
             ! No basis symmetry
             !
-            Basis%BasisSymmetryType =   BasisSymmetry_None   
+            Basis%BasisSymmetryType =   BasisSymmetry_None
             Thetas(1) = 0.      !By convention, the first basis point is at the center (theta=0,phi=0)
             Thetas(NThetas + 1) = 0.5*Pi    !and there is an N+1st point (not a basis element) at Pi/2
             NPhis(1) = 1
             NumElem = 1
-            DO I = 2,NThetas 
+            DO I = 2,NThetas
               Thetas(I)=Construct(IConst)%BSDFInput%BasisMat(I,1)*DegToRadians
               NPhis(I)=FLOOR(Construct(IConst)%BSDFInput%BasisMat(I,2)+0.001)
               IF(NPhis(I)<=0) Call ShowFatalError('WindowComplexManager: incorrect input, no. phis must be positive.')
-              NumElem=NumElem+NPhis(I)  
+              NumElem=NumElem+NPhis(I)
             END DO
             MaxNPhis =MAXVAL(NPhis(1:NThetas))
             ALLOCATE(Basis%Phis( MaxNPhis + 1 , NThetas+1 ) )  !N+1st Phi point (not basis element) at 2Pi
@@ -1095,7 +1202,7 @@ SUBROUTINE ConstructBasis (IConst, Basis)
                HalfDTheta = Theta - LowerTheta
                UpperTheta = Theta + HalfDTheta
              ELSE IF (I == NThetas) THEN
-               LastTheta = Thetas(I-1)  
+               LastTheta = Thetas(I-1)
                NextTheta = 0.5*Pi
                LowerTheta = UpperTheta  !It is assumed that Thetas(N) is the mean between the previous
                      !UpperTheta and pi/2.
@@ -1104,9 +1211,9 @@ SUBROUTINE ConstructBasis (IConst, Basis)
              DPhi=2*Pi/NPhis(I)
              IF (I==1) THEN
                Lamda = Pi*(SIN(UpperTheta))**2
-               SolAng = 2.*Pi*(1. - COS(UpperTheta)) 
+               SolAng = 2.*Pi*(1. - COS(UpperTheta))
              ELSE
-               Lamda=0.5*DPhi*((SIN(UpperTheta))**2-(SIN(LowerTheta))**2)  !For W6 basis, lamda is funct of Theta and 
+               Lamda=0.5*DPhi*((SIN(UpperTheta))**2-(SIN(LowerTheta))**2)  !For W6 basis, lamda is funct of Theta and
                     ! NPhis, not individual Phi
                SolAng = DPhi*(COS(LowerTheta) - COS(UpperTheta))
              END IF
@@ -1119,25 +1226,25 @@ SUBROUTINE ConstructBasis (IConst, Basis)
                Basis%Phis( J , I ) = Phi  !Note: this ordering of I & J are necessary to allow Phis(Theta) to
                      !  be searched as a one-dimensional table
                Call FillBasisElement (Theta,Phi,ElemNo,Basis%Grid(ElemNo) &
-                      &    ,LowerTheta,UpperTheta,DPhi,BasisType_WINDOW)  !This gets all the simple grid characteristics 
+                      &    ,LowerTheta,UpperTheta,DPhi,BasisType_WINDOW)  !This gets all the simple grid characteristics
                                          Basis%Lamda(ElemNo) = Lamda
-                                         Basis%SolAng(ElemNo) = SolAng  
+                                         Basis%SolAng(ElemNo) = SolAng
                            END DO
              END DO ThLoop
           ELSE BST
               !
               !  Axisymmetric basis symmetry (Note this only useful specular systems, where it allows shorter data input)
               !
-              Basis%BasisSymmetryType =   BasisSymmetry_Axisymmetric   
+              Basis%BasisSymmetryType =   BasisSymmetry_Axisymmetric
             Thetas(1) = 0.      !By convention, the first basis point is at the center (theta=0,phi=0)
             Thetas(NThetas + 1) = 0.5*Pi    !and there is an N+1st point (not a basis element) at Pi/2
             NPhis = 1      !As insurance, define one phi for each theta
             NumElem = 1
-            DO I = 2,NThetas 
+            DO I = 2,NThetas
               Thetas(I)=Construct(IConst)%BSDFInput%BasisMat(I,1)*DegToRadians
-              NumElem=NumElem+1  
+              NumElem=NumElem+1
             END DO
-            ALLOCATE(Basis%Phis( NThetas , 1 ) )  
+            ALLOCATE(Basis%Phis( NThetas , 1 ) )
           ALLOCATE( Basis%BasisIndex ( NThetas , 1 ) )
           Basis%Phis =0    !Initialize so undefined elements will contain zero
           Basis%BasisIndex = 0  !Initialize so undefined elements will contain zero
@@ -1163,7 +1270,7 @@ SUBROUTINE ConstructBasis (IConst, Basis)
                        HalfDTheta = Theta - LowerTheta
                        UpperTheta = Theta + HalfDTheta
                    ELSE IF (I == NThetas) THEN
-                       LastTheta = Thetas(I-1)  
+                       LastTheta = Thetas(I-1)
                        NextTheta = 0.5*Pi
                        LowerTheta = UpperTheta  !It is assumed that Thetas(N) is the mean between the previous
                      !UpperTheta and pi/2.
@@ -1171,9 +1278,9 @@ SUBROUTINE ConstructBasis (IConst, Basis)
                   ENDIF
                   IF (I==1) THEN
                        Lamda = Pi*(SIN(UpperTheta))**2
-                       SolAng = 2.*Pi*(1. - COS(UpperTheta)) 
+                       SolAng = 2.*Pi*(1. - COS(UpperTheta))
                   ELSE
-                       Lamda=0.5*DPhi*((SIN(UpperTheta))**2-(SIN(LowerTheta))**2)  !For W6 basis, lamda is funct of Theta and 
+                       Lamda=0.5*DPhi*((SIN(UpperTheta))**2-(SIN(LowerTheta))**2)  !For W6 basis, lamda is funct of Theta and
                     ! NPhis, not individual Phi
                        SolAng = DPhi*(COS(LowerTheta) - COS(UpperTheta))
                   END IF
@@ -1184,9 +1291,9 @@ SUBROUTINE ConstructBasis (IConst, Basis)
                        Basis%Phis( 1 , I ) = Phi  !Note: this ordering of I & J are necessary to allow Phis(Theta) to
                      !  be searched as a one-dimensional table
                        Call FillBasisElement (Theta,Phi,ElemNo,Basis%Grid(ElemNo)&
-                        ,LowerTheta,UpperTheta,DPhi,BasisType_WINDOW)  !This gets all the simple grid characteristics 
+                        ,LowerTheta,UpperTheta,DPhi,BasisType_WINDOW)  !This gets all the simple grid characteristics
                        Basis%Lamda(ElemNo) = Lamda
-                       Basis%SolAng(ElemNo) = SolAng  
+                       Basis%SolAng(ElemNo) = SolAng
 
           END DO ThLoop2
             END IF BST
@@ -1194,10 +1301,10 @@ SUBROUTINE ConstructBasis (IConst, Basis)
             Call ShowFatalError('WindowComplexManager: Non-Window6 basis type not yet implemented.')
           END IF BTW
     DEALLOCATE(Thetas,NPhis)
-    
+
    RETURN
 
-END SUBROUTINE ConstructBasis 
+END SUBROUTINE ConstructBasis
 
 SUBROUTINE FillBasisElement (Theta,Phi,Elem,BasisElem,LowerTheta,UpperTheta,DPhi,InputType)
 
@@ -1230,8 +1337,8 @@ SUBROUTINE FillBasisElement (Theta,Phi,Elem,BasisElem,LowerTheta,UpperTheta,DPhi
   REAL(r64), INTENT (IN) :: DPhi        !Width of element (azimuthal angle)
   INTEGER, INTENT (IN)   :: Elem        !Index number of element in basis
   INTEGER, INTENT (IN)   :: InputType   !Basis type
-  TYPE (BasisElemDescr), INTENT(INOUT)  :: BasisElem 
-          
+  TYPE (BasisElemDescr), INTENT(INOUT)  :: BasisElem
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1242,7 +1349,7 @@ SUBROUTINE FillBasisElement (Theta,Phi,Elem,BasisElem,LowerTheta,UpperTheta,DPhi
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          
+
   IF (InputType == BasisType_WINDOW) THEN
     !
     !WINDOW6 Type BASIS
@@ -1258,7 +1365,7 @@ SUBROUTINE FillBasisElement (Theta,Phi,Elem,BasisElem,LowerTheta,UpperTheta,DPhi
       BasisElem%LwrPhi = 0.
       BasisElem%UpprPhi =  2*Pi
     ELSE
-      BasisElem%Theta =Theta 
+      BasisElem%Theta =Theta
       BasisElem%Phi = Phi
       BasisElem%dPhi = DPhi
       BasisElem%LwrPhi = Phi-DPhi/2.
@@ -1275,7 +1382,7 @@ SUBROUTINE FillBasisElement (Theta,Phi,Elem,BasisElem,LowerTheta,UpperTheta,DPhi
     CALL ShowFatalError('WindowComplexManager: Custom basis type not yet implemented.')
   END IF
   RETURN
-   
+
 END SUBROUTINE FillBasisElement
 
 SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,Tilt,Window,Geom,State)
@@ -1297,7 +1404,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
 
           ! USE STATEMENTS:
   USE vectors
-  
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1310,7 +1417,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
        TYPE (BSDFWindowGeomDescr),INTENT(INOUT)    ::  Window  !Window Geometry
        TYPE (BSDFGeomDescr), INTENT(INOUT)  ::  Geom    !State Geometry
        TYPE (BSDFStateDescr), INTENT(INOUT)  ::  State    !State Description
- 
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1347,7 +1454,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
        REAL(r64)        ::   LeastHitDsq  !Squared distance to closest hit pt
        TYPE (vector)        ::   HitPt    !coords of hit pt (world syst)
        REAL(r64),DIMENSION(3)      ::   V    !vector array
-       REAL(r64)        ::   VLen    !Length of vector array 
+       REAL(r64)        ::   VLen    !Length of vector array
        TYPE (vector)        ::   X    !position vector
        TYPE (vector)        ::   VecNorm  !outer normal vector
        INTEGER, DIMENSION(:), ALLOCATABLE  ::  TmpRfSfInd  !Temporary RefSurfIndex
@@ -1362,19 +1469,19 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
        INTEGER, DIMENSION(:), ALLOCATABLE  ::  ITemp1D  !Temporary INT 1D array
        REAL(r64), DIMENSION(:,:), ALLOCATABLE    ::  Temp2D    !Temporary real 2D array
        TYPE (vector), DIMENSION(:,:), ALLOCATABLE  ::  TempV2D  !Temporary vector 2D array
-       TYPE (vector), DIMENSION(:,:), ALLOCATABLE  ::  TmpHitPt    !Temporary HitPt 
-       REAL(r64)        ::  TransRSurf  !Norminal transmittance of shading surface 
+       TYPE (vector), DIMENSION(:,:), ALLOCATABLE  ::  TmpHitPt    !Temporary HitPt
+       REAL(r64)        ::  TransRSurf  !Norminal transmittance of shading surface
        REAL(r64)                         ::  WtSum    !Sum for normalizing various weights
        TYPE (BackHitList)      ::  BSHit    !Temp list of back surface hit quantities for a ray
        REAL(r64)                ::      DotProd     !Temporary variable for manipulating dot product .dot.
-  
+
               !This routine primarily fills in the BSDFGeomDescr type for a given window and state
               !Note that on call the incoming and outgoing basis structure types have already been filled in
                   !
               !  Define the central ray directions (in world coordinate system)
               !
          !For incoming grid
-         
+
          ALLOCATE (Geom%sInc(Geom%Inc%NBasis))
           DO ElemNo=1 , Geom%Inc%NBasis
              Theta = Geom%Inc%Grid(ElemNo)%Theta
@@ -1390,7 +1497,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
              Phi = Geom%Trn%Grid(ElemNo)%Phi
                        !The following puts in the vectors depending on
                        ! window orientation
-             Geom%sTrn(ElemNo) = WorldVectFromW6 (Theta, Phi, Front_Transmitted, Tilt, Azimuth)  
+             Geom%sTrn(ElemNo) = WorldVectFromW6 (Theta, Phi, Front_Transmitted, Tilt, Azimuth)
           END DO
               !
               !  Incident Basis:
@@ -1476,7 +1583,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                                    TotHits = J
                                ELSE
                                    !  The new hit is scheduled (presumed transparent), so keep the more distant hits
-                                   !     Note that all the hists in the list will be transparent except the last, 
+                                   !     Note that all the hists in the list will be transparent except the last,
                                    !       which may be either transparent or opaque
                                    IF (TotHits >= J ) THEN
                                        DO I = TotHits , J , -1
@@ -1493,7 +1600,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                            ENDIF
                        ENDIF
                    ELSE
-                       !  A new closest hit.  If it is opaque, drop the current hit list, 
+                       !  A new closest hit.  If it is opaque, drop the current hit list,
                        !    otherwise add it at the front
                        LeastHitDsq = HitDsq
                        IF(.NOT.Surface(JSurf)%HeatTransSurf .AND. Surface(JSurf)&
@@ -1506,14 +1613,14 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                                TotHits = TotHits + 1
                            ENDDO
                        ELSE
-                           TransRSurf = 0.  !New closest hit is opaque, drop the existing hit list 
-                           TotHits = 1   
+                           TransRSurf = 0.  !New closest hit is opaque, drop the existing hit list
+                           TotHits = 1
                        ENDIF
                        TmpHSurfNo (NReflSurf,1) = JSurf  ! In either case the new hit is put in position 1
                        TmpHitPt (NReflSurf,1) = HitPt
                        TmpHSurfDSq (NReflSurf , 1) = LeastHitDsq
-                   ENDIF 
-               ENDIF 
+                   ENDIF
+               ENDIF
              END DO  !End of loop over surfaces
               IF (TotHits <= 0 ) THEN
                  !This ray reached the sky or ground unobstructed
@@ -1529,12 +1636,12 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                  ELSE
                     !A sky ray
                     NSky = NSky +1
-                    TmpSkyInd(NSky) = IRay 
+                    TmpSkyInd(NSky) = IRay
                  ENDIF
              ELSE
                  !Save the number of hits for this ray
                  TmpRfRyNH (NReflSurf) = TotHits
-             ENDIF   
+             ENDIF
           END DO  !End of loop over basis rays
           !
           !Store results of indexing the incident basis for this window
@@ -1566,10 +1673,10 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
           ENDDO
           DEALLOCATE(TmpRfRyNH,TmpRfSfInd,TmpHSurfNo,TmpHSurfDSq,TmpHitPt)
           !
-          !In above scheme sky and ground rays are those that intesect no exterior surfaces. 
+          !In above scheme sky and ground rays are those that intesect no exterior surfaces.
           !  The list of hit points is compiled for later (future?) calculation
           !  of reflections from these surfaces.  The hit list for each ray includes all
-          !   surfaces with schedulable transmittance intersected by the ray, 
+          !   surfaces with schedulable transmittance intersected by the ray,
           !   in order of increasing distance, up to the first opaque surface.
           !  Rays that intesect one or more schedulable transmittance but no opaque
           !  surfaces (therefore may reach the sky or ground) are left out of the sky/ground
@@ -1585,19 +1692,19 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
           ALLOCATE(Geom%SolSkyWt(NSky))
            DO I = 1, NSky
            J = Geom%SkyIndex(I)
-           Geom%SolSkyWt(I) = SkyWeight(Geom%sInc(J))   
+           Geom%SolSkyWt(I) = SkyWeight(Geom%sInc(J))
            ENDDO
            WtSum = SUM(Geom%SolSkyWt(1:NSky))
-           Geom%SolSkyWt(1:NSky) = Geom%SolSkyWt(1:NSky)/WtSum 
+           Geom%SolSkyWt(1:NSky) = Geom%SolSkyWt(1:NSky)/WtSum
            !
            !SkyGround Weights
            !
            ALLOCATE(Geom%SolSkyGndWt(NGnd))
            DO I = 1, NGnd
-           Geom%SolSkyGndWt(I) = SkyGndWeight(Geom%GndPt(I))   
+           Geom%SolSkyGndWt(I) = SkyGndWeight(Geom%GndPt(I))
            ENDDO
            WtSum = SUM(Geom%SolSkyGndWt(1:NGnd))
-           Geom%SolSkyGndWt(1:NGnd) = Geom%SolSkyGndWt(1:NGnd)/WtSum 
+           Geom%SolSkyGndWt(1:NGnd) = Geom%SolSkyGndWt(1:NGnd)/WtSum
            !  Weights for beam reflected from ground are calculated after shading
            !  interval is determined
               !
@@ -1650,7 +1757,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                    IF (HitDSq < BSHit%HitDSq) THEN
                        BSHit%KBkSurf = KBkSurf
                        BSHit%HitSurf = JSurf
-                       BSHit%HitPt = HitPt 
+                       BSHit%HitPt = HitPt
                        BSHit%HitDSq = HitDSq
                    ENDIF
                ENDIF
@@ -1663,7 +1770,7 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
                Geom%NSurfInt( KBkSurf  ) = Geom%NSurfInt( KBkSurf ) +1
                TmpSurfInt(KBkSurf , Geom%NSurfInt( KBkSurf  )) = IRay
                VecNorm = Surface(JSurf)%OutNormVec
-               TmpSjdotN(KBkSurf , Geom%NSurfInt( KBkSurf  )) = Geom%sTrn(IRay) .dot. VecNorm            
+               TmpSjdotN(KBkSurf , Geom%NSurfInt( KBkSurf  )) = Geom%sTrn(IRay) .dot. VecNorm
            ENDIF
         ENDDO        !ray loop
               !  All rays traced, now put away the results in the temporary arrays
@@ -1671,14 +1778,14 @@ SUBROUTINE SetupComplexWindowStateGeometry (IWind,ISurf, IState,IConst,Azimuth,T
               ALLOCATE(Geom%SurfInt(Window%NBkSurf , MaxInt))
               ALLOCATE(Geom%SjdotN(Window%NBkSurf , MaxInt))
               Geom%SurfInt = 0
-              DO I = 1 , Window%NBkSurf 
+              DO I = 1 , Window%NBkSurf
                   Geom%SurfInt(I,1:Geom%NSurfInt(I)) = TmpSurfInt(I, 1:Geom%NSurfInt(I))
                   Geom%SjdotN(I,1:Geom%NSurfInt(I)) = TmpSjdotN(I, 1:Geom%NSurfInt(I))
               END DO
-              
+
               DEALLOCATE(TmpSurfInt)
               DEALLOCATE(TmpSjdotN)
-        
+
   RETURN
 
 END SUBROUTINE SetupComplexWindowStateGeometry
@@ -1715,7 +1822,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
        TYPE (BSDFGeomDescr), INTENT(INOUT)  ::  Geom    !State Geometry
        TYPE (BSDFStateDescr), INTENT(INOUT)  ::  State    !State Description
 
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -1743,7 +1850,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
 
 
                  !Calculate the hemispherical-hemispherical transmittance
-                 
+
                  Sum1 = 0.
                  Sum2 = 0.
                  DO  J = 1 , Geom%Inc%NBasis     !Incident ray loop
@@ -1759,9 +1866,9 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      State%WinDiffTrans = 0.
                      CALL ShowWarningError ('BSDF--Inc basis has zero projected solid angle')
                  ENDIF
-                 
+
                  !Calculate the hemispherical-hemispherical transmittance for visible spetrum
-                 
+
                  Sum1 = 0.
                  Sum2 = 0.
                  DO  J = 1 , Geom%Inc%NBasis     !Incident ray loop
@@ -1777,16 +1884,16 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      State%WinDiffVisTrans = 0.
                      CALL ShowWarningError ('BSDF--Inc basis has zero projected solid angle')
                  ENDIF
-                 
+
                  !Set the nominal diffuse transmittance so the surface isn't mistaken as opaque
-                 Construct(IConst)%TransDiff = SurfaceWindow(ISurf)%ComplexFen%State(IState)%WinDiffTrans             
+                 Construct(IConst)%TransDiff = SurfaceWindow(ISurf)%ComplexFen%State(IState)%WinDiffTrans
                  !Calculate Window Sky Transmittance (transmitted radiation assumed diffuse)
                  !and Sky Absorptance (by layer)
                  Sum1 = 0.
                  Sum2 = 0.
                  Sum3 = 0.
-                 DO  JJ =  1 ,  Geom%NSky  
-                     DO M = 1 , Geom%Trn%NBasis 
+                 DO  JJ =  1 ,  Geom%NSky
+                     DO M = 1 , Geom%Trn%NBasis
                          J = Geom%SkyIndex( JJ )
                          Sum1 = Sum1 + Geom%SolSkyWt ( JJ ) * Construct(IConst)%BSDFInput%SolFrtTrans( J , M ) * &
      &                     Geom%Inc%Lamda( J ) * Geom%Trn%Lamda( M )
@@ -1797,7 +1904,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      Sum2 = Sum2 + Geom%SolSkyWt ( JJ ) * Geom%Inc%Lamda( J )
                  END DO
                  State%WinSkyTrans = Sum1/Sum2
-                
+
                  ALLOCATE(State%WinSkyFtAbs(State%NLayers))
                  !Also allocate the beam quantities for this state
                  DO L = 1 , State%NLayers
@@ -1808,7 +1915,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
      &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1 , J)
                      END DO
                      State%WinSkyFtAbs(L) = Sum3/Sum2
-                     
+
                  END DO
                  !Calculate Window Sky/Ground Transmittance
                  !(applies to ground-reflected sky radiation, transmitted radiation assumed diffuse)
@@ -1818,16 +1925,16 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  Sum1 = 0.
                  Sum2 = 0.
                  Sum3 = 0.
-                 
-                 DO   JJ = 1 ,  Geom%NGnd  
-                     DO M = 1 , Geom%Trn%NBasis 
+
+                 DO   JJ = 1 ,  Geom%NGnd
+                     DO M = 1 , Geom%Trn%NBasis
                          J = Geom%GndIndex( JJ )
-                         Sum1 = Sum1 + Geom%SolSkyGndWt ( JJ ) * Construct(IConst)%BSDFInput%SolFrtTrans( J , M ) * & 
+                         Sum1 = Sum1 + Geom%SolSkyGndWt ( JJ ) * Construct(IConst)%BSDFInput%SolFrtTrans( J , M ) * &
      &                     Geom%Inc%Lamda( J ) * Geom%Trn%Lamda( M )
                      END DO
-                    
+
                  END DO
-                 DO   JJ =  1 ,  Geom%NGnd 
+                 DO   JJ =  1 ,  Geom%NGnd
                      J = Geom%GndIndex( JJ )
                      Sum2 = Sum2 + Geom%SolSkyGndWt ( JJ ) * Geom%Inc%Lamda( J )
                  END DO
@@ -1835,10 +1942,10 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  ALLOCATE(State%WinSkyGndAbs(State%NLayers))
                  DO L = 1 , State%NLayers
                      Sum3 = 0.0d0
-                     DO  JJ =  1 ,  Geom%NGnd  
+                     DO  JJ =  1 ,  Geom%NGnd
                          J = Geom%GndIndex( JJ )
                          Sum3 = Sum3 + Geom%SolSkyGndWt ( JJ ) * Geom%Inc%Lamda( J ) * &
-     &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1 , J)    
+     &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1 , J)
                      END DO
                      State%WinSkyGndAbs(L) = Sum3/Sum2
                  END DO
@@ -1848,44 +1955,46 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  Sum3 = 0.
                  !Note this again assumes the equivalence Inc basis = transmission basis for back incidence and
                  ! Trn basis = incident basis for back incidence
-                 DO   J = 1 , Geom%Trn%NBasis 
-                     DO M = 1 , Geom%Inc%NBasis 
+                 DO   J = 1 , Geom%Trn%NBasis
+                     DO M = 1 , Geom%Inc%NBasis
                          Sum1 = Sum1 +  Construct(IConst)%BSDFInput%SolBkRefl( J , M ) * &
      &                     Geom%Trn%Lamda( J ) * Geom%Inc%Lamda( M )
-                         
+
                      END DO
                  END DO
-                 DO  J = 1 , Geom%Trn%NBasis 
+                 DO  J = 1 , Geom%Trn%NBasis
                      Sum2 = Sum2 +  Geom%Trn%Lamda( J )
                  END DO
                  State%WinBkHemRefl = Sum1/Sum2
-                 
+
+                 Construct(IConst)%ReflectSolDiffBack = State%WinBkHemRefl
+
                  ALLOCATE(State%WinBkHemAbs(State%NLayers))
                  DO L = 1 , State%NLayers
-                     DO    J = 1 , Geom%Trn%NBasis 
+                     DO    J = 1 , Geom%Trn%NBasis
                          Sum3 = Sum3 +  Geom%Trn%Lamda( J ) * &
-     &                     Construct(IConst)%BSDFInput%Layer(L)%BkAbs( 1 , J)    
+     &                     Construct(IConst)%BSDFInput%Layer(L)%BkAbs( 1 , J)
                      END DO
                      State%WinBkHemAbs(L) = Sum3/Sum2
-                     
+
                      !Put this into the construction for use in non-detailed optical calculations
                      Construct(IConst)%AbsDiffBack(L) = State%WinBkHemAbs(L)
                  END DO
                  !Calculate Window Layer Front Hemispherical Absorptance
                  Sum1 = 0.
                  Sum2 = 0.
-                 DO  J = 1 , Geom%Inc%NBasis 
+                 DO  J = 1 , Geom%Inc%NBasis
                      Sum2 = Sum2 +  Geom%Inc%Lamda( J )
                  END DO
                  ALLOCATE(State%WinFtHemAbs(State%NLayers))
                  DO L = 1 , State%NLayers
                      Sum1 = 0.
-                     DO   J = 1 , Geom%Inc%NBasis 
+                     DO   J = 1 , Geom%Inc%NBasis
                          Sum1 = Sum1 +  Geom%Inc%Lamda( J ) * &
      &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs( 1 , J)
                      END DO
                      State%WinFtHemAbs(L) = Sum1/Sum2
-                     
+
                      !Put this into the construction for use in non-detailed optical calculations
                      Construct(IConst)%AbsDiff(L) = State%WinFtHemAbs(L)
                  END DO
@@ -1897,25 +2006,25 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  !   Here it is assumed that one can reverse these rays and get an equivalent set in the Trn
                  !   basis for back-incidence quantities: back transmittance and back layer absorptance
                  !   This assumption may fail if the Inc and Trn bases are allowed to have different structure.
-                 !   Note also that in this case one would need to rethink the relationship of the basis 
+                 !   Note also that in this case one would need to rethink the relationship of the basis
                  !   definitions to back-incidence quantities:  possibly this would
                  !   also require that the basis for back incident quantities be
                  !   different from the Trn basis, and similarly the basis for backward outgoing rays
                  !   be different from the Inc basis.
-                  
+
                  !     *     *     *     *
                  !  Note that we are assuming that for back incidence the layer numberings are the same
                  !  as for front incidence, i.e., from outside to inside when incidence is from inside
                  !     *     *     *     *
                  !For back surfaces that are complex fenestrations, calculate the directional-hemispherical back
-                 !  reflectance and the directional back absorptance by layer for this fenestration receiving 
+                 !  reflectance and the directional back absorptance by layer for this fenestration receiving
                  !  radiation via the back surface
                  !  Make this calculation only for cases where the back surface is a Complex Fenestration
                  !
                  !First allocate the back surface section of the state properties
                  IF(.NOT.ALLOCATED(State%BkSurf)) ALLOCATE( State%BkSurf( Window%NBkSurf ))
                  DO KBkSurf = 1, Window%NBkSurf  !back surface loop
-                     BaseSurf = Surface(ISurf)%BaseSurf     !ShadowComb is organized by base surface 
+                     BaseSurf = Surface(ISurf)%BaseSurf     !ShadowComb is organized by base surface
                      JSurf = ShadowComb(BaseSurf)%BackSurf(KBkSurf)
                      IF ( SurfaceWindow(JSurf)%WindowModelType /= WindowBSDFModel ) CYCLE
                      !
@@ -1927,23 +2036,23 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          DO   M = 1 , Geom%Inc%NBasis   !Outgoing Ray loop
                              Sum1 = Sum1 + Geom%Trn%Lamda( Geom%SurfInt(KBkSurf , J ) ) * Geom%Inc%Lamda( M ) * &
      &                        Construct(IConst)%BSDFInput%SolBkRefl ( M , Geom%SurfInt(KBkSurf , J ) )
-                          END DO    !Outgoing Ray loop           
+                          END DO    !Outgoing Ray loop
                      END DO    !Inc Ray loop
                      IF (Sum2 > 0. ) THEN
                          Hold =Sum1/Sum2
-                         DO  I = 1, 24 
+                         DO  I = 1, 24
                              DO J = 1 , NumOfTimeStepInHour
                                  State%BkSurf(KBkSurf)%WinDHBkRefl( I , J ) = Hold
                              END DO
                          END DO
                      ELSE
-                         DO  I = 1 , 24 
-                             DO J = 1 , NumOfTimeStepInHour 
+                         DO  I = 1 , 24
+                             DO J = 1 , NumOfTimeStepInHour
                                   State%BkSurf(KBkSurf)%WinDHBkRefl( I , J ) = 0.
                              END DO
                          END DO
                      ENDIF
-                     
+
                      !  Directional layer  back absorption
                      DO L = 1 , State%NLayers  !layer loop
                          Sum1 = 0.
@@ -1955,26 +2064,26 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          END DO    !Inc Ray loop
                          IF (Sum2 > 0. ) THEN
                              Hold =Sum1/Sum2
-                             DO  I = 1 , 24 
-                                 DO J = 1 , NumOfTimeStepInHour 
+                             DO  I = 1 , 24
+                                 DO J = 1 , NumOfTimeStepInHour
                                      State%BkSurf(KBkSurf)%WinDirBkAbs( L , I , J ) = Hold
                                  END DO
                              END DO
                          ELSE
-                             DO  I = 1 , 24 
-                                 DO J = 1 , NumOfTimeStepInHour 
+                             DO  I = 1 , 24
+                                 DO J = 1 , NumOfTimeStepInHour
                                      State%BkSurf(KBkSurf)%WinDirBkAbs( L , I , J ) = 0.
                                  END DO
                              END DO
                          ENDIF
-                         
+
                      END DO      !layer loop
                  END DO  !back surface loop
-                 
+
                  ! ********************************************************************************
                  ! Allocation and calculation of integrated values for front of window surface
                  ! ********************************************************************************
-                 
+
                  ! Sum of front absorptances for each incident direction (integration of absorptances)
                  IF(.not.ALLOCATED(State%IntegratedFtAbs)) ALLOCATE(State%IntegratedFtAbs(Geom%Inc%NBasis))
                  DO  J = 1 , Geom%Inc%NBasis
@@ -1982,9 +2091,9 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                    DO L = 1 , State%NLayers  !layer loop
                      Sum1 = Sum1 + Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1, J)
                    END DO
-                   State%IntegratedFtAbs(J) = Sum1                   
+                   State%IntegratedFtAbs(J) = Sum1
                  END DO
-                 
+
                  ! Integrating front transmittance
                  IF(.not.ALLOCATED(State%IntegratedFtTrans)) ALLOCATE(State%IntegratedFtTrans(Geom%Inc%NBasis))
                  DO  J = 1 , Geom%Inc%NBasis     ! Incident ray loop
@@ -1994,7 +2103,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      END DO        ! Outgoing ray loop
                      State%IntegratedFtTrans(J) = Sum1
                  END DO ! Incident ray loop
-                 
+
                  IF(.not.ALLOCATED(State%IntegratedFtRefl)) ALLOCATE(State%IntegratedFtRefl(Geom%Inc%NBasis))
                  ! Integrating front reflectance
                  DO  J = 1 , Geom%Inc%NBasis     ! Incoming ray loop
@@ -2004,7 +2113,7 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  ! ********************************************************************************
                  ! Allocation and calculation of integrated values for back of window surface
                  ! ********************************************************************************
-                 
+
                  ! Sum of back absorptances for each incident direction (integration of absorptances)
                  IF(.not.ALLOCATED(State%IntegratedBkAbs)) ALLOCATE(State%IntegratedBkAbs(Geom%Trn%NBasis))
                  DO  J = 1 , Geom%Trn%NBasis
@@ -2012,9 +2121,9 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                    DO L = 1 , State%NLayers  !layer loop
                      Sum1 = Sum1 + Construct(IConst)%BSDFInput%Layer(L)%BkAbs(1, J)
                    END DO
-                   State%IntegratedBkAbs(J) = Sum1                   
+                   State%IntegratedBkAbs(J) = Sum1
                  END DO
-                 
+
                  ! Integrating back reflectance
                  if(.not.ALLOCATED(State%IntegratedBkRefl)) ALLOCATE(State%IntegratedBkRefl(Geom%Trn%NBasis))
                  DO  J = 1 , Geom%Trn%NBasis     ! Outgoing ray loop
@@ -2024,11 +2133,11 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      END DO        !Incident ray loop
                      State%IntegratedBkRefl(J) = Sum1
                  END DO !Outgoing ray loop
-                 
+
                  if(.not.ALLOCATED(State%IntegratedBkTrans)) ALLOCATE(State%IntegratedBkTrans(Geom%Trn%NBasis))
                  ! Integrating back transmittance
                  DO  J = 1 , Geom%Trn%NBasis     ! Outgoing ray loop
-                     State%IntegratedBkTrans(J) = 1 - State%IntegratedBkRefl(J) - State%IntegratedBkAbs(J)                    
+                     State%IntegratedBkTrans(J) = 1 - State%IntegratedBkRefl(J) - State%IntegratedBkAbs(J)
                  END DO !Outgoing ray loop
   RETURN
 
@@ -2061,7 +2170,7 @@ FUNCTION SkyWeight (DirVec) RESULT(Wt)
           ! FUNCTION ARGUMENT DEFINITIONS:
   TYPE (vector), INTENT (IN)       ::  DirVec            ! Direction of the element to be weighted
   REAL(r64)         :: Wt  ! Weight
-  
+
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
 
@@ -2073,17 +2182,17 @@ FUNCTION SkyWeight (DirVec) RESULT(Wt)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS
           !na
-          
+
           !Flow:
 
           Wt = 1.0
-          
+
           ! To do:  figure out how to weight sky elements to reproduce the current E+ assumptions
           !  Possibly one will need to calculated average DH transmittance for isotropic sky and
           !  horizon separately and then later average according to sky conditions.  Then a completely
-          !  different scheme for daylight.  For now: rays that reach sky equally weighted in calculating 
+          !  different scheme for daylight.  For now: rays that reach sky equally weighted in calculating
           !  transmittance, rays passing through surfaces with scheduled transmittance are neglected.
-   
+
       RETURN
 
 END FUNCTION SkyWeight
@@ -2114,7 +2223,7 @@ FUNCTION SkyGndWeight (PosVec) RESULT(Wt)
           ! FUNCTION ARGUMENT DEFINITIONS:
   TYPE (vector), INTENT (IN)       ::  PosVec            ! x,y,z(=0) of ground intersection pt
   REAL(r64)         :: Wt  ! Weight
-  
+
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
 
@@ -2126,11 +2235,11 @@ FUNCTION SkyGndWeight (PosVec) RESULT(Wt)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS
           !na
-          
+
           !Flow:
 
           Wt = 1.0
-          
+
           !  At present, equally weights all ground rays for calculation of the complex window transmittance for
           !  sky radiation reflected from ground.  This does not take into account shading of the ground.
           !  The correct procedure would be to generate a set of rays to the sky and see which do not intersect
@@ -2140,8 +2249,8 @@ FUNCTION SkyGndWeight (PosVec) RESULT(Wt)
           !  whether the more detailed procedure would produce enough improvement in accuracy to make up for
           !  the additional calculation time.  Therefore a more detailed treatment is deferred until there is some
           !  experience with the new method to determine whether further detail is warranted.
-          
-             
+
+
       RETURN
 
 END FUNCTION SkyGndWeight
@@ -2179,7 +2288,7 @@ FUNCTION WorldVectFromW6 (Theta, Phi, RadType, Gamma, Alpha) RESULT(UnitVect)
   REAL(r64), INTENT(IN)      ::  Gamma  !Surface tilt angle, radians, world coordinate system
   REAL(r64), INTENT(IN)      ::  Alpha  !Surface azimuth, radians, world coordinate system
   TYPE(Vector)        ::  UnitVect  !unit vector direction in world CS
-          
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -2190,9 +2299,9 @@ FUNCTION WorldVectFromW6 (Theta, Phi, RadType, Gamma, Alpha) RESULT(UnitVect)
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-          
-  
-  UnitVect = vector(0.,0.,0.)        
+
+
+  UnitVect = vector(0.,0.,0.)
   SELECT CASE (RadType)
     CASE (Front_Incident)   !W6 vector will point in direction of propagation, must reverse to get world vector
                                              !  after the W6 vector has been rotated into the world CS
@@ -2232,25 +2341,25 @@ FUNCTION WorldVectFromW6 (Theta, Phi, RadType, Gamma, Alpha) RESULT(UnitVect)
         & +COS(Theta)*SIN(Gamma)*COS(Alpha))
       UnitVect%z = SIN(Theta)*SIN(Phi)*SIN(Gamma)-COS(Theta)*COS(Gamma)
    END SELECT
-   
+
    RETURN
-          
+
 END FUNCTION WorldVectFromW6
 
-                                
-     
+
+
 FUNCTION FindInBasis ( RayToFind, RadType,IWind,ISurf,IState,Basis,Theta,Phi) RESULT ( RayIndex )
 
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Joe Klems
-          !       DATE WRITTEN August 2011   
+          !       DATE WRITTEN August 2011
           !       MODIFIED       na
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS FUNCTION:
           !
-          
+
           ! METHODOLOGY EMPLOYED:
           ! <n/a>
 
@@ -2273,9 +2382,9 @@ FUNCTION FindInBasis ( RayToFind, RadType,IWind,ISurf,IState,Basis,Theta,Phi) RE
   REAL(r64), INTENT(OUT)        ::  Theta  !Theta value for ray
   REAL(r64), INTENT(OUT)        ::  Phi  !Phi value for ray
   INTEGER        ::  RayIndex  !Index of ray in basis, zero if ray not in hemisphere
-  
-  
-          
+
+
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -2294,17 +2403,17 @@ FUNCTION FindInBasis ( RayToFind, RadType,IWind,ISurf,IState,Basis,Theta,Phi) RE
           INTEGER        ::  IPhUp  !Phi upper table index
           REAL(r64)        ::  Gamma  !Gamma (tilt) angle of window
           REAL(r64)        ::  Alpha  !Alpha (azimuth) angle of window
-          
-          
+
+
           Theta = 0.0d0
           Phi = 0.0d0
-          
+
           !get window tilt and azimuth
           Gamma = DegToRadians*Surface(ISurf)%Tilt
           Alpha = DegToRadians*Surface(ISurf)%Azimuth
           !get the corresponding local Theta, Phi for ray
           CALL W6CoordsFromWorldVect (RayToFind, RadType, Gamma, Alpha,Theta, Phi)
-          
+
           IF (Theta >= 0.5*Pi) THEN     !Ray was in not in correct hemisphere
               RayIndex = 0
               RETURN
@@ -2340,7 +2449,7 @@ FUNCTION FindInBasis ( RayToFind, RadType,IWind,ISurf,IState,Basis,Theta,Phi) RE
                       IPhi = IPhDn
                   ELSE
                       IF (IPhUp == Basis%NPhis(ITheta) + 1 ) THEN
-                          ! Phi is above upper limit for highest Phi basis element, meaning it is closer to 2Pi, 
+                          ! Phi is above upper limit for highest Phi basis element, meaning it is closer to 2Pi,
                           ! i.e., the first element
                           IPhi =1
                       ELSE
@@ -2372,15 +2481,15 @@ FUNCTION FindInBasis ( RayToFind, RadType,IWind,ISurf,IState,Basis,Theta,Phi) RE
           ENDIF
           !No other type is implemented
            RayIndex = 0
-        
-          
-   
+
+
+
    RETURN
-          
+
 END FUNCTION FindInBasis
 
 
-SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi) 
+SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
 
 
           ! SUBROUTINE INFORMATION:
@@ -2395,7 +2504,7 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
           ! in the world coordinate system, for a window with a
           ! given rotation and tilt (Gamma and Alpha)
           !  (needed for locating the sun direction in the local coordinate system)
-          
+
           ! METHODOLOGY EMPLOYED:
           ! <n/a>
 
@@ -2415,8 +2524,8 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
   REAL(r64), INTENT(IN)      ::  Alpha  !Surface azimuth, world coordinate system
   REAL(r64), INTENT(OUT)      ::  Theta  !Polar angle in W6 Coords
   REAL(r64), INTENT(OUT)      ::  Phi  !Azimuthal angle in W6 Coords
-  
-          
+
+
          ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -2436,7 +2545,7 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
   REAL(r64)                     ::  RdotX   !Temp variable for manipulating .dot. produt
   REAL(r64)                     ::  RdotY   !Temp variable for manipulating .dot. produt
   REAL(r64)                     ::  RdotZ   !Temp variable for manipulating .dot. produt
-  
+
   ! define the local W6 coordinate vectors
   W6x%x = COS(Alpha)
   W6x%y = -SIN(Alpha)
@@ -2446,7 +2555,7 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
   W6y%z = SIN(Gamma)
   W6z%x = -SIN(Gamma)*SIN(Alpha)
   W6z%y = -SIN(Gamma)*COS(Alpha)
-  W6z%z = -COS(Gamma)    
+  W6z%z = -COS(Gamma)
   SELECT CASE (RadType)
     CASE (Front_Incident)
       RdotZ =W6z.dot.RayVect
@@ -2474,7 +2583,7 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
           Phi = Psi
       ENDIF
     CASE (Front_Reflected)
-      RdotZ =W6z.dot.RayVect 
+      RdotZ =W6z.dot.RayVect
       Cost = -RdotZ
       Sint = SQRT(1. - Cost**2)
       Theta = ACOS(Cost)
@@ -2527,7 +2636,7 @@ SUBROUTINE W6CoordsFromWorldVect (RayVect, RadType, Gamma, Alpha,Theta, Phi)
    IF(ABS(Cost) < rTinyValue)Cost = 0.
    IF(Cost < 0. ) Theta = Pi - Theta  !This signals ray out of hemisphere
    RETURN
-          
+
 END SUBROUTINE W6CoordsFromWorldVect
 
 
@@ -2544,7 +2653,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
 
           ! METHODOLOGY EMPLOYED:
           ! draft out an attempt for proof-of-concept, to reuse native TARCOG implementation
-          ! based off of 1-26-2009 version of WinCOG/TARCOG solution from Carli, Inc. 
+          ! based off of 1-26-2009 version of WinCOG/TARCOG solution from Carli, Inc.
 
           ! REFERENCES:
           ! na
@@ -2557,13 +2666,13 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   USE Psychrometrics,    ONLY : PsyCpAirFnWTdb,PsyTdpFnWPb
   USE General,           ONLY : InterpSlatAng , InterpSw ! Function for slat angle interpolation
   USE InputProcessor,    ONLY : SameString
-  USE DataHeatBalSurface,   ONLY : HcExtSurf
+  USE DataHeatBalSurface, ONLY : HcExtSurf
   USE DataGlobals, ONLY: StefanBoltzmann
   USE TARCOGGassesParams, ONLY : maxgas
   USE TARCOGParams, ONLY : maxlay, maxlay1
   USE DataHeatBalance, ONLY : GasCoeffsAir, SupportPillar
   USE TARCOGMain, ONLY : TARCOG90
-   
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2578,7 +2687,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   !INTEGER, INTENT(IN)        :: CurrentThermalModelNumber
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  !INTEGER,  PARAMETER :: maxlay = 100 ! maximum number of layers (including laminates) 
+  !INTEGER,  PARAMETER :: maxlay = 100 ! maximum number of layers (including laminates)
   !INTEGER,  PARAMETER :: maxgas = 10  ! maximum number of individual gasses
   !INTEGER, PARAMETER :: maxlay1  = maxlay+1     ! maximum number of 'gaps', including in and out (maxlay+1)
   !REAL(r64), PARAMETER :: StefanBoltzmannConst = 5.6697d-8   ! Stefan-Boltzmann constant in W/(m2*K4)
@@ -2596,19 +2705,19 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   INTEGER   ::  iwd    = 0 !    Wind direction:  0 - windward, 1 - leeward
   REAL(r64) ::  tout   = 0.0D0 !    Outdoor temperature [K]
   REAL(r64) ::  tind   = 0.0D0 !    Indoor temperature [K]
-  REAL(r64) ::  trmin  = 0.0D0 !    Indoor mean radiant temperature [K]  
+  REAL(r64) ::  trmin  = 0.0D0 !    Indoor mean radiant temperature [K]
   REAL(r64) ::  wso    = 0.0D0 !    Outdoor wind speed [m/s]
   REAL(r64) ::  wsi    = 0.0D0 !    Inside forced air speed [m/s]
   REAL(r64) ::  dir    = 0.0D0  !    Direct solar radiation [W/m^2]
   INTEGER   ::  isky   = 0  !    Flag for sky temperature (Tsky) and sky emittance (esky)
-                            !                      0 - both tsky and esky are specified  
-                            !                      1 - tsky specified, esky = 1 
+                            !                      0 - both tsky and esky are specified
+                            !                      1 - tsky specified, esky = 1
                             !                      2 - Swinbank model for effective sky emittance
   REAL(r64) ::  tsky   = 0.0D0 !    Night sky temperature [K]
   REAL(r64) ::  esky   = 0.0D0 !    Effective night sky emittance
   REAL(r64) ::  fclr   = 0.0D0 !    Fraction of sky that is clear
   REAL(r64) ::  VacuumPressure ! maximal pressure for gas to be considered as vacuum [Pa]
-  REAL(r64) ::  VacuumMaxGapThickness  ! maximal gap thickness for which vacuum calculation will work without issuing 
+  REAL(r64) ::  VacuumMaxGapThickness  ! maximal gap thickness for which vacuum calculation will work without issuing
                                        ! warning message
   REAL(r64) , DIMENSION(maxlay) ::  gap  = 0.0D0 ! Vector of gap widths [m] {maxlay}
   REAL(r64) , DIMENSION(maxlay) ::  thick    = 0.0D0 ! Vector of glass thicknesses [m] {maxlay}
@@ -2647,11 +2756,11 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
 
   INTEGER, DIMENSION(maxlay+1, maxgas)   ::  iprop = 1 !  Matrix of gas codes - see above {maxgap x maxgas}
   REAL(r64), DIMENSION(maxlay+1, maxgas) ::  frct  = 0.0D0  !  Matrix of mass percentages in gap mixtures  {maxgap x maxgas}
-  REAL(r64), DIMENSION(maxgas, 3)        ::  gcon  = 0.0D0  !  Matrix of constants for gas conductivity calc 
+  REAL(r64), DIMENSION(maxgas, 3)        ::  gcon  = 0.0D0  !  Matrix of constants for gas conductivity calc
                                                             !     (A, B, C for max of 10 gasses) {maxgas x 3}
-  REAL(r64), DIMENSION(maxgas, 3)        ::  gvis  = 0.0D0  !  Matrix of constants for gas dynamic viscosity calc 
+  REAL(r64), DIMENSION(maxgas, 3)        ::  gvis  = 0.0D0  !  Matrix of constants for gas dynamic viscosity calc
                                                             !     (A, B, C for max of 10 gasses) {maxgas x 3}
-  REAL(r64), DIMENSION(maxgas, 3)        ::  gcp   = 0.0D0  !  Matrix of constants for gas specific heat calc at constant pressure 
+  REAL(r64), DIMENSION(maxgas, 3)        ::  gcp   = 0.0D0  !  Matrix of constants for gas specific heat calc at constant pressure
                                                             !     (A, B, C for max of 10 gasses) {maxgas x 3}
   REAL(r64), DIMENSION(maxgas)           ::  wght   = 0.0D0  !  Vector of Molecular weights for gasses {maxgas}
   REAL(r64), DIMENSION(maxgas)           ::  gama   = 0.0D0  !  Vector of spefic heat ration for low pressure calc {maxgas}
@@ -2659,48 +2768,48 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   INTEGER, DIMENSION(maxlay + 1)         ::  nmix   = 0      !  Vector of number of gasses in gas mixture of each gap {maxlay+1}
   REAL(r64)  ::   hin  = 0.0D0  !      Indoor combined film coefficient (if non-zero) [W/m^2.K]
   REAL(r64)  ::   hout = 0.0D0  !      Outdoor combined film coefficient (if non-zero) [W/m^2.K]
-  INTEGER, DIMENSION(2) ::   ibc = 0  !  Vector of boundary condition flags (ibc(1) - outdoor, ibc(2) - indoor) 
-                                      !             0 - h to be calculated; 
-                                      !             1 - combined film coefficient (h) prescribed; 
-                                      !             2 - convective film coefficient (hc) prescribed. 
+  INTEGER, DIMENSION(2) ::   ibc = 0  !  Vector of boundary condition flags (ibc(1) - outdoor, ibc(2) - indoor)
+                                      !             0 - h to be calculated;
+                                      !             1 - combined film coefficient (h) prescribed;
+                                      !             2 - convective film coefficient (hc) prescribed.
                                       !           Also used in old algorithms for calculating h, accessible through
-                                      !           negative values for flags: 
-                                      !             -1  - old SPC142 correlation 
+                                      !           negative values for flags:
+                                      !             -1  - old SPC142 correlation
                                       !             -2  - Klems-Yazdanian correlation (applicable to outdoor only)
                                       !             -3  - Kimura correlation (applicable to outdoor only)
-  REAL(r64), DIMENSION(maxlay) :: Atop = 0.0D0  !      Vector with areas of top openings - between SD layers and top of 
+  REAL(r64), DIMENSION(maxlay) :: Atop = 0.0D0  !      Vector with areas of top openings - between SD layers and top of
                                                 !               glazing cavity, for each layer [m^2] {maxlay} *
   REAL(r64), DIMENSION(maxlay) :: Abot = 0.0D0  !      Vector with areas of bottom openings - between SD layers
-                                                !               and bottom of glazing cavity [m^2] {maxlay} 
+                                                !               and bottom of glazing cavity [m^2] {maxlay}
   REAL(r64), DIMENSION(maxlay) :: Al   = 0.0D0  !      Vector with areas of left-hand side openings - between SD layers
-                                                !               and left end of glazing cavity [m^2] {maxlay} 
+                                                !               and left end of glazing cavity [m^2] {maxlay}
   REAL(r64), DIMENSION(maxlay) :: Ar   = 0.0D0  !      Vector of areas of right-hand side openings - between SD layers
-                                                !               and right end of glazing cavity [m^2] {maxlay} 
+                                                !               and right end of glazing cavity [m^2] {maxlay}
   REAL(r64), DIMENSION(maxlay) :: Ah   = 0.0D0  !      Vector of total areas of holes for each SD [m^2] {maxlay}
   REAL(r64), DIMENSION(maxlay) :: SlatThick = 0.0D0 !  Thickness of the slat material [m] {maxlay} **
-  REAL(r64), DIMENSION(maxlay) :: SlatWidth = 0.0D0 !  Slat width [m] {maxlay} 
-  REAL(r64), DIMENSION(maxlay) :: SlatAngle = 0.0D0 !  Slat tilt angle [deg] {maxlay} 
-  REAL(r64), DIMENSION(maxlay) :: SlatCond  = 0.0D0 !  Conductivity of the slat material [W/m.K] {maxlay} 
-  REAL(r64), DIMENSION(maxlay) :: SlatSpacing = 0.0D0 ! Distance between slats [m] {maxlay} 
-  REAL(r64), DIMENSION(maxlay) :: SlatCurve = 0.0D0   ! Curvature radius of the slat [m] {maxlay} 
-  REAL(r64), DIMENSION(maxlay+1) :: vvent   = 0.0D0   !   Vector of velocities for forced ventilation, for each gap, and for 
+  REAL(r64), DIMENSION(maxlay) :: SlatWidth = 0.0D0 !  Slat width [m] {maxlay}
+  REAL(r64), DIMENSION(maxlay) :: SlatAngle = 0.0D0 !  Slat tilt angle [deg] {maxlay}
+  REAL(r64), DIMENSION(maxlay) :: SlatCond  = 0.0D0 !  Conductivity of the slat material [W/m.K] {maxlay}
+  REAL(r64), DIMENSION(maxlay) :: SlatSpacing = 0.0D0 ! Distance between slats [m] {maxlay}
+  REAL(r64), DIMENSION(maxlay) :: SlatCurve = 0.0D0   ! Curvature radius of the slat [m] {maxlay}
+  REAL(r64), DIMENSION(maxlay+1) :: vvent   = 0.0D0   !   Vector of velocities for forced ventilation, for each gap, and for
                                                       !               outdoor and indoor environment [m/s] {maxlay+1} ***
-  REAL(r64), DIMENSION(maxlay+1) :: tvent   = 0.0D0   !  Vector of temperatures of ventilation gas for forced ventilation, for each 
+  REAL(r64), DIMENSION(maxlay+1) :: tvent   = 0.0D0   !  Vector of temperatures of ventilation gas for forced ventilation, for each
                                                       !  gap, and for outdoor and indoor environment [K] {maxlay+1}
   INTEGER, DIMENSION(maxlay) ::  LayerType = 0 !  Glazing layer type flag {maxlay}:
-                                              !                 0 - Specular layer, 
+                                              !                 0 - Specular layer,
                                               !                 1 - Venetian blind (SD)
                                               !                 2 - Woven shade (SD) (not implemented)
                                               !                 3 - Diffuse shade (not implemented)
-  INTEGER, DIMENSION(maxlay) ::   nslice   = 0  !   Vector of numbers of slices in a laminated glazing layers 
+  INTEGER, DIMENSION(maxlay) ::   nslice   = 0  !   Vector of numbers of slices in a laminated glazing layers
                                                 !   (0 - monolithic layer) {maxlay}
   REAL(r64), DIMENSION(maxlay) :: LaminateA = 0.0D0 !  Left-hand side array for creating slice equations {maxlay}
   REAL(r64), DIMENSION(maxlay) :: LaminateB = 0.0D0 !  Right-hand side array for creating slice equations {maxlay}
-  REAL(r64), DIMENSION(maxlay) :: sumsol = 0.0D0    !  Array of absorbed solar energy fractions for each laminated 
+  REAL(r64), DIMENSION(maxlay) :: sumsol = 0.0D0    !  Array of absorbed solar energy fractions for each laminated
                                                   !               glazing layer [W/m^2] {maxlay}
   INTEGER ::   standard = 1 !   Calculation standard switch:
-                            !                 1 - ISO 15099, 
-                            !                 2 - EN673 / ISO 10292 Declared, 
+                            !                 1 - ISO 15099,
+                            !                 2 - EN673 / ISO 10292 Declared,
                             !                 3 - EN673 / ISO 10292 Design.
   INTEGER ::    ThermalMod  = 0 ! Thermal model:
                                 !                 0 - ISO15099
@@ -2716,9 +2825,9 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   INTEGER(4) ::    IGU_ID    = -1 ! ID of the IGU (long integer value, passed by W6)
   REAL(r64) ::   SDScalar  = 0.0D0 !  SD convection factor (value between 0 and 1)
                                     !                 0.0 - No SD layer
-                                    !                 1.0 - Closed SD  
+                                    !                 1.0 - Closed SD
   !
-  !               Notes:   * vvent, tvent, Atop, Abot, Al, Ar and Ah are considered for SD layers only. 
+  !               Notes:   * vvent, tvent, Atop, Abot, Al, Ar and Ah are considered for SD layers only.
   !                       ** SlatThick, SlatWidth, SlatAngle, SlatCond, SlatSpacing, SlatCurve
   !                          are used for Venetian blind layers only.
   !                      *** For vvent & tvent: vvent(1) - exterior, vvent(nlayer+1) - interior.
@@ -2730,12 +2839,12 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   REAL(r64) , DIMENSION(maxlay * 2 + 1) ::   q = 0.0D0 !   Vector of various heat fluxes [W/m^2] {2*maxlay+1},
                                                         !    depending on element index:
                                                         !    1  = qout (heat flux from outer-most glazing surface to outdoor space)
-                                                        !   2*i = qpane(i) (heat flux through i-th glazing layer) 
-                                                        ! 2*i-1 = qgap(i) (heat flux from i-th glazing cavity to indoor-faced 
+                                                        !   2*i = qpane(i) (heat flux through i-th glazing layer)
+                                                        ! 2*i-1 = qgap(i) (heat flux from i-th glazing cavity to indoor-faced
                                                         !          surface of the adjacent glazing layer)
-                                                        ! 2*nlayer+1 = qin (heat flux from indoor space to inner-most glazing 
+                                                        ! 2*nlayer+1 = qin (heat flux from indoor space to inner-most glazing
                                                         !              surface)
-  REAL(r64) , DIMENSION(maxlay1) :: qprim = 0.0D0 ! Vector of heat fluxes from the outdoor-faced surfaces of glazing layers 
+  REAL(r64) , DIMENSION(maxlay1) :: qprim = 0.0D0 ! Vector of heat fluxes from the outdoor-faced surfaces of glazing layers
                                                         !    towards the adjacent glazing cavity [W/m2]
   REAL(r64) , DIMENSION(maxlay1) ::  qv = 0.0D0 !     Vector of heat fluxes to each gap by ventillation [W/m^2]
   REAL(r64) :: ufactor = 0.0D0 !    Center of glass U-value [W/m^2.K]
@@ -2749,17 +2858,17 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   REAL(r64) ::   hrout = 0.0D0 !       Outdoor radiative surface heat transfer coefficient [W/m^2.K]
   REAL(r64) , DIMENSION(maxlay1) ::   hcgap  = 0.0D0 !      Convective part of gap effective conductivity {maxlay}
   REAL(r64) , DIMENSION(maxlay1) ::   hrgap  = 0.0D0 ! Radiative part of gap effective conductivity (including in and out)
-  REAL(r64) ::   shgc  = 0.0D0 !       Solar heat gain coefficient - per ISO 15099 
+  REAL(r64) ::   shgc  = 0.0D0 !       Solar heat gain coefficient - per ISO 15099
   REAL(r64) ::   shgct = 0.0D0 !       Solar heat gain coefficient - per old procedure
   REAL(r64) ::   tamb  = 0.0D0 !       Outdoor environmental temperature [K]
   REAL(r64) ::     troom  = 0.0D0 !      Indoor environmental temperature [K]
-  REAL(r64) , DIMENSION(maxlay) ::     hg    = 0.0D0  !      Gas conductance of the glazing cavity 
-                                                      !         [W/m^2.K] - EN673 and ISO 10292 procedure 
+  REAL(r64) , DIMENSION(maxlay) ::     hg    = 0.0D0  !      Gas conductance of the glazing cavity
+                                                      !         [W/m^2.K] - EN673 and ISO 10292 procedure
   REAL(r64) , DIMENSION(maxlay) ::     hr   = 0.0D0   !      Radiation conductance of the glazing cavity
                                                       !         [W/m^2.K] - EN673 and ISO 10292 procedure
-  REAL(r64) , DIMENSION(maxlay) ::     hs  = 0.0D0    !     Thermal conductance of the glazing cavity 
+  REAL(r64) , DIMENSION(maxlay) ::     hs  = 0.0D0    !     Thermal conductance of the glazing cavity
                                                       !         [W/m^2.K] - EN673 and ISO 10292 procedure
-  REAL(r64) ::     he  = 0.0D0 !         External heat transfer coefficient [W/m^2.K] - EN673 and ISO 10292 procedure 
+  REAL(r64) ::     he  = 0.0D0 !         External heat transfer coefficient [W/m^2.K] - EN673 and ISO 10292 procedure
   REAL(r64) ::     hi = 0.0D0 !          Internal heat transfer coefficient [W/m^2.K] - EN673 and ISO 10292 procedure
   REAL(r64) , DIMENSION(maxlay + 1)  ::  Ra = 0.0D0 !         Vector of Rayleigh numbers, for each gap {maxlay}
   REAL(r64) , DIMENSION(maxlay + 1)  ::  Nu = 0.0D0 !         Vector of Nusselt numbers, for each gap {maxlay}
@@ -2771,7 +2880,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   REAL(r64) ::   HcUnshadedOut     = 0.0D0 !    Hc value at outdoor surface of an unshaded subsystem [W/m^2.K]
   REAL(r64) ::   HcUnshadedIn     = 0.0D0 !     Hc value at indoor surface of an unshaded subsystem [W/m^2.K]
   REAL(r64) , DIMENSION(maxlay)  ::  Keff   = 0.0D0 !    Vector of keff values for gaps [W/m.K] {maxlay}
-  REAL(r64) , DIMENSION(maxlay-1)  ::    ShadeGapKeffConv  = 0.0D0 ! Vector of convective keff values for areas above/below 
+  REAL(r64) , DIMENSION(maxlay-1)  ::    ShadeGapKeffConv  = 0.0D0 ! Vector of convective keff values for areas above/below
                                                                    ! SD layers [W/m.K] {maxlay-1}
 
 
@@ -2792,6 +2901,13 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
                                             !   (sum of solid layers and gap layers)
   INTEGER   :: Lay                          ! Layer number
   INTEGER   :: LayPtr                       ! Material number for a layer
+  INTEGER   :: ShadingLayPtr                ! Shading layer pointer for effective temperature calculations
+  INTEGER   :: GlassLayPtr                  ! Glass layer pointer for effective temperature calculations
+  REAL(r64) :: EpsGlassIR
+  REAL(r64) :: RhoGlassIR
+  REAL(r64) :: TauShadeIR
+  REAL(r64) :: EpsShadeIR
+  REAL(r64) :: RhoShadeIR
   INTEGER   :: IGlass                       ! glass layer number (1,2,3,...)
   INTEGER   :: IGap                         ! Gap layer number (1,2,...)
   INTEGER   :: ShadeLayPtr                  ! Material number corresponding to a shade layer
@@ -2813,13 +2929,13 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   INTEGER   :: imix
   REAL(r64) :: EffShBlEmiss                 ! Effective interior shade or blind emissivity
   REAL(r64) :: EffGlEmiss                   ! Effective inside glass emissivity when interior shade or blind
-  
+
   REAL(r64)         :: IncidentSolar         ! Solar incident on outside of window (W)
   REAL(r64)         :: ConvHeatFlowNatural   ! Convective heat flow from gap between glass and interior shade or blind (W)
   REAL(r64)         :: ShadeArea             ! shade/blind area (m2)
   REAL(r64)         :: sconsh                ! shade/blind conductance (W/m2-K)
   REAL(r64)         :: CondHeatGainShade     ! Conduction through shade/blind, outside to inside (W)
-  
+
   REAL(r64)         :: ShGlReflFacIR         ! Factor for long-wave inter-reflection between shade/blind and adjacent glass
   REAL(r64)         :: RhoGlIR1,RhoGlIR2     ! Long-wave reflectance of glass surface facing shade/blind; 1=exterior shade/blind,
                                              !  2=interior shade/blind
@@ -2848,28 +2964,29 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   REAL(r64)         :: TransDiff             ! Diffuse shortwave transmittance
   INTEGER           :: CalcSHGC = 0          ! SHGC calculations are not necessary for E+ run
   INTEGER           :: NumOfIterations = 0   !
-  
+
   integer :: GasType  !locally used coefficent to point at correct gas type
   integer :: ICoeff
-  
+
   CHARACTER (len=2000) :: tarcogErrorMessage ! store error text from tarcog
-  
+
   !Simon: locally used variables
   integer :: ngllayer, nglface, nglfacep, tempInt
   integer :: PillarPtr, DeflectionPtr, GasPointer, ThermalModelNum
   real(r64) :: Rmir, outir, Ebout                         ! IR radiance of window's interior surround (W/m2)
+  REAL(r64) :: dominantGapWidth               ! store value for dominant gap width.  Used for airflow calculations
   
   ! fill local vars 
   
   CalcDeflection = 0
   CalcSHGC = 0
-  
+
   if (CalcCondition == noCondition) then
     ConstrNum = Surface(SurfNum)%Construction
     SurfNumAdj = Surface(SurfNum)%ExtBoundCond
     ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
   end if
-  
+
   TotGlassLay = Construct(ConstrNum)%TotGlassLayers
   ngllayer = Construct(ConstrNum)%TotGlassLayers
   nglface  = 2*ngllayer
@@ -2880,7 +2997,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   hcout = 0.0d0
 
   Pa = OutBaroPress
-  
+
   ThermalModelNum = Construct(ConstrNum)%BSDFInput%ThermalModel
   standard        = WindowThermalModel(ThermalModelNum)%CalculationStandard
   ThermalMod      = WindowThermalModel(ThermalModelNum)%ThermalModel
@@ -2893,10 +3010,10 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   if (CalcCondition == noCondition) then
     ZoneNum = Surface(SurfNum)%Zone
   end if
-  
+
   nlayer = Construct(ConstrNum)%TotSolidLayers
   isky = 3  ! IR radiation is provided from external source
-  iwd  = 0 ! assume windward for now.  TODO compare surface normal with wind direction 
+  iwd  = 0 ! assume windward for now.  TODO compare surface normal with wind direction
 
   if (CalcCondition == noCondition) then
 
@@ -2927,7 +3044,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
           DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
               NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
               MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
-              CpAir = PsyCpAirFnWTdb(ZoneAirHumRat(ZoneNum), NodeTemp,'CalcWindowHeatBalance')
+              CpAir = PsyCpAirFnWTdb(ZoneAirHumRat(ZoneNum), NodeTemp,'CalcComplexWindowThermal')
               SumSysMCp = SumSysMCp + MassFlowRate * CpAir
               SumSysMCpT = SumSysMCpT + MassFlowRate * CpAir * NodeTemp
           END DO
@@ -2939,12 +3056,12 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     END SELECT
 
     tind = RefAirTemp + KelvinConv  ! Inside air temperature
-  
-    ! now get "outside" air temperature 
-                                                                        IF(SurfNumAdj > 0) THEN  ! Interzone window
-  
+
+    ! now get "outside" air temperature
+    IF(SurfNumAdj > 0) THEN  ! Interzone window
+
     ZoneNumAdj = Surface(SurfNumAdj)%Zone
-  
+
      ! determine reference air temperature for this surface
     SELECT CASE (Surface(SurfNumAdj)%TAirRef)
       CASE (ZoneMeanAirTemp)
@@ -2966,7 +3083,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
           DO NodeNum = 1, ZoneEquipConfig(ZoneEquipConfigNum)%NumInletNodes
               NodeTemp = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%Temp
               MassFlowRate = Node(ZoneEquipConfig(ZoneEquipConfigNum)%InletNode(NodeNum))%MassFlowRate
-              CpAir = PsyCpAirFnWTdb(ZoneAirHumRat(ZoneNumAdj), NodeTemp, 'CalcWindowHeatBalance')
+              CpAir = PsyCpAirFnWTdb(ZoneAirHumRat(ZoneNumAdj), NodeTemp, 'CalcComplexWindowThermal')
               SumSysMCp = SumSysMCp + MassFlowRate * CpAir
               SumSysMCpT = SumSysMCpT + MassFlowRate * CpAir * NodeTemp
           END DO
@@ -2976,11 +3093,11 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
           ! currently set to mean air temp but should add error warning here
           RefAirTemp = MAT(ZoneNumAdj)
     END SELECT
-  
+
       Tout = RefAirTemp + KelvinConv  ! outside air temperature
-  
+
       tsky = MRT(ZoneNumAdj) + KelvinConv ! TODO this misses IR from sources such as high temp radiant and baseboards
-  
+
     !  ! Add long-wave radiation from adjacent zone absorbed by glass layer closest to the adjacent zone.
     !
     !  AbsRadGlassFace(1) = AbsRadGlassFace(1) + QRadThermInAbs(SurfNumAdj)
@@ -2989,9 +3106,9 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     !  ! from surfaces and high-temp radiant sources in the adjacent zone
     !
     outir = SurfaceWindow(SurfNumAdj)%IRfromParentZone + QHTRadSysSurf(SurfNumAdj) + QHWBaseboardSurf(SurfNumAdj)
-  
+
     ELSE  ! Exterior window (ExtBoundCond = 0)
-  
+
       IF(Surface(SurfNum)%ExtWind) THEN  ! Window is exposed to wind (and possibly rain)
         IF(IsRain) THEN  ! Raining: since wind exposed, outside window surface gets wet
           tout = Surface(SurfNum)%OutWetBulbTemp + KelvinConv
@@ -3006,12 +3123,12 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
         Ebout = sigma * tout**4
         outir = Surface(SurfNum)%ViewFactorSkyIR * (AirSkyRadSplit(SurfNum)*sigma*tsky**4 + (1.-AirSkyRadSplit(SurfNum))*Ebout) + &
              Surface(SurfNum)%ViewFactorGroundIR * Ebout
-  
+
     END IF
-  
+
     hin = HConvIn(SurfNum)  ! Room-side surface convective film conductance
     ibc(2) = 0  ! convective coefficient on indoor side will be recalculated (like in Winkelmann routines)
-  
+
     !hcout=HExtConvCoeff  ! Exterior convection coefficient is passed in from outer routine
     hout=HExtConvCoeff  ! Exterior convection coefficient is passed in from outer routine
     ibc(1) = 2 ! prescribed convective film coeff on outdoor side
@@ -3019,13 +3136,13 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     height = Surface(SurfNum)%Height
     heightt = height ! for now put same window and glazing pocket hights
     width = Surface(SurfNum)%Width
-  
-    !indoor mean radiant temperature. 
+
+    !indoor mean radiant temperature.
     ! IR incident on window from zone surfaces and high-temp radiant sources
     rmir = SurfaceWindow(SurfNum)%IRfromParentZone + QHTRadSysSurf(SurfNum) + QHWBaseboardSurf(SurfNum) + &
       QSteamBaseboardSurf(SurfNum) + QElecBaseboardSurf(SurfNum)
-    trmin = ( rmir / StefanBoltzmann)**0.25d0  ! TODO check model equation. 
-  
+    trmin = ( rmir / StefanBoltzmann)**0.25d0  ! TODO check model equation.
+
     ! outdoor wind speed
     IF (.NOT. Surface(SurfNum)%ExtWind) THEN
       wso =  0.0d0  ! No wind exposure
@@ -3034,14 +3151,14 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     ELSE
       wso = Surface(SurfNum)%WindSpeed
     ENDIF
-  
+
     ! indoor wind speed
-    wsi = 0.0d0 ! assumuption (TODO, what to use for inside air velocity?) 
-  
-  
-    fclr = 1.0D0 - CloudFraction 
+    wsi = 0.0d0 ! assumuption (TODO, what to use for inside air velocity?)
+
+
+    fclr = 1.0D0 - CloudFraction
   end if
-  
+
   !now fill layer data
   !IConst = ConstrNum
   !IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn &
@@ -3052,7 +3169,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   !TotLay = Construct(IConst)%TotLayers
   TotLay = Construct(ConstrNum)%TotLayers
   IGap = 0
-  
+
   !****************************************************************************************************
   !
   ! Inside and outside gas coefficients
@@ -3061,11 +3178,11 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   iprop(1, 1) = 1 ! air on outdoor side
   frct(1, 1)  = 1.0d0   ! pure air on outdoor side
   nmix(1)     = 1 ! pure air on outdoor side
-  
+
   iprop(nlayer + 1, 1) = 1 ! air on indoor side
   frct(nlayer + 1, 1)  = 1.0d0 ! pure air on indoor side
   nmix(nlayer + 1)     = 1 ! pure air on indoor side
-  
+
   !Simon: feed gas coefficients with air.  This is necessary for tarcog because it is used on indoor and outdoor sides
   GasType = GasCoeffsAir
   wght(iprop(1, 1)) = GasWght(GasType)
@@ -3073,15 +3190,15 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   DO ICoeff = 1,3
     gcon(iprop(1, 1), ICoeff)   = GasCoeffsCon(GasType,ICoeff)
     gvis(iprop(1, 1), ICoeff)   = GasCoeffsVis(GasType,ICoeff)
-    gcp(iprop(1, 1), ICoeff)   = GasCoeffsCp (GasType,ICoeff)        
+    gcp(iprop(1, 1), ICoeff)   = GasCoeffsCp (GasType,ICoeff)
   END DO
-  
+
   ! Fill window layer properties needed for window layer heat balance calculation
   IGlass = 0
   IGap = 0
   DO Lay = 1,TotLay
     LayPtr = Construct(ConstrNum)%LayerPoint(Lay)
-  
+
     IF(( Material(LayPtr)%Group == WindowGlass) .OR. (Material(LayPtr)%Group == WindowSimpleGlazing) ) THEN
       IGlass = IGlass + 1
       LayerType(IGlass) = 0 ! this marks specular layer type
@@ -3094,10 +3211,14 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       YoungsMod(IGlass) = Material(LayPtr)%YoungModulus
       PoissonsRat(IGlass) = Material(LayPtr)%PoissonsRatio
     else if (Material(LayPtr)%Group == ComplexWindowShade) then
+      if (CalcCondition == noCondition) then
+        if (Lay == 1) SurfaceWindow(SurfNum)%ShadingFlag = ExtShadeOn
+        if (Lay == TotLay) SurfaceWindow(SurfNum)%ShadingFlag = IntShadeOn
+      end if
       IGlass = IGlass + 1
       TempInt = Material(LayPtr)%ComplexShadePtr
       LayerType(IGlass)  = ComplexShade(TempInt)%LayerType
-      
+
       thick(IGlass)      = ComplexShade(TempInt)%Thickness
       scon(IGlass)      = ComplexShade(TempInt)%Conductivity
       emis(2*IGlass-1)  = ComplexShade(TempInt)%FrontEmissivity
@@ -3105,50 +3226,50 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       tir(2*IGlass-1)    = ComplexShade(TempInt)%IRTransmittance
       tir(2*IGlass)      = ComplexShade(TempInt)%IRTransmittance
       
-      ! Convert from coverage percentage to square meters
-      Atop(IGlass)      = ComplexShade(TempInt)%TopOpeningMultiplier * height * width
-      Abot(IGlass)      = ComplexShade(TempInt)%BottomOpeningMultiplier * height * width
-      Al(IGlass)        = ComplexShade(TempInt)%LeftOpeningMultiplier * height * width
-      Ar(IGlass)        = ComplexShade(TempInt)%RightOpeningMultiplier * height * width
-      Ah(IGlass)        = ComplexShade(TempInt)%FrontOpeningMultiplier * height * width
+      ! This needs to be converted into correct areas. That can be done only after loading complete window data
+      Atop(IGlass)      = ComplexShade(TempInt)%TopOpeningMultiplier
+      Abot(IGlass)      = ComplexShade(TempInt)%BottomOpeningMultiplier
+      Al(IGlass)        = ComplexShade(TempInt)%LeftOpeningMultiplier
+      Ar(IGlass)        = ComplexShade(TempInt)%RightOpeningMultiplier
+      Ah(IGlass)        = ComplexShade(TempInt)%FrontOpeningMultiplier
       
       SlatThick(IGlass)    = ComplexShade(TempInt)%SlatThickness
       SlatWidth(IGlass)    = ComplexShade(TempInt)%SlatWidth
       SlatAngle(IGlass)    = ComplexShade(TempInt)%SlatAngle
       SlatCond(IGlass)    = ComplexShade(TempInt)%SlatConductivity
       SlatSpacing(IGlass)  = ComplexShade(TempInt)%SlatSpacing
-      SlatCurve(IGlass)    = ComplexShade(TempInt)%SlatCurve  
+      SlatCurve(IGlass)    = ComplexShade(TempInt)%SlatCurve
     else if(Material(LayPtr)%Group == ComplexWindowGap) THEN
       IGap = IGap + 1
       gap(IGap)  = Material(LayPtr)%Thickness
       presure(IGap) = Material(LayPtr)%Pressure
-      
+
       DeflectionPtr = Material(LayPtr)%DeflectionStatePtr
       if(DeflectionPtr /= 0) then
         GapDefMax(IGap) = DeflectionState(DeflectionPtr)%DeflectedThickness
       else
         GapDefMax(IGap) = gap(IGap)
       end if
-      
+
       PillarPtr = Material(LayPtr)%SupportPillarPtr
-      
+
       if (PillarPtr.ne.0) then
         SupportPlr(IGap) = 1
         PillarSpacing(IGap) = SupportPillar(PillarPtr)%Spacing
         PillarRadius(IGap)  = SupportPillar(PillarPtr)%Radius
       end if
-      
+
       GasPointer = Material(LayPtr)%GasPointer
-      
+
       nmix(IGap+1) = Material(GasPointer)%NumberOfGasesInMixture
       DO IMix = 1,nmix(IGap+1)
         !iprop(IGap+1, IMix) = Material(LayPtr)%GasType(IMix)
         !iprop(IGap+1, IMix) = GetGasIndex(Material(LayPtr)%GasWGHT(IMix))
         frct(IGap+1,IMix) = Material(GasPointer)%GasFract(IMix)
-        
+
         !Now has to build-up gas coefficients arrays. All used gasses should be stored into these arrays and
         !to be correctly referenced by gap arrays
-  
+
         !First check if gas coefficients are already part of array.  Duplicates are not necessary
         CALL CheckGasCoefs(Material(GasPointer)%GasWGHT(IMix), iprop(IGap+1, IMix), wght, feedData)
         IF (feedData) THEN
@@ -3169,41 +3290,67 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       CALL ShowContinueError('   - WindowMaterial:Gap')
       CALL ShowFatalError('halting because of error in layer definition for Construction:ComplexFenestrationState')
     end if
-  
+
   END DO  ! End of loop over glass, gap and blind/shade layers in a window construction
+  
+  IF (CalcCondition == noCondition) THEN
+    ! now calculate correct areas for multipliers
+    DO Lay = 1, nlayer
+      IF (LayerType(Lay) /= 0) THEN ! Layer is shading
+        ! before changing multipliers, need to determine which one is dominant gap width
+        IF (Lay == 1) THEN ! Exterior shading device
+          dominantGapWidth = gap(Lay)        
+        ELSE IF (Lay == nlayer) THEN ! Interior shading device
+          dominantGapWidth = gap(Lay - 1) 
+        ELSE ! In-between shading device
+          dominantGapWidth = MIN(gap(Lay-1), gap(Lay))
+        END IF
+        Atop(Lay)      = Atop(Lay) * dominantGapWidth * width
+        Abot(Lay)      = Abot(Lay) * dominantGapWidth * width
+        Al(Lay)        = Al(Lay) * dominantGapWidth * height
+        Ar(Lay)        = Ar(Lay) * dominantGapWidth * height
+        Ah(Lay)        = Ah(Lay) * width * height
+      END IF
+    END DO
+  END IF
   
   !ThermalMod = 0
   Debug_mode = 0
   CalcSHGC = 0
-  
+
   Window_ID = ConstrNum
-  
-  !vector of absorbed solar energy fractions for each layer. 
+
+  !vector of absorbed solar energy fractions for each layer.
   asol = 0.0D0
   ! direct solar radiation
   if (CalcCondition == noCondition) then
+    ShadeFlag = SurfaceWindow(SurfNum)%ShadingFlag
     dir = QRadSWOutIncident(SurfNum) +  QS(Surface(SurfNum)%Zone) ! TODO, check , !
-    !                  currently using Exterior beam plus diffuse solar incident on surface 
-    !                  plus zone short wave.  CHECK 
-    if (dir.ne.0.0d0) then
+    !                  currently using Exterior beam plus diffuse solar incident on surface
+    !                  plus zone short wave.  CHECK
+    !if (dir.ne.0.0d0) then
       do IGlass = 1, nlayer
         !IF (dir > 0.0D0 ) THEN
-        asol(IGLASS) = QRadSWwinAbs(SurfNum, IGLASS)/dir
+        asol(IGLASS) = QRadSWwinAbs(SurfNum, IGLASS)
         !ELSE
         !  asol(IGLASS) = 0.0D0
         !ENDIF
       end do
-    end if  
-  
+    !end if
+
+    ! Add contribution of IR from zone internal gains (lights, equipment and people). This is absorbed in zone-side layer and it
+    ! is assumed that nothing is transmitted through
+    asol(nlayer) = asol(nlayer) + QRadThermInAbs(SurfNum)
+
     presure = OutBaroPress
-    
+
     ! Instead of doing temperature guess get solution from previous iteration.  That should be much better than guess
     do k = 1,2*nlayer
       theta(k) = SurfaceWindow(SurfNum)%ThetaFace(k)
     end do
-  
+
   end if
-  
+
   ! Standard conditions run (winter and summer)
   if (CalcCondition == winterCondition) then
     tind = 294.15d0
@@ -3215,18 +3362,18 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     tind = 297.15d0
     tout = 305.15d0
     hcout = 15.0d0
-    wso = 2.75d0    
+    wso = 2.75d0
     dir = 783.0d0
     CalcSHGC = 1
   end if
-  
+
   ! Common condition data
   if (CalcCondition /= noCondition) then
     trmin = tind
     outir = 0
     tsky = tout
     wsi = 0.0d0
-    fclr = 1.0d0 
+    fclr = 1.0d0
     ibc(1) = 0
     ibc(2) = 0
     presure = 101325.0d0
@@ -3240,7 +3387,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     ! Just to make initial quess different from absolute zero
     theta = 273.15d0
   end if
-  
+
   !  call TARCOG
   CALL TARCOG90(nlayer, iwd, tout, tind, trmin, wso, wsi, dir, outir, isky, tsky, esky, fclr, VacuumPressure, &
                 VacuumMaxGapThickness, CalcDeflection, Pa, Pini, Tini, gap, GapDefMax, thick, scon, YoungsMod, PoissonsRat, &
@@ -3253,10 +3400,10 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
                 sumsol, hg, hr, hs, he, hi,Ra,Nu, standard, ThermalMod, Debug_mode, Debug_dir, Debug_file, Window_ID, IGU_ID,&
                 ShadeEmisRatioOut, ShadeEmisRatioIn, ShadeHcRatioOut, ShadeHcRatioIn,&
                 HcUnshadedOut, HcUnshadedIn, Keff, ShadeGapKeffConv, SDScalar, CalcSHGC, NumOfIterations)
-  
+
   ! process results from TARCOG
-  IF ((nperr > 0).and.(nperr < 1000)) THEN ! process error signal from tarcog 
-    
+  IF ((nperr > 0).and.(nperr < 1000)) THEN ! process error signal from tarcog
+
     Call ShowSevereError('Window tarcog returned an error')
     tarcogErrorMessage = 'message = "'//tarcogErrorMessage//'"'
     Call ShowContinueErrorTimeStamp(tarcogErrorMessage)
@@ -3270,7 +3417,7 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
   ELSE IF (CalcCondition == summerCondition) THEN
     !tempInt = SurfaceWindow(SurfNum)%ComplexFen%CurrentState
     !tempReal = SurfaceWindow(SurfNum)%ComplexFen%State(tempInt)%WinDiffTrans
-    
+
     !Sum1 = 0.0d0
     !Sum2 = 0.0d0
     !do  j = 1 , ComplexWind(SurfNum)%Geom%Inc%NBasis     !Incident ray loop
@@ -3286,35 +3433,40 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     !  tempReal = 0.
     !  call ShowWarningError ('BSDF--Inc basis has zero projected solid angle')
     !endif
-    
+
     Construct(ConstrNum)%SummerSHGC = shgc
-    
+
     !Construct(SurfNum)%VisTransNorm = SurfaceWindow(SurfNum)%ComplexFen%State(tempInt)%WinDiffVisTrans
   ELSE IF (CalcCondition == noCondition) THEN ! expect converged results...
          ! Window heat balance solution has converged.
-         
+
     SurfaceWindow(SurfNum)%WindowCalcIterationsRep = NumOfIterations
+    HConvIn(SurfNum) = hcin
   
          ! For interior shade, add convective gain from glass/shade gap air flow to zone convective gain;
          ! For all cases, get total window heat gain for reporting. See CalcWinFrameAndDividerTemps for
          ! contribution of frame and divider.
-    
+
     SurfInsideTemp = theta(2*nlayer) - KelvinConv
     SurfOutsideTemp = theta(1) - KelvinConv
     SurfOutsideEmiss = emis(1)
-    
+
     IncidentSolar = Surface(SurfNum)%Area * QRadSWOutIncident(SurfNum)
     IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) THEN
          ! Interior shade or blind
-      ConvHeatFlowNatural = qv(2*nlayer-1)
+      ConvHeatFlowNatural = -qv(nlayer) * height * width
+      
       SurfaceWindow(SurfNum)%ConvHeatFlowNatural = ConvHeatFlowNatural
+      WinGapConvHtFlowRep(SurfNum) = ConvHeatFlowNatural
+      WinGapConvHtFlowRepEnergy(SurfNum) = WinGapConvHtFlowRep(SurfNum) * TimeStepZone * SecInHour
          ! Window heat gain from glazing and shade/blind to zone. Consists of transmitted solar, convection
          !   from air exiting gap, convection from zone-side of shade/blind, net IR to zone from shade and net IR to
          !   zone from the glass adjacent to the shade/blind (zero if shade/blind IR transmittance is zero).
          ! Following assumes glazed area = window area (i.e., dividers ignored) in calculating
          !   IR to zone from glass when interior shade/blind is present.
       ShadeArea = Surface(SurfNum)%Area + SurfaceWindow(SurfNum)%DividerArea
-      sconsh    = scon(ngllayer+1)
+      sconsh    = scon(ngllayer+1) / thick(ngllayer+1)
+      nglfacep = nglface + 2
       CondHeatGainShade  = ShadeArea * sconsh * (theta(nglfacep-1) - theta(nglfacep))
       EpsShIR1 = emis(nglface+1)
       EpsShIR2 = emis(nglface+2)
@@ -3332,34 +3484,41 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       WinHeatGain(SurfNum) = WinTransSolar(SurfNum) + ConvHeatFlowNatural + ConvHeatGainFrZoneSideOfShade + &
                            NetIRHeatGainGlass + NetIRHeatGainShade
       ! store components for reporting
-      WinGainConvGlazShadGapToZoneRep(SurfNum) = ConvHeatFlowNatural
+      WinGainConvGlazShadGapToZoneRep(SurfNum) = ConvHeatFlowNatural ! result is in [W]
       WinGainConvShadeToZoneRep(SurfNum)       = ConvHeatGainFrZoneSideOfShade
       WinGainIRGlazToZoneRep(SurfNum)          = NetIRHeatGainGlass
       WinGainIRShadeToZoneRep(SurfNum)         = NetIRHeatGainShade
     ELSE
          ! Interior shade or blind not present; innermost layer is glass
-      CondHeatGainGlass = Surface(SurfNum)%Area * scon(ngllayer)/thick(ngllayer) * (theta(2*ngllayer-1)-theta(2*ngllayer))
-      NetIRHeatGainGlass = Surface(SurfNum)%Area * emis(2*ngllayer)*(sigma*theta(2*ngllayer)**4 - rmir)
-      ConvHeatGainFrZoneSideOfGlass = Surface(SurfNum)%Area * hcin*(theta(2*ngllayer) - tind)
+      CondHeatGainGlass = Surface(SurfNum)%Area * scon(nlayer)/thick(nlayer) * (theta(2*nlayer-1)-theta(2*nlayer))
+      NetIRHeatGainGlass = Surface(SurfNum)%Area * emis(2*nlayer)*(sigma*theta(2*nlayer)**4 - rmir)
+      ConvHeatGainFrZoneSideOfGlass = Surface(SurfNum)%Area * hcin*(theta(2*nlayer) - tind)
       WinHeatGain(SurfNum) = WinTransSolar(SurfNum) + ConvHeatGainFrZoneSideOfGlass + NetIRHeatGainGlass
       ! store components for reporting
       WinGainConvGlazToZoneRep(SurfNum) = ConvHeatGainFrZoneSideOfGlass
       WinGainIRGlazToZoneRep(SurfNum) = NetIRHeatGainGlass
+      ! need to report convective heat flow from the gap in case of exterior shade
+      IF(ShadeFlag == ExtShadeOn) THEN
+        ConvHeatFlowNatural = -qv(2) * height * width ! qv(1) is exterior environment
+      
+        WinGapConvHtFlowRep(SurfNum) = ConvHeatFlowNatural
+        WinGapConvHtFlowRepEnergy(SurfNum) = WinGapConvHtFlowRep(SurfNum) * TimeStepZone * SecInHour
+      END IF
     END IF
-  
+
         ! Add convective heat gain from airflow window
         ! Note: effect of fan heat on gap outlet temperature is neglected since fan power (based
         ! on pressure drop through the gap) is extremely small
   
-    WinGapConvHtFlowRep(SurfNum) = 0.0d0
-    WinGapConvHtFlowRepEnergy(SurfNum) = 0.0d0
+    !WinGapConvHtFlowRep(SurfNum) = 0.0d0
+    !WinGapConvHtFlowRepEnergy(SurfNum) = 0.0d0
     TotAirflowGap = SurfaceWindow(SurfNum)%AirFlowThisTS * Surface(SurfNum)%Width
     TAirflowGapOutlet = KelvinConv ! TODO Need to calculate this
     TAirflowGapOutletC = TAirflowGapOutlet-KelvinConv
     SurfaceWindow(SurfNum)%TAirflowGapOutlet = TAirflowGapOutletC
     IF(SurfaceWindow(SurfNum)%AirFlowThisTS > 0.0d0) THEN
       ConvHeatFlowForced = sum(qv) ! TODO.  figure forced ventilation heat flow in Watts
-      
+
       WinGapConvHtFlowRep(SurfNum) = ConvHeatFlowForced
       WinGapConvHtFlowRepEnergy(SurfNum) = WinGapConvHtFlowRep(SurfNum) * TimeStepZone * SecInHour
       ! Add heat from gap airflow to zone air if destination is inside air; save the heat gain to return
@@ -3385,31 +3544,30 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       ! For AirflowDestination = ReturnAir in a controlled (i.e., conditioned) zone with return air, see CalcZoneLeavingConditions
       ! for calculation of modification of return-air temperature due to airflow from window gaps into return air.
     END IF
-  
+
         ! Correct WinHeatGain for interior diffuse shortwave (solar and shortwave from lights) transmitted
         ! back out window
     ConstrNum = Surface(SurfNum)%Construction
-    ConstrNumSh = Surface(SurfNum)%ShadedConstruction
-    IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
-      ConstrNum = Surface(SurfNum)%StormWinConstruction
-      ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
-    END IF
-    IF(ShadeFlag <= 0) THEN
+    !ConstrNumSh = Surface(SurfNum)%ShadedConstruction
+    !IF(SurfaceWindow(SurfNum)%StormWinFlag==1) THEN
+    !  ConstrNum = Surface(SurfNum)%StormWinConstruction
+    !  ConstrNumSh = Surface(SurfNum)%StormWinShadedConstruction
+    !END IF
+    !IF(ShadeFlag <= 0) THEN
       TransDiff = Construct(ConstrNum)%TransDiff
-    ELSE IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==BGShadeOn .OR. ShadeFlag==ExtScreenOn) THEN
-      TransDiff = Construct(ConstrNumSh)%TransDiff
-    ELSE IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR.ShadeFlag==BGBlindOn) THEN
-      TransDiff = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                                 Construct(ConstrNumSh)%BlTransDiff)
-    ELSE IF(ShadeFlag == SwitchableGlazing) THEN
-      TransDiff = InterpSW(SurfaceWindow(SurfNum)%SwitchingFactor,Construct(ConstrNum)%TransDiff, &
-                                 Construct(ConstrNumSh)%TransDiff)
-    END IF
+    !ELSE IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn) THEN
+    !  TransDiff = Construct(ConstrNum)%TransDiff
+    !ELSE IF(ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR.ShadeFlag==BGBlindOn) THEN
+    !  TransDiff = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+    !                             Construct(ConstrNumSh)%BlTransDiff)
+    !ELSE IF(ShadeFlag == SwitchableGlazing) THEN
+    !  TransDiff = InterpSW(SurfaceWindow(SurfNum)%SwitchingFactor,Construct(ConstrNum)%TransDiff, &
+    !                             Construct(ConstrNumSh)%TransDiff)
+    !END IF
     WinHeatGain(SurfNum) = WinHeatGain(SurfNum) - QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area * TransDiff
     WinLossSWZoneToOutWinRep(SurfNum) = QS(Surface(SurfNum)%Zone) * Surface(SurfNum)%Area * TransDiff
   
-    IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn.OR.ShadeFlag==IntBlindOn.OR.ShadeFlag==ExtBlindOn.OR. &
-       ShadeFlag==BGShadeOn.OR.ShadeFlag==BGBlindOn.OR.ShadeFlag==ExtScreenOn) THEN
+    IF(ShadeFlag==IntShadeOn.OR.ShadeFlag==ExtShadeOn) THEN
       WinShadingAbsorbedSolar(SurfNum) = (SurfaceWindow(SurfNum)%ExtBeamAbsByShade + &
                                          SurfaceWindow(SurfNum)%ExtDiffAbsByShade) * &
                                          (Surface(SurfNum)%Area+SurfaceWindow(SurfNum)%DividerArea)
@@ -3428,33 +3586,49 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
     END IF
   
        ! Save hcv for use in divider calc with interior or exterior shade (see CalcWinFrameAndDividerTemps)
-   ! IF(ShadeFlag==IntShadeOn .OR. ShadeFlag==ExtShadeOn .OR. ShadeFlag==IntBlindOn .OR. ShadeFlag==ExtBlindOn .OR. &
-      ! ShadeFlag==ExtScreenOn) SurfaceWindow(SurfNum)%ConvCoeffWithShade = hcv
+   IF(ShadeFlag==IntShadeOn) SurfaceWindow(SurfNum)%ConvCoeffWithShade = 0
   
-      IF(ShadeFlag == IntShadeOn .OR. ShadeFlag == IntBlindOn) THEN
+      IF(ShadeFlag == IntShadeOn) THEN
         SurfInsideTemp  = theta(2*ngllayer+2) - KelvinConv
-        EffShBlEmiss = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                          SurfaceWindow(SurfNum)%EffShBlindEmiss)
-        EffGlEmiss   = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
-                          SurfaceWindow(SurfNum)%EffGlassEmiss)
+        
+        ! Get properties of inside shading layer
+        ShadingLayPtr = Construct(ConstrNum)%LayerPoint(TotLay)
+        ShadingLayPtr = Material(ShadingLayPtr)%ComplexShadePtr
+        TauShadeIR = ComplexShade(ShadingLayPtr)%IRTransmittance
+        EpsShadeIR = ComplexShade(ShadingLayPtr)%FrontEmissivity
+        RhoShadeIR = MAX(0.d0,1.d0-TauShadeIR-EpsShadeIR)
+        
+        ! Get properties of glass next to inside shading layer
+        GlassLayPtr = Construct(ConstrNum)%LayerPoint(TotLay - 2)
+        EpsGlassIR = Material(GlassLayPtr)%AbsorpThermalBack
+        RhoGlassIR = 1 - EpsGlassIR
+        
+        EffShBlEmiss = EpsShadeIR*(1.d0+RhoGlassIR*TauShadeIR/(1.d0-RhoGlassIR*RhoShadeIR))
+        SurfaceWindow(SurfNum)%EffShBlindEmiss = EffShBlEmiss
+        EffGlEmiss   = EpsGlassIR*TauShadeIR/(1.d0-RhoGlassIR*RhoShadeIR)
+        SurfaceWindow(SurfNum)%EffGlassEmiss = EffGlEmiss
+      !  EffShBlEmiss = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+      !                    SurfaceWindow(SurfNum)%EffShBlindEmiss)
+      !  EffGlEmiss   = InterpSlatAng(SurfaceWindow(SurfNum)%SlatAngThisTS,SurfaceWindow(SurfNum)%MovableSlats, &
+      !                    SurfaceWindow(SurfNum)%EffGlassEmiss)
         SurfaceWindow(SurfNum)%EffInsSurfTemp = (EffShBlEmiss * SurfInsideTemp + EffGlEmiss * (theta(2*ngllayer)-KelvinConv)) / &
                                                    (EffShBlEmiss + EffGlEmiss)
-      ELSE
-        !SurfInsideTemp = theta(2*ngllayer) - TKelvin
-      END IF
-      IF(ShadeFlag == ExtShadeOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == ExtScreenOn) THEN
+      !ELSE
+      !  SurfInsideTemp = theta(2*ngllayer) - TKelvin
+      !END IF
+      !IF(ShadeFlag == ExtShadeOn .OR. ShadeFlag == ExtBlindOn .OR. ShadeFlag == ExtScreenOn) THEN
         !SurfOutsideTemp = theta(2*ngllayer+1) - TKelvin  !this looks wrong. 
       ELSE
-        !SurfOutsideTemp = theta(1) - TKelvin
+        SurfOutsideTemp = theta(1) - KelvinConv
       END IF
   
-      DO k = 1,nglfacep
+      DO k = 1,2*nlayer
         SurfaceWindow(SurfNum)%ThetaFace(k) = theta(k)
         !thetas(k) = theta(k)
       END DO
-  
+
   ENDIF
-  
+
   RETURN
 
 END SUBROUTINE CalcComplexWindowThermal
@@ -3483,73 +3657,20 @@ coeffFound = .FALSE.
 counter = 1
 DO WHILE((counter.LE.maxgas).AND.(wght(counter).NE.0).AND.(.NOT.coeffFound))
   IF(ABS(currentWeight-wght(counter)).lt.1e-5) THEN
-    coeffFound = .TRUE.        
+    coeffFound = .TRUE.
   ELSE
     counter = counter + 1
-  ENDIF        
+  ENDIF
 END DO !DO WHILE((counter.LE.maxgas).AND.(wght(couner).NE.0).AND.(.NOT.coeffFound))
-  
+
 ! In case coefficient is not found data needs to be stored in gas coefficients arrays
 IF ((.NOT.coeffFound).AND.(counter.LT.maxgas)) THEN
-  feedData = .TRUE.            
+  feedData = .TRUE.
 ENDIF
 
 indexNumber = counter
 
 END SUBROUTINE CheckGasCoefs
-
-INTEGER FUNCTION FindIntegerInList (Intg, Array, ArrayDim)
-
-          ! FUNCTION INFORMATION:
-          !       AUTHOR         Joe Klems
-          !       DATE WRITTEN   June 2011
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS FUNCTION:
-          ! Search a one-dimensional array for a given value, returning the index of the element equal to the value, if
-          !   found, or zero
-
-          ! METHODOLOGY EMPLOYED:
-          ! na
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-          ! na
-
-  IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
-
-          ! FUNCTION ARGUMENT DEFINITIONS:
-  INTEGER, INTENT (IN)       ::  Intg             ! Intg to be found in the array
-  INTEGER, DIMENSION(:), INTENT (IN)  ::  Array    ! Array to be searched
-  INTEGER, INTENT (IN)       :: ArrayDim  ! Length of array
-
-          ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
-
-          ! INTERFACE BLOCK SPECIFICATIONS
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS
-          ! na
-
-          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  INTEGER                       ::  I       !Gen purpose index
-  
-      DO I = 1,ArrayDim
-            IF(Array(I) == Intg) THEN
-                  FindIntegerInList = I
-                  RETURN
-            ENDIF
-      END DO
-            FindIntegerInList = 0
-   
-      RETURN
-
-END FUNCTION FindIntegerInList
-
 
 INTEGER FUNCTION SearchAscTable(y,n,ytab)
 
@@ -3619,11 +3740,11 @@ INTEGER FUNCTION SearchAscTable(y,n,ytab)
       Yl = Ym
       Il = Im
     ENDIF
-  
+
   END DO
-  
+
   SearchAscTable = Ih
-   
+
 RETURN
 
 END FUNCTION SearchAscTable
@@ -3689,7 +3810,7 @@ SUBROUTINE PierceSurface(ISurf, Orig, Dir, IPIERC, HitPt)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   REAL(r64)        :: CPhit(3)   ! Point that ray along RN intersects plane of surface
   REAL(r64)        :: R1(3)      ! Point from which ray originates
-  REAL(r64)        :: RN(3)      ! Unit vector along in direction of ray whose        
+  REAL(r64)        :: RN(3)      ! Unit vector along in direction of ray whose
   REAL(r64) :: V1(3)                    ! First vertex
   REAL(r64) :: V2(3)                    ! Second vertex
   REAL(r64) :: V3(3)                    ! Third vertex
@@ -3819,18 +3940,15 @@ SUBROUTINE PierceSurface(ISurf, Orig, Dir, IPIERC, HitPt)
     ! Surface is intersected
     IPIERC = 1
   END IF
-  
+
   RETURN
 
 END SUBROUTINE PierceSurface
 
 
-END MODULE WindowComplexManager
-
-
 !     NOTICE
 !
-!     Copyright  1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright  1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -3851,3 +3969,5 @@ END MODULE WindowComplexManager
 !
 !     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
 !
+
+END MODULE WindowComplexManager

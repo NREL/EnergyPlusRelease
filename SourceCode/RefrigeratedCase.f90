@@ -119,7 +119,8 @@ USE DataPrecisionGlobals
 USE DataHeatBalance,  ONLY: RefrigCaseCredit, HeatReclaimRefrigeratedRack, NumRefrigeratedRacks, &
                             NumRefrigSystems, HeatReclaimRefrigCondenser, NumRefrigCondensers, &
                             NumRefrigChillerSets, RefrigSystemTypeDetailed, RefrigSystemTypeRack, &
-                            RefrigCondenserTypeAir, RefrigCondenserTypeEvap, RefrigCondenserTypeWater
+                            RefrigCondenserTypeAir, RefrigCondenserTypeEvap, RefrigCondenserTypeWater, &
+                            RefrigCondenserTypeCascade
 
 USE DataHVACGlobals,  ONLY: TimeStepSys  !used when operating for warehouse coil
 USE DataGlobals  !includes LOGICAL :: BeginTimeStepFlag =.false.
@@ -157,11 +158,11 @@ INTEGER, PARAMETER :: DefElectricTerm       = 7
 ! Refrigerated display case rack heat rejection location
 INTEGER, PARAMETER :: LocationOutdoors      = 1
 INTEGER, PARAMETER :: LocationZone          = 2
-! Condenser cooling type
-INTEGER, PARAMETER :: CondenserCoolingAir   = 1
-INTEGER, PARAMETER :: CondenserCoolingEvap  = 2
-INTEGER, PARAMETER :: CondenserCoolingWater = 3
-INTEGER, PARAMETER :: CondenserCascade      = 4
+! Condenser cooling type -- See DataHeatBalance - RefrigxxxTypexxx
+!INTEGER, PARAMETER :: CondenserCoolingAir   = 1
+!INTEGER, PARAMETER :: CondenserCoolingEvap  = 2
+!INTEGER, PARAMETER :: CondenserCoolingWater = 3
+!INTEGER, PARAMETER :: CondenserCascade      = 4
 ! Air- and evap-cooled condenser fan speed control types
 INTEGER, PARAMETER :: FanVariableSpeed       = 1
 INTEGER, PARAMETER :: FanConstantSpeedLinear = 2
@@ -1923,7 +1924,7 @@ SUBROUTINE GetRefrigerationInput
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//  &
                              '", System Node Number not found for '//TRIM(cAlphaFieldNames(3))//' = '//TRIM(Alphas(3)))
         CALL ShowContinueError('..Refrigerated cases must reference a controlled Zone (appear'//  &
-               ' in a ZoneHVAC:EquipmentConnections object.')
+               ' in a ZoneHVAC:EquipmentConnections object).')
         ErrorsFound=.TRUE.
       ENDIF
     ENDIF
@@ -2253,6 +2254,7 @@ SUBROUTINE GetRefrigerationInput
         RefrigCase(CaseNum)%DefrostType /= DefNone) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigCase(CaseNum)%Name)//&
                            '", invalid  '//TRIM(cAlphaFieldNames(9))//' not found: '//TRIM(Alphas(9)))
+      CALL ShowContinueError('required when '//trim(cAlphaFieldNames(8))//'="'//trim(Alphas(8))//'".')
       ErrorsFound=.TRUE.
     END IF
 
@@ -3767,26 +3769,26 @@ IF(NumRefrigeratedRacks > 0) THEN
     END IF
 
     IF (SameString(Alphas(5),'EvaporativelyCooled')) THEN
-        RefrigRack(RackNum)%CondenserType = CondenserCoolingEvap
+        RefrigRack(RackNum)%CondenserType = RefrigCondenserTypeEvap
         IF (RefrigRack(RackNum)%HeatRejectionLocation==LocationZone) THEN
         CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
           '" Evap cooled '//TRIM(cAlphaFieldNames(5))//' not available with '//TRIM(cAlphaFieldNames(2))//' = Zone.')
         CALL ShowContinueError(TRIM(cAlphaFieldNames(5))//' reset to Air Cooled and simulation continues.')
-        RefrigRack(RackNum)%CondenserType = CondenserCoolingAir
+        RefrigRack(RackNum)%CondenserType = RefrigCondenserTypeAir
         END IF
     ELSEIF (SameString(Alphas(5),'WaterCooled')) THEN
-        RefrigRack(RackNum)%CondenserType = CondenserCoolingWater
+        RefrigRack(RackNum)%CondenserType = RefrigCondenserTypeWater
         IF (RefrigRack(RackNum)%HeatRejectionLocation==LocationZone) THEN
         CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
           '" Water cooled '//TRIM(cAlphaFieldNames(5))//' not available with '//TRIM(cAlphaFieldNames(2))//' = Zone.')
         CALL ShowContinueError(TRIM(cAlphaFieldNames(5))//' reset to Air Cooled and simulation continues.')
-        RefrigRack(RackNum)%CondenserType = CondenserCoolingAir
+        RefrigRack(RackNum)%CondenserType = RefrigCondenserTypeAir
         END IF
     ELSE
-        RefrigRack(RackNum)%CondenserType = CondenserCoolingAir
+        RefrigRack(RackNum)%CondenserType = RefrigCondenserTypeAir
     END IF
     ! Get water-cooled condenser input, if applicable
-    IF (RefrigRack(RackNum)%CondenserType == CondenserCoolingWater) THEN
+    IF (RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeWater) THEN
       RefrigRack(RackNum)%InletNode = GetOnlySingleNode(Alphas(6),ErrorsFound,CurrentModuleObject, &
                Alphas(1),NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
       RefrigRack(RackNum)%OutletNode = GetOnlySingleNode(Alphas(7),ErrorsFound,CurrentModuleObject, &
@@ -3872,7 +3874,7 @@ IF(NumRefrigeratedRacks > 0) THEN
     END IF
 
     RefrigRack(RackNum)%CondenserAirFlowRate = Numbers(8)
-    IF (RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap .AND. RefrigRack(RackNum)%CondenserAirFlowRate <= 0.0d0 &
+    IF (RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%CondenserAirFlowRate <= 0.0d0 &
        .AND. RefrigRack(RackNum)%CondenserAirFlowRate /= AutoCalculate) THEN
        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
             '", '//TRIM(cNumericFieldNames(8))//' cannot be less than or equal to zero.')
@@ -3881,20 +3883,20 @@ IF(NumRefrigeratedRacks > 0) THEN
 
 !   Basin heater power as a function of temperature must be greater than or equal to 0
     RefrigRack(RackNum)%BasinHeaterPowerFTempDiff = Numbers(9)
-       IF(RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap .AND. Numbers(9) < 0.0d0) THEN
+       IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. Numbers(9) < 0.0d0) THEN
            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="' //TRIM(RefrigRack(RackNum)%Name)//&
                      '", '//TRIM(cNumericFieldNames(9))//' must be >= 0')
            ErrorsFound = .TRUE.
        END IF
 
     RefrigRack(RackNum)%BasinHeaterSetPointTemp = Numbers(10)
-    IF(RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap .AND. RefrigRack(RackNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
+    IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%BasinHeaterSetPointTemp < 2.0d0) THEN
        CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
             '", '//TRIM(cNumericFieldNames(10))//' is less than 2 deg C. Freezing could occur.')
     END IF
 
     RefrigRack(RackNum)%EvapPumpPower = Numbers(11)
-    IF(RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap .AND. RefrigRack(RackNum)%EvapPumpPower < 0.0 &
+    IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%EvapPumpPower < 0.0 &
        .AND. RefrigRack(RackNum)%EvapPumpPower /= AutoCalculate) THEN
        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(RefrigRack(RackNum)%Name)//&
             '", '//TRIM(cNumericFieldNames(11))//' cannot be less than zero.')
@@ -4075,11 +4077,11 @@ IF(NumRefrigeratedRacks > 0) THEN
 
  ! set condenser air flow and evap water pump power if autocalculated
  ! autocalculate condenser evap water pump if needed
-        IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap .AND. RefrigRack(RackNum)%EvapPumpPower==AutoCalculate) THEN
+        IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap .AND. RefrigRack(RackNum)%EvapPumpPower==AutoCalculate) THEN
           RefrigRack(RackNum)%EvapPumpPower = CondPumpRatePower * RefrigRack(RackNum)%TotalRackLoad
         END IF
  ! autocalculate evap condenser air volume flow rate if needed
-        IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap .AND.   &
+        IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap .AND.   &
                           RefrigRack(RackNum)%CondenserAirFlowRate==AutoCalculate) THEN
           RefrigRack(RackNum)%CondenserAirFlowRate = AirVolRateEvapCond * RefrigRack(RackNum)%TotalRackLoad
         END IF
@@ -4142,7 +4144,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
              ALLOCATE(Condenser(CondNum)%SysNum(NumRefrigSystems))
 
     !set CondenserType and rated temperature difference (51.7 - 35)C per ARI 460
-    Condenser(CondNum)%CondenserType = CondenserCoolingAir
+    Condenser(CondNum)%CondenserType = RefrigCondenserTypeAir
     HeatReclaimRefrigCondenser(CondNum)%SourceType=RefrigCondenserTypeAir
     Condenser(CondNum)%RatedDelT     = CondARI460DelT  != 16.7d0 ,Rated sat cond temp - dry bulb air T for air-cooled Condensers, ARI460
     Condenser(CondNum)%RatedTCondense= CondARI460Tcond
@@ -4257,7 +4259,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
              ALLOCATE(Condenser(CondNum)%SysNum(NumRefrigSystems))
 
     !set CondenserType and rated Heat Rejection per ARI 490 rating
-    Condenser(CondNum)%CondenserType = CondenserCoolingEvap
+    Condenser(CondNum)%CondenserType = RefrigCondenserTypeEvap
     HeatReclaimRefrigCondenser(CondNum)%SourceType=RefrigCondenserTypeEvap
     Condenser(CondNum)%RatedTCondense= CondARI490Tcond
     Condenser(CondNum)%RatedDelT     = CondARI490DelT
@@ -4479,7 +4481,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
              ALLOCATE(Condenser(CondNum)%SysNum(NumRefrigSystems))
 
     !set CondenserType and rated Heat Rejection per ARI 450 rating
-    Condenser(CondNum)%CondenserType = CondenserCoolingWater
+    Condenser(CondNum)%CondenserType = RefrigCondenserTypeWater
     HeatReclaimRefrigCondenser(CondNum)%SourceType=RefrigCondenserTypeWater
     IF ((.NOT. lNumericBlanks(1)).AND.(Numbers(1)> 0.0d0)) THEN
       Condenser(CondNum)%RatedCapacity = Numbers(1)
@@ -4632,7 +4634,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
              ALLOCATE(Condenser(CondNum)%SysNum(NumRefrigSystems))
 
     !set CondenserType
-    Condenser(CondNum)%CondenserType = CondenserCascade
+    Condenser(CondNum)%CondenserType = RefrigCondenserTypeCascade
 
     IF (.NOT. lNumericBlanks(1)) THEN
       Condenser(CondNum)%RatedTCondense = Numbers(1)
@@ -4897,7 +4899,7 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     IF(lAlphaBlanks(AlphaNum) ) THEN
        !No cases or walkins specified, ie, secondary has no load
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)// &
-                    '" : has no loads, must have at least one of: '//TRIM(cAlphaFieldNames(Alphanum)))
+                    '", has no loads, must have at least one of: '//TRIM(cAlphaFieldNames(Alphanum)))
         ErrorsFound = .TRUE.
     ELSE  ! (.NOT. lAlphaBlanks(AlphaNum))
 
@@ -4922,10 +4924,10 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
           ErrorsFound = .TRUE.
           IF(NumNameMatches == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-                   '" : has an invalid '//TRIM(cAlphaFieldNames(AlphaNum))//': '//TRIM(Alphas(AlphaNum)))
+                   '", has an invalid '//TRIM(cAlphaFieldNames(AlphaNum))//': '//TRIM(Alphas(AlphaNum)))
           ELSEIF(NumNameMatches > 1) THEN
             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//&
-                    TRIM(Secondary(SecondaryNum)%Name)//'" : has a non-unique name '//&
+                    TRIM(Secondary(SecondaryNum)%Name)//'", has a non-unique name '//&
                     'that could be either a '//TRIM(cAlphaFieldNames(AlphaNum))//': '//TRIM(Alphas(AlphaNum)))
           END IF !num matches = 0 or > 1
       ELSEIF(CaseAndWalkInListNum /= 0)  THEN  !Name points to a CaseAndWalkInList
@@ -5060,12 +5062,19 @@ IF(NumRefrigSystems > 0 .OR. NumTransRefrigSystems >0) THEN
     END IF  ! blank on N4
 
 !^^^^^^^Now look at input and once-only calculations required only for liquid/brine secondary loops^^^^^^^^^^^^^^^^^^^^^^
+!   Ensure that required input data is not missing prior to performing the following once-only calculations
+    IF (ErrorsFound) THEN
+      CALL ShowFatalError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
+                 '", Program terminated due to previous condition(s).')
+    END IF  ! ErrorsFound
+
 IF( Secondary(SecondaryNum)%FluidType == SecFluidTypeAlwaysLiquid) THEN
    IF (.NOT. lNumericBlanks(5)) THEN
     Secondary(SecondaryNum)%TRangeDifRated =  Numbers(5)
    ELSE
      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-                        '" '//TRIM(cNumericFieldNames(5))//' must be specified.')
+                        '", '//TRIM(cNumericFieldNames(5))//' must be specified.')
+     CALL ShowContinueError('...when '//trim(cAlphaFieldNames(3))//'="FluidAlwaysLiquid".')
      ErrorsFound = .TRUE.
    END IF  ! blank on N5
 
@@ -5115,21 +5124,26 @@ IF( Secondary(SecondaryNum)%FluidType == SecFluidTypeAlwaysLiquid) THEN
   ELSE
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
                  '", Either "'//TRIM(cNumericFieldNames(1))//'" OR "'// &
-                 TRIM(cNumericFieldNames(2))//'" must be input')
+                 TRIM(cNumericFieldNames(2))//'" must be input.')
       ErrorsFound=.TRUE.
   END IF   ! Capacity Input via either or both options
 
-  !Calculate heat exchanger effectiveness based on rated flow and temperature differences
-  Secondary(SecondaryNum)%HeatExchangeEta = Secondary(SecondaryNum)%CoolingLoadRated / &
-       (FlowMassRated*CpBrineRated* (TBrineInRated - Secondary(SecondaryNum)%TEvapDesign))
-  Secondary(SecondaryNum)%TBrineInRated = TBrineInRated
-      IF (Secondary(SecondaryNum)%HeatExchangeEta > 0.99d0) THEN
-        CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
+  IF (.not. ErrorsFound) THEN
+    !Calculate heat exchanger effectiveness based on rated flow and temperature differences
+    Secondary(SecondaryNum)%HeatExchangeEta = Secondary(SecondaryNum)%CoolingLoadRated / &
+         (FlowMassRated*CpBrineRated* (TBrineInRated - Secondary(SecondaryNum)%TEvapDesign))
+    Secondary(SecondaryNum)%TBrineInRated = TBrineInRated
+    IF (Secondary(SecondaryNum)%HeatExchangeEta > 0.99d0) THEN
+      CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
              ' You may wish to check the system definition. '//&
              ' The heat exchanger effectiveness is, '// &
              TRIM(RoundSigDigits(Secondary(SecondaryNum)%HeatExchangeEta,2)))
         Secondary(SecondaryNum)%HeatExchangeEta = 0.99d0
-      END IF
+    END IF
+  ELSE
+    CALL ShowContinueError('...remainder of this object input skipped due to previous errors')
+    CYCLE
+  ENDIF
 
   PumpTotRatedFlowVol=SecondaryFlowVolRated
   IF (.NOT. lNumericBlanks(7)) PumpTotRatedFlowVol = Numbers(7)
@@ -5207,8 +5221,8 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       Secondary(SecondaryNum)%PumpTotRatedPower =  PumpTotRatedFlowVol*PumpTotRatedHead/(PumpImpellerEfficiency*PumpMotorEfficiency)
     ELSE
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)// &
-                 'Either "  '//TRIM(cNumericFieldNames(8))//'" OR "'// &
-                 TRIM(cNumericFieldNames(9))//'" must be input')
+                 '", Either "'//TRIM(cNumericFieldNames(8))//'" OR "'// &
+                 TRIM(cNumericFieldNames(9))//'" must be input.')
         ErrorsFound=.TRUE.
     END IF   !Either or pump power Input variations (head or power)
 
@@ -5229,6 +5243,16 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         ErrorsFound=.TRUE.
       END IF   !Set PumpControlType
     END IF  ! blank on pump drive control type
+
+    !  Print warning if Pump Control = Constant and Variable Speed Curve is specified.
+    IF ((Secondary(SecondaryNum)%PumpControlType == SecPumpControlConstant) .AND. &
+      (.NOT. lAlphaBlanks(AlphaNum+1))) THEN
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
+               '", A '//TRIM(cAlphaFieldNames(AlphaNum+1))//' is specified even though '//TRIM(cAlphaFieldNames(AlphaNum))//&
+               ' is "CONSTANT".')
+        CALL ShowContinueError('The secondary loop pump(s) will be modeled as constant speed and the '//&
+               TRIM(cAlphaFieldNames(AlphaNum+1))//' will be ignored.')
+    END IF
 
   IF(Secondary(SecondaryNum)%PumpControlType == SecPumpControlConstant) THEN
     !Set incremental flow and power amounts for pump dispatch
@@ -5254,7 +5278,7 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   Secondary(SecondaryNum)%PumpPowerToHeat=PumpMotorEfficiency
   NumNum = 11
   IF(.NOT. lNumericBlanks(NumNum))THEN
-    IF((0.5 <= Numbers(NumNum)).AND.(1.0 >= Numbers(NumNum)))THEN
+    IF((0.5d0 <= Numbers(NumNum)).AND.(1.0d0 >= Numbers(NumNum)))THEN
       Secondary(SecondaryNum)%PumpPowerToHeat=Numbers(NumNum)
     ELSE
       CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
@@ -5297,12 +5321,12 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     ENDIF
   ELSEIF(.NOT. lNumericBlanks(NumNum) .AND. lAlphaBlanks(AlphaNum)) THEN
      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-               '" '//TRIM(cAlphaFieldNames(AlphaNum))//' not found even though '//TRIM(cNumericFieldNames(NumNum))//&
+               '", '//TRIM(cAlphaFieldNames(AlphaNum))//' not found even though '//TRIM(cNumericFieldNames(NumNum))//&
                ' is greater than zero. Distribution piping heat gain will not be calculated unless a Zone'//&
                ' is defined to deterimine the environmental temperature surrounding the piping.')
   ELSEIF(lNumericBlanks(NumNum) .AND. .NOT. lAlphaBlanks(AlphaNum)) THEN
      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-               '" '//TRIM(cAlphaFieldNames(AlphaNum))//' will not be used and distribution piping heat gain will '//&
+               '", '//TRIM(cAlphaFieldNames(AlphaNum))//' will not be used and distribution piping heat gain will'//&
                ' not be calculated because '//TRIM(cNumericFieldNames(NumNum))//&
                ' was blank.')
   END IF  !distribution piping
@@ -5339,12 +5363,12 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     ENDIF
   ELSEIF(.NOT. lNumericBlanks(NumNum) .AND. lAlphaBlanks(AlphaNum)) THEN
      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-               '" '//TRIM(cAlphaFieldNames(AlphaNum))//' not found even though '//TRIM(cNumericFieldNames(NumNum))//&
+               '", '//TRIM(cAlphaFieldNames(AlphaNum))//' not found even though '//TRIM(cNumericFieldNames(NumNum))//&
                ' is greater than zero. Receiver heat gain will not be calculated unless a Zone'//&
                ' is defined to deterimine the environmental temperature surrounding the Receiver.')
   ELSEIF(lNumericBlanks(NumNum) .AND. .NOT. lAlphaBlanks(AlphaNum)) THEN
      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
-               '" '//TRIM(cAlphaFieldNames(AlphaNum))//' will not be used and Receiver heat gain will '//&
+               '", '//TRIM(cAlphaFieldNames(AlphaNum))//' will not be used and Receiver heat gain will'//&
                ' not be calculated because '//TRIM(cNumericFieldNames(NumNum))//&
                ' was blank.')
   END IF  !Receiver
@@ -5352,7 +5376,12 @@ END IF !fluid type AlwaysLiquid or PhaseChange ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 NumNum = 14
 Secondary(SecondaryNum)%ChillerRefInventory = 0.d0
 IF (.NOT. lNumericBlanks(NumNum))Secondary(SecondaryNum)%ChillerRefInventory = Numbers(NumNum)
-
+IF (Secondary(SecondaryNum)%ChillerRefInventory < 0.0) THEN
+    Secondary(SecondaryNum)%ChillerRefInventory = 0.d0
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
+               '", The value specified for '//TRIM(cNumericFieldNames(NumNum))//' is less than zero. The default'//&
+               ' value of zero will be used.')
+END IF
 
 AlphaNum=9
 IF (.NOT. lAlphaBlanks(AlphaNum))  Secondary(SecondaryNum)%EndUseSubcategory = Alphas(AlphaNum)
@@ -5365,7 +5394,7 @@ Secondary(SecondaryNum)%MaxVolFlow = MIN(SecondaryFlowVolRated,PumpTotRatedFlowV
 NominalSecondaryRefLoad = NominalTotalCaseCap + NominalTotalWalkInCap + &
                           Secondary(SecondaryNum)%PumpTotRatedPower
 
-IF( Secondary(SecondaryNum)%FluidType == SecFluidTypeAlwaysLiquid) THEN  !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IF( Secondary(SecondaryNum)%FluidType == SecFluidTypeAlwaysLiquid) THEN
   IF(TBrineOutRated > (Secondary(SecondaryNum)%TMinNeeded + 0.5d0)) THEN
       CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(Secondary(SecondaryNum)%Name)//&
           ' The design brine temperature to the refrigeration loads: '//&
@@ -5672,7 +5701,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
                              ': '//TRIM(Alphas(AlphaListNum)))
          ErrorsFound = .TRUE.
        ELSEIF (LoadCascadeNum /= 0) THEN
-         IF(Condenser(LoadCascadeNum)%CondenserType /= CondenserCascade) THEN
+         IF(Condenser(LoadCascadeNum)%CondenserType /= RefrigCondenserTypeCascade) THEN
            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(System(RefrigSysNum)%Name)&
                              //'" : has a condenser listed as a transfer load that is not a cascade condenser: '//&
                              TRIM(Alphas(AlphaListNum)))
@@ -6015,7 +6044,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
     IF (NumCascadeLoad > 0 ) THEN
       DO CascadeLoadIndex = 1, NumCascadeLoad
          CondID=System(RefrigSysNum)%CascadeLoadNum(CascadeLoadIndex)
-         IF(Condenser(CondID)%CondenserType /= CondenserCascade) THEN
+         IF(Condenser(CondID)%CondenserType /= RefrigCondenserTypeCascade) THEN
            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(System(RefrigSysNum)%Name)&
                              //'", has a  '//&
                              TRIM(cAlphaFieldNames(AlphaNum))//': '//TRIM(Alphas(AlphaNum))//&
@@ -6090,12 +6119,12 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
 
     System(RefrigSysNum)%RefInventory=System(RefrigSysNum)%RefInventory + Condenser(CondNum)%RefReceiverInventory + &
                Condenser(CondNum)%RefPipingInventory +  Condenser(CondNum)%RefOpCharge
-    IF(Condenser(CondNum)%CondenserType == CondenserCascade)Condenser(CondNum)%CascadeSysID=RefrigSysNum
-    IF((Condenser(Condnum)%CondenserType==CondenserCoolingAir).AND. &
+    IF(Condenser(CondNum)%CondenserType == RefrigCondenserTypeCascade)Condenser(CondNum)%CascadeSysID=RefrigSysNum
+    IF((Condenser(Condnum)%CondenserType==RefrigCondenserTypeAir).AND. &
        ( Condenser(Condnum)%CondenserRejectHeatToZone))System(RefrigSysNum)%SystemRejectHeatToZone = .TRUE.
 
     !Now do evaporative condenser auto sizing because it is a function of the system's cooling load
-    IF(Condenser(CondNum)%CondenserType == CondenserCoolingEvap)THEN
+    IF(Condenser(CondNum)%CondenserType == RefrigCondenserTypeEvap)THEN
       IF(Condenser(CondNum)%RatedAirFlowRate==AutoCalculate)    THEN
         Condenser(CondNum)%RatedAirFlowRate = AirVolRateEvapCond * Condenser(CondNum)%RatedCapacity
       END IF
@@ -6165,7 +6194,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
           '", '//TRIM(cNumericFieldNames(1))//' must be defined.')
           ErrorsFound = .TRUE.
   END IF
-  IF ((Condenser(CondNum)%CondenserType == CondenserCascade).AND. &
+  IF ((Condenser(CondNum)%CondenserType == RefrigCondenserTypeCascade).AND. &
       (System(RefrigSysNum)%TCondenseMin > Condenser(CondNum)%RatedTCondense)) &
       CALL ShowWarningError(TRIM(CurrentModuleObject)//'="'//TRIM(System(RefrigSysNum)%Name)//&
                           '", The system specified minimum condensing temperature is greater than '//&
@@ -6479,7 +6508,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
     IF (System(RefrigSysNum)%NumCascadeLoads == 0) CYCLE
     IF(System(RefrigSysNum)%CoilFlag) THEN !system already identified as serving coils
       DO CondID = 1,NumRefrigCondensers
-        IF (Condenser(CondID)%CondenserType /= CondenserCascade)CYCLE
+        IF (Condenser(CondID)%CondenserType /= RefrigCondenserTypeCascade)CYCLE
         IF (RefrigSysNum /= Condenser(CondID)%CascadeSinkSystemID) CYCLE  !this condenser is not a cascade load on this system
         IF (.NOT. Condenser(CondID)%CoilFlag )THEN
             !would mean system already serving coil loads and this condenser cooling system with case-type loads
@@ -6496,7 +6525,7 @@ END IF  !(  IF (NumSimulationSecondarySystems > 0)
       CaseLoads = .FALSE.
       NumCascadeLoadsChecked = 0
       DO CondID = 1,NumRefrigCondensers !look at All cascade condenser loads on system
-        IF (Condenser(CondID)%CondenserType /= CondenserCascade)CYCLE
+        IF (Condenser(CondID)%CondenserType /= RefrigCondenserTypeCascade)CYCLE
         IF (RefrigSysNum /= Condenser(CondID)%CascadeSinkSystemID)CYCLE !this condenser is not a cascade load on this system
         NumCascadeLoadsChecked = NumCascadeLoadsChecked + 1
         IF ((CaseLoads) .AND. (.NOT. Condenser(CondID)%CoilFlag).AND.(.NOT. System(RefrigSysNum)%CoilFlag)) CYCLE
@@ -7506,78 +7535,78 @@ IF(NumSimulationCases > 0) THEN
   ! CurrentModuleObject='Refrigeration:Case'
   DO CaseNum=1,NumSimulationCases
    IF(RefrigCase(CaseNum)%NumSysAttach == 1) THEN
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Total Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Total Cooling Rate [W]', &
                               RefrigCase(CaseNum)%TotalCoolingLoad,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Total Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Total Cooling Energy [J]', &
                               RefrigCase(CaseNum)%TotalCoolingEnergy,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name,ResourceTypeKey='ENERGYTRANSFER', &
                               EndUseKey='REFRIGERATION',GroupKey='Building',ZoneKey=RefrigCase(CaseNum)%ZoneName)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Sensible Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Sensible Cooling Rate [W]', &
                               RefrigCase(CaseNum)%SensCoolingEnergyRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Sensible Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Sensible Cooling Energy [J]', &
                               RefrigCase(CaseNum)%SensCoolingEnergy,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Latent Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Latent Cooling Rate [W]', &
                               RefrigCase(CaseNum)%LatCoolingEnergyRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Latent Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Latent Cooling Energy [J]', &
                               RefrigCase(CaseNum)%LatCoolingEnergy,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
 
-    CALL SetupOutputVariable('Refrigerated Case Sensible Cooling Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Sensible Cooling Rate [W]', &
                               RefrigCase(CaseNum)%SensZoneCreditCoolRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Cooling Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Sensible Cooling Energy [J]', &
                               RefrigCase(CaseNum)%SensZoneCreditCool,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Heating Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Sensible Heating Rate [W]', &
                               RefrigCase(CaseNum)%SensZoneCreditHeatRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Heating Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Sensible Heating Energy [J]', &
                               RefrigCase(CaseNum)%SensZoneCreditHeat,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
 
-    CALL SetupOutputVariable('Refrigerated Case Latent Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Latent Rate [W]', &
                               RefrigCase(CaseNum)%LatZoneCreditRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Latent Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Zone Latent Energy [J]', &
                               RefrigCase(CaseNum)%LatZoneCredit,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
 
-    CALL SetupOutputVariable('Refrigerated Case Sensible Cooling HVAC RA Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Sensible Cooling Rate [W]', &
                               RefrigCase(CaseNum)%SensHVACCreditCoolRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Cooling HVAC RA Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Sensible Cooling Energy [J]', &
                               RefrigCase(CaseNum)%SensHVACCreditCool,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Heating HVAC RA Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Sensible Heating Rate [W]', &
                               RefrigCase(CaseNum)%SensHVACCreditHeatRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Sensible Heating HVAC RA Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Sensible Heating Energy [J]', &
                               RefrigCase(CaseNum)%SensHVACCreditHeat,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
 
-    CALL SetupOutputVariable('Refrigerated Case Latent HVAC RA Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Latent Rate [W]', &
                               RefrigCase(CaseNum)%LatHVACCreditRate,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Latent HVAC RA Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Return Air Latent Energy [J]', &
                               RefrigCase(CaseNum)%LatHVACCredit,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name)
 
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Fan Electric Power [W]', &
                               RefrigCase(CaseNum)%ElecFanPower,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Evaporator Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Evaporator Fan Electric Energy [J]', &
                               RefrigCase(CaseNum)%ElecFanConsumption,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building',ZoneKey=RefrigCase(CaseNum)%ZoneName, &
                               EndUseSubKey='General')
-    CALL SetupOutputVariable('Refrigerated Case Lighting Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Case Lighting Electric Power [W]', &
                               RefrigCase(CaseNum)%ElecLightingPower,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-    CALL SetupOutputVariable('Refrigerated Case Lighting Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Case Lighting Electric Energy [J]', &
                               RefrigCase(CaseNum)%ElecLightingConsumption,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building',ZoneKey=RefrigCase(CaseNum)%ZoneName, &
@@ -7586,19 +7615,19 @@ IF(NumSimulationCases > 0) THEN
 ! Report defrost energy curve value only for cases having electric or hot-gas defrost with temperature termination
     IF(RefrigCase(CaseNum)%DefrostType == DefElectricTerm .OR. &
        RefrigCase(CaseNum)%DefrostType == DefHotFluidTerm )THEN
-      CALL SetupOutputVariable('Refrigerated Case Defrost Energy Correction Curve Value', &
+      CALL SetupOutputVariable('Refrigeration Case Defrost Energy Correction Curve Value []', &
                               RefrigCase(CaseNum)%DefEnergyCurveValue,'Zone','Average',RefrigCase(CaseNum)%Name)
     END IF
 
-    CALL SetupOutputVariable('Refrigerated Case Latent Case Credit Curve Value', RefrigCase(CaseNum)%LatEnergyCurveValue, &
+    CALL SetupOutputVariable('Refrigeration Case Latent Credit Curve Value []', RefrigCase(CaseNum)%LatEnergyCurveValue, &
                              'Zone','Average',RefrigCase(CaseNum)%Name)
 
 ! Report only for cases having anti-sweat heaters
     IF (RefrigCase(CaseNum)%AntiSweatControlType > ASNone) THEN
-      CALL SetupOutputVariable('Refrigerated Case Anti-Sweat Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Case Anti Sweat Electric Power [W]', &
                               RefrigCase(CaseNum)%ElecAntiSweatPower,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-      CALL SetupOutputVariable('Refrigerated Case Anti-Sweat Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Case Anti Sweat Electric Energy [J]', &
                               RefrigCase(CaseNum)%ElecAntiSweatConsumption,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building',ZoneKey=RefrigCase(CaseNum)%ZoneName, &
@@ -7609,10 +7638,10 @@ IF(NumSimulationCases > 0) THEN
 
     IF (RefrigCase(CaseNum)%DefrostType == DefElectric .OR. RefrigCase(CaseNum)%DefrostType == DefElectricOnDemand .OR. &
               RefrigCase(CaseNum)%DefrostType == DefElectricTerm ) THEN
-      CALL SetupOutputVariable('Refrigerated Case Defrost Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Case Defrost Electric Power [W]', &
                               RefrigCase(CaseNum)%ElecDefrostPower,'Zone','Average',&
                               RefrigCase(CaseNum)%Name)
-      CALL SetupOutputVariable('Refrigerated Case Defrost Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Case Defrost Electric Energy [J]', &
                               RefrigCase(CaseNum)%ElecDefrostConsumption,'Zone','Sum',&
                               RefrigCase(CaseNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building',ZoneKey=RefrigCase(CaseNum)%ZoneName, &
@@ -7639,50 +7668,50 @@ IF(NumSimulationWalkIns > 0) THEN
   ! CurrentModuleObject='Refrigeration:WalkIn'
   DO  WalkInNum=1,NumSimulationWalkIns
    IF( WalkIn( WalkInNum)%NumSysAttach == 1) THEN  !ensure no unuseds reported
-    CALL SetupOutputVariable('Walk In Evaporator Total Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Total Cooling Rate [W]', &
                                WalkIn( WalkInNum)%TotalCoolingLoad,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Evaporator Total Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Total Cooling Energy [J]', &
                                WalkIn( WalkInNum)%TotalCoolingEnergy,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Sensible Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Sensible Cooling Rate [W]', &
                                WalkIn( WalkInNum)%TotSensCoolingEnergyRate,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Sensible Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Sensible Cooling Energy [J]', &
                                WalkIn( WalkInNum)%TotSensCoolingEnergy,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Latent Heat Transfer Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Latent Cooling Rate [W]', &
                                WalkIn( WalkInNum)%TotLatCoolingEnergyRate,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Latent Heat Transfer Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Evaporator Latent Cooling Energy [J]', &
                                WalkIn( WalkInNum)%TotLatCoolingEnergy,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Auxiliary Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Ancillary Electric Power [W]', &
                                WalkIn( WalkInNum)%TotalElecPower,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Total Auxiliary Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Ancillary Electric Energy [J]', &
                                WalkIn( WalkInNum)%TotalElecConsumption,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Fans Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Fan Electric Power [W]', &
                                WalkIn( WalkInNum)%ElecFanPower,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Fans Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Fan Electric Energy [J]', &
                                WalkIn( WalkInNum)%ElecFanConsumption,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building', &
                               EndUseSubKey='General')
-    CALL SetupOutputVariable('Walk In Lighting Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Lighting Electric Power [W]', &
                                WalkIn( WalkInNum)%ElecLightingPower,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Lighting Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Lighting Electric Energy [J]', &
                                WalkIn( WalkInNum)%ElecLightingConsumption,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name,ResourceTypeKey='ELECTRICITY', &
                                EndUseKey='REFRIGERATION',GroupKey='Building', &
                                EndUseSubKey='General')
-    CALL SetupOutputVariable('Walk In Heaters Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Heater Electric Power [W]', &
                                WalkIn( WalkInNum)%ElecHeaterPower,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-    CALL SetupOutputVariable('Walk In Heaters Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Walk In Heater Electric Energy [J]', &
                                WalkIn( WalkInNum)%ElecHeaterConsumption,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name,ResourceTypeKey='ELECTRICITY', &
                                EndUseKey='REFRIGERATION',GroupKey='Building', &
@@ -7690,10 +7719,10 @@ IF(NumSimulationWalkIns > 0) THEN
 
 ! Report only for WalkIns using electric defrost
     IF ( WalkIn( WalkInNum)%DefrostType == WalkInDefrostElec) THEN
-      CALL SetupOutputVariable('Walk In Defrost Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Defrost Electric Power [W]', &
                                WalkIn( WalkInNum)%ElecDefrostPower,'Zone','Average',&
                                WalkIn( WalkInNum)%Name)
-      CALL SetupOutputVariable('Walk In Defrost Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Defrost Electric Energy [J]', &
                                WalkIn( WalkInNum)%ElecDefrostConsumption,'Zone','Sum',&
                                WalkIn( WalkInNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building', &
@@ -7708,22 +7737,22 @@ IF(NumSimulationWalkIns > 0) THEN
 
       Walkin_and_zone_name = TRIM(WalkIn(WalkInNum)%Name)//'InZone'//TRIM(WalkIn(WalkInNum)%ZoneName(ZoneID))
 
-      CALL SetupOutputVariable('Zone/Walk In Sensible Cooling Zone Credit Rate [W]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Sensible Cooling Rate [W]', &
                                WalkIn( WalkInNum)%SensZoneCreditCoolRate(ZoneID),'Zone','Average',&
                                Walkin_and_zone_name)
-      CALL SetupOutputVariable('Zone/Walk In Sensible Cooling Zone Credit Energy [J]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Sensible Cooling Energy [J]', &
                                WalkIn( WalkInNum)%SensZoneCreditCool(ZoneID),'Zone','Sum',&
                                Walkin_and_zone_name)
-      CALL SetupOutputVariable('Zone/Walk In Sensible Heating Zone Credit Rate [W]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Sensible Heating Rate [W]', &
                                WalkIn( WalkInNum)%SensZoneCreditHeatRate(ZoneID),'Zone','Average',&
                                Walkin_and_zone_name)
-      CALL SetupOutputVariable('Zone/Walk In Sensible Heating Zone Credit Energy [J]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Sensible Heating Energy [J]', &
                                WalkIn( WalkInNum)%SensZoneCreditHeat(ZoneID),'Zone','Sum',&
                                Walkin_and_zone_name)
-      CALL SetupOutputVariable('Zone/Walk In Latent Zone Credit Rate [W]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Latent Rate [W]', &
                                WalkIn( WalkInNum)%LatZoneCreditRate(ZoneID),'Zone','Average',&
                                Walkin_and_zone_name)
-      CALL SetupOutputVariable('Zone/Walk In Latent Zone Credit Energy [J]', &
+      CALL SetupOutputVariable('Refrigeration Walk In Zone Latent Energy [J]', &
                                WalkIn( WalkInNum)%LatZoneCredit(ZoneID),'Zone','Sum',&
                                Walkin_and_zone_name)
 
@@ -7745,80 +7774,80 @@ IF(NumSimulationRefrigAirChillers > 0) THEN
   ! CurrentModuleObject='Refrigeration:AirChiller'
   DO  CoilNum=1,NumSimulationRefrigAirChillers
    IF( WarehouseCoil(CoilNum)%NumSysAttach == 1) THEN  !ensure no unuseds reported
-    CALL SetupOutputVariable('Air Chiller Total Cooling Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Cooling Rate [W]', &
                                WarehouseCoil(CoilNum)%TotalCoolingLoad,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Total Cooling Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Cooling Energy [J]', &
                                WarehouseCoil(CoilNum)%TotalCoolingEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Sensible Cooling Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Cooling Rate [W]', &
                                WarehouseCoil(CoilNum)%SensCoolingEnergyRate,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Sensible Cooling Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Cooling Energy [J]', &
                                WarehouseCoil(CoilNum)%SensCoolingEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Latent Cooling Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Latent Cooling Rate [W]', &
                                WarehouseCoil(CoilNum)%LatCreditRate,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Latent Cooling Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Latent Cooling Energy [J]', &
                                WarehouseCoil(CoilNum)%LatCreditEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Water Removal [kg/s]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Water Removed Mass Flow Rate [kg/s]', &
                                WarehouseCoil(CoilNum)%LatKgPerS_ToZone,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Total Auxiliary Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Electric Power [W]', &
                                WarehouseCoil(CoilNum)%TotalElecPower,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Total Auxiliary Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Electric Energy [J]', &
                                WarehouseCoil(CoilNum)%TotalElecConsumption,'HVAC','Sum',&
-                               WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Fans Electric Power [W]', &
+                               WarehouseCoil(CoilNum)%Name) !components are metered seperately
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Fan Electric Power [W]', &
                                WarehouseCoil(CoilNum)%ElecFanPower,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Fans Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Fan Electric Energy [J]', &
                                WarehouseCoil(CoilNum)%ElecFanConsumption,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building', &
                               EndUseSubKey='General')
-    CALL SetupOutputVariable('Air Chiller Heaters Electric Power [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Heater Electric Power [W]', &
                                WarehouseCoil(CoilNum)%ElecHeaterPower,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Heaters Electric Consumption [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Heater Electric Energy [J]', &
                                WarehouseCoil(CoilNum)%ElecHeaterConsumption,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name,ResourceTypeKey='ELECTRICITY', &
                                EndUseKey='REFRIGERATION',GroupKey='Building', &
                                EndUseSubKey='General')
-    CALL SetupOutputVariable('Air Chiller Sensible Heat Ratio', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Heat Ratio []', &
                                WarehouseCoil(CoilNum)%SensHeatRatio,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Frost Accumulation [Kg]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Frost Accumulation Mass [Kg]', &
                                WarehouseCoil(CoilNum)%KgFrost,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Total Cooling Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Total Cooling Rate [W]', &
                                WarehouseCoil(CoilNum)%ReportTotalCoolCreditRate,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Total Cooling Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Total Cooling Energy [J]', &
                                WarehouseCoil(CoilNum)%ReportTotalCoolCreditEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Sensible Cooling Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Sensible Cooling Rate [W]', &
                                WarehouseCoil(CoilNum)%ReportSensCoolCreditRate,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Sensible Cooling Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Sensible Cooling Energy [J]', &
                                WarehouseCoil(CoilNum)%ReportSensCoolCreditEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Heating Zone Credit Rate [W]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Heating Rate [W]', &
                                WarehouseCoil(CoilNum)%ReportHeatingCreditRate,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-    CALL SetupOutputVariable('Air Chiller Heating Zone Credit Energy [J]', &
+    CALL SetupOutputVariable('Refrigeration Zone Air Chiller Zone Heating Energy [J]', &
                                WarehouseCoil(CoilNum)%ReportHeatingCreditEnergy,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name)
 
     ! Report only for Warehouse coils using electric defrost
     IF ( WarehouseCoil(CoilNum)%DefrostType == DefrostElec) THEN
-      CALL SetupOutputVariable('Air Chiller Defrost Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Zone Air Chiller Defrost Electric Power [W]', &
                                WarehouseCoil(CoilNum)%ElecDefrostPower,'HVAC','Average',&
                                WarehouseCoil(CoilNum)%Name)
-      CALL SetupOutputVariable('Air Chiller Defrost Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Zone Air Chiller Defrost Electric Energy [J]', &
                                WarehouseCoil(CoilNum)%ElecDefrostConsumption,'HVAC','Sum',&
                                WarehouseCoil(CoilNum)%Name,ResourceTypeKey='ELECTRICITY', &
                               EndUseKey='REFRIGERATION',GroupKey='Building', &
@@ -7837,69 +7866,69 @@ END IF ! NumSimulationRefrigAirChillers > 0
   DO ZoneID = 1,NumOfZones
     IF (RefrigPresentInZone(ZoneID))THEN
       IF(HaveCasesOrWalkins)THEN
-        CALL SetupOutputVariable('Zone Refrigeration: Total Sensible Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Sensible Cooling Rate [W]', &
                                 RefrigCaseCredit(ZoneID)%SenCaseCreditToZone,'Zone','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration: Total Sensible Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Sensible Cooling Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%SenCaseCreditToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Heating Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Heating Rate [W]', &
                                 CaseWIZoneReport(ZoneID)%HeatingToZoneRate,'Zone','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Heating Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Heating Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%HeatingToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Sensible Cooling Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Sensible Cooling Rate [W]', &
                                 CaseWIZoneReport(ZoneID)%SenCoolingToZoneRate,'Zone','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Sensible Cooling Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Sensible Cooling Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%SenCoolingToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration: Total Latent Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Latent Cooling Rate [W]', &
                                 CaseWIZoneReport(ZoneID)%LatCoolingToZoneRate,'Zone','Average',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration: Total Latent Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Latent Cooling Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%LatCoolingToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Total Cooling Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Cooling Rate [W]', &
                                 CaseWIZoneReport(ZoneID)%TotCoolingToZoneRate,'Zone','Average',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration Total Cooling Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Cooling Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%TotCoolingToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration: Total Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Heat Transfer Rate [W]', &
                                 CaseWIZoneReport(ZoneID)%TotHtXferToZoneRate,'Zone','Average',&
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Refrigeration: Total Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Case and Walk In Total Heat Transfer Energy [J]', &
                                 CaseWIZoneReport(ZoneID)%TotHtXferToZoneEnergy,'Zone','Sum',&
                                 Zone(ZoneID)%Name)
     END IF !HaveCasesOrWalkIns
 
       IF(HaveChillers)THEN
-        CALL SetupOutputVariable('Zone Chillers Sensible Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Heat Transfer Rate [W]', &
                                 CoilSysCredit(ZoneID)%SenCreditToZoneRate,'HVAC','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Sensible Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Heat Transfer Energy [J]', &
                                 CoilSysCredit(ZoneID)%SenCreditToZoneEnergy,'HVAC','Sum',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Sensible Cooling Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Cooling Rate [W]', &
                                 CoilSysCredit(ZoneID)%ReportSenCoolingToZoneRate,'HVAC','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Sensible Cooling Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Sensible Cooling Energy [J]', &
                                 CoilSysCredit(ZoneID)%ReportSenCoolingToZoneEnergy,'HVAC','Sum',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Latent Cooling Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Latent Cooling Rate [W]', &
                                 CoilSysCredit(ZoneID)%ReportLatCreditToZoneRate,'HVAC','Average',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Latent Cooling Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Latent Cooling Energy [J]', &
                                 CoilSysCredit(ZoneID)%ReportLatCreditToZoneEnergy,'HVAC','Sum',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Water Removed From Zone Air Rate [Kg/s]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Water Removed Mass Flow Rate [Kg/s]', &
                                 CoilSysCredit(ZoneID)%ReportH20RemovedKgPerS_FromZoneRate,'HVAC','Average',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Total Cooling Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Cooling Rate [W]', &
                                 CoilSysCredit(ZoneID)%ReportTotCoolingToZoneRate,'HVAC','Average',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Total Cooling Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Total Cooling Energy [J]', &
                                 CoilSysCredit(ZoneID)%ReportTotCoolingToZoneEnergy,'HVAC','Sum',Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Heating Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Heating Rate [W]', &
                                 CoilSysCredit(ZoneID)%ReportHeatingToZoneRate,'HVAC','Average', &
                                 Zone(ZoneID)%Name)
-        CALL SetupOutputVariable('Zone Chillers Heating Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Zone Air Chiller Heating Energy [J]', &
                                 CoilSysCredit(ZoneID)%ReportHeatingToZoneEnergy,'HVAC','Sum',Zone(ZoneID)%Name)
       END IF !HaveChillers
     END IF !RefrigPresentInZone(ZoneID)
@@ -7910,57 +7939,57 @@ END IF ! NumSimulationRefrigAirChillers > 0
     DO SecondNum=1,NumSimulationSecondarySystems
     IF(Secondary(SecondNum)%NumSysAttach == 1) THEN
       IF(Secondary(SecondNum)%CoilFlag) THEN  !secondary system serves chillers and is solved on HVAC time step
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Pump Electric Power [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Pump Electric Power [W]', &
                        Secondary(SecondNum)%PumpPowerTotal,'HVAC','Average',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Pump Electric Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Pump Electric Energy [J]', &
                        Secondary(SecondNum)%PumpElecEnergyTotal,'HVAC','Sum',&
                        Secondary(SecondNum)%Name, &
                        ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                        EndUseSubKey=Secondary(SecondNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Refrigeration Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Load Heat Transfer Rate [W]', &
                        Secondary(SecondNum)%TotalRefrigLoad,'HVAC','Average',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Refrigeration Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Load Heat Transfer Energy [J]', &
                        Secondary(SecondNum)%TotalRefrigEnergy,'HVAC','Sum',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Total Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Total Heat Transfer Rate [W]', &
                        Secondary(SecondNum)%TotalCoolingLoad,'HVAC','Average',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Total Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Total Heat Transfer Energy [J]', &
                        Secondary(SecondNum)%TotalCoolingEnergy,'HVAC','Sum',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Estimated Refrigerant Inventory [kg]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Estimated Refrigerant Inventory Mass [kg]', &
                      Secondary(SecondNum)%RefInventory,'HVAC','Average',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Coolant Vol Flow [m3/s]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Volume Flow Rate [m3/s]', &
                      Secondary(SecondNum)%FlowVolActual,'HVAC','Average',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Pipe Heat Gain Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Pipe Heat Gain Rate [W]', &
                      Secondary(SecondNum)%DistPipeHeatGain,'HVAC','Average',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Pipe Heat Gain Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Pipe Heat Gain Energy [J]', &
                      Secondary(SecondNum)%DistPipeHeatGainEnergy,'HVAC','Sum',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Receiver Heat Gain Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Receiver Heat Gain Rate [W]', &
                      Secondary(SecondNum)%ReceiverHeatGain,'HVAC','Average',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Secondary Loop Receiver Heat Gain Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Secondary Loop Receiver Heat Gain Energy [J]', &
                      Secondary(SecondNum)%ReceiverHeatGainEnergy,'HVAC','Sum',&
                      Secondary(SecondNum)%Name)
       ELSE  !Secondary loop serves cases and walk-ins on zone(load) time step
         CALL SetupOutputVariable('Refrigeration Secondary Loop Pump Electric Power [W]', &
                        Secondary(SecondNum)%PumpPowerTotal,'Zone','Average',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Secondary Loop Pump Electric Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Secondary Loop Pump Electric Energy [J]', &
                        Secondary(SecondNum)%PumpElecEnergyTotal,'Zone','Sum',&
                        Secondary(SecondNum)%Name, &
                        ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                        EndUseSubKey=Secondary(SecondNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Secondary Loop Refrigeration Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Secondary Loop Load Heat Transfer Rate [W]', &
                        Secondary(SecondNum)%TotalRefrigLoad,'Zone','Average',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Secondary Loop Refrigeration Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Secondary Loop Load Heat Transfer Energy [J]', &
                        Secondary(SecondNum)%TotalRefrigEnergy,'Zone','Sum',&
                        Secondary(SecondNum)%Name)
         CALL SetupOutputVariable('Refrigeration Secondary Loop Total Heat Transfer Rate [W]', &
@@ -7969,10 +7998,10 @@ END IF ! NumSimulationRefrigAirChillers > 0
         CALL SetupOutputVariable('Refrigeration Secondary Loop Total Heat Transfer Energy [J]', &
                        Secondary(SecondNum)%TotalCoolingEnergy,'Zone','Sum',&
                        Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Secondary Loop Estimated Refrigerant Inventory [kg]', &
+        CALL SetupOutputVariable('Refrigeration Secondary Loop Estimated Refrigerant Inventory Mass [kg]', &
                      Secondary(SecondNum)%RefInventory,'Zone','Average',&
                      Secondary(SecondNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Secondary Loop Coolant Vol Flow [m3/s]', &
+        CALL SetupOutputVariable('Refrigeration Secondary Loop Volume Flow Rate [m3/s]', &
                      Secondary(SecondNum)%FlowVolActual,'Zone','Average',&
                      Secondary(SecondNum)%Name)
         CALL SetupOutputVariable('Refrigeration Secondary Loop Pipe Heat Gain Rate [W]', &
@@ -8011,54 +8040,55 @@ END IF ! NumSimulationRefrigAirChillers > 0
   ! CurrentModuleObject='Refrigeration:CompressorRack'
   DO RackNum=1,NumRefrigeratedRacks
     IF(RefrigRack(RackNum)%CoilFlag) THEN  !rack serves chillers and is solved on HVAC time step
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Electric Power [W]', &
                               RefrigRack(RackNum)%RackCompressorPower,'HVAC','Average',&
                               RefrigRack(RackNum)%Name)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Electric Energy [J]', &
                               RefrigRack(RackNum)%RackElecConsumption,'HVAC','Sum',&
                               RefrigRack(RackNum)%Name, &
                               ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                               EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Condenser Fan Electric Power [W]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Condenser Fan Electric Power [W]', &
                               RefrigRack(RackNum)%ActualCondenserFanPower,'HVAC','Average',&
                               RefrigRack(RackNum)%Name)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Condenser Fan Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Condenser Fan Electric Energy [J]', &
                               RefrigRack(RackNum)%CondenserFanConsumption,'HVAC','Sum',&
                               RefrigRack(RackNum)%Name, &
                               ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                               EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Total Heat Transfer Rate [W]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Total Heat Transfer Rate [W]', &
                               RefrigRack(RackNum)%RackCapacity,'HVAC','Average',&
                               RefrigRack(RackNum)%Name)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Total Heat Transfer Energy [J]', &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Total Heat Transfer Energy [J]', &
                               RefrigRack(RackNum)%RackCoolingEnergy,'HVAC','Sum',&
                               RefrigRack(RackNum)%Name, &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                               EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-      CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack COP [W/W]', RefrigRack(RackNum)%RackCompressorCOP, &
+      CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack COP [W/W]', RefrigRack(RackNum)%RackCompressorCOP, &
                              'HVAC','Average',RefrigRack(RackNum)%Name)
 
-      IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap) THEN
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Condenser Pump Electric Power [W]', &
+      IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap) THEN
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser Pump Electric Power [W]', &
                                 RefrigRack(RackNum)%ActualEvapPumpPower,'HVAC','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Condenser Pump Elec Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser Pump Electric Energy [J]', &
                                 RefrigRack(RackNum)%EvapPumpConsumption,'HVAC','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                                 EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Cond Basin Heater Elec Power [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser Basin Heater Electric Power [W]',&
                                 RefrigRack(RackNum)%BasinHeaterPower,'HVAC','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Cond Basin Heater Elec Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser '//  &
+                                'Basin Heater Electric Energy [J]', &
                                 RefrigRack(RackNum)%BasinHeaterConsumption,'HVAC','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                                 EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Condenser Water Consumption Rate [m3/s]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser Water Volume Flow Rate [m3/s]', &
                                 RefrigRack(RackNum)%EvapWaterConsumpRate,'HVAC','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Evap Condenser Water Consumption [m3]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Evaporative Condenser Water Volume [m3]', &
                                 RefrigRack(RackNum)%EvapWaterConsumption,'HVAC','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='Water',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8066,17 +8096,17 @@ END IF ! NumSimulationRefrigAirChillers > 0
       END IF !Evap condenser
 
       IF(RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Sensible Heating Rate to Zone [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Zone Sensible Heating Rate [W]', &
                               RefrigRack(RackNum)%SensZoneCreditHeatRate,'HVAC','Average',&
                               RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Sensible Heating Energy To Zone [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Zone Sensible Heating Energy [J]', &
                               RefrigRack(RackNum)%SensZoneCreditHeat,'HVAC','Sum',&
                               RefrigRack(RackNum)%Name)
 
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Sensible Heating Rate To HVAC Return Air [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Return Air Sensible Heating Rate [W]', &
                               RefrigRack(RackNum)%SensHVACCreditHeatRate,'HVAC','Average',&
                               RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Rack Sensible Heating Energy To HVAC Return Air [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller Compressor Rack Return Air Sensible Heating Energy [J]', &
                               RefrigRack(RackNum)%SensHVACCreditHeat,'HVAC','Sum',&
                               RefrigRack(RackNum)%Name)
 
@@ -8094,7 +8124,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
       CALL SetupOutputVariable('Refrigeration Compressor Rack Electric Power [W]', &
                               RefrigRack(RackNum)%RackCompressorPower,'Zone','Average',&
                               RefrigRack(RackNum)%Name)
-      CALL SetupOutputVariable('Refrigeration Compressor Rack Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Compressor Rack Electric Energy [J]', &
                               RefrigRack(RackNum)%RackElecConsumption,'Zone','Sum',&
                               RefrigRack(RackNum)%Name, &
                               ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8102,7 +8132,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
       CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Fan Electric Power [W]', &
                               RefrigRack(RackNum)%ActualCondenserFanPower,'Zone','Average',&
                               RefrigRack(RackNum)%Name)
-      CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Fan Electric Consumption [J]', &
+      CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Fan Electric Energy [J]', &
                               RefrigRack(RackNum)%CondenserFanConsumption,'Zone','Sum',&
                               RefrigRack(RackNum)%Name, &
                               ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8118,27 +8148,27 @@ END IF ! NumSimulationRefrigAirChillers > 0
       CALL SetupOutputVariable('Refrigeration Compressor Rack COP [W/W]', RefrigRack(RackNum)%RackCompressorCOP, &
                              'Zone','Average',RefrigRack(RackNum)%Name)
 
-      IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap) THEN
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Condenser Pump Electric Power [W]', &
+      IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap) THEN
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Pump Electric Power [W]', &
                                 RefrigRack(RackNum)%ActualEvapPumpPower,'Zone','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Condenser Pump Elec Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Pump Electric Energy [J]', &
                                 RefrigRack(RackNum)%EvapPumpConsumption,'Zone','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                                 EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Cond Basin Heater Elec Power [W]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Basin Heater Electric Power [W]', &
                                 RefrigRack(RackNum)%BasinHeaterPower,'Zone','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Cond Basin Heater Elec Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Basin Heater Electric Energy [J]', &
                                 RefrigRack(RackNum)%BasinHeaterConsumption,'Zone','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                                 EndUseSubKey=RefrigRack(RackNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Condenser Water Consumption Rate [m3/s]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Water Volume Flow Rate [m3/s]', &
                                 RefrigRack(RackNum)%EvapWaterConsumpRate,'Zone','Average',&
                                 RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Evap Condenser Water Consumption [m3]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Evaporative Condenser Water Volume [m3]', &
                                 RefrigRack(RackNum)%EvapWaterConsumption,'Zone','Sum',&
                                 RefrigRack(RackNum)%Name, &
                                 ResourceTypeKey='Water',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8146,17 +8176,17 @@ END IF ! NumSimulationRefrigAirChillers > 0
       END IF !condenser evap
 
       IF(RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Sensible Heating Rate to Zone [W]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Zone Sensible Heating Rate [W]', &
                               RefrigRack(RackNum)%SensZoneCreditHeatRate,'Zone','Average',&
                               RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Sensible Heating Energy To Zone [J]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Zone Sensible Heating Energy [J]', &
                               RefrigRack(RackNum)%SensZoneCreditHeat,'Zone','Sum',&
                               RefrigRack(RackNum)%Name)
 
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Sensible Heating Rate To HVAC Return Air [W]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Return Air Sensible Heating Rate [W]', &
                               RefrigRack(RackNum)%SensHVACCreditHeatRate,'Zone','Average',&
                               RefrigRack(RackNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Rack Sensible Heating Energy To HVAC Return Air [J]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Return Air Sensible Heating Energy [J]', &
                               RefrigRack(RackNum)%SensHVACCreditHeat,'Zone','Sum',&
                               RefrigRack(RackNum)%Name)
         CALL SetupZoneInternalGain(RefrigCase(RefrigRack(RackNum)%CaseNum(1))%ActualZoneNum, &
@@ -8169,14 +8199,14 @@ END IF ! NumSimulationRefrigAirChillers > 0
       END IF !location zone
     END IF ! Serves coils or case/walkin loads
 
-    IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingWater) THEN !on HVAC time step no matter what
-        CALL SetupOutputVariable('Compressor Rack Condenser Mass Flow Rate [kg/s]', &
+    IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeWater) THEN !on HVAC time step no matter what
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Mass Flow Rate [kg/s]', &
                        RefrigRack(RackNum)%MassFlowRate, 'HVAC','Average',RefrigRack(RackNum)%Name)
 
-        CALL SetupOutputVariable('Compressor Rack Condenser Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Heat Transfer Rate [W]', &
                        RefrigRack(RackNum)%CondLoad, 'HVAC','Average',RefrigRack(RackNum)%Name)
 
-        CALL SetupOutputVariable('Compressor Rack Condenser Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Compressor Rack Condenser Heat Transfer Energy [J]', &
                        RefrigRack(RackNum)%CondEnergy, 'HVAC','Sum',RefrigRack(RackNum)%Name, &
                        ResourceTypeKey='ENERGYTRANSFER',EndUseKey='Heating',GroupKey='Plant')
 
@@ -8190,116 +8220,116 @@ END IF ! NumSimulationRefrigAirChillers > 0
     DO RefrigSysNum=1,NumRefrigSystems
       IF(System(RefrigSysNum)%CoilFlag) THEN  !system serves chillers and is solved on HVAC time step
         IF (System(RefrigSysNum)%NumStages == 1) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotCompPower,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsump,'HVAC','Sum',&
                          System(RefrigSysNum)%Name)
         ELSE IF (System(RefrigSysNum)%NumStages == 2) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Low-Stage Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Low Stage Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotCompPower,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Low-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Low Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsump,'HVAC','Sum',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total High-Stage Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total High Stage Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotHiStageCompPower,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total High-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total High Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotHiStageCompElecConsump,'HVAC','Sum',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Low- and High-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Low and High Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsumpTwoStage,'HVAC','Sum',&
                          System(RefrigSysNum)%Name)
         END IF  ! NumStages
-        CALL SetupOutputVariable('Refrigeration Chiller System Average Compressor COP [W/W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Average Compressor COP [W/W]', &
                        System(RefrigSysNum)%AverageCompressorCOP,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Air Chiller Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Air Chiller Heat Transfer Rate [W]', &
                        System(RefrigSysNum)%TotalCoolingLoad,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Cases and Walk-Ins Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Case and Walk In Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%TotalCoolingEnergy,'HVAC','Sum',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Transferred Load Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Transferred Load Heat Transfer Rate [W]', &
                        System(RefrigSysNum)%TotTransferLoad,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Transferred Load Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Transferred Load Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%TotTransferEnergy,'HVAC','Sum',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Suction Pipe Heat Gain Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Suction Pipe Heat Gain Rate [W]', &
                        System(RefrigSysNum)%PipeHeatLoad,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Total Suction Pipe Heat Gain Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Total Suction Pipe Heat Gain Energy [J]', &
                        System(RefrigSysNum)%PipeHeatEnergy,'HVAC','Sum',&
                        System(RefrigSysNum)%Name)
         IF (System(RefrigSysNum)%NumStages == 1) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Compressor Heat Transfer Rate [W]', &
                          System(RefrigSysNum)%TotCompCapacity,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Compressor Heat Transfer Energy [J]', &
                          System(RefrigSysNum)%TotCompCoolingEnergy,'HVAC','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
         ELSE IF (System(RefrigSysNum)%NumStages == 2) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Low-Stage Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Low Stage Compressor Heat Transfer Rate [W]', &
                          System(RefrigSysNum)%TotCompCapacity,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total Low-Stage Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total Low Stage Compressor Heat Transfer Energy [J]', &
                          System(RefrigSysNum)%TotCompCoolingEnergy,'HVAC','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
-          CALL SetupOutputVariable('Refrigeration Chiller System Total High-Stage Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total High Stage Compressor Heat Transfer Rate [W]', &
                          System(RefrigSysNum)%TotHiStageCompCapacity,'HVAC','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Total High-Stage Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Total High Stage Compressor Heat Transfer Energy [J]', &
                          System(RefrigSysNum)%TotHiStageCompCoolingEnergy,'HVAC','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
         END IF  ! NumStages
-        CALL SetupOutputVariable('Refrigeration Chiller System Net Heat Rejected Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Net Rejected Heat Transfer Rate [W]', &
                        System(RefrigSysNum)%NetHeatRejectLoad,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Net Heat Rejected Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Net Rejected Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%NetHeatRejectEnergy,'HVAC','Sum',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Refrigerant Inventory [kg]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Estimated Refrigerant Inventory Mass [kg]', &
                      System(RefrigSysNum)%RefInventory,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
         IF (System(RefrigSysNum)%NumStages == 1) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Estimated Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Estimated Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowComps,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
         ELSE IF (System(RefrigSysNum)%NumStages == 2) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Estimated Low-Stage Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Estimated Low Stage Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowComps,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Estimated High-Stage Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Estimated High Stage Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowHiStageComps,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
         END IF  ! NumStages
         IF(System(RefrigSysNum)%NumStages == 2) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Intercooler Temperature [C]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Intercooler Temperature [C]', &
                        System(RefrigSysNum)%TIntercooler,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Intercooler Pressure [Pa]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Intercooler Pressure [Pa]', &
                        System(RefrigSysNum)%PIntercooler,'HVAC','Average',&
                        System(RefrigSysNum)%Name)
         END IF
-        CALL SetupOutputVariable('Refrigeration Chiller System Condensing Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Condensing Temperature [C]', &
                      System(RefrigSysNum)%TCondense,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Evaporating Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Evaporating Temperature [C]', &
                      System(RefrigSysNum)%TEvapNeeded,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Suction Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Suction Temperature [C]', &
                      System(RefrigSysNum)%TCompIn,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Liquid Temperature to TXV [C]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System TXV Liquid Temperature [C]', &
                      System(RefrigSysNum)%TLiqInActual,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Liquid Suction Subcooler Load Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Liquid Suction Subcooler Heat Transfer Rate [W]', &
                      System(RefrigSysNum)%LSHXTrans,'HVAC','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Liquid Suction Subcooler Load Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Liquid Suction Subcooler Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%LSHXTransEnergy,'HVAC','Sum',&
                        System(RefrigSysNum)%Name)
       ELSE  ! NOT System(SysNum)%CoilFlag, so serving loads on zone timestep
@@ -8307,33 +8337,33 @@ END IF ! NumSimulationRefrigAirChillers > 0
           CALL SetupOutputVariable('Refrigeration System Total Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotCompPower,'Zone','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsump,'Zone','Sum',&
                          System(RefrigSysNum)%Name)
         ELSE IF (System(RefrigSysNum)%NumStages == 2)THEN
-          CALL SetupOutputVariable('Refrigeration System Total Low-Stage Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration System Total Low Stage Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotCompPower,'Zone','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total Low-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total Low Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsump,'Zone','Sum',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total High-Stage Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration System Total High Stage Compressor Electric Power [W]', &
                          System(RefrigSysNum)%TotHiStageCompPower,'Zone','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total High-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total High Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotHiStageCompElecConsump,'Zone','Sum',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total Low- and High-Stage Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total Low and High Stage Compressor Electric Energy [J]', &
                          System(RefrigSysNum)%TotCompElecConsumpTwoStage,'Zone','Sum',&
                          System(RefrigSysNum)%Name)
         END IF  ! NumStages
         CALL SetupOutputVariable('Refrigeration System Average Compressor COP [W/W]', &
                        System(RefrigSysNum)%AverageCompressorCOP,'Zone','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Total Cases and Walk-Ins Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration System Total Cases and Walk Ins Heat Transfer Rate [W]', &
                        System(RefrigSysNum)%TotalCoolingLoad,'Zone','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Total Cases and Walk-Ins Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration System Total Cases and Walk Ins Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%TotalCoolingEnergy,'Zone','Sum',&
                        System(RefrigSysNum)%Name)
         CALL SetupOutputVariable('Refrigeration System Total Transferred Load Heat Transfer Rate [W]', &
@@ -8356,37 +8386,37 @@ END IF ! NumSimulationRefrigAirChillers > 0
                          System(RefrigSysNum)%TotCompCoolingEnergy,'Zone','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
         ELSE IF (System(RefrigSysNum)%NumStages == 2)THEN
-          CALL SetupOutputVariable('Refrigeration System Total Low-Stage Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration System Total Low Stage Compressor Heat Transfer Rate [W]', &
                          System(RefrigSysNum)%TotCompCapacity,'Zone','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total Low-Stage Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total Low Stage Compressor Heat Transfer Energy [J]', &
                          System(RefrigSysNum)%TotCompCoolingEnergy,'Zone','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
-          CALL SetupOutputVariable('Refrigeration System Total High-Stage Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration System Total High Stage Compressor Heat Transfer Rate [W]', &
                          System(RefrigSysNum)%TotHiStageCompCapacity,'Zone','Average',&
                          System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Total High-Stage Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Total High Stage Compressor Heat Transfer Energy [J]', &
                          System(RefrigSysNum)%TotHiStageCompCoolingEnergy,'Zone','Sum',&
                          System(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
         END IF  ! NumStages
-        CALL SetupOutputVariable('Refrigeration System Net Heat Rejected Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration System Net Rejected Heat Transfer Rate [W]', &
                        System(RefrigSysNum)%NetHeatRejectLoad,'Zone','Average',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Net Heat Rejected Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration System Net Rejected Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%NetHeatRejectEnergy,'Zone','Sum',&
                        System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Refrigerant Inventory [kg]', &
+        CALL SetupOutputVariable('Refrigeration System Estimated Refrigerant Inventory Mass [kg]', &
                      System(RefrigSysNum)%RefInventory,'Zone','Average',&
                      System(RefrigSysNum)%Name)
         IF (System(RefrigSysNum)%NumStages == 1) THEN
-          CALL SetupOutputVariable('Refrigeration System Estimated Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration System Estimated Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowComps,'Zone','Average',&
                        System(RefrigSysNum)%Name)
         ELSE IF (System(RefrigSysNum)%NumStages == 2)THEN
-          CALL SetupOutputVariable('Refrigeration System Estimated Low-Stage Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration System Estimated Low Stage Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowComps,'Zone','Average',&
                        System(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Estimated High-Stage Refrigerant Mass Flow [kg/s]', &
+          CALL SetupOutputVariable('Refrigeration System Estimated High Stage Refrigerant Mass Flow Rate [kg/s]', &
                        System(RefrigSysNum)%RefMassFlowHiStageComps,'Zone','Average',&
                        System(RefrigSysNum)%Name)
         END IF  ! NumStages
@@ -8404,16 +8434,16 @@ END IF ! NumSimulationRefrigAirChillers > 0
         CALL SetupOutputVariable('Refrigeration System Evaporating Temperature [C]', &
                      System(RefrigSysNum)%TEvapNeeded,'Zone','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Suction Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration System Suction Pipe Suction Temperature [C]', &
                      System(RefrigSysNum)%TCompIn,'Zone','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration System Liquid Temperature to TXV [C]', &
+        CALL SetupOutputVariable('Refrigeration System Thermostatic Expansion Valve Liquid Temperature [C]', &
                      System(RefrigSysNum)%TLiqInActual,'Zone','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Liquid Suction Subcooler Load Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration System Liquid Suction Subcooler Heat Transfer Rate [W]', &
                      System(RefrigSysNum)%LSHXTrans,'Zone','Average',&
                      System(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Liquid Suction Subcooler Load Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration System Liquid Suction Subcooler Heat Transfer Energy [J]', &
                        System(RefrigSysNum)%LSHXTransEnergy,'Zone','Sum',&
                        System(RefrigSysNum)%Name)
       END IF !system(coilflag)
@@ -8441,21 +8471,21 @@ END IF ! NumSimulationRefrigAirChillers > 0
      ! CurrentModuleObject='Refrigeration:Compressor'
      IF(Compressor(CompNum)%NumSysAttach == 1) THEN  !only set up reports for compressors that are used once and only once
       IF(Compressor(CompNum)%CoilFlag) THEN !Compressor serving system with chillers on HVAC time step
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Electric Power [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Compressor Electric Power [W]', &
                        Compressor(CompNum)%Power,'HVAC','Average',&
                        Compressor(CompNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Electric Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Compressor Electric Energy [J]', &
                        Compressor(CompNum)%ElecConsumption,'HVAC','Sum',&
                        Compressor(CompNum)%Name, &
                        ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                        EndUseSubKey=Compressor(CompNum)%EndUseSubcategory)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Compressor Heat Transfer Rate [W]', &
                        Compressor(CompNum)%Capacity,'HVAC','Average',&
                        Compressor(CompNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Compressor Heat Transfer Energy [J]', &
                        Compressor(CompNum)%CoolingEnergy,'HVAC','Sum',&
                        Compressor(CompNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller Compressor Run Time Fraction []', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Compressor Runtime Fraction []', &
                        Compressor(CompNum)%LoadFactor, 'HVAC','Average',&
                        Compressor(CompNum)%Name)
       ELSE ! serve cases/walkins on zone time step
@@ -8473,7 +8503,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
         CALL SetupOutputVariable('Refrigeration Compressor Heat Transfer Energy [J]', &
                        Compressor(CompNum)%CoolingEnergy,'Zone','Sum',&
                        Compressor(CompNum)%Name)
-        CALL SetupOutputVariable('Refrigeration Compressor Run Time Fraction []', &
+        CALL SetupOutputVariable('Refrigeration Compressor Runtime Fraction []', &
                        Compressor(CompNum)%LoadFactor, 'Zone','Average',&
                        Compressor(CompNum)%Name)
        END IF ! Serve coils on HVAC time step or cases/walkins on Zone time step
@@ -8484,76 +8514,76 @@ END IF ! NumSimulationRefrigAirChillers > 0
     DO CondNum=1,NumRefrigCondensers
     ! CurrentModuleObject='Refrigeration:Condenser:*'
       IF(Condenser(Condnum)%CoilFlag) THEN !Condenser serving system with chillers on HVAC time step
-        CALL SetupOutputVariable('Refrigeration Chiller System Condenser Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Heat Transfer Rate [W]', &
                          Condenser(Condnum)%CondLoad, 'HVAC','Average',Condenser(Condnum)%Name)
-        CALL SetupOutputVariable('Refrigeration Chiller System Condenser Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Heat Transfer Energy [J]', &
                          Condenser(Condnum)%CondEnergy, 'HVAC','Sum',Condenser(Condnum)%Name)
 
-        IF(Condenser(CondNum)%CondenserType /= CondenserCascade)THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Total Recovered Heat Rate [W]', &
+        IF(Condenser(CondNum)%CondenserType /= RefrigCondenserTypeCascade)THEN
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Total Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%TotalHeatRecoveredLoad, 'HVAC','Average',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Total Recovered Heat Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Total Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%TotalHeatRecoveredEnergy, 'HVAC','Sum',Condenser(Condnum)%Name)
           CALL SetupOutputVariable(  &
-             'Refrigeration Chiller System Condenser Heat Recovered for Non-Refrigeration Purposes Rate [W]', &
+             'Refrigeration Air Chiller System Condenser Non Refrigeration Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%ExternalHeatRecoveredLoad, 'HVAC','Average',Condenser(Condnum)%Name)
           CALL SetupOutputVariable(  &
-             'Refrigeration Chiller System Condenser Heat Recovered for Non-Refrigeration Purposes Energy [J]', &
+             'Refrigeration Air Chiller System Condenser Non Refrigeration Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%ExternalEnergyRecovered, 'HVAC','Sum',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Heat Recovered for Refrigeration Defrost Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Defrost Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%InternalHeatRecoveredLoad, 'HVAC','Average',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Heat Recovered for Refrigeration Defrost Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Defrost Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%InternalEnergyRecovered, 'HVAC','Sum',Condenser(Condnum)%Name)
         END IF !not cascade because recovered energy on cascade systems passed up to higher temperature system
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingAir) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Fan Electric Power [W]', &
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeAir) THEN
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Fan Electric Power [W]', &
                          Condenser(Condnum)%ActualFanPower,'HVAC','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Fan Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Fan Electric Energy [J]', &
                          Condenser(Condnum)%FanElecEnergy,'HVAC','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
         END IF  !Air cooled
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingEvap) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Fan Electric Power [W]', &
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeEvap) THEN
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Fan Electric Power [W]', &
                          Condenser(Condnum)%ActualFanPower,'HVAC','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Fan Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Fan Electric Energy [J]', &
                          Condenser(Condnum)%FanElecEnergy,'HVAC','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Pump Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Pump Electric Power [W]', &
                          Condenser(Condnum)%ActualEvapPumpPower,'HVAC','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Pump Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Pump Electric Energy [J]', &
                          Condenser(Condnum)%EvapPumpConsumption,'HVAC','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Basin Heater Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Basin Heater Electric Power [W]', &
                          Condenser(Condnum)%BasinHeaterPower,'HVAC','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Basin Heater Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Basin Heater Electric Energy [J]', &
                          Condenser(Condnum)%BasinHeaterConsumption,'HVAC','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Water Consumption Rate [m3/s]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Evaporated Water Volume Flow Rate [m3/s]', &
                          Condenser(Condnum)%EvapWaterConsumpRate,'HVAC','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Water Consumption [m3]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Evaporated Water Volume [m3]', &
                          Condenser(Condnum)%EvapWaterConsumption,'HVAC','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='Water',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
         END IF !Evaporative Condenser Variables
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingWater) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller System Condenser Water Mass Flow Rate [kg/s]', &
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeWater) THEN
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Condenser Fluid Mass Flow Rate [kg/s]', &
                          Condenser(Condnum)%MassFlowRate, 'HVAC','Average',Condenser(Condnum)%Name)
 
          END IF !Water-cooled Condenser variables
@@ -8565,37 +8595,37 @@ END IF ! NumSimulationRefrigAirChillers > 0
         CALL SetupOutputVariable('Refrigeration System Condenser Heat Transfer Energy [J]', &
                          Condenser(Condnum)%CondEnergy, 'Zone','Sum',Condenser(Condnum)%Name)
 
-        IF(Condenser(CondNum)%CondenserType /= CondenserCascade)THEN
-          CALL SetupOutputVariable('Refrigeration System Condenser Total Recovered Heat Rate [W]', &
+        IF(Condenser(CondNum)%CondenserType /= RefrigCondenserTypeCascade)THEN
+          CALL SetupOutputVariable('Refrigeration System Condenser Total Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%TotalHeatRecoveredLoad, 'Zone','Average',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Total Recovered Heat Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Total Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%TotalHeatRecoveredEnergy, 'Zone','Sum',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Heat Recovered for Non-Refrigeration Purposes Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Non Refrigeration Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%ExternalHeatRecoveredLoad, 'Zone','Average',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Heat Recovered for Non-Refrigeration Purposes Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Non Refrigeration Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%ExternalEnergyRecovered, 'Zone','Sum',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Heat Recovered for Refrigeration Defrost Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Defrost Recovered Heat Transfer Rate [W]', &
                          Condenser(Condnum)%InternalHeatRecoveredLoad, 'Zone','Average',Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Heat Recovered for Refrigeration Defrost Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Defrost Recovered Heat Transfer Energy [J]', &
                          Condenser(Condnum)%InternalEnergyRecovered, 'Zone','Sum',Condenser(Condnum)%Name)
         END IF !not cascade because recovered energy on cascade systems passed up to higher temperature system
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingAir) THEN
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeAir) THEN
           CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Power [W]', &
                          Condenser(Condnum)%ActualFanPower,'Zone','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Energy [J]', &
                          Condenser(Condnum)%FanElecEnergy,'Zone','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
         END IF  !Air cooled
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingEvap) THEN
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeEvap) THEN
           CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Power [W]', &
                          Condenser(Condnum)%ActualFanPower,'Zone','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Fan Electric Energy [J]', &
                          Condenser(Condnum)%FanElecEnergy,'Zone','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8603,7 +8633,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
           CALL SetupOutputVariable('Refrigeration System Condenser Pump Electric Power [W]', &
                          Condenser(Condnum)%ActualEvapPumpPower,'Zone','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Pump Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Pump Electric Energy [J]', &
                          Condenser(Condnum)%EvapPumpConsumption,'Zone','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
@@ -8611,22 +8641,22 @@ END IF ! NumSimulationRefrigAirChillers > 0
           CALL SetupOutputVariable('Refrigeration System Condenser Basin Heater Electric Power [W]', &
                          Condenser(Condnum)%BasinHeaterPower,'Zone','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Basin Heater Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Basin Heater Electric Energy [J]', &
                          Condenser(Condnum)%BasinHeaterConsumption,'Zone','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
-          CALL SetupOutputVariable('Refrigeration System Condenser Water Consumption Rate [m3/s]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Evaporated Water Volume Flow Rate [m3/s]', &
                          Condenser(Condnum)%EvapWaterConsumpRate,'Zone','Average',&
                          Condenser(Condnum)%Name)
-          CALL SetupOutputVariable('Refrigeration System Condenser Water Consumption [m3]', &
+          CALL SetupOutputVariable('Refrigeration System Condenser Evaporated Water Volume [m3]', &
                          Condenser(Condnum)%EvapWaterConsumption,'Zone','Sum',&
                          Condenser(Condnum)%Name, &
                          ResourceTypeKey='Water',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=Condenser(Condnum)%EndUseSubcategory)
         END IF !Evaporative Condenser Variables
 
-        IF(Condenser(Condnum)%CondenserType==CondenserCoolingWater) THEN
+        IF(Condenser(Condnum)%CondenserType==RefrigCondenserTypeWater) THEN
           CALL SetupOutputVariable('Refrigeration System Condenser Water Mass Flow Rate [kg/s]', &
                          Condenser(Condnum)%MassFlowRate, 'HVAC','Average',Condenser(Condnum)%Name)
 
@@ -8639,19 +8669,19 @@ END IF ! NumSimulationRefrigAirChillers > 0
       ! CurrentModuleObject='Refrigeration:Subcooler'
        IF(Subcooler(SubcoolNum)%CoilFlag) THEN !Subcooler serving system with chillers on HVAC time step
         IF(Subcooler(SubcoolNum)%Subcoolertype == Mechanical) THEN
-          CALL SetupOutputVariable('Refrigeration Chiller Mechanical Subcooler Load Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Mechanical Subcooler Heat Transfer Rate [W]', &
                        Subcooler(SubcoolNum)%MechSCTransLoad,'Zone','Average',&
                        Subcooler(SubcoolNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Chiller Mechanical Subcooler Load Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Air Chiller System Mechanical Subcooler Heat Transfer Energy [J]', &
                        Subcooler(SubcoolNum)%MechSCTransEnergy,'Zone','Sum',&
                        Subcooler(SubcoolNum)%Name)
         END IF
       ELSE ! Subcooler on system serving cases and/or walkins
         IF(Subcooler(SubcoolNum)%Subcoolertype == Mechanical) THEN
-          CALL SetupOutputVariable('Refrigeration Mechanical Subcooler Load Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration System Mechanical Subcooler Heat Transfer Rate [W]', &
                        Subcooler(SubcoolNum)%MechSCTransLoad,'HVAC','Average',&
                        Subcooler(SubcoolNum)%Name)
-          CALL SetupOutputVariable('Refrigeration Mechanical Subcooler Load Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration System Mechanical Subcooler Heat Transfer Energy [J]', &
                        Subcooler(SubcoolNum)%MechSCTransEnergy,'HVAC','Sum',&
                        Subcooler(SubcoolNum)%Name)
         END IF
@@ -8665,90 +8695,90 @@ END IF ! NumSimulationRefrigAirChillers > 0
     ! CurrentModuleObject='Refrigeration:TranscriticalSystem'
     DO RefrigSysNum=1,NumTransRefrigSystems
         ! for both SingleStage and TwoStage systems (medium temperature loads present)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total High Pressure Compressor Electric Power [W]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Total High Pressure Compressor Electric Power [W]', &
                        TransSystem(RefrigSysNum)%TotCompPowerHP,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total High Pressure Compressor Electric Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Total High Pressure Compressor Electric Energy [J]', &
                        TransSystem(RefrigSysNum)%TotCompElecConsumpHP,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Compressor Electric Consumption [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Total Compressor Electric Energy [J]', &
                        TransSystem(RefrigSysNum)%TotCompElecConsump,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Average COP [W/W]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Average COP [W/W]', &
                        TransSystem(RefrigSysNum)%AverageCompressorCOP,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Medium Temperature Cases and Walk-Ins Heat Transfer '// &
-                       'Rate [W]', &
+        CALL SetupOutputVariable( &
+                       'Refrigeration Transcritical System Medium Temperature Cases and Walk Ins Heat Transfer Rate [W]', &
                        TransSystem(RefrigSysNum)%TotalCoolingLoadMT,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Medium Temperature Cases and Walk-Ins Heat '// &
-                       'Transfer Energy [J]', &
+        CALL SetupOutputVariable( &
+                       'Refrigeration Transcritical System Medium Temperature Cases and Walk Ins Heat Transfer Energy [J]', &
                        TransSystem(RefrigSysNum)%TotalCoolingEnergyMT,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Cases and Walk-Ins Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Total Cases and Walk Ins Heat Transfer Energy [J]', &
                        TransSystem(RefrigSysNum)%TotalCoolingEnergy,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Medium Temperature Suction Pipe Heat Gain Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Medium Temperature Suction Pipe Heat Transfer Rate [W]', &
                        TransSystem(RefrigSysNum)%PipeHeatLoadMT,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Medium Temperature Suction Pipe Heat Gain Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Medium Temperature Suction Pipe Heat Transfer Energy [J]', &
                        TransSystem(RefrigSysNum)%PipeHeatEnergyMT,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total High Pressure Compressor Heat Transfer Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System High Pressure Compressor Heat Transfer Rate [W]', &
                        TransSystem(RefrigSysNum)%TotCompCapacityHP,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total High Pressure Compressor Heat Transfer Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System High Pressure Compressor Heat Transfer Energy [J]', &
                        TransSystem(RefrigSysNum)%TotCompCoolingEnergyHP,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
-        CALL SetupOutputVariable('Transcritical Refrigeration System Net Heat Rejected Rate [W]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Net Rejected Heat Transfer Rate [W]', &
                        TransSystem(RefrigSysNum)%NetHeatRejectLoad,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Net Heat Rejected Energy [J]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Net Rejected Heat Transfer Energy [J]', &
                        TransSystem(RefrigSysNum)%NetHeatRejectEnergy,'Zone','Sum',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Refrigerant Inventory [kg]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Estimated Refrigerant Inventory Mass [kg]', &
                        TransSystem(RefrigSysNum)%RefInventory,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Total Refrigerant Mass Flow [kg/s]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Refrigerant Mass Flow Rate [kg/s]', &
                        TransSystem(RefrigSysNum)%RefMassFlowComps,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Medium Temperature Evaporating Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Medium Temperature Evaporating Temperature [C]', &
                        TransSystem(RefrigSysNum)%TEvapNeededMT,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
-        CALL SetupOutputVariable('Transcritical Refrigeration System Medium Temperature Suction Temperature [C]', &
+        CALL SetupOutputVariable('Refrigeration Transcritical System Medium Temperature Suction Temperature [C]', &
                        TransSystem(RefrigSysNum)%TCompInHP,'Zone','Average',&
                        TransSystem(RefrigSysNum)%Name)
         IF (TransSystem(RefrigSysNum)%TransSysType == 2 ) THEN   ! for TwoStage system only (low temperature loads present)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Pressure Compressor Electric Power [W]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Pressure Compressor Electric Power [W]', &
                          TransSystem(RefrigSysNum)%TotCompPowerLP,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Pressure Compressor Electric Consumption [J]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Pressure Compressor Electric Energy [J]', &
                          TransSystem(RefrigSysNum)%TotCompElecConsumpLP,'Zone','Sum',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Temperature Cases and Walk-Ins Heat Transfer '// &
-                         'Rate [W]', &
+          CALL SetupOutputVariable( &
+                         'Refrigeration Transcritical System Low Temperature Cases and Walk Ins Heat Transfer Rate [W]', &
                          TransSystem(RefrigSysNum)%TotalCoolingLoadLT,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Temperature Cases and Walk-Ins Heat '// &
-                         'Transfer Energy [J]', &
+          CALL SetupOutputVariable( &
+                         'Refrigeration Transcritical System Low Temperature Cases and Walk Ins Heat Transfer Energy [J]', &
                          TransSystem(RefrigSysNum)%TotalCoolingEnergyLT,'Zone','Sum',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Temperature Suction Pipe Heat Gain Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Temperature Suction Pipe Heat Transfer Rate [W]', &
                          TransSystem(RefrigSysNum)%PipeHeatLoadLT,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Temperature Suction Pipe Heat Gain Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Temperature Suction Pipe Heat Transfer Energy [J]', &
                          TransSystem(RefrigSysNum)%PipeHeatEnergyLT,'Zone','Sum',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Pressure Compressor Heat Transfer Rate [W]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Pressure Compressor Heat Transfer Rate [W]', &
                          TransSystem(RefrigSysNum)%TotCompCapacityLP,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Total Low Pressure Compressor Heat Transfer Energy [J]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Pressure Compressor Heat Transfer Energy [J]', &
                          TransSystem(RefrigSysNum)%TotCompCoolingEnergyLP,'Zone','Sum',&
                          TransSystem(RefrigSysNum)%Name) !indiv compressors go to meter, not system sum
-          CALL SetupOutputVariable('Transcritical Refrigeration System Low Temperature Evaporating Temperature [C]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Temperature Evaporating Temperature [C]', &
                          TransSystem(RefrigSysNum)%TEvapNeededLT,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
-          CALL SetupOutputVariable('Transcritical Refrigeration System Low Temperature Suction Temperature [C]', &
+          CALL SetupOutputVariable('Refrigeration Transcritical System Low Temperature Suction Temperature [C]', &
                          TransSystem(RefrigSysNum)%TCompInLP,'Zone','Average',&
                          TransSystem(RefrigSysNum)%Name)
         END IF  ! (TransSystem(RefrigSysNum)%TransSysType == 2)
@@ -8796,7 +8826,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
             CALL SetupOutputVariable('Refrigeration Compressor Heat Transfer Energy [J]', &
                            Compressor(CompNum)%CoolingEnergy,'Zone','Sum',&
                            Compressor(CompNum)%Name)
-            CALL SetupOutputVariable('Refrigeration Compressor Run Time Fraction []', &
+            CALL SetupOutputVariable('Refrigeration Compressor Runtime Fraction []', &
                            Compressor(CompNum)%LoadFactor, 'Zone','Average',&
                            Compressor(CompNum)%Name)
          END IF ! NumSysAttach
@@ -8821,7 +8851,7 @@ END IF ! NumSimulationRefrigAirChillers > 0
             CALL SetupOutputVariable('Refrigeration Compressor Heat Transfer Energy [J]', &
                            Compressor(CompNum)%CoolingEnergy,'Zone','Sum',&
                            Compressor(CompNum)%Name)
-            CALL SetupOutputVariable('Refrigeration Compressor Run Time Fraction []', &
+            CALL SetupOutputVariable('Refrigeration Compressor Runtime Fraction []', &
                            Compressor(CompNum)%LoadFactor, 'Zone','Average',&
                            Compressor(CompNum)%Name)
          END IF ! NumSysAttach
@@ -8833,27 +8863,27 @@ END IF ! NumSimulationRefrigAirChillers > 0
   IF (NumSimulationGasCooler > 0) THEN
     DO GCNum=1,NumSimulationGasCooler
        ! CurrentModuleObject='Refrigeration:GasCooler:AirCooled'
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Heat Transfer Rate [W]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Heat Transfer Rate [W]', &
                          GasCooler(GCNum)%GasCoolerLoad, 'Zone','Average',GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Heat Transfer Energy [J]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Heat Transfer Energy [J]', &
                          GasCooler(GCNum)%GasCoolerEnergy, 'Zone','Sum',GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Fan Electric Power [W]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Fan Electric Power [W]', &
                          GasCooler(GCNum)%ActualFanPower,'Zone','Average',&
                          GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Fan Electric Consumption [J]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Fan Electric Energy [J]', &
                          GasCooler(GCNum)%FanElecEnergy,'Zone','Sum',&
                          GasCooler(GCNum)%Name, &
                          ResourceTypeKey='ELECTRICITY',EndUseKey='REFRIGERATION',GroupKey='Plant', &
                          EndUseSubKey=GasCooler(GCNum)%EndUseSubcategory)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Outlet Temperature [C]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Outlet Temperature [C]', &
                          GasCooler(GCNum)%TGasCoolerOut,'Zone','Average',GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Outlet Pressure [Pa]', &
+       CALL SetupOutputVariable('Refrigeration Transcritical System Gas Cooler Outlet Pressure [Pa]', &
                          GasCooler(GCNum)%PGasCoolerOut,'Zone','Average',GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Heat Recovered '//  &
-          'for Refrigeration Defrost Rate [W]', &
+       CALL SetupOutputVariable( &
+              'Refrigeration Transcritical System Gas Cooler Defrost Recovered Heat Transfer Rate [W]', &
                          GasCooler(GCNum)%InternalHeatRecoveredLoad, 'Zone','Average',GasCooler(GCNum)%Name)
-       CALL SetupOutputVariable('Transcritical Refrigeration System Gas Cooler Heat Recovered '//  &
-          'for Refrigeration Defrost Energy [J]', &
+       CALL SetupOutputVariable( &
+              'Refrigeration Transcritical System Gas Cooler Defrost Recovered Heat Transfer Energy [J]', &
                          GasCooler(GCNum)%InternalEnergyRecovered, 'Zone','Sum',GasCooler(GCNum)%Name)
     END DO ! GCNum on NumSimulationGasCooler
   END IF   ! (NumSimulationGasCooler >0)
@@ -9422,7 +9452,7 @@ SUBROUTINE InitRefrigerationPlantConnections
     !initialize plant topology information, if applicable
   IF (MyReferPlantScanFlag .AND. ALLOCATED(PlantLoop)) THEN
     DO RefCondLoop = 1, NumRefrigCondensers
-      IF (.NOT. Condenser(RefCondLoop)%CondenserType == CondenserCoolingWater) CYCLE
+      IF (.NOT. Condenser(RefCondLoop)%CondenserType == RefrigCondenserTypeWater) CYCLE
 
       errFlag   = .FALSE.
       CALL ScanPlantLoopsForObject(  Condenser(RefCondLoop)%Name, &
@@ -9487,7 +9517,7 @@ SUBROUTINE InitRefrigerationPlantConnections
         ! do plant inits, if applicable
         IF (.NOT. MyReferPlantScanFlag) THEN
           DO RefCondLoop = 1, NumRefrigCondensers
-            IF (.NOT. Condenser(RefCondLoop)%CondenserType == CondenserCoolingWater) CYCLE
+            IF (.NOT. Condenser(RefCondLoop)%CondenserType == RefrigCondenserTypeWater) CYCLE
 
             rho = GetDensityGlycol(PlantLoop(Condenser(RefCondLoop)%PlantLoopNum)%FluidName, &
                                    20.d0, &
@@ -9692,7 +9722,7 @@ SUBROUTINE CalcRackSystem(RackNum)
   !  check.
     IF(OutDbTemp < EvapCutOutTdb)EvapAvail = .FALSE.
 
-    IF (RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap .AND. EvapAvail) THEN
+    IF (RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap .AND. EvapAvail) THEN
     ! determine temps for evap cooling
       IF (RefrigRack(RackNum)%OutsideAirNodeNum /= 0) THEN
         HumRatIn = Node(RefrigRack(RackNum)%OutsideAirNodeNum)%HumRat
@@ -9704,7 +9734,7 @@ SUBROUTINE CalcRackSystem(RackNum)
     END IF    !evapAvail
 
     ! Obtain water-cooled condenser inlet/outlet temps
-    IF (RefrigRack(RackNum)%CondenserType==CondenserCoolingWater) THEN
+    IF (RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeWater) THEN
     InletNode = RefrigRack(RackNum)%InletNode
     OutletNode = RefrigRack(RackNum)%OutletNode
     RefrigRack(RackNum)%InletTemp = Node(InletNode)%Temp
@@ -9721,7 +9751,7 @@ SUBROUTINE CalcRackSystem(RackNum)
             RefrigRack(RackNum)%LowTempWarnIndex)
        !END IF  !LowTempWarn
       END IF   !InletTempMin
-    END IF     !CondenserCoolingWater
+    END IF     !RefrigCondenserTypeWater
 
     COPFTempOutput           = CurveValue(RefrigRack(RackNum)%COPFTempPtr,EffectTemp)
   END IF       !Location Zone
@@ -9742,7 +9772,7 @@ SUBROUTINE CalcRackSystem(RackNum)
 
   !calculate condenser fan usage here if not water-cooled; if water-cooled, fan is in separate tower object
   ! fan loads > 0 only if the connected cases are operating
-  IF(TotalRackDeliveredCapacity > 0.0 .AND. RefrigRack(RackNum)%CondenserType /= CondenserCoolingWater) THEN
+  IF(TotalRackDeliveredCapacity > 0.0 .AND. RefrigRack(RackNum)%CondenserType /= RefrigCondenserTypeWater) THEN
     IF(RefrigRack(RackNum)%TotCondFTempPtr /= 0) THEN
       IF(RefrigRack(RackNum)%HeatRejectionLocation == LocationZone) THEN
         CondenserFrac            = MAX(0.0d0,MIN(1.0d0,CurveValue(RefrigRack(RackNum)%TotCondFTempPtr, &
@@ -9763,14 +9793,14 @@ SUBROUTINE CalcRackSystem(RackNum)
 
   ! calculate evap water use and water pump power, if applicable
   ! assumes pump runs whenever evap cooling is available to minimize scaling
-    IF(RefrigRack(RackNum)%CondenserType==CondenserCoolingEvap .AND. EvapAvail) THEN
+    IF(RefrigRack(RackNum)%CondenserType==RefrigCondenserTypeEvap .AND. EvapAvail) THEN
         TotalCondenserPumpPower  = RefrigRack(RackNum)%EvapPumpPower
         HumRatOut = PsyWFnTdbTwbPb(EffectTemp,OutWbTemp,BPress)
         TotalEvapWaterUseRate = RefrigRack(RackNum)%CondenserAirFlowRate* CondenserFrac * &
          PsyRhoAirFnPbTdbW(BPress,OutDbTemp,HumRatIn) * (HumRatOut-HumRatIn) / RhoH2O(EffectTemp)
     END IF   !evapAvail
   ! calculate basin water heater load
-  IF(RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap) THEN
+  IF(RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap) THEN
     IF ((TotalRackDeliveredCapacity == 0.0) .AND. &
        (EvapAvail)                          .AND. &
        (OutDbTemp < RefrigRack(RackNum)%BasinHeaterSetPointTemp)) THEN
@@ -10555,9 +10585,9 @@ SUBROUTINE SimRefrigCondenser(SysType, CompName, CompIndex, FirstHVACIteration, 
 ! this next block may not be necessary, should only get called from plant now.
 !  SELECT CASE (SysType)
 !   CASE (TypeOf_RefrigerationWaterCoolRack)
-!       IF(RefrigRack(Num)%CondenserType/=CondenserCoolingWater) RETURN
+!       IF(RefrigRack(Num)%CondenserType/=RefrigCondenserTypeWater) RETURN
 !   CASE (TypeOf_RefrigSystemWaterCondenser)
-!       IF(Condenser(Num)%CondenserType/=CondenserCoolingWater) RETURN
+!       IF(Condenser(Num)%CondenserType/=RefrigCondenserTypeWater) RETURN
 !  END SELECT
   ! Return if not water cooled condenser
 
@@ -11113,16 +11143,16 @@ IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
                                                System(SysNum)%CpSatVapEvap*CaseSuperheat
          !Establish estimates to start solution loop
          SELECT CASE (Condenser(System(SysNum)%CondenserNum(1))%CondenserType) !only one condenser allowed now
-           CASE (CondenserCoolingAir)
+           CASE (RefrigCondenserTypeAir)
            System(SysNum)%TCondense = OutDryBulbTemp + 16.7d0
            !16.7C is delta T at rating point for air-cooled condensers, just estimate, so ok for zone-located condensers
-           CASE (CondenserCoolingEvap)
+           CASE (RefrigCondenserTypeEvap)
            System(SysNum)%TCondense = OutDryBulbTemp + 15.0d0
            !15C is delta T at rating point for evap-cooled condensers
-           CASE (CondenserCoolingWater)
+           CASE (RefrigCondenserTypeWater)
            !define starting estimate at temperature of water exiting condenser
            System(SysNum)%TCondense = Node(Condenser(System(SysNum)%CondenserNum(1))%OutletNode)%Temp
-           CASE (CondenserCascade)
+           CASE (RefrigCondenserTypeCascade)
            !?Don't need estimate for cascade condenser because it doesn't iterate?
         END SELECT
 
@@ -11898,7 +11928,7 @@ IF(UseSysTimeStep) LocalTimeStep = TimeStepSys
  END DO ! Sysloop over every system connected to this condenser
 
  ! for cascade condensers, condenser defrost credit gets passed on to the primary system condenser
- IF(Condenser(CondID)%CondenserType == CondenserCascade) TotalCondDefrostCredit       = 0.0
+ IF(Condenser(CondID)%CondenserType == RefrigCondenserTypeCascade) TotalCondDefrostCredit       = 0.0
 
   ! Calculate Total Heat rejection needed.  Assume hermetic compressors - conservative assumption
   ! Note that heat rejection load carried by desuperheater hvac coils or water heaters is the
@@ -11938,7 +11968,7 @@ END IF !total condenser heat < 0
 !   Here, we just need load and condensing temperatures.
 !   Condensing temperature a fixed delta (the rated approach temperature) from inlet water temp so long as above minimum.
 !   Note, if condensing temperature falls below minimum, get warning and reset but no change in water-side calculations.
-IF (Condenser(CondID)%CondenserType == CondenserCoolingWater) THEN
+IF (Condenser(CondID)%CondenserType == RefrigCondenserTypeWater) THEN
       ! Obtain water-cooled condenser inlet/outlet temps
       InletNode = Condenser(CondID)%InletNode
       Condenser(CondID)%InletTemp = Node(InletNode)%Temp
@@ -11961,8 +11991,8 @@ IF (Condenser(CondID)%CondenserType == CondenserCoolingWater) THEN
           System(SysNum)%TCondense=TCondCalc
         END IF
 
-ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
-        (Condenser(CondID)%CondenserType == CondenserCoolingEvap)) THEN
+ELSEIF ((Condenser(CondID)%CondenserType == RefrigCondenserTypeAir) .OR. &
+        (Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap)) THEN
         !Condensing Temp, fan and other aux loads for air-cooled or evap-cooled
 
   !The rated capacity of air-cooled condenser was adjusted for elevation in get input step
@@ -11993,12 +12023,12 @@ ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
 
   ! Check schedule to determine evap condenser availability
   ! IF schedule exists, evap condenser can be scheduled OFF
-  IF((Condenser(CondID)%CondenserType == CondenserCoolingEvap) .AND. &
+  IF((Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap) .AND. &
      (Condenser(CondID)%EvapSchedPtr > 0) .AND. &
      (GetCurrentScheduleValue(Condenser(CondID)%EvapSchedPtr)== 0)) EvapAvail = .FALSE.
 
   !Calculate condensing temperatures for air-cooled and evap-cooled
-  IF (Condenser(CondID)%CondenserType == CondenserCoolingEvap)THEN
+  IF (Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap)THEN
       !Manufacturer's HRCF regressed to produce a function of the form:
       ! (Tcondense-Twb)=A1 + A2*hrcf + A3/hrcf + A4*Twb
       ! HRCF defined as rated capacity divided by load
@@ -12039,12 +12069,12 @@ ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
      System(SysNum)%TCondense=System(SysNum)%TCondenseMin
      TcondCalc = System(SysNum)%TCondenseMin
      ! recalculate CapFac at current delta T
-     IF (Condenser(CondID)%CondenserType == CondenserCoolingAir) THEN
+     IF (Condenser(CondID)%CondenserType == RefrigCondenserTypeAir) THEN
        CurMaxCapacity = CurveValue(Condenser(CondID)%CapCurvePtr,(System(SysNum)%TCondenseMin - OutDbTemp))
        CapFac = TotalCondenserHeat / CurMaxCapacity
        AirVolRatio = MAX(FanMinAirFlowRatio,CapFac**CondAirVolExponentDry) !Fans limited by minimum air flow ratio
        AirVolRatio = MIN(AirVolRatio, 1.d0)
-     ELSE  ! Condenser(CondID)%CondenserType == CondenserCoolingEvap
+     ELSE  ! Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap
        HRCFFullFlow=HRCF
        !if evap condenser need to back calculate the operating capacity using HRCF relationship, given known Tcond
        QuadBterm=Condenser(CondID)%EvapCoeff1-(System(SysNum)%TCondense-SinkTemp)+ &
@@ -12067,7 +12097,7 @@ ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
          AirVolRatio = MAX(FanMinAirFlowRatio,CapFac**CondAirVolExponentDry) !Fans limited by minimum air flow ratio
        END IF !evap available
        AirVolRatio = MIN(AirVolRatio, 1.d0)
-     END IF  ! condenser type = condensercoolingair with else for evap
+     END IF  ! condenser type = RefrigCondenserTypeAir with else for evap
 
      SELECT CASE (Condenser(CondID)%FanSpeedControlType)
        CASE(FanVariableSpeed)  !fan power law, adjusted for reality, applies
@@ -12087,7 +12117,7 @@ ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
      END SELECT  ! fan speed control type
   END IF   !Tcondense >= Tcondense minimum
 
-  IF ((Condenser(CondID)%CondenserType == CondenserCoolingEvap) .AND. (EvapAvail)) THEN
+  IF ((Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap) .AND. (EvapAvail)) THEN
       ! calculate evap water use,  need to include bleed down/purge water as well as water
       ! actually evaporated.  Use BAC Engineering Reference value of 3 gpm/100 tons because it's more
       ! conservative than the ASHRAE value.
@@ -12130,7 +12160,7 @@ ELSEIF ((Condenser(CondID)%CondenserType == CondenserCoolingAir) .OR. &
       END IF      ! no load and cold outside
   END IF   !EvapAvail
 
-ELSEIF (Condenser(CondID)%CondenserType == CondenserCascade) THEN ! continuing Condenser type = water, (evap or air), or cascade
+ELSEIF (Condenser(CondID)%CondenserType == RefrigCondenserTypeCascade) THEN ! continuing Condenser type = water, (evap or air), or cascade
   !Cascade condenser does not iterate.  Condensing temperature specified as a load on higher temp system
   !    or floats to meet other loads on that system
   !therese ** future - here and for new phase change heat exchanger - need to handle unmet loads!
@@ -13696,11 +13726,11 @@ END IF !(NumTransRefrigSystems > 0)
       ChrOut='Zone'
     END IF
     SELECT CASE (RefrigRack(RackNum)%CondenserType)
-      CASE(CondenserCoolingAir)
+      CASE(RefrigCondenserTypeAir)
       ChrOut2='Air-Cooled'
-      CASE(CondenserCoolingEvap)
+      CASE(RefrigCondenserTypeEvap)
       ChrOut2='Evap-Cooled'
-      CASE(CondenserCoolingWater)
+      CASE(RefrigCondenserTypeWater)
       ChrOut2='Water-Cooled'
     END SELECT
     WRITE(OutputFileInits,101) ' Refrigeration Compressor Rack,'//TRIM(RefrigRack(RackNum)%Name)//','// &
@@ -13881,25 +13911,25 @@ IF(NumRefrigSystems > 0)THEN
 
     CondID=System(SystemNum)%CondenserNum(1)
     SELECT CASE (Condenser(CondID)%CondenserType)
-      CASE(CondenserCoolingAir)
+      CASE(RefrigCondenserTypeAir)
         WRITE(OutputFileInits,103) ' Refrigeration Condenser:Air-Cooled,'//  &
             TRIM(RoundSigDigits(CondID))//','// TRIM(Condenser(CondID)%Name)//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedTCondense,1))//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedCapacity,1))//','//   &
             trim(RoundSigDigits(Condenser(CondID)%RatedFanPower,1))
-      CASE(CondenserCoolingEvap)
+      CASE(RefrigCondenserTypeEvap)
         WRITE(OutputFileInits,103) ' Refrigeration Condenser:Evaporative-Cooled,'//  &
             TRIM(RoundSigDigits(CondID))//','// TRIM(Condenser(CondID)%Name)//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedCapacity,1))//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedFanPower,1))
-      CASE(CondenserCoolingWater)
+      CASE(RefrigCondenserTypeWater)
         WRITE(OutputFileInits,103) ' Refrigeration Condenser:Water-Cooled,'//  &
             TRIM(RoundSigDigits(CondID))//','// TRIM(Condenser(CondID)%Name)//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedTCondense,1))//','//  &
             trim(RoundSigDigits(Condenser(CondID)%RatedCapacity,1))//','//   &
             trim(RoundSigDigits(Condenser(CondID)%InletTemp,1))//','//  &
             trim(RoundSigDigits(Condenser(CondID)%DesVolFlowRate,1))
-      CASE(CondenserCascade)
+      CASE(RefrigCondenserTypeCascade)
 
         SELECT CASE (Condenser(CondID)%CascadeTempControl)
           CASE(CascadeTempSet)
@@ -14890,6 +14920,13 @@ AtPartLoad = .TRUE.
  !  because that total load has to include pump energy
  IF(AtPartLoad) THEN
    DO Iter=1,10
+     IF(TotalLoad<=0.0d0) THEN
+        ! Load on secondary loop is zero (or negative).
+        ! Set volumetric flow rate and pump power to be zero.
+        VolFlowRate=0.0d0
+        TotalPumpPower=0.0d0
+        EXIT
+     END IF
      PrevTotalLoad = TotalLoad
      IF(Secondary(SecondaryNum)%FluidType == SecFluidTypeAlwaysLiquid) THEN
        FlowVolNeeded = TotalLoad/eta/(cpBrine*DensityBrine*(TBrineIn  - TEvap))
@@ -16137,7 +16174,7 @@ SUBROUTINE ZeroHVACValues
     !HaveRefrigRacks is TRUE when NumRefrigeratedRAcks > 0
     !RefrigRack ALLOCATED to NumRefrigeratedRacks
     DO RackNum = 1,NumRefrigeratedRacks
-      IF (RefrigRack(RackNum)%CondenserType == CondenserCoolingWater) THEN
+      IF (RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeWater) THEN
         PlantInletNode     = RefrigRack(RackNum)%InletNode
         PlantOutletNode    = RefrigRack(RackNum)%OutletNode
         PlantLoopIndex     = RefrigRack(RackNum)%PlantLoopNum
@@ -16150,7 +16187,7 @@ SUBROUTINE ZeroHVACValues
                              PlantLoopIndex, PlantLoopSideIndex, &
                              PlantBranchIndex, PlantCompIndex )
       END IF
-      IF (RefrigRack(RackNum)%CondenserType == CondenserCoolingEvap) THEN
+      IF (RefrigRack(RackNum)%CondenserType == RefrigCondenserTypeEvap) THEN
          IF (RefrigRack(RackNum)%EvapWaterSupplyMode == WaterSupplyFromTank) THEN
            DemandARRID = RefrigRack(RackNum)%EvapWaterTankDemandARRID
            TankID = RefrigRack(RackNum)%EvapWaterSupTankID
@@ -16163,7 +16200,7 @@ SUBROUTINE ZeroHVACValues
   IF(NumRefrigCondensers.GT.0) THEN
     !Condenser ALLOCATED to NumRefrigCondensers
     DO CondID = 1,NumRefrigCondensers
-      IF (Condenser(CondID)%CondenserType == CondenserCoolingWater) THEN
+      IF (Condenser(CondID)%CondenserType == RefrigCondenserTypeWater) THEN
         PlantInletNode     = Condenser(CondID)%InletNode
         PlantOutletNode    = Condenser(CondID)%OutletNode
         PlantLoopIndex     = Condenser(CondID)%PlantLoopNum
@@ -16176,7 +16213,7 @@ SUBROUTINE ZeroHVACValues
                              PlantLoopIndex, PlantLoopSideIndex, &
                              PlantBranchIndex, PlantCompIndex )
       END IF
-      IF (Condenser(CondID)%CondenserType == CondenserCoolingEvap) THEN
+      IF (Condenser(CondID)%CondenserType == RefrigCondenserTypeEvap) THEN
         IF (Condenser(CondID)%EvapWaterSupplyMode == WaterSupplyFromTank) THEN
            DemandARRID = Condenser(CondID)%EvapWaterTankDemandARRID
            TankID = Condenser(CondID)%EvapWaterSupTankID
@@ -16192,7 +16229,7 @@ END SUBROUTINE ZeroHVACValues
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

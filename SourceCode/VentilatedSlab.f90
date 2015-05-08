@@ -432,7 +432,7 @@ SUBROUTINE GetVentilatedSlabInput
   USE WaterCoils,               ONLY : GetWaterCoilMaxFlowRate=>GetCoilMaxWaterFlowRate
   Use SteamCoils,               ONLY : GetSteamCoilMaxFlowRate=>GetCoilMaxWaterFlowRate
   USE HVACHXAssistedCoolingCoil,ONLY : GetHXAssistedCoilFlowRate=>GetCoilMaxWaterFlowRate,GetHXCoilTypeAndName
-  USE DataGlobals,              ONLY : NumOfZones
+  USE DataGlobals,              ONLY : NumOfZones, ScheduleAlwaysOn
   USE DataHeatBalance,          ONLY : Zone, Construct
   USE DataSizing,               ONLY : AutoSize
   USE DataZoneEquipment,        ONLY : VentilatedSlab_Num
@@ -494,7 +494,7 @@ SUBROUTINE GetVentilatedSlabInput
           ! Figure out how many Ventilated Slab Systems there are in the input file
 
    SteamMessageNeeded=.true.
-   CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumArgs,NumAlphas,NumNumbers)
+   CALL GetObjectDefMaxArgs(CurrentModuleObject,NumArgs,NumAlphas,NumNumbers)
    ALLOCATE(cAlphaArgs(NumAlphas))
    cAlphaArgs=' '
    ALLOCATE(cAlphaFields(NumAlphas))
@@ -533,18 +533,15 @@ SUBROUTINE GetVentilatedSlabInput
 
     VentSlab(Item)%Name      = cAlphaArgs(1)
     VentSlab(Item)%SchedName = cAlphaArgs(2)
-    VentSlab(Item)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-
-! convert schedule name to pointer
-    IF (VentSlab(Item)%SchedPtr== 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
-           trim(cAlphaFields(2))//' is required but input is blank.')
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      VentSlab(Item)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      VentSlab(Item)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
+      IF (VentSlab(Item)%SchedPtr== 0) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cAlphaFields(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+        ErrorsFound = .TRUE.
       END IF
-      ErrorsFound = .TRUE.
     END IF
 
     VentSlab(Item)%ZoneName = cAlphaArgs(3)
@@ -1287,68 +1284,68 @@ SUBROUTINE GetVentilatedSlabInput
 !   CALL SetupOutputVariable('Ventilated Slab Direct Heat Gain [J]',        &
 !                           VentSlab(Item)%DirectHeatGain,'System', &
 !                             'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Radiant Heating Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Radiant Heating Rate [W]',        &
                              VentSlab(Item)%RadHeatingPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Radiant Heating Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Radiant Heating Energy [J]',        &
                              VentSlab(Item)%RadHeatingEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Radiant Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Radiant Cooling Rate [W]',        &
                              VentSlab(Item)%RadCoolingPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Radiant Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Radiant Cooling Energy [J]',        &
                              VentSlab(Item)%RadCoolingEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Coil Heating Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Heating Rate [W]',        &
                              VentSlab(Item)%HeatCoilPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Coil Heating Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Heating Energy [J]',        &
                              VentSlab(Item)%HeatCoilEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Total Coil Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Total Cooling Rate [W]',        &
                              VentSlab(Item)%TotCoolCoilPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Total Coil Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Total Cooling Energy [J]',        &
                              VentSlab(Item)%TotCoolCoilEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Sensible Coil Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Sensible Cooling Rate [W]',        &
                              VentSlab(Item)%SensCoolCoilPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Sensible Coil Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Sensible Cooling Energy [J]',        &
                              VentSlab(Item)%SensCoolCoilEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Latent Coil Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Latent Cooling Rate [W]',        &
                              VentSlab(Item)%LateCoolCoilPower,'System', &
                              'Average', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Latent Coil Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Ventilated Slab Coil Latent Cooling Energy [J]',        &
                              VentSlab(Item)%LateCoolCoilEnergy,'System', &
                              'Sum', VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Air Mass Flow Rate [kg/s]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Air Mass Flow Rate [kg/s]',   &
                              VentSlab(Item)%AirMassFlowRate,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Fan Electric Power [W]',  &
+    CALL SetupOutputVariable('Zone Ventilated Slab Fan Electric Power [W]',  &
                              VentSlab(Item)%ElecFanPower,'System', &
                              'Average', VentSlab(Item)%Name)
 !! Note that the ventilated slab fan electric is NOT metered because this value is already metered through the fan component
-    CALL SetupOutputVariable('Ventilated Slab Fan Electric Consumption [J]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Fan Electric Energy [J]',   &
                             VentSlab(Item)%ElecFanEnergy,'System','Sum', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Slab Inlet Air Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Inlet Air Temperature [C]',   &
                              VentSlab(Item)%SlabInTemp,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Slab Outlet Air Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Outlet Air Temperature [C]',   &
                              VentSlab(Item)%SlabOutTemp,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Zone Inlet Air Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Zone Inlet Air Temperature [C]',   &
                              VentSlab(Item)%ZoneInletTemp,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Slab Return Air Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Return Air Temperature [C]',   &
                              VentSlab(Item)%ReturnAirTemp,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Slab Fan Outlet Air Temperature [C]',   &
+    CALL SetupOutputVariable('Zone Ventilated Slab Fan Outlet Air Temperature [C]',   &
                              VentSlab(Item)%FanOutletTemp,'System','Average', &
                              VentSlab(Item)%Name)
-    CALL SetupOutputVariable('Ventilated Slab Fan Availability Status', VentSlab(Item)%AvailStatus,&
+    CALL SetupOutputVariable('Zone Ventilated Slab Fan Availability Status []', VentSlab(Item)%AvailStatus,&
                              'System','Average',VentSlab(Item)%Name)
 
 
@@ -2800,8 +2797,9 @@ ElSE IF (SetpointTemp>AirTempCoolLo)  THEN  ! Cooling Mode
 
 END IF    ! ...end of system ON/OFF IF-THEN block
 
-  SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-  SpecHumIn  = Node(FanOutletNode)%HumRat / (1.0d0 + Node(FanOutletNode)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(OutletNode)%HumRat 
+  SpecHumIn  = Node(FanOutletNode)%HumRat 
   LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
   QTotUnitOut = AirMassFlow * (Node(FanOutletNode)%Enthalpy - Node(OutletNode)%Enthalpy)
@@ -3153,7 +3151,7 @@ IF (AirMassFlow <= 0.0) THEN
     END DO
 
     VentSlab(Item)%SlabOutTemp = VentSlab(Item)%SlabInTemp
-    
+
     ! zero out node flows
     Node(SlabInNode)%MassFlowRate          = 0.0
     Node(FanOutletNode)%MassFlowRate       = 0.0
@@ -4262,7 +4260,7 @@ SUBROUTINE ReportVentilatedSlab(Item)
     VentSlab(Item)%ZoneInletTemp = Node(VentSlab(Item)%ZoneAirInNode)%Temp
     VentSlab(Item)%SlabOutTemp =   Node(VentSlab(Item)%ReturnAirNode)%Temp
   END IF
-  
+
   VentSlab(Item)%ReturnAirTemp = Node(VentSlab(Item)%ReturnAirNode)%Temp
   VentSlab(Item)%FanOutletTemp = Node(VentSlab(Item)%FanOutletNode)%Temp
 
@@ -4274,7 +4272,7 @@ END SUBROUTINE ReportVentilatedSlab
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

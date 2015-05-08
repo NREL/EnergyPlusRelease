@@ -218,16 +218,45 @@ int getepvariables( char*  const fileName,
                     int*   const myStrLen);
 
 ////////////////////////////////////////////////////////////////
+///  This method will return the input and output variable for EnergyPlus
+///  in sequence. The difference with getepvariables is that it does not
+///  validate the configuration file
+///
+///\param fileName the variable configuration file name.
+///\param myOutputVarsName Array to store the output variable names found.
+///\param myOutputvarsType Array to store the output variable types found.
+///\param myNumOutputVars Integer holder to store number of output variables found.
+///\param myInputKeys Array to store the input variable keys.
+///\param myNumInputKeys Integer holder to store number of input variable keys.
+///\param myInputVars Array to store the name of input variables found.
+///\param myNumInputVars Integer holder to store number of input variables found.
+///\param myInputVarsType Integer array to store the corresponding input variable types in myInputVars.
+///\param myStrLen The length of the string that is passed to this function.
+///
+////////////////////////////////////////////////////////////////
+
+int getepvariablesFMU( char*  const fileName, 
+                    char*  const myOutputVarsName, 
+                    char*  const myOutputVarsType, 
+                    int*   const myNumOutputVars, 
+                    char*  const myInputKeys, 
+                    int*   const myNumInputKeys, 
+                    char*  const myInputVars, 
+                    int*   const myNumInputVars,
+                    int*   const myInputVarsType,
+                    int*   const myStrLen);
+
+////////////////////////////////////////////////////////////////
 /// Stack operation, this function will pop one element from stack
 /// and will free the resource unused
 ////////////////////////////////////////////////////////////////
-int stackPop();
+int stackPopBCVTB();
 
 ////////////////////////////////////////////////////////////////
 /// Stack operation, will push one element into the stack
 /// and will allocate memory for the new element, hence is deep copy
 ////////////////////////////////////////////////////////////////
-int stackPush(char* str);
+int stackPushBCVTB(char* str);
 
 ////////////////////////////////////////////////////////////////
 /// This is a general function that returns the value according to \c exp

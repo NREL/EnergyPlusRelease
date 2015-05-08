@@ -68,23 +68,25 @@ REAL(r64), PARAMETER    :: StefanBoltzmann = 5.6697D-8   ! Stefan-Boltzmann cons
 REAL(r64), PARAMETER    :: UniversalGasConst = 8314.462175D0 !(J/mol*K)
 
 ! Parameters for EMS Calling Points
-INTEGER, PARAMETER :: emsCallFromZoneSizing                           = 1 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromSystemSizing                         = 2 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromBeginNewEvironment                   = 3 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromBeginNewEvironmentAfterWarmUp        = 4 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromBeginTimestepBeforePredictor         = 5 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromBeforeHVACManagers                   = 6 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromAfterHVACManagers                    = 7 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromHVACIterationLoop                    = 8 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromEndSystemTimestepBeforeHVACReporting = 9 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromEndSystemTimestepAfterHVACReporting  = 10 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromEndZoneTimestepBeforeZoneReporting   = 11 ! Indentify where EMS called from
-INTEGER, PARAMETER :: emsCallFromEndZoneTimestepAfterZoneReporting    = 12 ! Indentify where EMS called from
+INTEGER, PARAMETER :: emsCallFromZoneSizing                           = 1 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromSystemSizing                         = 2 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromBeginNewEvironment                   = 3 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromBeginNewEvironmentAfterWarmUp        = 4 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromBeginTimestepBeforePredictor         = 5 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromBeforeHVACManagers                   = 6 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromAfterHVACManagers                    = 7 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromHVACIterationLoop                    = 8 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromEndSystemTimestepBeforeHVACReporting = 9 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromEndSystemTimestepAfterHVACReporting  = 10 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromEndZoneTimestepBeforeZoneReporting   = 11 ! Identity where EMS called from
+INTEGER, PARAMETER :: emsCallFromEndZoneTimestepAfterZoneReporting    = 12 ! Identity where EMS called from
 INTEGER, PARAMETER :: emsCallFromSetupSimulation                      = 13 ! identify where EMS called from,
                                                                            ! this is for input processing only
-INTEGER, PARAMETER :: emsCallFromExternalInterface                    = 14 ! Indentify where EMS called from
+INTEGER, PARAMETER :: emsCallFromExternalInterface                    = 14 ! Identity where EMS called from
 INTEGER, PARAMETER :: emsCallFromComponentGetInput                    = 15  ! EMS called from end of get input for a component
 INTEGER, PARAMETER :: emsCallFromUserDefinedComponentModel            = 16  ! EMS called from inside a custom user component model
+
+INTEGER, PARAMETER :: ScheduleAlwaysOn = -1    ! Value when passed to schedule routines gives back 1.0 (on)
 
           ! DERIVED TYPE DEFINITIONS:
           ! na
@@ -154,12 +156,17 @@ LOGICAL :: KickOffSizing=.false.      ! Kick off sizing -- meaning run each envi
 LOGICAL :: AnyEnergyManagementSystemInModel=.FALSE.  ! true if there is any EMS or Erl in model.  otherwise false
 LOGICAL :: AnyPlantInModel = .FALSE. ! true if there are any plant or condenser loops in model, otherwise false
 INTEGER :: CacheIPErrorFile    =0 ! Cache IP errors until IDF processing done.
-LOGICAL :: AnyIdealCondEntSetPointInModel=.FALSE.  ! true if there is any ideal condenser entering set point manager in model. 
+LOGICAL :: AnyIdealCondEntSetPointInModel=.FALSE.  ! true if there is any ideal condenser entering set point manager in model.
 LOGICAL :: RunOptCondEntTemp =.FALSE. ! true if the ideal condenser entering set point optimization is running
+LOGICAL :: CompLoadReportIsReq=.FALSE. !true if the extra sizing calcs are performed to create a "pulse" for the load component report
+LOGICAL :: isPulseZoneSizing=.FALSE. !true during the set of zone sizing calcs that include the "pulse" for the load component report
+INTEGER :: OutputFileZonePulse = 0 !file handle for special zone sizing report that contains the result of the "pulse" for the load component report
+LOGICAL :: doLoadComponentPulseNow = .FALSE. !true for the time step that is the "pulse" for the load component report
+LOGICAL :: ShowDecayCurvesInEIO = .FALSE. !true if the Radiant to Convective Decay Curves should appear in the EIO file
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

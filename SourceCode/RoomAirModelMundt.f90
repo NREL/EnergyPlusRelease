@@ -328,7 +328,7 @@ SUBROUTINE InitMundtModel
                             LineNode(MundtZoneIndex,NodeNum)%AirNodeName    = AirNode(AirNodeNum)%Name
                             LineNode(MundtZoneIndex,NodeNum)%Height         = AirNode(AirNodeNum)%Height
                             LineNode(MundtZoneIndex,NodeNum)%SurfMask       = AirNode(AirNodeNum)%SurfMask
-                            CALL SetupOutputVariable('Mundt RoomAir Model Air Node Temp [C]', &
+                            CALL SetupOutputVariable('Room Air Node Air Temperature [C]', &
                                 LineNode(MundtZoneIndex,NodeNum)%Temp,'HVAC','Average',  &
                                 LineNode(MundtZoneIndex,NodeNum)%AirNodeName)
 
@@ -371,7 +371,7 @@ SUBROUTINE InitMundtModel
         MaxNumOfFloorSurfs = MAX(MaxNumOfFloorSurfs,FloorSurfCount)
 
     END DO
-    
+
     IF (ErrorsFound) CALL ShowFatalError('InitMundtModel: Preceding condition(s) cause termination.')
 
     ! allocate arrays
@@ -948,7 +948,7 @@ END SUBROUTINE SetSurfHBDataForMundtModel
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

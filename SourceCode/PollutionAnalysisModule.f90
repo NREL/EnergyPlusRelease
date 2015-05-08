@@ -53,7 +53,9 @@ INTEGER, PARAMETER :: CoalPollFactor=5
 INTEGER, PARAMETER :: GasolinePollFactor=6
 INTEGER, PARAMETER :: PropanePollFactor=7
 INTEGER, PARAMETER :: DieselPollFactor=8
-INTEGER, PARAMETER :: PollFactorNumTypes=8
+INTEGER, PARAMETER :: OtherFuel1PollFactor=9
+INTEGER, PARAMETER :: OtherFuel2PollFactor=10
+INTEGER, PARAMETER :: PollFactorNumTypes=10
 
           ! DERIVED TYPE DEFINITIONS:
 TYPE ComponentProps
@@ -128,14 +130,16 @@ TYPE PollutionProps
   TYPE (ComponentProps) :: GasolineComp
   TYPE (ComponentProps) :: PropaneComp
   TYPE (ComponentProps) :: DieselComp
+  TYPE (ComponentProps) :: OtherFuel1Comp
+  TYPE (ComponentProps) :: OtherFuel2Comp
 
   !Total for all of the Pollutants
-  REAL(r64)    :: NOxPollutTotal = 0.0
+  REAL(r64)    :: N2OPollutTotal = 0.0
   REAL(r64)    :: CH4PollutTotal = 0.0
   REAL(r64)    :: CO2PollutTotal = 0.0
 
   !Total Carbon Equivalent Components
-  REAL(r64)    :: TotCarbonEquivFromNOx = 0.0
+  REAL(r64)    :: TotCarbonEquivFromN2O = 0.0
   REAL(r64)    :: TotCarbonEquivFromCH4 = 0.0
   REAL(r64)    :: TotCarbonEquivFromCO2 = 0.0
 
@@ -148,9 +152,11 @@ TYPE PollutionProps
   TYPE (CoefficientProps) :: GasolineCoef
   TYPE (CoefficientProps) :: PropaneCoef
   TYPE (CoefficientProps) :: DieselCoef
+  TYPE (CoefficientProps) :: OtherFuel1Coef
+  TYPE (CoefficientProps) :: OtherFuel2Coef
 
   !Total Carbon Equivalent Coeffs
-  REAL(r64)    :: CarbonEquivNOx = 0.0
+  REAL(r64)    :: CarbonEquivN2O = 0.0
   REAL(r64)    :: CarbonEquivCH4 = 0.0
   REAL(r64)    :: CarbonEquivCO2 = 0.0
 
@@ -161,7 +167,7 @@ END TYPE PollutionProps
 
 TYPE FuelTypeProps
 !FuelType Names
-  CHARACTER(len=MaxNameLength), DIMENSION(1:8) :: FuelTypeNames=' '
+  CHARACTER(len=MaxNameLength), DIMENSION(1:PollFactorNumTypes) :: FuelTypeNames=' '
 !Fuel Types used with the Pollution Factors
   REAL(r64)    :: Elec = 0.0
   REAL(r64)    :: NatGas = 0.0
@@ -171,6 +177,8 @@ TYPE FuelTypeProps
   REAL(r64)    :: Gasoline = 0.0
   REAL(r64)    :: Propane = 0.0
   REAL(r64)    :: Diesel = 0.0
+  REAL(r64)    :: OtherFuel1 = 0.0
+  REAL(r64)    :: OtherFuel2 = 0.0
   REAL(r64)    :: ElecPurch = 0.0D0
   REAL(r64)    :: ElecSold  = 0.0D0
 !Facility Meter Indexes
@@ -184,6 +192,8 @@ TYPE FuelTypeProps
   Integer :: FuelOil1FacilityIndex=0
   Integer :: FuelOil2FacilityIndex=0
   Integer :: PropaneFacilityIndex=0
+  Integer :: OtherFuel1FacilityIndex=0
+  Integer :: OtherFuel2FacilityIndex=0
   Integer :: ElecProducedFacilityIndex=0
   Integer :: SteamFacilityIndex=0
   INTEGER :: ElecPurchasedFacilityIndex=0
@@ -199,6 +209,8 @@ TYPE FuelTypeProps
   REAL(r64)    :: FuelOil1Facility=0.0
   REAL(r64)    :: FuelOil2Facility=0.0
   REAL(r64)    :: PropaneFacility=0.0
+  REAL(r64)    :: OtherFuel1Facility=0.0
+  REAL(r64)    :: OtherFuel2Facility=0.0
   REAL(r64)    :: ElecProducedFacility=0.0
   REAL(r64)    :: SteamFacility=0.0
   REAL(r64)    :: ElecPurchasedFacility=0.0D0
@@ -217,6 +229,8 @@ TYPE (PollutionProps):: Pollution=PollutionProps(                       &
   ComponentProps(GasolinePollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0), &
   ComponentProps(PropanePollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),  &
   ComponentProps(DieselPollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
+  ComponentProps(OtherFuel1PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
+  ComponentProps(OtherFuel2PollFactor,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),   &
   !Total for all of the Pollutants
   0.0,0.0,0.0,                                                          &
   !Total Carbon Equivalent Components
@@ -247,15 +261,21 @@ TYPE (PollutionProps):: Pollution=PollutionProps(                       &
    CoefficientProps(DieselPollFactor,.false., &
     1.05,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
       0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
+   CoefficientProps(OtherFuel1PollFactor,.false., &
+    1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+      0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
+   CoefficientProps(OtherFUel2PollFactor,.false., &
+    1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0, &
+      0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ), &
   !Total Carbon Equivalent Coeffs
   0.0,0.0,0.0,                                                                      &
   ! Purchased Efficiencies
   0.0,0.0,0.0)
 
 TYPE (FuelTypeProps) :: FuelType =FuelTypeProps(' ',                 &
-              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,               &
-              0,0,0,0,0,0,0,0,0,0,0,0,0,0,                           &
-              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)
+              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,       &
+              0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0,0.0,                   &
+              0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0)
 
 LOGICAL :: PollutionReportSetup = .False.
 LOGICAL :: GetInputFlagPollution = .True.
@@ -376,12 +396,12 @@ SUBROUTINE SetupPollutionCalculations
 
     !First determine if the Pollution reporting has been triggered, and is not exit.
     cCurrentModuleObject='Output:EnvironmentalImpactFactors'
-    NumPolluteRpt = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumPolluteRpt = GetNumObjectsFound(cCurrentModuleObject)
     PollutionReportSetup = .true.
 
     Do Loop = 1,NumPolluteRpt
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -422,7 +442,6 @@ SUBROUTINE GetPollutionFactorInput
     USE DataIPShortCuts
     USE InputProcessor, ONLY: GetNumObjectsFound,GetObjectItem,MakeUPPERCase
     USE DataInterfaces, ONLY: ShowWarningError,ShowSevereError,ShowFatalError
-    USE OutputProcessor, ONLY: GetStandardMeterResourceType
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -451,10 +470,10 @@ SUBROUTINE GetPollutionFactorInput
     GetInputFlagPollution=.false.
 
     cCurrentModuleObject='EnvironmentalImpactFactors'
-    NumEnvImpactFactors=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumEnvImpactFactors=GetNumObjectsFound(cCurrentModuleObject)
     IF (NumEnvImpactFactors > 0) THEN
       ! Now find and load all of the user inputs and factors.
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ELSE
@@ -465,7 +484,7 @@ SUBROUTINE GetPollutionFactorInput
     Pollution%PurchHeatEffic = 0.3d0
     Pollution%PurchCoolCOP =  3.0d0
     Pollution%SteamConvEffic = 0.25d0
-    Pollution%CarbonEquivNOx = 0.0d0
+    Pollution%CarbonEquivN2O = 0.0d0
     Pollution%CarbonEquivCH4 = 0.0d0
     Pollution%CarbonEquivCO2 = 0.0d0
 
@@ -486,7 +505,7 @@ SUBROUTINE GetPollutionFactorInput
       End If
 
       !Load the Total Carbon Equivalent Pollution Factor coefficients
-      Pollution%CarbonEquivNOx = rNumericArgs(4)
+      Pollution%CarbonEquivN2O = rNumericArgs(4)
       Pollution%CarbonEquivCH4 = rNumericArgs(5)
       Pollution%CarbonEquivCO2 = rNumericArgs(6)
     End If
@@ -494,11 +513,11 @@ SUBROUTINE GetPollutionFactorInput
 
     !Compare all of the Fuel Factors and compare to PollutionCalculationFactors List
     cCurrentModuleObject='FuelFactors'
-    NumFuelFactors = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumFuelFactors = GetNumObjectsFound(cCurrentModuleObject)
 
     Do Loop = 1,NumFuelFactors
       ! Now find and load all of the user inputs and factors.
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1257,6 +1276,194 @@ SUBROUTINE GetPollutionFactorInput
                                       Pollution%DieselCoef%NucLoSched,ErrorsFound)
           END IF
 
+        CASE ('OTHERFUEL1')
+          IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+            CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(FuelType%FuelTypeNames(Loop))//' already entered.'//  &
+              ' Previous entry will be used.')
+            CYCLE
+          ENDIF
+          Pollution%OtherFuel1Coef%FuelFactorUsed = .True.
+         !OtherFuel1 Coeffs
+          Pollution%OtherFuel1Coef%Source = rNumericArgs(2)
+          IF (.not. lAlphaFieldBlanks(3)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(3)),trim(cAlphaArgs(3)),  &
+                                      Pollution%OtherFuel1Coef%SourceSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%CO2    = rNumericArgs(3)
+          IF (.not. lAlphaFieldBlanks(4)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(4)),trim(cAlphaArgs(4)),  &
+                                      Pollution%OtherFuel1Coef%CO2Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%CO     = rNumericArgs(4)
+          IF (.not. lAlphaFieldBlanks(5)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(5)),trim(cAlphaArgs(5)),  &
+                                      Pollution%OtherFuel1Coef%COSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%CH4    = rNumericArgs(5)
+          IF (.not. lAlphaFieldBlanks(6)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(6)),trim(cAlphaArgs(6)),  &
+                                      Pollution%OtherFuel1Coef%CH4Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%NOx    = rNumericArgs(6)
+          IF (.not. lAlphaFieldBlanks(7)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(7)),trim(cAlphaArgs(7)),  &
+                                      Pollution%OtherFuel1Coef%NOxSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%N2O    = rNumericArgs(7)
+          IF (.not. lAlphaFieldBlanks(8)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(8)),trim(cAlphaArgs(8)),  &
+                                      Pollution%OtherFuel1Coef%N2OSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%SO2    = rNumericArgs(8)
+          IF (.not. lAlphaFieldBlanks(9)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(9)),trim(cAlphaArgs(9)),  &
+                                      Pollution%OtherFuel1Coef%SO2Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%PM     = rNumericArgs(9)
+          IF (.not. lAlphaFieldBlanks(10)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(10)),trim(cAlphaArgs(10)),  &
+                                      Pollution%OtherFuel1Coef%PMSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%PM10   = rNumericArgs(10)
+          IF (.not. lAlphaFieldBlanks(11)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(11)),trim(cAlphaArgs(11)),  &
+                                      Pollution%OtherFuel1Coef%PM10Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%PM25   = rNumericArgs(11)
+          IF (.not. lAlphaFieldBlanks(12)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(12)),trim(cAlphaArgs(12)),  &
+                                      Pollution%OtherFuel1Coef%PM25Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%NH3    = rNumericArgs(12)
+          IF (.not. lAlphaFieldBlanks(13)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(13)),trim(cAlphaArgs(13)),  &
+                                      Pollution%OtherFuel1Coef%NH3Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%NMVOC  = rNumericArgs(13)
+          IF (.not. lAlphaFieldBlanks(14)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(14)),trim(cAlphaArgs(14)),  &
+                                      Pollution%OtherFuel1Coef%NMVOCSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%Hg     = rNumericArgs(14)
+          IF (.not. lAlphaFieldBlanks(15)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(15)),trim(cAlphaArgs(15)),  &
+                                      Pollution%OtherFuel1Coef%HgSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%Pb     = rNumericArgs(15)
+          IF (.not. lAlphaFieldBlanks(16)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(16)),trim(cAlphaArgs(16)),  &
+                                      Pollution%OtherFuel1Coef%PbSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%Water  = rNumericArgs(16)
+          IF (.not. lAlphaFieldBlanks(17)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(17)),trim(cAlphaArgs(17)),  &
+                                      Pollution%OtherFuel1Coef%WaterSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%NucHi  = rNumericArgs(17)
+          IF (.not. lAlphaFieldBlanks(18)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(18)),trim(cAlphaArgs(18)),  &
+                                      Pollution%OtherFuel1Coef%NucHiSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel1Coef%NucLo  = rNumericArgs(18)
+          IF (.not. lAlphaFieldBlanks(19)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel1',trim(cAlphaFieldNames(19)),trim(cAlphaArgs(19)),  &
+                                      Pollution%OtherFuel1Coef%NucLoSched,ErrorsFound)
+          END IF
+
+        CASE ('OTHERFUEL2')
+          IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+            CALL ShowWarningError(TRIM(cCurrentModuleObject)//': '//TRIM(FuelType%FuelTypeNames(Loop))//' already entered.'//  &
+              ' Previous entry will be used.')
+            CYCLE
+          ENDIF
+          Pollution%OtherFuel2Coef%FuelFactorUsed = .True.
+         !OtherFuel2 Coeffs
+          Pollution%OtherFuel2Coef%Source = rNumericArgs(2)
+          IF (.not. lAlphaFieldBlanks(3)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(3)),trim(cAlphaArgs(3)),  &
+                                      Pollution%OtherFuel2Coef%SourceSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%CO2    = rNumericArgs(3)
+          IF (.not. lAlphaFieldBlanks(4)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(4)),trim(cAlphaArgs(4)),  &
+                                      Pollution%OtherFuel2Coef%CO2Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%CO     = rNumericArgs(4)
+          IF (.not. lAlphaFieldBlanks(5)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(5)),trim(cAlphaArgs(5)),  &
+                                      Pollution%OtherFuel2Coef%COSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%CH4    = rNumericArgs(5)
+          IF (.not. lAlphaFieldBlanks(6)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(6)),trim(cAlphaArgs(6)),  &
+                                      Pollution%OtherFuel2Coef%CH4Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%NOx    = rNumericArgs(6)
+          IF (.not. lAlphaFieldBlanks(7)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(7)),trim(cAlphaArgs(7)),  &
+                                      Pollution%OtherFuel2Coef%NOxSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%N2O    = rNumericArgs(7)
+          IF (.not. lAlphaFieldBlanks(8)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(8)),trim(cAlphaArgs(8)),  &
+                                      Pollution%OtherFuel2Coef%N2OSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%SO2    = rNumericArgs(8)
+          IF (.not. lAlphaFieldBlanks(9)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(9)),trim(cAlphaArgs(9)),  &
+                                      Pollution%OtherFuel2Coef%SO2Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%PM     = rNumericArgs(9)
+          IF (.not. lAlphaFieldBlanks(10)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(10)),trim(cAlphaArgs(10)),  &
+                                      Pollution%OtherFuel2Coef%PMSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%PM10   = rNumericArgs(10)
+          IF (.not. lAlphaFieldBlanks(11)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(11)),trim(cAlphaArgs(11)),  &
+                                      Pollution%OtherFuel2Coef%PM10Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%PM25   = rNumericArgs(11)
+          IF (.not. lAlphaFieldBlanks(12)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(12)),trim(cAlphaArgs(12)),  &
+                                      Pollution%OtherFuel2Coef%PM25Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%NH3    = rNumericArgs(12)
+          IF (.not. lAlphaFieldBlanks(13)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(13)),trim(cAlphaArgs(13)),  &
+                                      Pollution%OtherFuel2Coef%NH3Sched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%NMVOC  = rNumericArgs(13)
+          IF (.not. lAlphaFieldBlanks(14)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(14)),trim(cAlphaArgs(14)),  &
+                                      Pollution%OtherFuel2Coef%NMVOCSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%Hg     = rNumericArgs(14)
+          IF (.not. lAlphaFieldBlanks(15)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(15)),trim(cAlphaArgs(15)),  &
+                                      Pollution%OtherFuel2Coef%HgSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%Pb     = rNumericArgs(15)
+          IF (.not. lAlphaFieldBlanks(16)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(16)),trim(cAlphaArgs(16)),  &
+                                      Pollution%OtherFuel2Coef%PbSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%Water  = rNumericArgs(16)
+          IF (.not. lAlphaFieldBlanks(17)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(17)),trim(cAlphaArgs(17)),  &
+                                      Pollution%OtherFuel2Coef%WaterSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%NucHi  = rNumericArgs(17)
+          IF (.not. lAlphaFieldBlanks(18)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(18)),trim(cAlphaArgs(18)),  &
+                                      Pollution%OtherFuel2Coef%NucHiSched,ErrorsFound)
+          END IF
+          Pollution%OtherFuel2Coef%NucLo  = rNumericArgs(18)
+          IF (.not. lAlphaFieldBlanks(19)) THEN
+            CALL CheckFFSchedule(trim(cCurrentModuleObject),'OtherFuel2',trim(cAlphaFieldNames(19)),trim(cAlphaArgs(19)),  &
+                                      Pollution%OtherFuel2Coef%NucLoSched,ErrorsFound)
+          END IF
+
         CASE DEFAULT
           CALL ShowSevereError('Illegal FuelType for Pollution Calc Entered='//TRIM(FuelType%FuelTypeNames(Loop)))
           ErrorsFound=.true.
@@ -1271,11 +1478,13 @@ SUBROUTINE GetPollutionFactorInput
     FuelType%PurchCoolFacilityIndex = GetMeterIndex('DistrictCooling:Facility')
     FuelType%PurchHeatFacilityIndex = GetMeterIndex('DistrictHeating:Facility')
     FuelType%NatGasFacilityIndex   = GetMeterIndex('Gas:Facility')
-    FuelType%GasolineFacilityIndex = GetMeterIndex('GASOLINE:Facility')
-    FuelType%CoalFacilityIndex     = GetMeterIndex('COAL:Facility')
+    FuelType%GasolineFacilityIndex = GetMeterIndex('Gasoline:Facility')
+    FuelType%CoalFacilityIndex     = GetMeterIndex('Coal:Facility')
     FuelType%FuelOil1FacilityIndex = GetMeterIndex('FuelOil#1:Facility')
     FuelType%FuelOil2FacilityIndex = GetMeterIndex('FuelOil#2:Facility')
     FuelType%PropaneFacilityIndex  = GetMeterIndex('Propane:Facility')
+    FuelType%OtherFuel1FacilityIndex  = GetMeterIndex('OtherFuel1:Facility')
+    FuelType%OtherFuel2FacilityIndex  = GetMeterIndex('OtherFuel2:Facility')
     FuelType%ElecProducedFacilityIndex = GetMeterIndex('ElectricityProduced:Facility')
     FuelType%SteamFacilityIndex    = GetMeterIndex('Steam:Facility')
     FuelType%ElecPurchasedFacilityIndex = GetMeterIndex('ElectricityPurchased:Facility')
@@ -1333,6 +1542,18 @@ SUBROUTINE GetPollutionFactorInput
       If(.not. Pollution%DieselCoef%FuelFactorUsed .and. (FuelType%DieselFacilityIndex > 0)) Then
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//  &
              ' Not Found or Fuel not specified For Pollution Calculation for DIESEL')
+          ErrorsFound=.true.
+      End If
+      ! Check for OtherFuel1
+      If(.not. Pollution%OtherFuel1Coef%FuelFactorUsed .and. (FuelType%OtherFuel1FacilityIndex > 0)) Then
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//  &
+             ' Not Found or Fuel not specified For Pollution Calculation for OTHERFUEL1')
+          ErrorsFound=.true.
+      End If
+      ! Check for OtherFuel2
+      If(.not. Pollution%OtherFuel2Coef%FuelFactorUsed .and. (FuelType%OtherFuel2FacilityIndex > 0)) Then
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//  &
+             ' Not Found or Fuel not specified For Pollution Calculation for OTHERFUEL2')
           ErrorsFound=.true.
       End If
     END IF
@@ -1396,302 +1617,471 @@ SUBROUTINE SetupPollutionMeterReporting
       SELECT CASE (MakeUPPERCase(FuelType%FuelTypeNames(Loop)))
         CASE ('NATURALGAS','NATURAL GAS','GAS')
           !Pollutants from Natural Gas
-          CALL SetupOutputVariable('Source From Natural Gas[J]', Pollution%NatGasComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Source Energy [J]', Pollution%NatGasComp%Source,            &
          'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Natural Gas[kg]', Pollution%NatGasComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas CO2 Emissions Mass [kg]', Pollution%NatGasComp%CO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Natural Gas[kg]', Pollution%NatGasComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas CO Emissions Mass [kg]', Pollution%NatGasComp%COPollution,  &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Natural Gas[kg]', Pollution%NatGasComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas CH4 Emissions Mass [kg]', Pollution%NatGasComp%CH4Pollution,&
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Natural Gas[kg]', Pollution%NatGasComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas NOx Emissions Mass [kg]', Pollution%NatGasComp%NOxPollution,&
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Natural Gas[kg]', Pollution%NatGasComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas N2O Emissions Mass [kg]', Pollution%NatGasComp%N2OPollution,&
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Natural Gas[kg]', Pollution%NatGasComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas SO2 Emissions Mass [kg]', Pollution%NatGasComp%SO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Natural Gas[kg]', Pollution%NatGasComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas PM Emissions Mass [kg]', Pollution%NatGasComp%PMPollution,  &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Natural Gas[kg]', Pollution%NatGasComp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas PM10 Emissions Mass [kg]', &
+                                    Pollution%NatGasComp%PM10Pollution,            &
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Natural Gas[kg]', Pollution%NatGasComp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas PM2.5 Emissions Mass [kg]', &
+                                    Pollution%NatGasComp%PM25Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Natural Gas[kg]', Pollution%NatGasComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas NH3 Emissions Mass [kg]', Pollution%NatGasComp%NH3Pollution,&
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Natural Gas[kg]', Pollution%NatGasComp%NMVOCPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas NMVOC Emissions Mass [kg]', &
+                                    Pollution%NatGasComp%NMVOCPollution,           &
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Natural Gas[kg]', Pollution%NatGasComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Hg Emissions Mass [kg]', Pollution%NatGasComp%HgPollution,  &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Natural Gas[kg]', Pollution%NatGasComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Pb Emissions Mass [kg]', Pollution%NatGasComp%PbPollution,  &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Natural Gas[L]', Pollution%NatGasComp%WaterPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Water Consumption Volume [L]', &
+                                    Pollution%NatGasComp%WaterPollution,           &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Natural Gas[kg]', Pollution%NatGasComp%NucHiPollution, &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%NatGasComp%NucHiPollution, &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='NaturalGasEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Natural Gas[m3]', Pollution%NatGasComp%NucLoPollution, &
+          CALL SetupOutputVariable('Environmental Impact Natural Gas Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%NatGasComp%NucLoPollution, &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='NaturalGasEmissions',GroupKey='')
 
         CASE ('RESIDUALOIL','RESIDUAL OIL','FUEL OIL #2','FUELOIL#2')
           !Pollutants from FuelOil#2
-          CALL SetupOutputVariable('Source From Fuel Oil #2[J]', Pollution%FuelOil2Comp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Source Energy [J]', Pollution%FuelOil2Comp%Source,           &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 CO2 Emissions Mass [kg]', &
+                                Pollution%FuelOil2Comp%CO2Pollution,            &
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 CO Emissions Mass [kg]', Pollution%FuelOil2Comp%COPollution,&
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 CH4 Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%CH4Pollution,            &
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 NOx Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%NOxPollution,            &
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 N2O Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%N2OPollution,            &
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 SO2 Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%SO2Pollution,            &
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 PM Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%PMPollution,              &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 PM10 Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%PM10Pollution,            &
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 PM2.5 Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%PM25Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 NH3 Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%NH3Pollution,              &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%NMVOCPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 NMVOC Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%NMVOCPollution,           &
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Hg Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%HgPollution,              &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Pb Emissions Mass [kg]', &
+                                    Pollution%FuelOil2Comp%PbPollution,              &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Fuel Oil #2[L]', Pollution%FuelOil2Comp%WaterPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Water Consumption Volume [L]', &
+                                    Pollution%FuelOil2Comp%WaterPollution,  &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Fuel Oil #2[kg]', Pollution%FuelOil2Comp%NucHiPollution, &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%FuelOil2Comp%NucHiPollution, &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='FuelOil#2Emissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Fuel Oil #2[m3]', Pollution%FuelOil2Comp%NucLoPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #2 Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%FuelOil2Comp%NucLoPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='FuelOil#2Emissions',GroupKey='')
 
         CASE ('DISTILLATEOIL','DISTILLATE OIL','FUEL OIL #1','FUELOIL#1','FUEL OIL')
           !Pollutants from FuelOil#1
-          CALL SetupOutputVariable('Source From Fuel Oil #1[J]', Pollution%FuelOil1Comp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Source Energy [J]', Pollution%FuelOil1Comp%Source,  &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 CO2 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%CO2Pollution,            &
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 CO Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%COPollution,            &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 CH4 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%CH4Pollution,            &
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 NOx Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%NOxPollution,            &
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 N2O Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%N2OPollution,            &
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 SO2 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%SO2Pollution,            &
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 PM Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%PMPollution,              &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%PM10Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 PM10 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%PM10Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 PM2.5 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%PM25Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 NH3 Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%NH3Pollution,              &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%NMVOCPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 NMVOC Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%NMVOCPollution,           &
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Hg Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%HgPollution,              &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Pb Emissions Mass [kg]', &
+                                    Pollution%FuelOil1Comp%PbPollution,              &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Fuel Oil #1[L]', Pollution%FuelOil1Comp%WaterPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Water Consumption Volume [L]', &
+                                    Pollution%FuelOil1Comp%WaterPollution,           &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Fuel Oil #1[kg]', Pollution%FuelOil1Comp%NucHiPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%FuelOil1Comp%NucHiPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='FuelOil#1Emissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Fuel Oil #1[m3]', Pollution%FuelOil1Comp%NucLoPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Fuel Oil #1 Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%FuelOil1Comp%NucLoPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='FuelOil#1Emissions',GroupKey='')
 
         CASE ('COAL')
           !Pollutants from Coal
-          CALL SetupOutputVariable('Source From Coal[J]', Pollution%CoalComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Coal Source Energy [J]', Pollution%CoalComp%Source,            &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Coal[kg]', Pollution%CoalComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal CO2 Emissions Mass [kg]', Pollution%CoalComp%CO2Pollution,     &
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Coal[kg]', Pollution%CoalComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal CO Emissions Mass [kg]', Pollution%CoalComp%COPollution,       &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Coal[kg]', Pollution%CoalComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal CH4 Emissions Mass [kg]', Pollution%CoalComp%CH4Pollution,  &
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Coal[kg]', Pollution%CoalComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal NOx Emissions Mass [kg]', Pollution%CoalComp%NOxPollution,     &
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Coal[kg]', Pollution%CoalComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal N2O Emissions Mass [kg]', Pollution%CoalComp%N2OPollution,     &
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Coal[kg]', Pollution%CoalComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal SO2 Emissions Mass [kg]', Pollution%CoalComp%SO2Pollution,     &
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Coal[kg]', Pollution%CoalComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal PM Emissions Mass [kg]', Pollution%CoalComp%PMPollution,       &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Coal[kg]', Pollution%CoalComp%PM10Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal PM10 Emissions Mass [kg]', Pollution%CoalComp%PM10Pollution,   &
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Coal[kg]', Pollution%CoalComp%PM25Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal PM2.5 Emissions Mass [kg]', Pollution%CoalComp%PM25Pollution,  &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Coal[kg]', Pollution%CoalComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal NH3 Emissions Mass [kg]', Pollution%CoalComp%NH3Pollution,     &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Coal[kg]', Pollution%CoalComp%NMVOCPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal NMVOC Emissions Mass [kg]', Pollution%CoalComp%NMVOCPollution, &
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Coal[kg]', Pollution%CoalComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal Hg Emissions Mass [kg]', Pollution%CoalComp%HgPollution,       &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Coal[kg]', Pollution%CoalComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal Pb Emissions Mass [kg]', Pollution%CoalComp%PbPollution,       &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Coal[L]', Pollution%CoalComp%WaterPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Coal Water Consumption Volume [L]', Pollution%CoalComp%WaterPollution,&
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Coal[kg]', Pollution%CoalComp%NucHiPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Coal Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%CoalComp%NucHiPollution,&
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='CoalEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Coal[m3]', Pollution%CoalComp%NucLoPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Coal Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%CoalComp%NucLoPollution,&
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='CoalEmissions',GroupKey='')
 
         CASE ('ELECTRICITY','ELECTRIC','ELEC')
           !Pollutants from Electricity
-          CALL SetupOutputVariable('Source From Electricity[J]', Pollution%ElecComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity Source Energy [J]', Pollution%ElecComp%Source,          &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Electricity[kg]', Pollution%ElecComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity CO2 Emissions Mass [kg]', Pollution%ElecComp%CO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Electricity[kg]', Pollution%ElecComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity CO Emissions Mass [kg]', Pollution%ElecComp%COPollution,  &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Electricity[kg]', Pollution%ElecComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity CH4 Emissions Mass [kg]', Pollution%ElecComp%CH4Pollution,&
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Electricity[kg]', Pollution%ElecComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity NOx Emissions Mass [kg]', Pollution%ElecComp%NOxPollution,&
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Electricity[kg]', Pollution%ElecComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity N2O Emissions Mass [kg]', Pollution%ElecComp%N2OPollution,&
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Electricity[kg]', Pollution%ElecComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity SO2 Emissions Mass [kg]', Pollution%ElecComp%SO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Electricity[kg]', Pollution%ElecComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Electricity PM Emissions Mass [kg]', Pollution%ElecComp%PMPollution,   &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Electricity[kg]', Pollution%ElecComp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Electricity PM10 Emissions Mass [kg]', Pollution%ElecComp%PM10Pollution,&
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Electricity[kg]', Pollution%ElecComp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Electricity PM2.5 Emissions Mass [kg]', Pollution%ElecComp%PM25Pollution,&
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Electricity[kg]', Pollution%ElecComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Electricity NH3 Emissions Mass [kg]', Pollution%ElecComp%NH3Pollution,  &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Electricity[kg]', Pollution%ElecComp%NMVOCPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Electricity NMVOC Emissions Mass [kg]', &
+                                    Pollution%ElecComp%NMVOCPollution,&
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Electricity[kg]', Pollution%ElecComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Electricity Hg Emissions Mass [kg]', Pollution%ElecComp%HgPollution,     &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Electricity[kg]', Pollution%ElecComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Electricity Pb Emissions Mass [kg]', Pollution%ElecComp%PbPollution,     &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Electricity[L]', Pollution%ElecComp%WaterPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Electricity Water Consumption Volume [L]', &
+                                    Pollution%ElecComp%WaterPollution,           &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Electricity[kg]', Pollution%ElecComp%NucHiPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Electricity Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%ElecComp%NucHiPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Electricity[m3]', Pollution%ElecComp%NucLoPollution, &
+          CALL SetupOutputVariable('Environmental Impact Electricity Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%ElecComp%NucLoPollution, &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='ElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Source From Electricity Purchased [J]', Pollution%ElecPurchComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Purchased Electricity Source Energy [J]', &
+                                     Pollution%ElecPurchComp%Source,            &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='PurchasedElectricEmissions',GroupKey='')
-          CALL SetupOutputVariable('Source From Surplus Electricity Sold [J]', Pollution%ElecSurplusSoldComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Surplus Sold Electricity Source [J]', &
+                                     Pollution%ElecSurplusSoldComp%Source,            &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='SoldElectricEmissions',GroupKey='')
         CASE ('GASOLINE')
           !Pollutants from Gasoline
-          CALL SetupOutputVariable('Source From Gasoline[J]', Pollution%GasolineComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Source Energy [J]', Pollution%GasolineComp%Source,           &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Gasoline[kg]', Pollution%GasolineComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline CO2 Emissions Mass [kg]', Pollution%GasolineComp%CO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Gasoline[kg]', Pollution%GasolineComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline CO Emissions Mass [kg]', Pollution%GasolineComp%COPollution,  &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Gasoline[kg]', Pollution%GasolineComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline CH4 Emissions Mass [kg]', Pollution%GasolineComp%CH4Pollution,&
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Gasoline[kg]', Pollution%GasolineComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline NOx Emissions Mass [kg]', Pollution%GasolineComp%NOxPollution,&
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Gasoline[kg]', Pollution%GasolineComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline N2O Emissions Mass [kg]', Pollution%GasolineComp%N2OPollution,&
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Gasoline[kg]', Pollution%GasolineComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline SO2 Emissions Mass [kg]', Pollution%GasolineComp%SO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Gasoline[kg]', Pollution%GasolineComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Gasoline PM Emissions Mass [kg]', Pollution%GasolineComp%PMPollution,  &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Gasoline[kg]', Pollution%GasolineComp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline PM10 Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%PM10Pollution,            &
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Gasoline[kg]', Pollution%GasolineComp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Gasoline PM2.5 Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%PM25Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Gasoline[kg]', Pollution%GasolineComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Gasoline NH3 Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%NH3Pollution,              &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Gasoline[kg]', Pollution%GasolineComp%NMVOCPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Gasoline NMVOC Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%NMVOCPollution,            &
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Gasoline[kg]', Pollution%GasolineComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Hg Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%HgPollution,              &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Gasoline[kg]', Pollution%GasolineComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Pb Emissions Mass [kg]', &
+                                    Pollution%GasolineComp%PbPollution,              &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Gasoline[L]', Pollution%GasolineComp%WaterPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Water Consumption Volume [L]', &
+                                    Pollution%GasolineComp%WaterPollution,           &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Gasoline[kg]', Pollution%GasolineComp%NucHiPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%GasolineComp%NucHiPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='GasolineEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Gasoline[m3]', Pollution%GasolineComp%NucLoPollution,  &
+          CALL SetupOutputVariable('Environmental Impact Gasoline Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%GasolineComp%NucLoPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='GasolineEmissions',GroupKey='')
 
         CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
           !Pollutants from Propane
-          CALL SetupOutputVariable('Source From Propane[J]', Pollution%PropaneComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Propane Source Energy [J]', Pollution%PropaneComp%Source,            &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Propane[kg]', Pollution%PropaneComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane CO2 Emissions Mass [kg]', Pollution%PropaneComp%CO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Propane[kg]', Pollution%PropaneComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane CO Emissions Mass [kg]', Pollution%PropaneComp%COPollution, &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Propane[kg]', Pollution%PropaneComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane CH4 Emissions Mass [kg]', Pollution%PropaneComp%CH4Pollution,&
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Propane[kg]', Pollution%PropaneComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane NOx Emissions Mass [kg]', Pollution%PropaneComp%NOxPollution,&
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Propane[kg]', Pollution%PropaneComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane N2O Emissions Mass [kg]', Pollution%PropaneComp%N2OPollution,&
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Propane[kg]', Pollution%PropaneComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane SO2 Emissions Mass [kg]', Pollution%PropaneComp%SO2Pollution,&
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Propane[kg]', Pollution%PropaneComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Propane PM Emissions Mass [kg]', Pollution%PropaneComp%PMPollution,  &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Propane[kg]', Pollution%PropaneComp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane PM10 Emissions Mass [kg]', Pollution%PropaneComp%PM10Pollution,&
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Propane[kg]', Pollution%PropaneComp%PM25Pollution,           &
+          CALL SetupOutputVariable('Environmental Impact Propane PM2.5 Emissions Mass [kg]', &
+                                    Pollution%PropaneComp%PM25Pollution,           &
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Propane[kg]', Pollution%PropaneComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Propane NH3 Emissions Mass [kg]', Pollution%PropaneComp%NH3Pollution,  &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Propane[kg]', Pollution%PropaneComp%NMVOCPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane NMVOC Emissions Mass [kg]', Pollution%PropaneComp%NMVOCPollution,&
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Propane[kg]', Pollution%PropaneComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Propane Hg Emissions Mass [kg]', Pollution%PropaneComp%HgPollution,  &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Propane[kg]', Pollution%PropaneComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Propane Pb Emissions Mass [kg]', Pollution%PropaneComp%PbPollution,  &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Propane[L]', Pollution%PropaneComp%WaterPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane Water Consumption Volume [L]', &
+                                    Pollution%PropaneComp%WaterPollution,            &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Propane[kg]', Pollution%PropaneComp%NucHiPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Propane Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%PropaneComp%NucHiPollution,           &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='PropaneEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Propane[m3]', Pollution%PropaneComp%NucLoPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Propane Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%PropaneComp%NucLoPollution,            &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='PropaneEmissions',GroupKey='')
 
         CASE ('DIESEL')
           !Pollutants from Diesel
-          CALL SetupOutputVariable('Source From Diesel[J]', Pollution%DieselComp%Source,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel Source Energy [J]', Pollution%DieselComp%Source,       &
            'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO2 Pollution From Diesel[kg]', Pollution%DieselComp%CO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel CO2 Emissions Mass [kg]', Pollution%DieselComp%CO2Pollution, &
            'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('CO Pollution From Diesel[kg]', Pollution%DieselComp%COPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel CO Emissions Mass [kg]', Pollution%DieselComp%COPollution,   &
            'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('CH4 Pollution From Diesel[kg]', Pollution%DieselComp%CH4Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel CH4 Emissions Mass [kg]', Pollution%DieselComp%CH4Pollution, &
            'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('NOx Pollution From Diesel[kg]', Pollution%DieselComp%NOxPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel NOx Emissions Mass [kg]', Pollution%DieselComp%NOxPollution, &
            'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('N2O Pollution From Diesel[kg]', Pollution%DieselComp%N2OPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel N2O Emissions Mass [kg]', Pollution%DieselComp%N2OPollution, &
            'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('SO2 Pollution From Diesel[kg]', Pollution%DieselComp%SO2Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel SO2 Emissions Mass [kg]', Pollution%DieselComp%SO2Pollution, &
            'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM Pollution From Diesel[kg]', Pollution%DieselComp%PMPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Diesel PM Emissions Mass [kg]', Pollution%DieselComp%PMPollution,   &
            'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM10 Pollution From Diesel[kg]', Pollution%DieselComp%PM10Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel PM10 Emissions Mass [kg]', Pollution%DieselComp%PM10Pollution,&
            'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('PM2.5 Pollution From Diesel[kg]', Pollution%DieselComp%PM25Pollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel PM2.5 Emissions Mass [kg]', Pollution%DieselComp%PM25Pollution,&
            'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('NH3 Pollution From Diesel[kg]', Pollution%DieselComp%NH3Pollution,              &
+          CALL SetupOutputVariable('Environmental Impact Diesel NH3 Emissions Mass [kg]', Pollution%DieselComp%NH3Pollution,  &
            'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('NMVOC Pollution From Diesel[kg]', Pollution%DieselComp%NMVOCPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel NMVOC Emissions Mass [kg]', Pollution%DieselComp%NMVOCPollution,&
            'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('Hg Pollution From Diesel[kg]', Pollution%DieselComp%HgPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Diesel Hg Emissions Mass [kg]', Pollution%DieselComp%HgPollution,  &
            'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('Pb Pollution From Diesel[kg]', Pollution%DieselComp%PbPollution,              &
+          CALL SetupOutputVariable('Environmental Impact Diesel Pb Emissions Mass [kg]', Pollution%DieselComp%PbPollution,   &
            'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('Water Consumption From Diesel[L]', Pollution%DieselComp%WaterPollution,            &
+          CALL SetupOutputVariable('Environmental Impact Diesel Water Consumption Volume [L]', &
+                                    Pollution%DieselComp%WaterPollution, &
            'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear High Level Waste From Diesel[kg]', Pollution%DieselComp%NucHiPollution,          &
+          CALL SetupOutputVariable('Environmental Impact Diesel Nuclear High Level Waste Mass [kg]', &
+                                    Pollution%DieselComp%NucHiPollution,  &
            'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='DieselEmissions',GroupKey='')
-          CALL SetupOutputVariable('Nuclear Low Level Waste From Diesel[m3]', Pollution%DieselComp%NucLoPollution,           &
+          CALL SetupOutputVariable('Environmental Impact Diesel Nuclear Low Level Waste Volume [m3]', &
+                                    Pollution%DieselComp%NucLoPollution,           &
            'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='DieselEmissions',GroupKey='')
+
+        CASE ('OTHERFUEL1')
+          !Pollutants from OtherFuel1
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 Source Energy [J]',   &
+             Pollution%OtherFuel1Comp%Source,            &
+           'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 CO2 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%CO2Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 CO Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%COPollution,            &
+           'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 CH4 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%CH4Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 NOx Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%NOxPollution,            &
+           'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 N2O Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%N2OPollution,            &
+           'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 SO2 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%SO2Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 PM Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%PMPollution,              &
+           'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 PM10 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%PM10Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 PM2.5 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%PM25Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 NH3 Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%NH3Pollution,              &
+           'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 NMVOC Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%NMVOCPollution,            &
+           'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 Hg Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%HgPollution,              &
+           'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 Pb Emissions Mass [kg]',   &
+             Pollution%OtherFuel1Comp%PbPollution,              &
+           'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 CO2 Water Consumption Volume [L]',   &
+             Pollution%OtherFuel1Comp%WaterPollution,            &
+           'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 Nuclear High Level Waste Mass [kg]',   &
+             Pollution%OtherFuel1Comp%NucHiPollution,          &
+           'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='OtherFuel1Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel1 Nuclear Low Level Waste Volume [m3]',   &
+             Pollution%OtherFuel1Comp%NucLoPollution,           &
+           'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='OtherFuel1Emissions',GroupKey='')
+
+        CASE ('OTHERFUEL2')
+          !Pollutants from OtherFuel2
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 Source Energy [J]',   &
+             Pollution%OtherFuel2Comp%Source,            &
+           'System','Sum','Site',ResourceTypeKey='Source',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 CO2 Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%CO2Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='CO2',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 CO Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%COPollution,            &
+           'System','Sum','Site',ResourceTypeKey='CO',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 CH4 Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%CH4Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='CH4',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 NOx Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%NOxPollution,            &
+           'System','Sum','Site',ResourceTypeKey='NOx',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 N2O Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%N2OPollution,            &
+           'System','Sum','Site',ResourceTypeKey='N2O',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 SO2 Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%SO2Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='SO2',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 PM Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%PMPollution,              &
+           'System','Sum','Site',ResourceTypeKey='PM',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 PM10 Emissions Mass [kg]',   &
+             Pollution%OtherFuel2Comp%PM10Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='PM10',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 PM2.5 Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%PM25Pollution,            &
+           'System','Sum','Site',ResourceTypeKey='PM2.5',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 NH3 Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%NH3Pollution,              &
+           'System','Sum','Site',ResourceTypeKey='NH3',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 NMVOC Emissions Mass [kg]',   &
+             Pollution%OtherFuel2Comp%NMVOCPollution,            &
+           'System','Sum','Site',ResourceTypeKey='NMVOC',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 Hg Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%HgPollution,              &
+           'System','Sum','Site',ResourceTypeKey='Hg',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 Pb Emissions Mass [kg]',  &
+             Pollution%OtherFuel2Comp%PbPollution,              &
+           'System','Sum','Site',ResourceTypeKey='Pb',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 CO2 Water Consumption Volume [L]',  &
+             Pollution%OtherFuel2Comp%WaterPollution,            &
+           'System','Sum','Site',ResourceTypeKey='WaterEnvironmentalFactors',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 Nuclear High Level Waste Mass [kg]',   &
+             Pollution%OtherFuel2Comp%NucHiPollution,          &
+           'System','Sum','Site',ResourceTypeKey='Nuclear High',EndUseKey='OtherFuel2Emissions',GroupKey='')
+          CALL SetupOutputVariable('Environmental Impact OtherFuel2 Nuclear Low Level Waste Volume [m3]',  &
+             Pollution%OtherFuel2Comp%NucLoPollution,           &
+           'System','Sum','Site',ResourceTypeKey='Nuclear Low',EndUseKey='OtherFuel2Emissions',GroupKey='')
 
       END SELECT
 
@@ -1699,11 +2089,14 @@ SUBROUTINE SetupPollutionMeterReporting
 
 
     ! Always setup the Total Carbon Equivalent
-    CALL SetupOutputVariable('Carbon Equivalent Pollution From NOx[kg]', Pollution%TotCarbonEquivFromNOx,            &
+    CALL SetupOutputVariable('Environmental Impact Total N2O Emissions Carbon Equivalent Mass [kg]', &
+                              Pollution%TotCarbonEquivFromN2O,            &
         'System','Sum','Site',ResourceTypeKey='Carbon Equivalent',EndUseKey='CarbonEquivalentEmissions',GroupKey='')
-    CALL SetupOutputVariable('Carbon Equivalent Pollution From CH4[kg]', Pollution%TotCarbonEquivFromCH4,            &
+    CALL SetupOutputVariable('Environmental Impact Total CH4 Emissions Carbon Equivalent Mass [kg]', &
+                              Pollution%TotCarbonEquivFromCH4,            &
         'System','Sum','Site',ResourceTypeKey='Carbon Equivalent',EndUseKey='CarbonEquivalentEmissions',GroupKey='')
-    CALL SetupOutputVariable('Carbon Equivalent Pollution From CO2[kg]', Pollution%TotCarbonEquivFromCO2,            &
+    CALL SetupOutputVariable('Environmental Impact Total CO2 Emissions Carbon Equivalent Mass [kg]', &
+                              Pollution%TotCarbonEquivFromCO2,            &
         'System','Sum','Site',ResourceTypeKey='Carbon Equivalent',EndUseKey='CarbonEquivalentEmissions',GroupKey='')
 
   RETURN
@@ -1750,9 +2143,9 @@ SUBROUTINE CheckPollutionMeterReporting
 
   ! in progress
     IF (NumFuelFactors == 0 .or. NumEnvImpactFactors == 0) THEN
-      IF (ReportingThisVariable('Carbon Equivalent Pollution From NOx') .or.   &
-          ReportingThisVariable('Carbon Equivalent Pollution From CH4') .or.   &
-          ReportingThisVariable('Carbon Equivalent Pollution From CO2') .or.   &
+      IF (ReportingThisVariable('Environmental Impact Total N2O Emissions Carbon Equivalent Mass') .or.   &
+          ReportingThisVariable('Environmental Impact Total CH4 Emissions Carbon Equivalent Mass') .or.   &
+          ReportingThisVariable('Environmental Impact Total CO2 Emissions Carbon Equivalent Mass') .or.   &
           ReportingThisVariable('Carbon Equivalent:Facility') .or.   &
           ReportingThisVariable('CarbonEquivalentEmissions:Carbon Equivalent') ) THEN
         CALL ShowWarningError('GetPollutionFactorInput: Requested reporting for Carbon Equivalent Pollution, '//  &
@@ -1873,6 +2266,8 @@ END SUBROUTINE CheckFFSchedule
       REAL(r64) :: GasolineValue
       REAL(r64) :: PropaneValue
       REAL(r64) :: DieselValue
+      REAL(r64) :: OtherFuel1Value
+      REAL(r64) :: OtherFuel2Value
 
 
 !       Then the amount of Pollution produced by each fuel type is
@@ -1891,6 +2286,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%CO2Pollution     = 0.0
@@ -1965,6 +2362,26 @@ END SUBROUTINE CheckFFSchedule
         Pollution%DieselComp%CO2Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
 
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%CO2Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%CO2Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CO2/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CO2*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%CO2Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%CO2Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%CO2Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%CO2Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CO2/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CO2*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%CO2Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%CO2Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
+
 
       Pollution%CO2PollutTotal = Pollution%ElecComp%CO2Pollution +     &
                         Pollution%NatGasComp%CO2Pollution        +      &
@@ -1973,7 +2390,9 @@ END SUBROUTINE CheckFFSchedule
                         Pollution%CoalComp%CO2Pollution          +      &
                         Pollution%GasolineComp%CO2Pollution      +      &
                         Pollution%PropaneComp%CO2Pollution       +      &
-                        Pollution%DieselComp%CO2Pollution
+                        Pollution%DieselComp%CO2Pollution        +      &
+                        Pollution%OtherFuel1Comp%CO2Pollution    +      &
+                        Pollution%OtherFuel2Comp%CO2Pollution
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -1983,6 +2402,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%NOxPollution     = 0.0
@@ -2056,15 +2477,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%NOxPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
-
-      Pollution%NOxPollutTotal = Pollution%ElecComp%NOxPollution +     &
-                        Pollution%NatGasComp%NOxPollution        +      &
-                        Pollution%FuelOil1Comp%NOxPollution      +      &
-                        Pollution%FuelOil2Comp%NOxPollution      +      &
-                        Pollution%CoalComp%NOxPollution          +      &
-                        Pollution%GasolineComp%NOxPollution      +      &
-                        Pollution%PropaneComp%NOxPollution       +      &
-                        Pollution%DieselComp%NOxPollution
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%NOxPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%NOxSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NOx/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NOx*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%NOxSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%NOxPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%NOxPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%NOxSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NOx/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NOx*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%NOxSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%NOxPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2074,6 +2504,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%CH4Pollution     = 0.0
@@ -2147,6 +2579,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%CH4Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%CH4Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%CH4Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CH4/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CH4*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%CH4Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%CH4Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%CH4Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%CH4Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CH4/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CH4*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%CH4Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%CH4Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       Pollution%CH4PollutTotal = Pollution%ElecComp%CH4Pollution +     &
                         Pollution%NatGasComp%CH4Pollution        +      &
@@ -2155,7 +2605,9 @@ END SUBROUTINE CheckFFSchedule
                         Pollution%CoalComp%CH4Pollution          +      &
                         Pollution%GasolineComp%CH4Pollution      +      &
                         Pollution%PropaneComp%CH4Pollution       +      &
-                        Pollution%DieselComp%CH4Pollution
+                        Pollution%DieselComp%CH4Pollution        +      &
+                        Pollution%OtherFuel1Comp%CH4Pollution    +      &
+                        Pollution%OtherFuel1Comp%CH4Pollution
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2165,6 +2617,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%COPollution     = 0.0
@@ -2238,6 +2692,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%COPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%COPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%COSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CO/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%CO*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%COSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%COPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%COPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%COSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CO/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%CO*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%COSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%COPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2247,6 +2719,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%N2OPollution     = 0.0
@@ -2320,6 +2794,35 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%N2OPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%N2OPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%N2OSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%N2O/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%N2O*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%N2OSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%N2OPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%N2OPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%N2OSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%N2O/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%N2O*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%N2OSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%N2OPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
+
+      Pollution%N2OPollutTotal = Pollution%ElecComp%N2OPollution +     &
+                        Pollution%NatGasComp%N2OPollution        +      &
+                        Pollution%FuelOil1Comp%N2OPollution      +      &
+                        Pollution%FuelOil2Comp%N2OPollution      +      &
+                        Pollution%CoalComp%N2OPollution          +      &
+                        Pollution%GasolineComp%N2OPollution      +      &
+                        Pollution%PropaneComp%N2OPollution       +      &
+                        Pollution%DieselComp%N2OPollution        +      &
+                        Pollution%OtherFuel1Comp%N2OPollution    +      &
+                        Pollution%OtherFuel2Comp%N2OPollution
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2329,6 +2832,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%SO2Pollution     = 0.0
@@ -2402,6 +2907,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%SO2Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%SO2Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%SO2Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%SO2/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%SO2*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%SO2Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%SO2Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%SO2Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%SO2Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%SO2/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%SO2*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%SO2Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%SO2Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2411,6 +2934,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%PMPollution     = 0.0
@@ -2484,6 +3009,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%PMPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%PMPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%PMSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%PMSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%PMPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%PMPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%PMSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%PMSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%PMPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2493,6 +3036,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%PM10Pollution     = 0.0
@@ -2566,6 +3111,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%PM10Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%PM10Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%PM10Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM10/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM10*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%PM10Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%PM10Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%PM10Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%PM10Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM10/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM10*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%PM10Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%PM10Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2575,6 +3138,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%PM25Pollution     = 0.0
@@ -2648,6 +3213,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%PM25Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%PM25Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%PM25Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM25/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%PM25*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%PM25Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%PM25Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%PM25Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%PM25Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM25/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%PM25*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%PM25Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%PM25Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2657,6 +3240,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%NH3Pollution     = 0.0
@@ -2730,6 +3315,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%NH3Pollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%NH3Pollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%NH3Sched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NH3/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NH3*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%NH3Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%NH3Pollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%NH3Pollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%NH3Sched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NH3/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NH3*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%NH3Sched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%NH3Pollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2739,6 +3342,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%NMVOCPollution     = 0.0
@@ -2812,6 +3417,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%NMVOCPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%NMVOCPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%NMVOCSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NMVOC/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NMVOC*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%NMVOCSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%NMVOCPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%NMVOCPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%NMVOCSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NMVOC/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NMVOC*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%NMVOCSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%NMVOCPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2821,6 +3444,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%HgPollution     = 0.0
@@ -2894,6 +3519,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%HgPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%HgPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%HgSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Hg/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Hg*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%HgSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%HgPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%HgPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%HgSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Hg/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Hg*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%HgSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%HgPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2903,6 +3546,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%PbPollution     = 0.0
@@ -2976,6 +3621,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%PbPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%PbPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%PbSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Pb/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Pb*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%PbSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%PbPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%PbPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%PbSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Pb/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Pb*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%PbSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%PbPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -2985,6 +3648,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%WaterPollution     = 0.0
@@ -3058,6 +3723,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%WaterPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%WaterPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%WaterSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Water
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%Water*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%WaterSched)
+        ENDIF
+        Pollution%OtherFuel1Comp%WaterPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%WaterPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%WaterSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Water
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%Water*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%WaterSched)
+        ENDIF
+        Pollution%OtherFuel2Comp%WaterPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -3067,6 +3750,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%NucHiPollution     = 0.0
@@ -3140,6 +3825,24 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%NucHiPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%NucHiPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%NucHiSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NucHi/1000.0d0
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NucHi*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%NucHiSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel1Comp%NucHiPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%NucHiPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%NucHiSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NucHi/1000.0d0
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NucHi*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%NucHiSched)/1000.0d0
+        ENDIF
+        Pollution%OtherFuel2Comp%NucHiPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
       ElecValue     = 0.0
       NatGasValue   = 0.0
@@ -3149,6 +3852,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%FuelFactorUsed) THEN
         Pollution%ElecComp%NucLoPollution     = 0.0
@@ -3222,8 +3927,26 @@ END SUBROUTINE CheckFFSchedule
         ENDIF
         Pollution%DieselComp%NucLoPollution   = (FuelType%Diesel/1.0d6)*DieselValue
       ENDIF
+      IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel1Comp%NucLoPollution  = 0.0
+        IF (Pollution%OtherFuel1Coef%NucLoSched == 0) THEN
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NucLo
+        ELSE
+          OtherFuel1Value = Pollution%OtherFuel1Coef%NucLo*GetCurrentScheduleValue(Pollution%OtherFuel1Coef%NucLoSched)
+        ENDIF
+        Pollution%OtherFuel1Comp%NucLoPollution   = (FuelType%OtherFuel1/1.0d6)*OtherFuel1Value
+      ENDIF
+      IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+        Pollution%OtherFuel2Comp%NucLoPollution  = 0.0
+        IF (Pollution%OtherFuel2Coef%NucLoSched == 0) THEN
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NucLo
+        ELSE
+          OtherFuel2Value = Pollution%OtherFuel2Coef%NucLo*GetCurrentScheduleValue(Pollution%OtherFuel2Coef%NucLoSched)
+        ENDIF
+        Pollution%OtherFuel2Comp%NucLoPollution   = (FuelType%OtherFuel2/1.0d6)*OtherFuel2Value
+      ENDIF
 
-      Pollution%TotCarbonEquivFromNOx = Pollution%NOxPollutTotal*Pollution%CarbonEquivNOx
+      Pollution%TotCarbonEquivFromN2O = Pollution%N2OPollutTotal*Pollution%CarbonEquivN2O
       Pollution%TotCarbonEquivFromCH4  = Pollution%CH4PollutTotal*Pollution%CarbonEquivCH4
       Pollution%TotCarbonEquivFromCO2 = Pollution%CO2PollutTotal*Pollution%CarbonEquivCO2
 
@@ -3235,6 +3958,8 @@ END SUBROUTINE CheckFFSchedule
       GasolineValue = 0.0
       PropaneValue  = 0.0
       DieselValue   = 0.0
+      OtherFuel1Value   = 0.0
+      OtherFuel2Value   = 0.0
 
       IF (Pollution%ElecCoef%SourceSched .NE. 0) THEN
         Pollution%ElecComp%Source   = FuelType%Elec*Pollution%ElecCoef%Source &
@@ -3290,6 +4015,18 @@ END SUBROUTINE CheckFFSchedule
                                              * GetCurrentScheduleValue(Pollution%DieselCoef%SourceSched)
       ELSE
         Pollution%DieselComp%Source = FuelType%Diesel*Pollution%DieselCoef%Source
+      END IF
+      IF (Pollution%OtherFuel1Coef%SourceSched .NE. 0) THEN
+        Pollution%OtherFuel1Comp%Source = FuelType%OtherFuel1*Pollution%OtherFuel1Coef%Source &
+                                             * GetCurrentScheduleValue(Pollution%OtherFuel1Coef%SourceSched)
+      ELSE
+        Pollution%OtherFuel1Comp%Source = FuelType%OtherFuel1*Pollution%OtherFuel1Coef%Source
+      END IF
+      IF (Pollution%OtherFuel2Coef%SourceSched .NE. 0) THEN
+        Pollution%OtherFuel2Comp%Source = FuelType%OtherFuel2*Pollution%OtherFuel2Coef%Source &
+                                             * GetCurrentScheduleValue(Pollution%OtherFuel2Coef%SourceSched)
+      ELSE
+        Pollution%OtherFuel2Comp%Source = FuelType%OtherFuel2*Pollution%OtherFuel2Coef%Source
       END IF
 
 
@@ -3355,6 +4092,10 @@ END SUBROUTINE CheckFFSchedule
                                 GetInstantMeterValue(FuelType%FuelOil2FacilityIndex,2)
     FuelType%PropaneFacility   =GetInstantMeterValue(FuelType%PropaneFacilityIndex,1)*FracTimeStepZone + &
                                 GetInstantMeterValue(FuelType%PropaneFacilityIndex,2)
+    FuelType%OtherFuel1Facility=GetInstantMeterValue(FuelType%OtherFuel1FacilityIndex,1)*FracTimeStepZone + &
+                                GetInstantMeterValue(FuelType%OtherFuel1FacilityIndex,2)
+    FuelType%OtherFuel2Facility=GetInstantMeterValue(FuelType%OtherFuel2FacilityIndex,1)*FracTimeStepZone + &
+                                GetInstantMeterValue(FuelType%OtherFuel2FacilityIndex,2)
     FuelType%ElecProducedFacility =GetInstantMeterValue(FuelType%ElecProducedFacilityIndex,1)*FracTimeStepZone + &
                                 GetInstantMeterValue(FuelType%ElecProducedFacilityIndex,2)
     FuelType%SteamFacility     =GetInstantMeterValue(FuelType%SteamFacilityIndex,1)*FracTimeStepZone + &
@@ -3396,6 +4137,12 @@ END SUBROUTINE CheckFFSchedule
 
     !The Diesel fuel type will be summed
     FuelType%Diesel = FuelType%DieselFacility
+
+    !The OtherFuel1 fuel type will be summed
+    FuelType%OtherFuel1 = FuelType%OtherFuel1Facility
+
+    !The OtherFuel2 fuel type will be summed
+    FuelType%OtherFuel2 = FuelType%OtherFuel2Facility
 
     FuelType%ElecPurch = FuelType%ElecPurchasedFacility
 
@@ -3575,6 +4322,34 @@ SUBROUTINE GetFuelFactorInfo(fuelName,fuelFactorUsed,fuelSourceFactor,fuelFactor
           fuelSourceFactor = 1.05d0
         ENDIF
 
+      CASE ('OtherFuel1')
+        IF (Pollution%OtherFuel1Coef%FuelFactorUsed) THEN
+          fuelFactorUsed=.true.
+          fuelSourceFactor=Pollution%OtherFuel1Coef%Source
+          IF (Pollution%OtherFuel1Coef%SourceSched == 0) THEN
+            fuelFactorScheduleUsed=.false.
+          ELSE
+            fuelFactorScheduleUsed=.true.
+            ffScheduleIndex = Pollution%OtherFuel1Coef%SourceSched
+          ENDIF
+        ELSE
+          fuelSourceFactor = 1.0d0
+        ENDIF
+
+      CASE ('OtherFuel2')
+        IF (Pollution%OtherFuel2Coef%FuelFactorUsed) THEN
+          fuelFactorUsed=.true.
+          fuelSourceFactor=Pollution%OtherFuel2Coef%Source
+          IF (Pollution%OtherFuel2Coef%SourceSched == 0) THEN
+            fuelFactorScheduleUsed=.false.
+          ELSE
+            fuelFactorScheduleUsed=.true.
+            ffScheduleIndex = Pollution%OtherFuel2Coef%SourceSched
+          ENDIF
+        ELSE
+          fuelSourceFactor = 1.0d0
+        ENDIF
+
       CASE ('DistrictHeating')
         IF (Pollution%NatGasCoef%FuelFactorUsed) THEN
           fuelFactorUsed=.true.
@@ -3660,7 +4435,7 @@ END SUBROUTINE GetEnvironmentalImpactFactorInfo
 ! *****************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

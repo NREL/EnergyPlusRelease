@@ -27,7 +27,7 @@ MODULE PoweredInductionUnits
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, BeginDayFlag, MaxNameLength, SecInHour, NumOfZones, &
-                           InitConvTemp, SysSizingCalc
+                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
                            SetupOutputVariable
 USE DataHVACGlobals, ONLY: SmallMassFlow, SmallLoad, FanElecPower, SmallTempDiff, SmallAirVolFlow, SingleCoolingSetPoint, &
@@ -324,7 +324,7 @@ DO PIUIndex = 1,NumSeriesPIUs
 
   cCurrentModuleObject = 'AirTerminal:SingleDuct:SeriesPIU:Reheat'
 
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),PIUIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+  CALL GetObjectItem(cCurrentModuleObject,PIUIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                      NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -340,18 +340,16 @@ DO PIUIndex = 1,NumSeriesPIUs
   PIU(PIUNum)%UnitType = TRIM(cCurrentModuleObject)
   PIU(PIUNum)%UnitType_Num = SingleDuct_SeriesPIU_Reheat
   PIU(PIUNum)%Sched    = cAlphaArgs(2)
-  PIU(PIUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
-
-  IF (PIU(PIUNum)%SchedPtr .EQ. 0) THEN
-    IF (lAlphaFieldBlanks(2)) THEN
-       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-            ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-    ELSE
-       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
+  IF (lAlphaFieldBlanks(2)) THEN
+    PIU(PIUNum)%SchedPtr = ScheduleAlwaysOn
+  ELSE
+    PIU(PIUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
+    IF (PIU(PIUNum)%SchedPtr .EQ. 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                             ' entered ='//TRIM(cAlphaArgs(2))// &
                             ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      ErrorsFound=.TRUE.
     END IF
-    ErrorsFound=.TRUE.
   END IF
 
   PIU(PIUNum)%MaxTotAirVolFlow  = rNumericArgs(1)
@@ -385,19 +383,19 @@ DO PIUIndex = 1,NumSeriesPIUs
 
   PIU(PIUNum)%PriAirInNode = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,PIU(PIUNum)%UnitType,cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFieldNames(3))
 
   PIU(PIUNum)%SecAirInNode = &
                GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,PIU(PIUNum)%UnitType,cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFieldNames(4))
 
   PIU(PIUNum)%OutAirNode = &
                GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,PIU(PIUNum)%UnitType,cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFieldNames(5))
 
   PIU(PIUNum)%HCoilInAirNode = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,PIU(PIUNum)%UnitType,cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Internal,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Internal,1,ObjectIsParent,cAlphaFieldNames(6))
   ! The reheat coil control node is necessary for hot water reheat, but not necessary for
   ! electric or gas reheat.
   IF (PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Gas .OR. PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Electric) THEN
@@ -414,7 +412,7 @@ DO PIUIndex = 1,NumSeriesPIUs
     END IF
     PIU(PIUNum)%HotControlNode  = &
       GetOnlySingleNode(cAlphaArgs(11),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                        NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent)
+                        NodeType_Water,NodeConnectionType_Actuator,1,ObjectIsParent,cAlphaFieldNames(11))
   END IF
   PIU(PIUNum)%MixerName = cAlphaArgs(7)  ! name of zone mixer object
   PIU(PIUNum)%FanName   = cAlphaArgs(8)  ! name of fan object
@@ -469,7 +467,7 @@ DO PIUIndex = 1,NumParallelPIUs
 
   cCurrentModuleObject = 'AirTerminal:SingleDuct:ParallelPIU:Reheat'
 
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),PIUIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+  CALL GetObjectItem(cCurrentModuleObject,PIUIndex,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                      NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -485,17 +483,16 @@ DO PIUIndex = 1,NumParallelPIUs
   PIU(PIUNum)%UnitType = TRIM(cCurrentModuleObject)
   PIU(PIUNum)%UnitType_Num = SingleDuct_ParallelPIU_Reheat
   PIU(PIUNum)%Sched    = cAlphaArgs(2)
-  PIU(PIUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
-  IF (PIU(PIUNum)%SchedPtr .EQ. 0) THEN
-    IF (lAlphaFieldBlanks(2)) THEN
-       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-            ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-    ELSE
-       CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
+  IF (lAlphaFieldBlanks(2)) THEN
+    PIU(PIUNum)%SchedPtr = ScheduleAlwaysOn
+  ELSE
+    PIU(PIUNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
+    IF (PIU(PIUNum)%SchedPtr .EQ. 0) THEN
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                             ' entered ='//TRIM(cAlphaArgs(2))// &
                             ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      ErrorsFound=.TRUE.
     END IF
-    ErrorsFound=.TRUE.
   END IF
   PIU(PIUNum)%MaxPriAirVolFlow  = rNumericArgs(1)
   PIU(PIUNum)%MaxSecAirVolFlow  = rNumericArgs(2)
@@ -528,19 +525,19 @@ DO PIUIndex = 1,NumParallelPIUs
 
   PIU(PIUNum)%PriAirInNode = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFieldNames(3))
 
   PIU(PIUNum)%SecAirInNode = &
                GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFieldNames(4))
 
   PIU(PIUNum)%OutAirNode = &
                GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFieldNames(5))
 
   PIU(PIUNum)%HCoilInAirNode = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                            NodeType_Air,NodeConnectionType_Internal,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Internal,1,ObjectIsParent,cAlphaFieldNames(6))
   ! The reheat coil control node is necessary for hot water reheat, but not necessary for
   ! electric or gas reheat.
 !  IF (PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Gas .OR. PIU(PIUNum)%HCoilType_Num .EQ. HCoilType_Electric) THEN
@@ -635,13 +632,13 @@ END IF
 
 Do PIUNum=1,NumPIUs
   ! Setup Report variables for the Fan Coils
-  CALL SetupOutputVariable('PIU Heating Rate[W]',PIU(PIUNum)%HeatingRate,'System','Average',&
+  CALL SetupOutputVariable('Zone Air Terminal Heating Rate [W]',PIU(PIUNum)%HeatingRate,'System','Average',&
                            PIU(PIUNum)%Name)
-  CALL SetupOutputVariable('PIU Heating Energy[J]',PIU(PIUNum)%HeatingEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Zone Air Terminal Heating Energy [J]',PIU(PIUNum)%HeatingEnergy,'System','Sum',&
                            PIU(PIUNum)%Name)
-  CALL SetupOutputVariable('PIU Sensible Cooling Rate[W]',PIU(PIUNum)%SensCoolRate,'System','Average',&
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Cooling Rate [W]',PIU(PIUNum)%SensCoolRate,'System','Average',&
                            PIU(PIUNum)%Name)
-  CALL SetupOutputVariable('PIU Sensible Cooling Energy[J]',PIU(PIUNum)%SensCoolEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Cooling Energy [J]',PIU(PIUNum)%SensCoolEnergy,'System','Sum',&
                            PIU(PIUNum)%Name)
 
 END DO
@@ -1825,7 +1822,7 @@ SUBROUTINE PIUInducesPlenumAir(NodeNum)
       EXIT
     END IF
   END DO
-  
+
   RETURN
 
 END SUBROUTINE PIUInducesPlenumAir
@@ -1833,7 +1830,7 @@ END SUBROUTINE PIUInducesPlenumAir
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -12,7 +12,7 @@ MODULE UserDefinedComponents
           ! Collect component models for custom program with Erl.
 
           ! METHODOLOGY EMPLOYED:
-          ! <description>
+          ! na
 
           ! REFERENCES:
           ! na
@@ -607,10 +607,9 @@ SUBROUTINE SimZoneAirUserDefined(CompName,ZoneNum,SensibleOutputProvided,LatentO
               (  PsyHFnTdbW(Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%Temp,MinHumRat, 'SimZoneAirUserDefined') &
                 - PsyHFnTdbW(Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%Temp,MinHumRat, 'SimZoneAirUserDefined'))
 
-  SpecHumOut = Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%HumRat &
-               / (1.0d0 + Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%HumRat)
-  SpecHumIn  = Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%HumRat &
-              / (1.0d0 + Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(UserZoneAirHVAC(CompNum)%ZoneAir%OutletNodeNum)%HumRat 
+  SpecHumIn  = Node(UserZoneAirHVAC(CompNum)%ZoneAir%InletNodeNum)%HumRat 
   LatentOutputProvided = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s (dehumid = negative)
 
 
@@ -764,6 +763,7 @@ SUBROUTINE GetUserDefinedComponents
                                    IntGainTypeOf_AirTerminalUserDefined
   USE WaterManager,          ONLY: SetupTankDemandComponent, SetupTankSupplyComponent
   USE DataZoneEquipment,     ONLY: ZoneEquipConfig
+  USE GlobalNames,           ONLY: VerifyUniqueCoilName
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -809,6 +809,7 @@ SUBROUTINE GetUserDefinedComponents
   INTEGER  :: MgrCountTest
   INTEGER  :: CtrlZone   ! controlled zone do loop index
   INTEGER  :: SupAirIn   ! controlled zone supply air inlet index
+  LOGICAL  :: errflag
 
   cCurrentModuleObject = 'PlantComponent:UserDefined'
   CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
@@ -833,13 +834,13 @@ SUBROUTINE GetUserDefinedComponents
   !need to make sure GetEMSInput has run...
 
   cCurrentModuleObject = 'PlantComponent:UserDefined'
-  NumUserPlantComps = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumUserPlantComps = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumUserPlantComps > 0) THEN
     ALLOCATE(UserPlantComp(NumUserPlantComps))
     ALLOCATE(CheckUserPlantCompName(NumUserPlantComps))
     CheckUserPlantCompName = .TRUE.
     DO CompLoop =1, NumUserPlantComps
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
+      CALL GetObjectItem(cCurrentModuleObject, CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
              NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
              AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK = .FALSE.
@@ -1107,13 +1108,13 @@ SUBROUTINE GetUserDefinedComponents
   ENDIF
 
   cCurrentModuleObject = 'Coil:UserDefined'
-  NumUserCoils = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumUserCoils = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumUserCoils > 0) THEN
     ALLOCATE(UserCoil(NumUserCoils))
     ALLOCATE(CheckUserCoilName(NumUserCoils))
     CheckUserCoilName = .TRUE.
     DO CompLoop = 1, NumUserCoils
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
+      CALL GetObjectItem(cCurrentModuleObject, CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
              NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
              AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK = .FALSE.
@@ -1123,6 +1124,10 @@ SUBROUTINE GetUserDefinedComponents
         ErrorsFound = .TRUE.
         IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
       END IF
+      CALL VerifyUniqueCoilName(cCurrentModuleObject,cAlphaArgs(1),errflag,TRIM(cCurrentModuleObject)//' Name')
+      IF (errflag) THEN
+        ErrorsFound=.true.
+      ENDIF
       UserCoil(CompLoop)%Name =  cAlphaArgs(1)
 
       ! now get program manager for model simulations
@@ -1324,13 +1329,13 @@ SUBROUTINE GetUserDefinedComponents
   ENDIF
 
   cCurrentModuleObject = 'ZoneHVAC:ForcedAir:UserDefined'
-  NumUserZoneAir = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumUserZoneAir = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumUserZoneAir > 0) THEN
     ALLOCATE(UserZoneAirHVAC(NumUserZoneAir))
     ALLOCATE(CheckUserZoneAirName(NumUserZoneAir))
     CheckUserZoneAirName = .TRUE.
     DO  CompLoop=1, NumUserZoneAir
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
+      CALL GetObjectItem(cCurrentModuleObject, CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
              NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
              AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK = .FALSE.
@@ -1572,13 +1577,13 @@ SUBROUTINE GetUserDefinedComponents
   ENDIF
 
   cCurrentModuleObject = 'AirTerminal:SingleDuct:UserDefined'
-  NumUserAirTerminals = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumUserAirTerminals = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumUserAirTerminals > 0) THEN
     ALLOCATE(UserAirTerminal(NumUserAirTerminals))
     ALLOCATE(CheckUserAirTerminal(NumUserAirTerminals))
     CheckUserAirTerminal = .TRUE.
     DO  CompLoop=1, NumUserAirTerminals
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
+      CALL GetObjectItem(cCurrentModuleObject, CompLoop, cAlphaArgs, NumAlphas, rNumericArgs, &
              NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
              AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IsNotOK = .FALSE.
@@ -1618,7 +1623,7 @@ SUBROUTINE GetUserDefinedComponents
 
       UserAirTerminal(CompLoop)%AirLoop%InletNodeNum = &
              GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                         NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                         NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(4))
         !model input related internal variables
       CALL SetupEMSInternalVariable( 'Inlet Temperature for Primary Air Connection' , UserAirTerminal(CompLoop)%Name, &
                                      '[C]',      UserAirTerminal(CompLoop)%AirLoop%InletTemp )
@@ -1643,7 +1648,7 @@ SUBROUTINE GetUserDefinedComponents
                                       UserAirTerminal(CompLoop)%AirLoop%InletMassFlowRate)
       UserAirTerminal(CompLoop)%AirLoop%OutletNodeNum = &
              GetOnlySingleNode(cAlphaArgs(5),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                         NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                         NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(5))
       CALL SetupEMSActuator('Primary Air Connection', UserAirTerminal(CompLoop)%Name, &
                                       'Outlet Temperature', '[C]', lDummy, &
                                       UserAirTerminal(CompLoop)%AirLoop%OutletTemp )
@@ -1683,7 +1688,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(6) ) THEN
         UserAirTerminal(CompLoop)%SourceAir%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(6),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                           NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFieldNames(6))
           !model input related internal variables
         CALL SetupEMSInternalVariable( 'Inlet Temperature for Secondary Air Connection' , UserAirTerminal(CompLoop)%Name, &
                                        '[C]',      UserAirTerminal(CompLoop)%SourceAir%InletTemp )
@@ -1702,7 +1707,7 @@ SUBROUTINE GetUserDefinedComponents
       IF (.NOT. lAlphaFieldBlanks(7) ) THEN
         UserAirTerminal(CompLoop)%SourceAir%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(7),ErrorsFound,TRIM(cCurrentModuleObject),UserAirTerminal(CompLoop)%Name, &
-                           NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                           NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(7))
         CALL SetupEMSActuator('Secondary Air Connection', UserAirTerminal(CompLoop)%Name, &
                                         'Outlet Temperature', '[C]', lDummy, &
                                         UserAirTerminal(CompLoop)%SourceAir%OutletTemp )
@@ -1728,10 +1733,10 @@ SUBROUTINE GetUserDefinedComponents
           aArgCount = (ConnectionLoop-1) *  2 + 8
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%InletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Inlet, 1, ObjectIsNotParent,cAlphaFieldNames(aArgCount))
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%OutletNodeNum = &
                GetOnlySingleNode(cAlphaArgs(aArgCount + 1),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeType_Water, &
-               NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+               NodeConnectionType_Outlet, 1, ObjectIsNotParent,cAlphaFieldNames(aArgCount+1))
           CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(aArgCount),cAlphaArgs(aArgCount + 1),'Plant Nodes')
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%HowLoadServed = HowMet_NoneDemand
           UserAirTerminal(CompLoop)%Loop(ConnectionLoop)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
@@ -2725,6 +2730,29 @@ SUBROUTINE ReportAirTerminalUserDefined(CompNum)
 
 END SUBROUTINE ReportAirTerminalUserDefined
 
+!     NOTICE
+!
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
+!     and The Regents of the University of California through Ernest Orlando Lawrence
+!     Berkeley National Laboratory.  All rights reserved.
+!
+!     Portions of the EnergyPlus software package have been developed and copyrighted
+!     by other individuals, companies and institutions.  These portions have been
+!     incorporated into the EnergyPlus software package under license.   For a complete
+!     list of contributors, see "Notice" located in EnergyPlus.f90.
+!
+!     NOTICE: The U.S. Government is granted for itself and others acting on its
+!     behalf a paid-up, nonexclusive, irrevocable, worldwide license in this data to
+!     reproduce, prepare derivative works, and perform publicly and display publicly.
+!     Beginning five (5) years after permission to assert copyright is granted,
+!     subject to two possible five year renewals, the U.S. Government is granted for
+!     itself and others acting on its behalf a paid-up, non-exclusive, irrevocable
+!     worldwide license in this data to reproduce, prepare derivative works,
+!     distribute copies to the public, perform publicly and display publicly, and to
+!     permit others to do so.
+!
+!     TRADEMARKS: EnergyPlus is a trademark of the US Department of Energy.
+!
 
 END MODULE UserDefinedComponents
 

@@ -196,6 +196,7 @@ REAL(r64)    :: AnyZoneNotMetHeating = 0.0d0
 REAL(r64)    :: AnyZoneNotMetCooling = 0.0d0
 REAL(r64)    :: AnyZoneNotMetHeatingOccupied = 0.0d0
 REAL(r64)    :: AnyZoneNotMetCoolingOccupied = 0.0d0
+REAL(r64)    :: AnyZoneNotMetOccupied = 0.0d0
 !total time from beginning of simulation AnyZoneTimeNotSimpleASH55
 REAL(r64) :: TotalAnyZoneTimeNotSimpleASH55Summer = 0.0d0
 REAL(r64) :: TotalAnyZoneTimeNotSimpleASH55Winter = 0.0d0
@@ -205,6 +206,8 @@ REAL(r64)    :: TotalAnyZoneNotMetHeating = 0.0d0
 REAL(r64)    :: TotalAnyZoneNotMetCooling = 0.0d0
 REAL(r64)    :: TotalAnyZoneNotMetHeatingOccupied = 0.0d0
 REAL(r64)    :: TotalAnyZoneNotMetCoolingOccupied = 0.0d0
+REAL(r64)    :: TotalAnyZoneNotMetOccupied = 0.0d0
+REAL(r64),ALLOCATABLE,DIMENSION(:) :: ZoneOccHrs
 
 
 
@@ -227,7 +230,7 @@ PRIVATE CalcAngleFactorMRT
 
 CONTAINS
 
-SUBROUTINE ManageThermalComfort
+SUBROUTINE ManageThermalComfort(InitializeOnly)
 
           ! SUBROUTINE INFORMATION:
           !     AUTHOR         Rick Strand
@@ -250,7 +253,7 @@ SUBROUTINE ManageThermalComfort
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+  LOGICAL, INTENT(IN) :: InitializeOnly   ! when called from ZTPC and calculations aren't needed
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -277,6 +280,12 @@ SUBROUTINE ManageThermalComfort
       IF (ANY(People%AdaptiveCEN15251)) CEN15251Flag = .true.
     ENDIF
   END IF
+
+  IF (InitializeOnly) RETURN
+
+  IF (BeginEnvrnFlag) THEN
+    ZoneOccHrs=0.0d0
+  ENDIF
 
   IF (.not. DoingSizing .and. .not. WarmupFlag) THEN
     CALL CalcThermalComfortFanger
@@ -339,73 +348,75 @@ SUBROUTINE InitThermalComfort
 
   ALLOCATE (ThermalComfortData(TotPeople))
 
-
   DO Loop = 1, TotPeople
 
     CurrentGroupName = People(Loop)%Name
 
     ! CurrentModuleObject='People'
     IF (People(Loop)%Fanger) THEN
-      CALL SetupOutputVariable('FangerPMV []',ThermalComfortData(Loop)%FangerPMV, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Fanger Model PMV []',ThermalComfortData(Loop)%FangerPMV, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('FangerPPD []',ThermalComfortData(Loop)%FangerPPD, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Fanger Model PPD [%]',ThermalComfortData(Loop)%FangerPPD, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('Clothing Surface Temperature [C]',ThermalComfortData(Loop)%CloSurfTemp, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Clothing Surface Temperature [C]',ThermalComfortData(Loop)%CloSurfTemp, &
                                'Zone','State',People(Loop)%Name)
     END IF
 
     IF (People(Loop)%Pierce) THEN
-      CALL SetupOutputVariable('PiercePMVET []',ThermalComfortData(Loop)%PiercePMVET, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Pierce Model Effective Temperature PMV []', &
+                                ThermalComfortData(Loop)%PiercePMVET, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('PiercePMVSET []',ThermalComfortData(Loop)%PiercePMVSET, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Pierce Model Standard Effective Temperature PMV []', &
+                                ThermalComfortData(Loop)%PiercePMVSET, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('PierceDISC []',ThermalComfortData(Loop)%PierceDISC, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Pierce Model Discomfort Index []',ThermalComfortData(Loop)%PierceDISC, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('PierceTSENS []',ThermalComfortData(Loop)%PierceTSENS, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Pierce Model Thermal Sensation Index []', &
+                                ThermalComfortData(Loop)%PierceTSENS, &
                                'Zone','State',People(Loop)%Name)
     END IF
 
     IF (People(Loop)%Ksu) THEN
-      CALL SetupOutputVariable('KsuTSV []',ThermalComfortData(Loop)%KsuTSV, &
+      CALL SetupOutputVariable('Zone Thermal Comfort KSU Model Thermal Sensation Vote []',ThermalComfortData(Loop)%KsuTSV, &
                                'Zone','State',People(Loop)%Name)
     END IF
 
     IF ((People(Loop)%Fanger).OR.(People(Loop)%Pierce).OR.(People(Loop)%Ksu)) THEN
-      CALL SetupOutputVariable('ThermalComfortMRT [C]',ThermalComfortData(Loop)%ThermalComfortMRT, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Mean Radiant Temperature [C]',ThermalComfortData(Loop)%ThermalComfortMRT, &
                               'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('ThermalComfort Operative Temperature [C]',ThermalComfortData(Loop)%ThermalComfortOpTemp, &
+      CALL SetupOutputVariable('Zone Thermal Comfort Operative Temperature [C]',ThermalComfortData(Loop)%ThermalComfortOpTemp, &
                               'Zone','State',People(Loop)%Name)
     END IF
 
     IF (People(Loop)%AdaptiveASH55) THEN
-      CALL SetupOutputVariable('ASHRAE55AdaptiveComfort at 90% Acceptability Limits []', &
+      CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Adaptive Model 90% Acceptability Status []', &
                                ThermalComfortData(Loop)%ThermalComfortAdaptiveASH5590, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('ASHRAE55AdaptiveComfort at 80% Acceptability Limits []', &
+      CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Adaptive Model 80% Acceptability Status []', &
                                ThermalComfortData(Loop)%ThermalComfortAdaptiveASH5580, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('ASHRAE55 Running Mean Outdoor Temperature [C]', &
+      CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Adaptive Model Running Average Outdoor Air Temperature [C]', &
                                ThermalComfortData(Loop)%ASHRAE55RunningMeanOutdoorTemp, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('ASHRAE55 Adaptive Comfort Temperature [C]', &
+      CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Adaptive Model Temperature [C]', &
                                ThermalComfortData(Loop)%TComfASH55, &
                                'Zone','State',People(Loop)%Name)
     END IF
 
     IF (People(Loop)%AdaptiveCEN15251) THEN
-      CALL SetupOutputVariable('CEN15251AdaptiveComfort at Category I []', &
+      CALL SetupOutputVariable('Zone Thermal Comfort CEN 15251 Adaptive Model Category I Status []', &
                                ThermalComfortData(Loop)%ThermalComfortAdaptiveCEN15251CatI, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('CEN15251AdaptiveComfort at Category II []', &
+      CALL SetupOutputVariable('Zone Thermal Comfort CEN 15251 Adaptive Model Category II Status []', &
                                ThermalComfortData(Loop)%ThermalComfortAdaptiveCEN15251CatII, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('CEN15251AdaptiveComfort at Category III []', &
+      CALL SetupOutputVariable('Zone Thermal Comfort CEN 15251 Adaptive Model Category III Status []', &
                                ThermalComfortData(Loop)%ThermalComfortAdaptiveCEN15251CatIII, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('CEN15251 Running Mean Outdoor Temperature [C]', &
+      CALL SetupOutputVariable('Zone Thermal Comfort CEN 15251 Adaptive Model Running Average Outdoor Air Temperature [C]', &
                                ThermalComfortData(Loop)%CEN15251RunningMeanOutdoorTemp, &
                                'Zone','State',People(Loop)%Name)
-      CALL SetupOutputVariable('CEN15251 Adaptive Comfort Temperature [C]', &
+      CALL SetupOutputVariable('Zone Thermal Comfort CEN 15251 Adaptive Model Temperature [C]', &
                                ThermalComfortData(Loop)%TComfCEN15251, &
                                'Zone','State',People(Loop)%Name)
     END IF
@@ -423,44 +434,53 @@ SUBROUTINE InitThermalComfort
 
   ! CurrentModuleObject='Zone'
   DO Loop = 1, NumOfZones
-    CALL SetupOutputVariable('Time Not Comfortable Summer Clothes[hr]',ThermalComfortInASH55(Loop)%timeNotSummer, &
+    CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Simple Model Summer Clothes Not Comfortable Time [hr]', &
+                              ThermalComfortInASH55(Loop)%timeNotSummer, &
                               'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Time Not Comfortable Winter Clothes[hr]',ThermalComfortInASH55(Loop)%timeNotWinter, &
+    CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Simple Model Winter Clothes Not Comfortable Time [hr]', &
+                              ThermalComfortInASH55(Loop)%timeNotWinter, &
                               'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Time Not Comfortable Summer Or Winter Clothes[hr]',ThermalComfortInASH55(Loop)%timeNotEither, &
+    CALL SetupOutputVariable('Zone Thermal Comfort ASHRAE 55 Simple Model Summer or Winter Clothes Not Comfortable Time [hr]', &
+                              ThermalComfortInASH55(Loop)%timeNotEither, &
                               'Zone','Sum',Zone(Loop)%Name)
   END DO
-  CALL SetupOutputVariable('Time Not Comfortable Summer Clothes Any Zone[hr]',AnyZoneTimeNotSimpleASH55Summer, &
+  CALL SetupOutputVariable('Facility Thermal Comfort ASHRAE 55 Simple Model Summer Clothes Not Comfortable Time [hr]', &
+                            AnyZoneTimeNotSimpleASH55Summer, &
                               'Zone','Sum','Facility')
-  CALL SetupOutputVariable('Time Not Comfortable Winter Clothes Any Zone[hr]',AnyZoneTimeNotSimpleASH55Winter, &
+  CALL SetupOutputVariable('Facility Thermal Comfort ASHRAE 55 Simple Model Winter Clothes Not Comfortable Time [hr]', &
+                             AnyZoneTimeNotSimpleASH55Winter, &
                               'Zone','Sum','Facility')
-  CALL SetupOutputVariable('Time Not Comfortable Summer Or Winter Clothes Any Zone[hr]',AnyZoneTimeNotSimpleASH55Either, &
+  CALL SetupOutputVariable('Facility Thermal Comfort ASHRAE 55 Simple Model Summer or Winter Clothes Not Comfortable Time [hr]', &
+                             AnyZoneTimeNotSimpleASH55Either, &
                               'Zone','Sum','Facility')
 
   ALLOCATE (ThermalComfortSetpoint(NumOfZones))
   DO Loop = 1, NumOfZones
-    CALL SetupOutputVariable('Time Heating Setpoint Not Met[hr]',ThermalComfortSetpoint(Loop)%notMetHeating, &
+    CALL SetupOutputVariable('Zone Heating Setpoint Not Met Time [hr]',ThermalComfortSetpoint(Loop)%notMetHeating, &
                               'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Time Heating Setpoint Not Met While Occupied[hr]',  &
+    CALL SetupOutputVariable('Zone Heating Setpoint Not Met While Occupied Time [hr]',  &
                               ThermalComfortSetpoint(Loop)%notMetHeatingOccupied, &
                               'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Time Cooling Setpoint Not Met[hr]',ThermalComfortSetpoint(Loop)%notMetCooling, &
+    CALL SetupOutputVariable('Zone Cooling Setpoint Not Met Time [hr]',ThermalComfortSetpoint(Loop)%notMetCooling, &
                               'Zone','Sum',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Time Cooling Setpoint Not Met While Occupied[hr]',  &
+    CALL SetupOutputVariable('Zone Cooling Setpoint Not Met While Occupied Time [hr]',  &
                               ThermalComfortSetpoint(Loop)%notMetCoolingOccupied, &
                               'Zone','Sum',Zone(Loop)%Name)
   END DO
 
-  CALL SetupOutputVariable('Time Heating Setpoint Not Met Any Zone[hr]',AnyZoneNotMetHeating, &
+  CALL SetupOutputVariable('Facility Heating Setpoint Not Met Time [hr]',AnyZoneNotMetHeating, &
                               'Zone','Sum','Facility')
-  CALL SetupOutputVariable('Time Cooling Setpoint Not Met Any Zone[hr]',AnyZoneNotMetCooling, &
+  CALL SetupOutputVariable('Facility Cooling Setpoint Not Met Time [hr]',AnyZoneNotMetCooling, &
                               'Zone','Sum','Facility')
-  CALL SetupOutputVariable('Time Heating Setpoint Not Met While Occupied Any Zone[hr]',AnyZoneNotMetHeatingOccupied, &
+  CALL SetupOutputVariable('Facility Heating Setpoint Not Met While Occupied Time [hr]',AnyZoneNotMetHeatingOccupied, &
                               'Zone','Sum','Facility')
-  CALL SetupOutputVariable('Time Cooling Setpoint Not Met While Occupied Any Zone[hr]',AnyZoneNotMetCoolingOccupied, &
+  CALL SetupOutputVariable('Facility Cooling Setpoint Not Met While Occupied Time [hr]',AnyZoneNotMetCoolingOccupied, &
                               'Zone','Sum','Facility')
 
   CALL GetAngleFactorList
+
+  ALLOCATE(ZoneOccHrs(NumOfZones))
+  ZoneOccHrs=0.0d0
 
   RETURN
 
@@ -1681,7 +1701,7 @@ SUBROUTINE GetAngleFactorList
 
 
   cCurrentModuleObject='ComfortViewFactorAngles'
-  NumOfAngleFactorLists = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfAngleFactorLists = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(AngleFactorList(NumOfAngleFactorLists))
   AngleFactorList%Name              = Blank
   AngleFactorList%ZoneName          = Blank
@@ -1691,7 +1711,7 @@ SUBROUTINE GetAngleFactorList
 
     AllAngleFacSummed = 0.0
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                           AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2033,6 +2053,8 @@ END DO
 !loop through the zones and determine if in simple ashrae 55 comfort regions
 DO iZone = 1, NumOfZones
   IF (ThermalComfortInASH55(iZone)%ZoneIsOccupied) THEN
+    !keep track of occupied hours
+    ZoneOccHrs(iZone) = ZoneOccHrs(iZone) + TimeStepZone
     IF (IsZoneDV(iZone) .or. IsZoneUI(iZone)) THEN
       CurAirTemp = TCMF(iZone)
     ELSE
@@ -2182,6 +2204,10 @@ IF (EndDesignDayEnvrnsFlag) THEN
     CASE(ksRunPeriodWeather)
       CALL addFootNoteSubTable(pdstSimpleComfort,'Aggregated over the RunPeriods for Weather')
   END SELECT
+  !report number of occupied hours per week for LEED report
+  DO iZone = 1, NumOfZones
+    CALL PreDefTableEntry(pdchLeedSutHrsWeek,Zone(iZone)%Name,7 * 24 * (ZoneOccHrs(iZone)/ (NumOfDayInEnvrn * 24)))
+  END DO
 END IF
 END SUBROUTINE CalcThermalComfortSimpleASH55
 
@@ -2235,6 +2261,7 @@ LOGICAL :: testCooling
 ! was called for
 AnyZoneNotMetHeating = 0.0
 AnyZoneNotMetCooling = 0.0
+AnyZoneNotMetOccupied = 0.0
 AnyZoneNotMetHeatingOccupied = 0.0
 AnyZoneNotMetCoolingOccupied = 0.0
 DO iZone = 1, NumOfZones
@@ -2276,6 +2303,7 @@ DO iZone = 1, NumOfZones
         ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied = &
             ThermalComfortSetpoint(iZone)%totalNotMetHeatingOccupied + TimeStepZone
         IF (AnyZoneNotMetHeatingOccupied .EQ. 0.0) AnyZoneNotMetHeatingOccupied = TimeStepZone
+        IF (AnyZoneNotMetOccupied .EQ. 0.0) AnyZoneNotMetOccupied = TimeStepZone
       END IF
     END IF
   ELSEIF (testCooling .AND. (SensibleLoadPredictedNoAdj .LT. 0)) THEN !cooling
@@ -2294,6 +2322,7 @@ DO iZone = 1, NumOfZones
         ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied = &
             ThermalComfortSetpoint(iZone)%totalNotMetCoolingOccupied + TimeStepZone
         IF (AnyZoneNotMetCoolingOccupied .EQ. 0.0) AnyZoneNotMetCoolingOccupied = TimeStepZone
+        IF (AnyZoneNotMetOccupied .EQ. 0.0) AnyZoneNotMetOccupied = TimeStepZone
       END IF
     END IF
   ENDIF
@@ -2302,6 +2331,8 @@ TotalAnyZoneNotMetHeating = TotalAnyZoneNotMetHeating + AnyZoneNotMetHeating
 TotalAnyZoneNotMetCooling = TotalAnyZoneNotMetCooling + AnyZoneNotMetCooling
 TotalAnyZoneNotMetHeatingOccupied = TotalAnyZoneNotMetHeatingOccupied + AnyZoneNotMetHeatingOccupied
 TotalAnyZoneNotMetCoolingOccupied = TotalAnyZoneNotMetCoolingOccupied + AnyZoneNotMetCoolingOccupied
+TotalAnyZoneNotMetOccupied = TotalAnyZoneNotMetOccupied + AnyZoneNotMetOccupied
+
 !was EndEnvrnsFlag prior to CR7562
 IF (EndDesignDayEnvrnsFlag) THEN
   DO iZone = 1, NumOfZones
@@ -2317,6 +2348,7 @@ IF (EndDesignDayEnvrnsFlag) THEN
   !set value for ABUPS report
   TotalNotMetHeatingOccupiedForABUPS = TotalAnyZoneNotMetHeatingOccupied
   TotalNotMetCoolingOccupiedForABUPS = TotalAnyZoneNotMetCoolingOccupied
+  TotalNotMetOccupiedForABUPS = TotalAnyZoneNotMetOccupied
   !reset counters
   DO iZone = 1, NumOfZones
     ThermalComfortSetpoint(iZone)%totalNotMetHeating = 0.0
@@ -2842,7 +2874,7 @@ END SUBROUTINE CalcThermalComfortAdaptiveCEN15251
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

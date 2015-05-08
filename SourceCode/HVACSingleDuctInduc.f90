@@ -25,7 +25,7 @@ MODULE HVACSingleDuctInduc
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, &
-                           InitConvTemp, SysSizingCalc
+                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
                            SetupOutputVariable, ShowWarningMessage, ShowRecurringWarningErrorAtEnd, &
                            ShowContinueErrorTimeStamp
@@ -52,7 +52,7 @@ TYPE IndUnitData
   INTEGER                      :: SchedPtr            =0   ! index to schedule
   REAL(r64)                    :: MaxTotAirVolFlow    =0.0 ! m3/s (autosizable)
   REAL(r64)                    :: MaxTotAirMassFlow   =0.0 ! kg/s
-  REAL(r64)                    :: InducRatio          =0.0 ! ratio of induced air flow to primary air flow
+  REAL(r64)                    :: InducRatio          =2.5 ! ratio of induced air flow to primary air flow
   INTEGER                      :: PriAirInNode        =0   ! unit primary air inlet node number
   INTEGER                      :: SecAirInNode        =0   ! unit induced air inlet node number
   INTEGER                      :: OutAirNode          =0   ! unit air outlet node number
@@ -97,6 +97,8 @@ TYPE IndUnitData
   REAL(r64)                    :: MaxPriAirMassFlow   =0.0 ! kg/s
   REAL(r64)                    :: MaxSecAirMassFlow   =0.0 ! kg/s
   INTEGER                      :: ADUNum              =0   ! index of corresponding air distribution unit
+  REAL(r64)                    :: DesCoolingLoad      = 0.0 ! used for reporting during coil sizing
+  REAL(r64)                    :: DesHeatingLoad      = 0.0 ! used for reporting during coil sizing
 END TYPE IndUnitData
           ! MODULE VARIABLE DECLARATIONS:
 TYPE (IndUnitData), ALLOCATABLE, DIMENSION(:)         :: IndUnit
@@ -298,14 +300,14 @@ SUBROUTINE GetIndUnits
 
   ! find the number of each type of induction unit
   CurrentModuleObject = 'AirTerminal:SingleDuct:ConstantVolume:FourPipeInduction'
-  NumFourPipes = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumFourPipes = GetNumObjectsFound(CurrentModuleObject)
   NumIndUnits = NumFourPipes
   ! allocate the data structures
   ALLOCATE(IndUnit(NumIndUnits))
   ALLOCATE(CheckEquipName(NumIndUnits))
   CheckEquipName=.true.
 
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
@@ -323,7 +325,7 @@ SUBROUTINE GetIndUnits
   ! loop over Series PIUs; get and load the input data
   DO IUIndex = 1,NumFourPipes
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),IUIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,IUIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -339,30 +341,30 @@ SUBROUTINE GetIndUnits
     IndUnit(IUNum)%UnitType = TRIM(CurrentModuleObject)
     IndUnit(IUNum)%UnitType_Num = SingleDuct_CV_FourPipeInduc
     IndUnit(IUNum)%Sched = Alphas(2)
-    IndUnit(IUNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-    IF (IndUnit(IUNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      IndUnit(IUNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      IndUnit(IUNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (IndUnit(IUNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
              ' entered ='//TRIM(Alphas(2))// &
              ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     IndUnit(IUNum)%MaxTotAirVolFlow = Numbers(1)
     IndUnit(IUNum)%InducRatio       = Numbers(2)
+    IF (lNumericBlanks(2)) IndUnit(IUNum)%InducRatio = 2.5d0
 
     IndUnit(IUNum)%PriAirInNode = &
       GetOnlySingleNode(Alphas(3),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFields(3))
     IndUnit(IUNum)%SecAirInNode = &
       GetOnlySingleNode(Alphas(4),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFields(4))
     IndUnit(IUNum)%OutAirNode = &
       GetOnlySingleNode(Alphas(5),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                        NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFields(5))
 
     IndUnit(IUNum)%HCoilType = Alphas(8) ! type (key) of heating coil
     IF (SameString(IndUnit(IUNum)%HCoilType,'Coil:Heating:Water')) THEN
@@ -823,7 +825,7 @@ SUBROUTINE SizeIndUnit(IUNum)
               DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(ZoneSizThermSetPtLo(CurZoneEqNum) -   &
                                     TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatCoilInTempTU)
             END IF
-
+            IndUnit(IUNum)%DesHeatingLoad = DesCoilLoad
             Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidName, &
                                        60.d0, &
                                        PlantLoop(IndUnit(IUNum)%HWLoopNum)%FluidIndex, &
@@ -891,7 +893,7 @@ IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
               DesCoilLoad = CpAir*RhoAir*DesPriVolFlow*(TermUnitFinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTempTU   &
                                          - ZoneSizThermSetPtHi(CurZoneEqNum))
             END IF
-
+            IndUnit(IUNum)%DesCoolingLoad = DesCoilLoad
             Cp = GetSpecificHeatGlycol(PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidName, &
                                        5.0d0, &
                                        PlantLoop(IndUnit(IUNum)%CWLoopNum)%FluidIndex, &
@@ -936,6 +938,9 @@ IF (IndUnit(IUNum)%MaxVolColdWaterFlow == AutoSize) THEN
     ! save the max hot and cold water flows for use in coil sizing
     TermUnitSizing(CurZoneEqNum)%MaxHWVolFlow = IndUnit(IUNum)%MaxVolHotWaterFlow
     TermUnitSizing(CurZoneEqNum)%MaxCWVolFlow = IndUnit(IUNum)%MaxVolColdWaterFlow
+    ! save the design load used for reporting
+    TermUnitSizing(CurZoneEqNum)%DesCoolingLoad = IndUnit(IUNum)%DesCoolingLoad
+    TermUnitSizing(CurZoneEqNum)%DesHeatingLoad = IndUnit(IUNum)%DesHeatingLoad
     ! save the induction ratio for use in subsequent sizing calcs
     TermUnitSizing(CurZoneEqNum)%InducRat = IndUnit(IUNum)%InducRatio
     IF (SameString(IndUnit(IUNum)%HCoilType,'Coil:Heating:Water')) THEN
@@ -1487,7 +1492,7 @@ END FUNCTION FourPipeInductionUnitHasMixer
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

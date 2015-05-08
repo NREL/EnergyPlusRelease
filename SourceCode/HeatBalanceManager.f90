@@ -538,10 +538,10 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
    !Assign the values to the building data
 
    CurrentModuleObject='Building'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
 
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         ! Building Name (remove certain characters)
@@ -707,9 +707,9 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
    ! Above should be validated...
 
    CurrentModuleObject='SurfaceConvectionAlgorithm:Inside'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -760,7 +760,7 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
 
    !Get only the first (if more were input)
    CurrentModuleObject='SurfaceConvectionAlgorithm:Outside'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
    IF (NumObjects > 0) THEN
      CALL GetObjectItem('SurfaceConvectionAlgorithm:Outside',1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -823,9 +823,9 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
            'Outside Convection Algorithm,',A)
 
    CurrentModuleObject='HeatBalanceAlgorithm'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
      SELECT CASE (AlphaName(1))
@@ -853,6 +853,16 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
        CASE ('COMBINEDHEATANDMOISTUREFINITEELEMENT','HAMT')
          OverallHeatTransferSolutionAlgo = UseHAMT
          AlphaName(1)='HAMT - Combined Heat and Moisture Transfer Finite Element'
+         IF (NumOfTimeStepInHour < 20) THEN
+           CALL ShowSevereError('GetSolutionAlgorithm: '//TRIM(CurrentModuleObject)//' '//TRIM(cAlphaFieldNames(1))//  &
+              ' is Combined Heat and Moisture Finite Element but Number of TimeSteps in Hour < 20, Value is '//   &
+              TRIM(RoundSigDigits(NumOfTimeStepInHour))//'.')
+           CALL ShowContinueError('...Suggested minimum number of time steps in hour for '//  &
+                  'Combined Heat and Moisture Finite Element solutions is 20.'//  &
+                  ' Errors or inaccurate calculations may occur.')
+           CALL ShowContinueError('...If the simulation crashes, look at material properties (esp porosity), '//  &
+                  'use timestep=60, or less layers in your constructions.')
+         ENDIF
 
        CASE DEFAULT
          OverallHeatTransferSolutionAlgo = UseCTF
@@ -895,10 +905,10 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
 
 
    CurrentModuleObject='Compliance:Building'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
 
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         ! Building Rotation for Appendix G
@@ -907,9 +917,9 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
 
    ! A new object is added by L. Gu, 12/09
    CurrentModuleObject='ZoneAirHeatBalanceAlgorithm'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
      If (NumAlpha > 0) Then
@@ -944,9 +954,9 @@ SUBROUTINE GetProjectControlData(ErrorsFound)
 
    ! A new object is added by L. Gu, 06/10
    CurrentModuleObject='ZoneAirContaminantBalance'
-   NumObjects=GetNumObjectsFound(TRIM(CurrentModuleObject))
+   NumObjects=GetNumObjectsFound(CurrentModuleObject)
    IF (NumObjects > 0) THEN
-     CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
+     CALL GetObjectItem(CurrentModuleObject,1,AlphaName,NumAlpha,BuildingNumbers,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
      If (NumAlpha > 0) Then
@@ -1066,10 +1076,10 @@ SUBROUTINE GetSiteAtmosphereData(ErrorsFound)
 
      ! FLOW:
   CurrentModuleObject='Site:HeightVariation'
-  NumObjects = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumObjects = GetNumObjectsFound(CurrentModuleObject)
 
   IF (NumObjects == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,AlphArray,NumAlphas,NumArray,NumNums,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,AlphArray,NumAlphas,NumArray,NumNums,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1235,7 +1245,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,RegMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1298,10 +1308,10 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
     Material(MaterNum)%Group=RegularMaterial
     Material(MaterNum)%Name = '~FC_Concrete'
-    Material(MaterNum)%Thickness     = 0.15d0
-    Material(MaterNum)%Conductivity  = 1.95d0
-    Material(MaterNum)%Density       = 2240.0d0
-    Material(MaterNum)%SpecHeat      = 900.0d0
+    Material(MaterNum)%Thickness     = 0.15d0       ! m, 0.15m = 6 inches
+    Material(MaterNum)%Conductivity  = 1.95d0       ! W/mK
+    Material(MaterNum)%Density       = 2240.0d0     ! kg/m3
+    Material(MaterNum)%SpecHeat      = 900.0d0      ! J/kgK
     Material(MaterNum)%Roughness = MediumRough
     Material(MaterNum)%AbsorpSolar = 0.7d0
     Material(MaterNum)%AbsorpThermal = 0.9d0
@@ -1316,7 +1326,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,RegRMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1385,7 +1395,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,AirMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1416,7 +1426,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,IRTMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1473,7 +1483,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,W5GlsMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1513,6 +1523,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
 
     IF (Material(MaterNum)%Conductivity > 0.0) THEN
       NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
+      Material(MaterNum)%Resistance = NominalR(MaterNum)
     ELSE
       ErrorsFound = .true.
       CALL ShowSevereError('Window glass material ' //Trim(Material(MaterNum)%Name)// &
@@ -1691,7 +1702,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,W5GlsMatAlt
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1743,7 +1754,10 @@ SUBROUTINE GetMaterialData(ErrorsFound)
     IF(MaterialProps(9) == 0.0) Material(MaterNum)%GlassTransDirtFactor = 1.0
     Material(MaterNum)%AbsorpThermal       = Material(MaterNum)%AbsorpThermalBack
 
-    IF (Material(MaterNum)%Conductivity > 0.0) NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
+    IF (Material(MaterNum)%Conductivity > 0.0) THEN
+      NominalR(MaterNum)=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
+      Material(MaterNum)%Resistance = NominalR(MaterNum)
+    ENDIF
 
     Material(MaterNum)%GlassSpectralDataPtr = 0
 
@@ -1773,7 +1787,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,W5GasMat
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1882,7 +1896,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,W5GasMatMixture
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,cAlphaArgs,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,cAlphaArgs,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1953,7 +1967,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,TotShades
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2024,7 +2038,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,TotScreens
 
     !Call GetObjectItem routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2197,7 +2211,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,TotBlinds
 
     !Call Input Get routine to retrieve material data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2463,7 +2477,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   DO Loop=1,EcoRoofMat
     !Call Input Get Routine to retrieve material data from ecoroof
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha,MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2532,14 +2546,14 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   ! Thermochromic glazing group
   ! get the number of WindowMaterial:GlazingGroup:Thermochromic objects in the idf file
   CurrentModuleObject='WindowMaterial:GlazingGroup:Thermochromic'
-  TotTCGlazings = GetNumObjectsFound(Trim(CurrentModuleObject))
+  TotTCGlazings = GetNumObjectsFound(CurrentModuleObject)
   IF (TotTCGlazings >=1) THEN
     ! Read TC glazings
     ALLOCATE (TCGlazings(TotTCGlazings))
 
     DO Loop = 1, TotTCGlazings
       !Get each TCGlazings from the input processor
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,cAlphaArgs,MaterialNumAlpha,rNumericArgs,MaterialNumProp,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,Loop,cAlphaArgs,MaterialNumAlpha,rNumericArgs,MaterialNumProp,IOSTAT, &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2605,7 +2619,7 @@ SUBROUTINE GetMaterialData(ErrorsFound)
   cCurrentModuleObject='WindowMaterial:SimpleGlazingSystem'
   DO Loop=1, TotSimpleWindow
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject), Loop, cAlphaArgs, MaterialNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject, Loop, cAlphaArgs, MaterialNumAlpha, &
                       rNumericArgs, MaterialNumProp,IOSTAT,     &
                       AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2751,7 +2765,7 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
   REAL(r64)    :: Tau,RhoF,RhoB     ! Transmittance, front reflectance, back reflectance
 
   CurrentModuleObject='MaterialProperty:GlazingSpectralData'
-  TotSpectralData=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotSpectralData=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE (SpectralData(TotSpectralData))
   IF (TotSpectralData > 0) ALLOCATE(SpecDataProps(MaxSpectralDataElements*4))
 
@@ -2761,7 +2775,7 @@ SUBROUTINE GetWindowGlassSpectralData(ErrorsFound)
     ! Name is followed by up to 450 sets of normal-incidence measured values of
     ! [wavelength (microns), transmittance, front reflectance, back reflectance] for
     ! wavelengths covering the short-wave solar spectrum (from about 0.25 to 2.5 microns)
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,SpecDataNames,SpecDataNumAlpha,SpecDataProps,SpecDataNumProp,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,SpecDataNames,SpecDataNumAlpha,SpecDataProps,SpecDataNumProp,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3039,7 +3053,7 @@ SUBROUTINE GetConstructData(ErrorsFound)
   DO Loop = 1, TotRegConstructs ! Loop through all constructs in the input...
 
       !Get the object names for each construction from the input processor
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3134,7 +3148,7 @@ SUBROUTINE GetConstructData(ErrorsFound)
   DO Loop = 1, TotSourceConstructs  ! Loop through all constructs with sources in the input...
 
       !Get the object names for each construction from the input processor
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3233,7 +3247,7 @@ SUBROUTINE GetConstructData(ErrorsFound)
                                      ! from the Window5 data file and can be referenced only by windows
 
       !Get the object names for each construction from the input processor
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3412,7 +3426,7 @@ SUBROUTINE GetZoneData(ErrorsFound)
   LOGICAL :: IsBlank
 
   cCurrentModuleObject='Zone'
-  NumOfZones=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfZones=GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(Zone(NumOfZones))
 
@@ -3423,7 +3437,7 @@ SUBROUTINE GetZoneData(ErrorsFound)
   DO Loop=1,NumOfZones
 
     rNumericArgs=0.0       ! Zero out just in case
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     TMP=INDEX(cAlphaArgs(1),CHAR(1))
@@ -3559,11 +3573,11 @@ SUBROUTINE GetZoneData(ErrorsFound)
     END IF
 
     ! Zone outdoor environmental variables, used for zone infiltration/ventilation
-    CALL SetupOutputVariable('Zone Outdoor Dry Bulb [C]',Zone(ZoneLoop)%OutDryBulbTemp, &
+    CALL SetupOutputVariable('Zone Outdoor Air Drybulb Temperature [C]',Zone(ZoneLoop)%OutDryBulbTemp, &
                                'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Outdoor Wet Bulb [C]',Zone(ZoneLoop)%OutWetBulbTemp, &
+    CALL SetupOutputVariable('Zone Outdoor Air Wetbulb Temperature [C]',Zone(ZoneLoop)%OutWetBulbTemp, &
                                'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Outdoor Wind Speed [m/s]',Zone(ZoneLoop)%WindSpeed, &
+    CALL SetupOutputVariable('Zone Outdoor Air Wind Speed [m/s]',Zone(ZoneLoop)%WindSpeed, &
                                'Zone','Average',Zone(ZoneLoop)%Name)
   END DO ! Loop
 
@@ -3579,14 +3593,14 @@ SUBROUTINE GetZoneData(ErrorsFound)
 
   ! Get ZONE LIST objects
   cCurrentModuleObject='ZoneList'
-  NumOfZoneLists = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfZoneLists = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOfZoneLists > 0) THEN
 
     ALLOCATE(ZoneList(NumOfZoneLists))
 
     DO ListNum = 1, NumOfZoneLists
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),ListNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(cCurrentModuleObject,ListNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3600,7 +3614,6 @@ SUBROUTINE GetZoneData(ErrorsFound)
       END IF
 
       ZoneList(ListNum)%Name = cAlphaArgs(1)
-
       IF (FindItemInList(ZoneList(ListNum)%Name,Zone%Name,NumOfZones) > 0) THEN
         CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
            '":  is a duplicate of a zone name.')
@@ -3619,6 +3632,7 @@ SUBROUTINE GetZoneData(ErrorsFound)
 
         DO ZoneNum = 1, ZoneList(ListNum)%NumOfZones
           ZoneName = cAlphaArgs(ZoneNum + 1)
+          ZoneList(ListNum)%MaxZoneNameLength=MAX(ZoneList(ListNum)%MaxZoneNameLength,len_trim(ZoneName))
           ZoneList(ListNum)%Zone(ZoneNum) = FindItemInList(ZoneName,Zone%Name,NumOfZones)
           IF (ZoneList(ListNum)%Zone(ZoneNum) == 0) THEN
             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'":  '//  &
@@ -3643,13 +3657,13 @@ SUBROUTINE GetZoneData(ErrorsFound)
 
   ! Get ZONE GROUP objects
   cCurrentModuleObject='ZoneGroup'
-  NumOfZoneGroups = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfZoneGroups = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOfZoneGroups > 0) THEN
     ALLOCATE(ZoneGroup(NumOfZoneGroups))
 
     DO GroupNum = 1, NumOfZoneGroups
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),GroupNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(cCurrentModuleObject,GroupNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -3749,7 +3763,8 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
   USE ConductionTransferFunctionCalc
   USE WindowManager
   USE SolarShading
-  USE DaylightingDevices, ONLY: InitDaylightingDevices
+  USE DaylightingDevices,  ONLY: InitDaylightingDevices
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
 !  USE DataRoomAirModel, ONLY: IsZoneDV,IsZoneCV,HVACMassFlow, ZoneDVMixedFlag
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
@@ -3785,7 +3800,7 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
     CALL InitGlassOpticalCalculations ! Initialize the window optical properties
     CALL InitDaylightingDevices ! Initialize any daylighting devices
     CALL DisplayString('Initializing Solar Calculations')
-    CALL InitSolarCalculations ! Perform the shadowing calculations
+    CALL InitSolarCalculations ! Initialize the shadowing calculations
 
   END IF
 
@@ -3843,8 +3858,14 @@ SUBROUTINE InitHeatBalance  ! Heat Balance Initialization Manager
         MinTempZone=1000.d0
       END IF
     END IF
-    CALL PerformSolarCalculations
+    IF (.NOT. DetailedSolarTimestepIntegration) THEN
+      CALL PerformSolarCalculations
+    ENDIF
   END IF
+
+  IF (DetailedSolarTimestepIntegration) THEN ! always redo solar calcs
+    CALL PerformSolarCalculations
+  ENDIF
 
   RETURN
 
@@ -4607,7 +4628,7 @@ SUBROUTINE GetFrameAndDividerData(ErrorsFound)
   LOGICAL :: IsBlank
 
   CurrentModuleObject='WindowProperty:FrameAndDivider'
-  TotFrameDivider=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  TotFrameDivider=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE (FrameDivider(TotFrameDivider))
   IF(TotFrameDivider == 0) RETURN
 
@@ -4616,7 +4637,7 @@ SUBROUTINE GetFrameAndDividerData(ErrorsFound)
   DO Loop=1,TotFrameDivider
 
     !Call Input Get routine to retrieve frame/divider data
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,FrameDividerNames,FrameDividerNumAlpha, &
+    CALL GetObjectItem(CurrentModuleObject,Loop,FrameDividerNames,FrameDividerNumAlpha, &
                        FrameDividerProps,FrameDividerNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -5829,6 +5850,8 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
   LOGICAL, INTENT(INOUT) :: ErrorsFound ! If errors found in input
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
+
+   ! ASHRAE Handbook Fundamental 2005
    !Thermal resistance of the inside air film, m2.K/W. Average of 0.14 (heat flow up) and 0.11 (heat flow down)
   REAL(r64),PARAMETER :: Rfilm_in = 0.125d0
     !Thermal resistance of the outside air film used in calculating the Ffactor, m2.K/W. 0.17/5.678
@@ -5881,7 +5904,7 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
   DO Loop = 1, TotFfactorConstructs
 
       !Get the object names for each construction from the input processor
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -5938,13 +5961,14 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
     Construct(ConstrNum)%LayerPoint(1) = MaterNum
 
     ! Calculate the thermal resistance of the fictitious insulation layer
+    ! effective thermal resistance excludes inside and outside air films
     IF (PerimeterExposed > 0.0) THEN
-      Reff = Area / (PerimeterExposed * Ffactor)
+      Reff = Area / (PerimeterExposed * Ffactor) - Rfilm_in - Rfilm_out
     ELSE  ! PerimeterExposed = 0 for underground floor, assume R-1000 (IP)
       Reff = 177
     ENDIF
 
-    Rfic = Reff - Rfilm_in - Rfilm_out - Rcon
+    Rfic = Reff - Rcon
     IF (Rfic <=0 ) THEN
       CALL ShowSevereError(CurrentModuleObject // '="' //Trim(ConstructAlphas(1))// &
       '" has calculated R value <= 0.0, must be > 0.0.')
@@ -5954,7 +5978,10 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
 
     Material(MaterNum)%Resistance = Rfic
     NominalR(MaterNum) = Rfic
-    NominalU(ConstrNum) = NominalU(ConstrNum) + Reff
+
+    !excluding thermal resistance of inside or outside air film
+    ! 1/Reff gets reported as the "U-Factor no Film" in the summary report Envelope Summary | Opaque Exterior
+    NominalU(ConstrNum) = Reff
   END DO
 
   ! Then create underground wall constructions defined with C factor method if any
@@ -5963,7 +5990,7 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
   DO Loop = 1, TotCfactorConstructs ! Loop through all constructs defined with Ffactor method
 
       !Get the object names for each construction from the input processor
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
+    CALL GetObjectItem(CurrentModuleObject,Loop,ConstructAlphas,ConstructNumAlpha,DummyProps,DummyNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6010,14 +6037,16 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
     MaterNum = FindIteminList('~FC_Insulation_' // RoundSigDigits(Loop+TotFfactorConstructs,0),Material%Name,TotMaterials)
     Construct(ConstrNum)%LayerPoint(1) = MaterNum
 
-    IF (Height <= 0.305d0) THEN      ! 1 ft
-      Rsoilequ = 4.88d0
-    ELSEIF (Height >= 3.048d0) THEN  ! 10 ft
-      Rsoilequ = 34.64d0
-    ELSE  ! regression from ASHRAE 90.1-2007 TABLE C6.10.1 Effective R-Value of Soil, R2 = 0.9972
-      Rsoilequ = 2.592d0 + 10.736d0 * Height
+! CR 8886 Rsoil should be in SI unit. From ASHRAE 90.1-2010 SI
+    IF (Height <= 0.25d0) THEN
+      Rsoilequ = 0.12d0  !m2K/W
+    ELSEIF (Height >= 2.5d0) THEN
+      Rsoilequ = 0.92d0
+    ELSE  ! regression from ASHRAE 90.1-2010 SI TABLE C6.10.1 Effective R-Value of Soil, R2 = 0.9967
+      Rsoilequ = 0.0607 + 0.3479*Height
     ENDIF
 
+    ! effective thermal resistance excludes inside and outside air films
     Reff = 1.0d0/Cfactor + Rsoilequ    ! Cfactor does not include air films
 
     Rfic = Reff - Rcon
@@ -6030,7 +6059,10 @@ SUBROUTINE CreateFCfactorConstructions(ConstrNum,ErrorsFound)
 
     Material(MaterNum)%Resistance = Rfic
     NominalR(MaterNum) = Rfic
-    NominalU(ConstrNum) = NominalU(ConstrNum) + Reff
+
+    !Reff includes the wall itself and soil, but excluding thermal resistance of inside or outside air film
+    ! 1/Reff gets reported as the "U-Factor no Film" in the summary report Envelope Summary | Opaque Exterior
+    NominalU(ConstrNum) = Reff
   END DO
 
   RETURN
@@ -6234,6 +6266,7 @@ SUBROUTINE SetupSimpleWindowGlazingSystem(MaterNum)
   Material(MaterNum)%Conductivity = Material(MaterNum)%Thickness / Rlw
   IF (Material(MaterNum)%Conductivity > 0.0) THEN
     NominalR(MaterNum) = Rlw
+    Material(MaterNum)%Resistance = Rlw
   ELSE
     ErrorsFound = .true.
     CALL ShowSevereError('WindowMaterial:SimpleGlazingSystem: ' //Trim(Material(MaterNum)%Name)// &
@@ -6401,10 +6434,10 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
 
   !Reading WindowGap:SupportPillar
   cCurrentModuleObject = 'WindowGap:SupportPillar'
-  W7SupportPillars = GetNumObjectsFound(TRIM(cCurrentModuleObject));
+  W7SupportPillars = GetNumObjectsFound(cCurrentModuleObject);
   ALLOCATE (SupportPillar(W7SupportPillars))
   DO Loop=1,W7SupportPillars
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6414,7 +6447,7 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),SupportPillar%Name,Loop,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All WindowGap:SupportPillar names must be unique.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
       CYCLE
@@ -6439,10 +6472,10 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
 
   !Reading WindowGap:DeflectionState
   cCurrentModuleObject = 'WindowGap:DeflectionState'
-  W7DeflectionStates = GetNumObjectsFound(TRIM(cCurrentModuleObject));
+  W7DeflectionStates = GetNumObjectsFound(cCurrentModuleObject);
   ALLOCATE (DeflectionState(W7DeflectionStates))
   DO Loop=1,W7DeflectionStates
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6452,7 +6485,7 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),DeflectionState%Name,Loop,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All WindowGap:DeflectionState names must be unique.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
       CYCLE
@@ -6467,11 +6500,13 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     END IF
   ENDDO
 
+  !Reading WindowMaterial:Gap
+
   cCurrentModuleObject = 'WindowMaterial:Gap'
-  W7MaterialGaps = GetNumObjectsFound(TRIM(cCurrentModuleObject));
+  W7MaterialGaps = GetNumObjectsFound(cCurrentModuleObject);
   !!ALLOCATE (DeflectionState(W7DeflectionStates))
   DO Loop=1,W7MaterialGaps
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6481,7 +6516,7 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
       ! Verify unique names
     CALL VerifyName(cAlphaArgs(1),Material%Name,MaterNum-1,IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
     IF (IsNotOK) THEN
-      CALL ShowContinueError('...All WindowGap:DeflectionState names must be unique.')
+      CALL ShowContinueError('...All Material names must be unique regardless of subtype.')
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'", Illegal value.')
       ErrorsFound=.true.
       CYCLE
@@ -6522,18 +6557,16 @@ SUBROUTINE SetupComplexFenestrationMaterialInput(MaterNum,ErrorsFound)
     END IF
   ENDDO
 
-  !Reading WindowMaterial:Gap
-
   !Reading WindowMaterial:ComplexShade
   cCurrentModuleObject = 'WindowMaterial:ComplexShade'
-  TotComplexShades=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotComplexShades=GetNumObjectsFound(cCurrentModuleObject)
 
   IF(TotComplexShades > 0) THEN
     ALLOCATE (ComplexShade(TotComplexShades))! Allocate the array Size to the number of complex shades
   ENDIF
 
   DO Loop=1,TotComplexShades
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                  AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                  AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -6805,11 +6838,11 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
   !Reading WindowThermalModel:Params
   cCurrentModuleObject = 'WindowThermalModel:Params'
-  TotThermalModels =  GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotThermalModels =  GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(WindowThermalModel(TotThermalModels))
 
   DO Loop = 1, TotThermalModels
-    CALL GetObjectItem(TRIM(cCurrentModuleObject), Loop, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers , IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject, Loop, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers , IOStatus, &
              NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames )
     IsNotOK=.FALSE.
     IsBlank=.FALSE.
@@ -6912,7 +6945,7 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
   !Reading Construction:ComplexFenestrationState
   locCurrentModuleObject = 'Construction:ComplexFenestrationState'
-  TotComplexFenStates =  GetNumObjectsFound(TRIM(locCurrentModuleObject))
+  TotComplexFenStates =  GetNumObjectsFound(locCurrentModuleObject)
 
   call GetObjectDefMaxArgs(locCurrentModuleObject, TotalArgs, NumAlphas, NumNumbers)
   if (.not. allocated(locAlphaFieldNames)) allocate(locAlphaFieldNames(NumAlphas))
@@ -6924,7 +6957,7 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
   FirstBSDF=ConstrNum+1    ! Location of first BSDF construction input (They will be consecutive)
   DO Loop = 1, TotComplexFenStates
-    CALL GetObjectItem(TRIM(locCurrentModuleObject), Loop, locAlphaArgs, NumAlphas, locNumericArgs, NumNumbers , IOStatus, &
+    CALL GetObjectItem(locCurrentModuleObject, Loop, locAlphaArgs, NumAlphas, locNumericArgs, NumNumbers , IOStatus, &
              NumBlank=locNumericFieldBlanks,AlphaFieldnames=locAlphaFieldNames,NumericFieldNames=locNumericFieldNames )
     ConstrNum = ConstrNum + 1
         IsNotOK=.FALSE.
@@ -7237,7 +7270,7 @@ END SUBROUTINE SetupComplexFenestrationStateInput
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

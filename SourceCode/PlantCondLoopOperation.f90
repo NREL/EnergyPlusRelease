@@ -259,7 +259,7 @@ SUBROUTINE ManagePlantLoadDistribution(LoopNum,LoopSideNum, BranchNum, CompNum, 
     IF (CurListNum > 0)THEN
       IF (PlantLoop(LoopNum)%Opscheme(CurSchemePtr)%EquipList(ListPtr)%NumComps .GT. 0) THEN
         CALL TurnOnPlantLoopPipes(LoopNum, LoopSideNum)
-        CALL DistributePlantLoad(LoopNum, LoopSideNum,CurSchemePtr,ListPtr,LoopDemand,RemLoopDemand, FirstHVACIteration)
+        CALL DistributePlantLoad(LoopNum, LoopSideNum,CurSchemePtr,ListPtr,LoopDemand,RemLoopDemand)
         IF(PRESENT(LoadDistributionWasPerformed)) LoadDistributionWasPerformed = .TRUE.
       ENDIF
     ENDIF
@@ -338,7 +338,7 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
 
   ! get number of operation schemes
   CurrentModuleObject ='PlantEquipmentOperationSchemes'
-  NumPlantOpSchemes  = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumPlantOpSchemes  = GetNumObjectsFound(CurrentModuleObject)
 
   IF (NumPlantOpSchemes > 0) THEN
   ! OpSchemeListNames is used to determine if there are any duplicate operation scheme names
@@ -346,7 +346,7 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
     OpSchemeNames=' '
     Num=0
     DO OpNum=1,NumPlantOpSchemes
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OpNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,OpNum,cAlphaArgs,NumAlphas, &
                      rNumericArgs,NumNums,IOSTAT)
       IsNotOK=.false.
       IsBlank=.false.
@@ -364,7 +364,7 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
   END IF
 
   CurrentModuleObject ='CondenserEquipmentOperationSchemes'
-  NumCondOpSchemes  = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCondOpSchemes  = GetNumObjectsFound(CurrentModuleObject)
 
   IF (NumCondOpSchemes > 0) THEN
   ! OpSchemeListNames is used to determine if there are any duplicate operation scheme names
@@ -372,7 +372,7 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
     OpSchemeNames=' '
     Num=0
     DO OpNum=1,NumCondOpSchemes
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OpNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,OpNum,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNums,IOSTAT)
       IsNotOK=.false.
       IsBlank=.false.
@@ -401,7 +401,7 @@ SUBROUTINE GetPlantOperationInput(GetInputOK)
     END IF
     OpNum=GetObjectItemNum(TRIM(CurrentModuleObject),PlantOpSchemeName)
     IF (OpNum > 0) THEN
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OpNum,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,OpNum,cAlphaArgs,NumAlphas, &
                      rNumericArgs,NumNums,IOSTAT, NumBlank=lNumericFieldBlanks, NumericFieldNames=cNumericFieldNames, &
                      AlphaBlank=lAlphaFieldBlanks,AlphaFieldNames=cAlphaFieldNames)
       PlantLoop(LoopNum)%NumOpSchemes  = (NumAlphas - 1)/3
@@ -610,7 +610,7 @@ SUBROUTINE GetOperationSchemeInput
      CALL ShowFatalError('Error in control scheme identification')
    ENDIF
 
-   CALL GetObjectItem(TRIM(CurrentModuleObject),Count,cAlphaArgs,NumAlphas, &
+   CALL GetObjectItem(CurrentModuleObject,Count,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT)
    IsNotOK=.false.
    IsBlank=.false.
@@ -639,7 +639,7 @@ SUBROUTINE GetOperationSchemeInput
      CurrentModuleObject ='CondenserEquipmentList'
      Count = Num-PeLists
    ENDIF
-   CALL GetObjectItem(TRIM(CurrentModuleObject),Count,cAlphaArgs,NumAlphas, &
+   CALL GetObjectItem(CurrentModuleObject,Count,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT)
      IsNotOK=.false.
      IsBlank=.false.
@@ -787,7 +787,7 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
   SchemeNameFound = .TRUE.
 
 ! Determine max number of alpha and numeric arguments for all objects being read, in order to allocate local arrays
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNums)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNums)
 
   ALLOCATE(AlphArray(NumAlphas))
   AlphArray=' '
@@ -810,9 +810,9 @@ SUBROUTINE FindRangeBasedOrUncontrolledInput(CurrentModuleObject,NumSchemes,Loop
 
   IF (NumSchemes .GT. 0) THEN
     DO Num = 1, NumSchemes
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Num, &
+      CALL GetObjectItem(CurrentModuleObject,Num, &
                         AlphArray,NumAlphas,NumArray,NumNums,IOSTAT)
-      IF(SameString(TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name),TRIM(AlphArray(1))))EXIT
+      IF(SameString(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name,AlphArray(1))) EXIT
       IF (Num == NumSchemes) THEN
         CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                              '", could not find '// &
@@ -963,7 +963,7 @@ SUBROUTINE FindDeltaTempRangeInput(CurrentModuleObject,NumSchemes,LoopNum,Scheme
   SchemeNameFound = .TRUE.
 
 ! Determine max number of alpha and numeric arguments for all objects being read, in order to allocate local arrays
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNums)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNums)
 
   ALLOCATE(AlphArray(NumAlphas))
   AlphArray=' '
@@ -986,9 +986,9 @@ SUBROUTINE FindDeltaTempRangeInput(CurrentModuleObject,NumSchemes,LoopNum,Scheme
 
   IF (NumSchemes .GT. 0) THEN
     DO Num = 1, NumSchemes
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Num, &
+      CALL GetObjectItem(CurrentModuleObject,Num, &
                         AlphArray,NumAlphas,NumArray,NumNums,IOSTAT)
-      IF(SameString(TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name),TRIM(AlphArray(1))))EXIT
+      IF(SameString(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name,AlphArray(1))) EXIT
       IF (Num == NumSchemes) THEN
         CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                              '", could not find '// &
@@ -1114,7 +1114,7 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
         CurrentModuleObject = 'PlantEquipmentList'
         DO Num = 1,PELists
           iIndex = Num
-          CALL GetObjectItem(TRIM(CurrentModuleObject),Num,cAlphaArgs,NumAlphas, &
+          CALL GetObjectItem(CurrentModuleObject,Num,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1153,7 +1153,7 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
         CurrentModuleObject = 'CondenserEquipmentList'
         DO Num = 1,CELists
           iIndex = Num + PELists
-          CALL GetObjectItem(TRIM(CurrentModuleObject),Num,cAlphaArgs,NumAlphas, &
+          CALL GetObjectItem(CurrentModuleObject,Num,cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1198,7 +1198,7 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
   FoundIntendedList = .FALSE.
   ! find name in set of possible list
   DO Num = 1, TotNumLists
-    IF(SameString(TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%name), TRIM(EquipListsNameList(Num)))) THEN
+    IF(SameString(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(ListNum)%name, EquipListsNameList(Num))) THEN
       FoundIntendedList = .TRUE.
       ! get object item for real this time
       SELECT CASE (EquipListsTypeList(num))
@@ -1207,7 +1207,7 @@ SUBROUTINE LoadEquipList(LoopNum,SchemeNum,ListNum,ErrorsFound)
       CASE (LoopType_Condenser)
         CurrentModuleObject = 'CondenserEquipmentList'
       END SELECT
-      CALL GetObjectItem(TRIM(CurrentModuleObject),EquipListsIndexList(Num),cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(CurrentModuleObject,EquipListsIndexList(Num),cAlphaArgs,NumAlphas, &
                            rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1236,7 +1236,7 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher
           !       DATE WRITTEN   July 2010
-          !       MODIFIED       na
+          !       MODIFIED       B. Griffith, check setpoint nodes have setpoint managers on EMS on them.
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -1257,7 +1257,9 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
   USE DataSizing
   USE DataIPShortCuts
   USE ReportSizingManager, ONLY: ReportSizingOutput
-
+  USE DataGlobals,         ONLY: AnyEnergyManagementSystemInModel
+  USE EMSManager ,         ONLY: CheckIfNodeSetpointManagedByEMS, iTemperatureSetpoint, &
+                                 iTemperatureMinSetpoint, iTemperatureMaxSetpoint
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1286,7 +1288,7 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
   INTEGER :: Num
   CHARACTER(len=MaxNameLength) :: LoopOpSchemeObj    ! Used to identify the object name for loop equipment operation scheme
   LOGICAL :: SchemeNameFound ! Set to FALSE if a match of OpScheme object and OpScheme name is not found
-
+  LOGICAL :: NodeEMSSetpointMissing
   SchemeNameFound = .TRUE.
 
   IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
@@ -1297,9 +1299,9 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
 
   IF (NumSchemes .GT. 0) THEN
     DO Num = 1, NumSchemes
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Num, &
+      CALL GetObjectItem(CurrentModuleObject,Num, &
                         cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT)
-      IF(SameString(TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name),TRIM(cAlphaArgs(1))))EXIT
+      IF(SameString(PlantLoop(LoopNum)%OpScheme(SchemeNum)%Name,cAlphaArgs(1))) EXIT
       IF (Num == NumSchemes) THEN
         CALL ShowSevereError(TRIM(LoopOpSchemeObj)//' = "'//TRIM(PlantLoop(LoopNum)%OperationScheme)// &
                              '", could not find '// &
@@ -1358,6 +1360,163 @@ SUBROUTINE FindCompSPInput(CurrentModuleObject,NumSchemes,LoopNum,SchemeNum,Erro
             Call ShowSevereError('Equipment Operation Mode should be either HEATING or COOLING or DUAL mode, for '// &
                                  TRIM(CurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
           END IF
+          !check that setpoint node has valid setpoint managers or EMS
+          SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetpoint)
+            IF (Node(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum)%TempSetPoint &
+                            == SensedNodeFlagValue) THEN
+              IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+                CALL ShowSevereError('Missing temperature setpoint for '//TRIM(CurrentModuleObject) &
+                                     //' named '//TRIM(cAlphaArgs(1)) )
+                CALL ShowContinueError('A temperature setpoint is needed at the node named '//  &
+                                     TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName) )
+                IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                  CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                     '", Plant Loop Demand Calculation Scheme=SingleSetpoint')
+                ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                ENDIF
+                CALL ShowContinueError(' Use a setpoint manager to place a single temperature setpoint on the node')
+                ErrorsFound=.true.
+              ELSE
+                ! need call to EMS to check node
+                NodeEMSSetpointMissing = .FALSE.
+                CALL CheckIfNodeSetpointManagedByEMS( &
+                        PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum, &
+                        iTemperatureSetpoint, NodeEMSSetpointMissing)
+                IF (NodeEMSSetpointMissing) THEN
+                  CALL ShowSevereError('Missing temperature setpoint for '//TRIM(CurrentModuleObject) &
+                                       //' named '//TRIM(cAlphaArgs(1)) )
+                  CALL ShowContinueError('A temperature setpoint is needed at the node named '//  &
+                                        TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName))
+                  IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                    CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                       '", Plant Loop Demand Calculation Scheme=SingleSetpoint')
+                  ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                  ENDIF
+                  CALL ShowContinueError(' Use a setpoint manager or EMS actuator to place a single temperature setpoint on node')
+                  ErrorsFound=.true.
+                ENDIF
+              ENDIF
+            ENDIF
+          CASE (DualSetpointDeadband)
+            IF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%CtrlTypeNum == CoolingOp) THEN
+              IF (Node(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum)%TempSetPointHI &
+                            == SensedNodeFlagValue) THEN
+                IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+                  CALL ShowSevereError('Missing temperature high setpoint for '//TRIM(CurrentModuleObject) &
+                                       //' named '//TRIM(cAlphaArgs(1)) )
+                  CALL ShowContinueError('A temperature high setpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName) )
+                  IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                    CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                       '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                  ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                  ENDIF
+                  CALL ShowContinueError(' Use a setpoint manager to place a dual temperature setpoint on the node')
+                  ErrorsFound=.true.
+                ELSE
+                  ! need call to EMS to check node
+                  NodeEMSSetpointMissing = .FALSE.
+                  CALL CheckIfNodeSetpointManagedByEMS( &
+                          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum,&
+                          iTemperatureMaxSetpoint, NodeEMSSetpointMissing)
+                  IF (NodeEMSSetpointMissing) THEN
+                    CALL ShowSevereError('Missing high temperature setpoint for '//TRIM(CurrentModuleObject) &
+                                         //' named '//TRIM(cAlphaArgs(1)) )
+                    CALL ShowContinueError('A high temperature setpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName))
+                    IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                      CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                         '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                    ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                    ENDIF
+                    CALL ShowContinueError(' Use a setpoint manager or EMS actuator to place a dual or high temperature' &
+                                          //' setpoint on node')
+                    ErrorsFound=.true.
+                  ENDIF
+                ENDIF
+              ENDIF
+            ELSEIF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%CtrlTypeNum == HeatingOp) THEN
+              IF (Node(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum)%TempSetPointLo &
+                            == SensedNodeFlagValue) THEN
+                IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+                  CALL ShowSevereError('Missing temperature low setpoint for '//TRIM(CurrentModuleObject) &
+                                       //' named '//TRIM(cAlphaArgs(1)) )
+                  CALL ShowContinueError('A temperature low setpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName) )
+                  IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                    CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                       '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                  ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                  ENDIF
+                  CALL ShowContinueError(' Use a setpoint manager to place a dual temperature setpoint on the node')
+                  ErrorsFound=.true.
+                ELSE
+                  ! need call to EMS to check node
+                  NodeEMSSetpointMissing = .FALSE.
+                  CALL CheckIfNodeSetpointManagedByEMS( &
+                          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum, &
+                          iTemperatureMinSetpoint, NodeEMSSetpointMissing)
+                  CALL CheckIfNodeSetpointManagedByEMS( &
+                          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum, &
+                          iTemperatureMaxSetpoint, NodeEMSSetpointMissing)
+                  IF (NodeEMSSetpointMissing) THEN
+                    CALL ShowSevereError('Missing low temperature setpoint for '//TRIM(CurrentModuleObject) &
+                                         //' named '//TRIM(cAlphaArgs(1)) )
+                    CALL ShowContinueError('A low temperature setpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName))
+                    IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                      CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                         '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                    ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                    ENDIF
+                    CALL ShowContinueError(' Use a setpoint manager or EMS actuator to place a dual or low temperature' &
+                                          //' setpoint on node')
+                    ErrorsFound=.true.
+                  ENDIF
+                ENDIF
+          END IF
+            ELSEIF (PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%CtrlTypeNum == DualOP) THEN
+              IF ((Node(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum)%TempSetPointHI &
+                            == SensedNodeFlagValue)  .OR. &
+                  (Node(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum)%TempSetPointLo &
+                            == SensedNodeFlagValue) ) THEN
+                IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+                  CALL ShowSevereError('Missing temperature dual setpoints for '//TRIM(CurrentModuleObject) &
+                                       //' named '//TRIM(cAlphaArgs(1)) )
+                  CALL ShowContinueError('A dual temperaturesetpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName) )
+                  IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                    CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                       '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                  ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                  ENDIF
+                  CALL ShowContinueError(' Use a setpoint manager to place a dual temperature setpoint on the node')
+                  ErrorsFound=.true.
+                ELSE
+                  ! need call to EMS to check node
+                  NodeEMSSetpointMissing = .FALSE.
+                  CALL CheckIfNodeSetpointManagedByEMS( &
+                          PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeNum, &
+                          iTemperatureMinSetpoint, NodeEMSSetpointMissing)
+                  IF (NodeEMSSetpointMissing) THEN
+                    CALL ShowSevereError('Missing dual temperature setpoint for '//TRIM(CurrentModuleObject) &
+                                         //' named '//TRIM(cAlphaArgs(1)) )
+                    CALL ShowContinueError('A dual temperature setpoint is needed at the node named '//  &
+                                       TRIM(PlantLoop(LoopNum)%OpScheme(SchemeNum)%EquipList(1)%Comp(compnum)%SetpointNodeName))
+                    IF (PlantLoop(LoopNum)%TypeofLoop == Plant) THEN
+                      CALL ShowContinueError('PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//  &
+                         '", Plant Loop Demand Calculation Scheme=DualSetpointDeadband')
+                    ELSEIF (PlantLoop(LoopNum)%TypeofLoop == Condenser) THEN  ! not applicable to Condenser loops
+                    ENDIF
+                    CALL ShowContinueError(' Use a setpoint manager or EMS actuator to place a dual temperature' &
+                                          //' setpoint on node')
+                    ErrorsFound=.true.
+                  ENDIF
+                ENDIF
+              ENDIF
+            ENDIF
+          END SELECT
         END DO
       ELSE
         CALL ShowSevereError(TRIM(CurrentModuleObject)//' = "'//TRIM(cAlphaArgs(1))//&
@@ -1778,7 +1937,7 @@ END SUBROUTINE InitLoadDistribution
 ! Begin Load Calculation/Distribution Section of the Plant Loop Module
 !******************************************************************************
 
-SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDemand,RemLoopDemand,FirstHVACIteration)
+SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDemand,RemLoopDemand)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher
@@ -1807,7 +1966,7 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
   INTEGER, INTENT(IN )      :: ListPtr      !use as index in PlantLoop()Opscheme() data structure
   REAL(r64), INTENT(IN)     :: LoopDemand
   REAL(r64), INTENT(INOUT)  :: RemLoopDemand
-  LOGICAL, INTENT(IN)       :: FirstHVACIteration
+
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -1861,7 +2020,7 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
 
         CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
-        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
+        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
         ChangeInLoad= MAX(0.0d0,ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
@@ -1924,7 +2083,7 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
 
         CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
-        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
+        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
         ChangeInLoad = MAX(0.0d0, ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
@@ -1954,7 +2113,7 @@ SUBROUTINE DistributePlantLoad(LoopNum, LoopSideNum, CurSchemePtr,ListPtr,LoopDe
 
         CALL AdjustChangeInLoadByEMSControls(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
-        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
+        CALL AdjustChangeInLoadByHowServed(LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
         ChangeInLoad = MAX(0.0d0, ChangeInLoad)
         PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Myload = SIGN(ChangeInLoad, RemLoopDemand)
         RemLoopDemand = RemLoopDemand- SIGN(ChangeInLoad, RemLoopDemand)
@@ -2048,7 +2207,7 @@ SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit(LoopNum, CurOpSchemePtr
 END SUBROUTINE AdjustChangeInLoadForLastStageUpperRangeLimit
 
 
-SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad, FirstHVACIteration)
+SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompNum, ChangeInLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         B. Griffith
@@ -2079,7 +2238,6 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
   INTEGER, INTENT(IN)  :: BranchNum ! component topology
   INTEGER, INTENT(IN)  :: CompNum ! component topology
   REAL(r64), INTENT(INOUT) :: ChangeInLoad ! positive magnitude of load change
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -2203,17 +2361,6 @@ SUBROUTINE AdjustChangeInLoadByHowServed( LoopNum, LoopSideNum, BranchNum, CompN
 
   CASE (HowMet_PassiveCap) ! need to estimate current capacity if more or less passive devices ??
 
-!    IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num == TypeOf_WaterSideEconHtExchg) THEN
-!      ! need to determine current capacity of free cooling heat exchanger.
-!      IF (.NOT. FirstHVACIteration) THEN
-!        IF (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%LoadProvided  &
-!             > PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad) THEN ! device could not keep up
-!          QdotTmp = ABS(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%LoadProvided)
-!          ChangeInLoad = MIN(ChangeInLoad,QdotTmp)
-!        ENDIF
-!      ENDIF
-!
-!    ENDIF
 
   CASE DEFAULT
 
@@ -2530,8 +2677,7 @@ SUBROUTINE TurnOffLoopEquipment(LoopNum)
       DO Num =1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches
        DO MachineOnBranch = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%TotalComponents
         !Sankar Non Integrated Economizer
-        IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump .AND. &
-          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%TypeOf_Num /= TypeOf_WaterSideEconHtExchg) THEN
+        IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump) THEN
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%ON = .FALSE.
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0
         ENDIF
@@ -2576,8 +2722,7 @@ SUBROUTINE TurnOffLoopSideEquipment(LoopNum,LoopSideNum)
       DO Num =1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%TotalBranches
        DO MachineOnBranch = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%TotalComponents
         !Sankar Non Integrated Economizer
-        IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump .AND. &
-          PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%TypeOf_Num /= TypeOf_WaterSideEconHtExchg) THEN
+        IF(PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%GeneralEquipType /= GenEquipTypes_Pump ) THEN
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%ON = .FALSE.
           PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(Num)%Comp(MachineOnBranch)%Myload = 0.0
         ENDIF
@@ -2887,7 +3032,7 @@ END SUBROUTINE AdjustChangeInLoadByEMSControls
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

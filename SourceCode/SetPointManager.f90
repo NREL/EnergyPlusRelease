@@ -87,8 +87,8 @@ INTEGER, PARAMETER :: iRefGroundTempObjType_FCfactorMethod = 4
 INTEGER, PUBLIC, PARAMETER :: iCtrlVarType_Temp = 1  ! control type 'Temperature'
 INTEGER, PARAMETER :: iCtrlVarType_MaxTemp      = 2  ! control type 'MaximumTemperature'
 INTEGER, PARAMETER :: iCtrlVarType_MinTemp      = 3  ! control type 'MinimumTemperature'
-INTEGER, PARAMETER :: iCtrlVarType_HumRat       = 4  ! control Type 'HumidityRatio'
-INTEGER, PARAMETER :: iCtrlVarType_MaxHumRat    = 5  ! control Type 'MaximumHumidityRatio'
+INTEGER, PUBLIC, PARAMETER :: iCtrlVarType_HumRat  = 4  ! control Type 'HumidityRatio'
+INTEGER, PUBLIC, PARAMETER :: iCtrlVarType_MaxHumRat    = 5  ! control Type 'MaximumHumidityRatio'
 INTEGER, PARAMETER :: iCtrlVarType_MinHumRat    = 6  ! control Type 'MinimumHumidityRatio'
 INTEGER, PARAMETER :: iCtrlVarType_MassFlow     = 7  ! control type 'MassFlowRate'
 INTEGER, PARAMETER :: iCtrlVarType_MaxMassFlow  = 8  ! control Type 'MaximumMassFlowRate'
@@ -602,6 +602,7 @@ END TYPE DefineIdealCondEntSetPointManager
   INTEGER :: NumIdealCondEntSetPtMgrs    = 0   ! number of Ideal Condenser Entering Temperature setpoint managers
 
   LOGICAL :: ManagerOn=.false.
+  LOGICAL,SAVE :: GetInputFlag = .TRUE.        ! First time, input is "gotten"
 
   TYPE (DataSetPointManager),             ALLOCATABLE, DIMENSION(:) :: AllSetPtMgr ! Array for all Setpoint Manager data(warnings)
   TYPE (DefineScheduledSetPointManager),  ALLOCATABLE, DIMENSION(:) :: SchSetPtMgr ! Array for Scheduled Setpoint Manager data
@@ -663,6 +664,7 @@ PRIVATE    UpdateSetPointManagers
 PRIVATE    UpdateMixedAirSetPoints
 PRIVATE    UpdateOAPretreatSetPoints
 PUBLIC     IsNodeOnSetPtManager
+PUBLIC     NodeHasSPMCtrlVarType
 PRIVATE    CalcMultiZoneAverageCoolingSetPoint
 PRIVATE    CalcMultiZoneAverageHeatingSetPoint
 PRIVATE    CalcMultiZoneAverageMinHumSetPoint
@@ -707,7 +709,6 @@ SUBROUTINE ManageSetPoints
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  LOGICAL,SAVE :: GetInputFlag = .TRUE.  ! First time, input is "gotten"
   INTEGER      :: SetPtMgrNum ! loop index
 
 ! First time ManageSetPoints is called, get the input for all the setpoint managers
@@ -782,7 +783,7 @@ SUBROUTINE GetSetPointManagerInputs
     USE NodeInputManager, ONLY: GetOnlySingleNode, GetNodeNums
     USE DataHeatBalance, ONLY: Zone
     USE ScheduleManager, ONLY: GetScheduleIndex, CheckScheduleValueMinMax
-    USE DataIPShortCuts
+!    USE DataIPShortCuts
     USE General, ONLY: RoundSigDigits, FindNumberinList
     USE DataEnvironment, ONLY: GroundTemp_DeepObjInput, GroundTempObjInput, GroundTemp_SurfaceObjInput, FCGroundTemps, &
                                GroundTemp_Deep, GroundTemp,GroundTemp_Surface, GroundTempFC
@@ -790,7 +791,7 @@ SUBROUTINE GetSetPointManagerInputs
     IMPLICIT NONE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER    :: RoutineName='GetSetPointManagerInputs: ' ! include trailing blank space
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -799,6 +800,15 @@ SUBROUTINE GetSetPointManagerInputs
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaFieldNames
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cNumericFieldNames
+LOGICAL, ALLOCATABLE, DIMENSION(:) :: lNumericFieldBlanks
+LOGICAL, ALLOCATABLE, DIMENSION(:) :: lAlphaFieldBlanks
+CHARACTER(len=MaxNameLength),ALLOCATABLE, DIMENSION(:) :: cAlphaArgs
+REAL(r64),ALLOCATABLE, DIMENSION(:) :: rNumericArgs
+CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
+INTEGER :: MaxNumAlphas = 0 !argument for call to GetObjectDefMaxArgs
+INTEGER :: MaxNumNumbers = 0 !argument for call to GetObjectDefMaxArgs
 
 INTEGER :: NumNums                                    ! Number of real numbers returned by GetObjectItem
 INTEGER :: NumAlphas                                  ! Number of alphanumerics returned by GetObjectItem
@@ -818,7 +828,6 @@ LOGICAL :: IsBlank                                    ! Flag for blank name
 LOGICAL :: NodeListError=.false.
 LOGICAL :: ErrInList
 INTEGER :: Found
-CHARACTER(len=*), PARAMETER    :: RoutineName='GetSetPointManagerInputs: ' ! include trailing blank space
 LOGICAL :: NoSurfaceGroundTempObjWarning = .TRUE.  ! This will cause a warning to be issued if no "surface" ground
                                                    ! temperature object was input.
 LOGICAL :: NoShallowGroundTempObjWarning = .TRUE.  ! This will cause a warning to be issued if no "shallow" ground
@@ -833,31 +842,156 @@ CtrldNodeNum = 0
 NumZones = 0
 ZoneNum = 0
 
-NumSchSetPtMgrs             = GetNumObjectsFound('SetpointManager:Scheduled')
-NumDualSchSetPtMgrs         = GetNumObjectsFound('SetpointManager:Scheduled:DualSetpoint')
-NumOutAirSetPtMgrs          = GetNumObjectsFound('SetpointManager:OutdoorAirReset')
-NumSZRhSetPtMgrs            = GetNumObjectsFound('SetpointManager:SingleZone:Reheat')
-NumSZHtSetPtMgrs            = GetNumObjectsFound('SetpointManager:SingleZone:Heating')
-NumSZClSetPtMgrs            = GetNumObjectsFound('SetpointManager:SingleZone:Cooling')
-NumSZMinHumSetPtMgrs        = GetNumObjectsFound('SetpointManager:SingleZone:Humidity:Minimum')
-NumSZMaxHumSetPtMgrs        = GetNumObjectsFound('SetpointManager:SingleZone:Humidity:Maximum')
-NumMixedAirSetPtMgrs        = GetNumObjectsFound('SetpointManager:MixedAir')
-NumOAPretreatSetPtMgrs      = GetNumObjectsFound('SetpointManager:OutdoorAirPretreat')
-NumWarmestSetPtMgrs         = GetNumObjectsFound('SetpointManager:Warmest')
-NumColdestSetPtMgrs         = GetNumObjectsFound('SetpointManager:Coldest')
-NumWarmestSetPtMgrsTempFlow = GetNumObjectsFound('SetpointManager:WarmestTemperatureFlow')
-NumRABFlowSetPtMgrs         = GetNumObjectsFound('SetpointManager:ReturnAirBypassFlow')
-NumMZClgAverageSetPtMgrs    = GetNumObjectsFound('SetpointManager:MultiZone:Cooling:Average')
-NumMZHtgAverageSetPtMgrs    = GetNumObjectsFound('SetpointManager:MultiZone:Heating:Average')
-NumMZAverageMinHumSetPtMgrs = GetNumObjectsFound('SetpointManager:MultiZone:MinimumHumidity:Average')
-NumMZAverageMaxHumSetPtMgrs = GetNumObjectsFound('SetpointManager:MultiZone:MaximumHumidity:Average')
-NumMZMinHumSetPtMgrs        = GetNumObjectsFound('SetpointManager:MultiZone:Humidity:Minimum')
-NumMZMaxHumSetPtMgrs        = GetNumObjectsFound('SetpointManager:MultiZone:Humidity:Maximum')
-NumFollowOATempSetPtMgrs    = GetNumObjectsFound('SetpointManager:FollowOutdoorAirTemperature')
-NumFollowSysNodeTempSetPtMgrs   = GetNumObjectsFound('SetpointManager:FollowSystemNodeTemperature')
-NumGroundTempSetPtMgrs      = GetNumObjectsFound('SetpointManager:FollowGroundTemperature')
-NumCondEntSetPtMgrs         = GetNumObjectsFound('SetpointManager:CondenserEnteringReset')
-NumIdealCondEntSetPtMgrs    = GetNumObjectsFound('SetpointManager:CondenserEnteringReset:Ideal')
+  cCurrentModuleObject = 'SetpointManager:Scheduled'
+  NumSchSetPtMgrs             = GetNumObjectsFound(cCurrentModuleObject) ! 'SetpointManager:Scheduled'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=NumNums
+  MaxNumAlphas=NumAlphas
+
+  cCurrentModuleObject = 'SetpointManager:Scheduled:DualSetpoint'
+  NumDualSchSetPtMgrs         = GetNumObjectsFound(cCurrentModuleObject) ! 'SetpointManager:Scheduled:DualSetpoint'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:OutdoorAirReset'
+  NumOutAirSetPtMgrs          = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:OutdoorAirReset'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:SingleZone:Reheat'
+  NumSZRhSetPtMgrs            = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:SingleZone:Reheat'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:SingleZone:Heating'
+  NumSZHtSetPtMgrs            = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:SingleZone:Heating'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:SingleZone:Cooling'
+  NumSZClSetPtMgrs            = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:SingleZone:Cooling'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:SingleZone:Humidity:Minimum'
+  NumSZMinHumSetPtMgrs        = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:SingleZone:Humidity:Minimum'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:SingleZone:Humidity:Maximum'
+  NumSZMaxHumSetPtMgrs        = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:SingleZone:Humidity:Maximum'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MixedAir'
+  NumMixedAirSetPtMgrs        = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MixedAir'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:OutdoorAirPretreat'
+  NumOAPretreatSetPtMgrs      = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:OutdoorAirPretreat'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:Warmest'
+  NumWarmestSetPtMgrs         = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:Warmest'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:Coldest'
+  NumColdestSetPtMgrs         = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:Coldest'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:WarmestTemperatureFlow'
+  NumWarmestSetPtMgrsTempFlow = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:WarmestTemperatureFlow'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:ReturnAirBypassFlow'
+  NumRABFlowSetPtMgrs         = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:ReturnAirBypassFlow'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:Cooling:Average'
+  NumMZClgAverageSetPtMgrs    = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:Cooling:Average'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:Heating:Average'
+  NumMZHtgAverageSetPtMgrs    = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:Heating:Average'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:MinimumHumidity:Average'
+  NumMZAverageMinHumSetPtMgrs = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:MinimumHumidity:Average'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:MaximumHumidity:Average'
+  NumMZAverageMaxHumSetPtMgrs = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:MaximumHumidity:Average'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:Humidity:Minimum'
+  NumMZMinHumSetPtMgrs        = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:Humidity:Minimum'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:MultiZone:Humidity:Maximum'
+  NumMZMaxHumSetPtMgrs        = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:MultiZone:Humidity:Maximum'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:FollowOutdoorAirTemperature'
+  NumFollowOATempSetPtMgrs    = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:FollowOutdoorAirTemperature'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:FollowSystemNodeTemperature'
+  NumFollowSysNodeTempSetPtMgrs   = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:FollowSystemNodeTemperature'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:FollowGroundTemperature'
+  NumGroundTempSetPtMgrs      = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:FollowGroundTemperature'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:CondenserEnteringReset'
+  NumCondEntSetPtMgrs         = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:CondenserEnteringReset'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
+  cCurrentModuleObject = 'SetpointManager:CondenserEnteringReset:Ideal'
+  NumIdealCondEntSetPtMgrs    = GetNumObjectsFound(cCurrentModuleObject)  ! 'SetpointManager:CondenserEnteringReset:Ideal'
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumParams,NumAlphas,NumNums)
+  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+
 
 NumAllSetPtMgrs             = NumSchSetPtMgrs + NumDualSchSetPtMgrs + NumOutAirSetPtMgrs + NumSZRhSetPtMgrs + &
                               NumSZHtSetPtMgrs + NumSZClSetPtMgrs + NumSZMinHumSetPtMgrs + NumSZMaxHumSetPtMgrs + &
@@ -867,6 +1001,19 @@ NumAllSetPtMgrs             = NumSchSetPtMgrs + NumDualSchSetPtMgrs + NumOutAirS
                               NumMZAverageMaxHumSetPtMgrs + NumMZMinHumSetPtMgrs + NumMZMaxHumSetPtMgrs + &
                               NumFollowOATempSetPtMgrs + NumFollowSysNodeTempSetPtMgrs + NumGroundTempSetPtMgrs + &
                               NumCondEntSetPtMgrs + NumIdealCondEntSetPtMgrs
+
+ALLOCATE(cAlphaFieldNames(MaxNumAlphas))
+cAlphaFieldNames=' '
+ALLOCATE(cAlphaArgs(MaxNumAlphas))
+cAlphaArgs=' '
+ALLOCATE(lAlphaFieldBlanks(MaxNumAlphas))
+lAlphaFieldBlanks=.false.
+ALLOCATE(cNumericFieldNames(MaxNumNumbers))
+cNumericFieldNames=' '
+ALLOCATE(rNumericArgs(MaxNumNumbers))
+rNumericArgs=0.0d0
+ALLOCATE(lNumericFieldBlanks(MaxNumNumbers))
+lNumericFieldBlanks=.false.
 
 CALL GetObjectDefMaxArgs('NodeList',NumParams,NumAlphas,NumNums)
 ALLOCATE(NodeNums(NumParams))
@@ -883,7 +1030,7 @@ IF (NumSchSetPtMgrs.GT.0) ALLOCATE(SchSetPtMgr(NumSchSetPtMgrs)) ! Allocate the 
 cCurrentModuleObject='SetpointManager:Scheduled'
 
 DO SetPtMgrNum = 1,NumSchSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -916,9 +1063,12 @@ DO SetPtMgrNum = 1,NumSchSetPtMgrs
   ELSEIF (SameString(SchSetPtMgr(SetPtMgrNum)%CtrlVarType,'MinimumMassFlowRate')) THEN
     SchSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinMassFlow
   ELSE
-    ! should not come here if idd type choice and key list is working
-    Call ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid values are "Temperature","MaximumTemperature","MinimumTemperature",')
+    CALL ShowContinueError('     "HumidityRatio","MaximumHumidityRatio","MinimumHumidityRatio","MassFlowRate",')
+    CALL ShowContinueError('     "MaximumMassFlowRate" or "MinimumMassFlowRate"')
     ErrorsFound = .TRUE.
   ENDIF
 
@@ -926,19 +1076,21 @@ DO SetPtMgrNum = 1,NumSchSetPtMgrs
   SchSetPtMgr(SetPtMgrNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(3))
   IF (SchSetPtMgr(SetPtMgrNum)%SchedPtr == 0) THEN
     IF (lAlphaFieldBlanks(3)) THEN
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(3))//  &
-         ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", blank required field.')
+      Call ShowContinueError('..required field '//trim(cAlphaFieldNames(3)))
     ELSE
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
-         ' entered ='//TRIM(cAlphaArgs(3))// &
-         ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     END IF
     ErrorsFound=.TRUE.
   ENDIF
   SchSetPtMgr(SetPtMgrNum)%CtrlNodeListName = cAlphaArgs(4)
   NodeListError=.false.
   CALL GetNodeNums(SchSetPtMgr(SetPtMgrNum)%CtrlNodeListName,NumNodes,NodeNums,NodeListError, &
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(4))
 
   IF (.not. NodeListError) THEN
     NumNodesCtrld = NumNodes
@@ -950,8 +1102,9 @@ DO SetPtMgrNum = 1,NumSchSetPtMgrs
       SchSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(4))//' in '//TRIM(cCurrentModuleObject)//'='//  &
-       TRIM(SchSetPtMgr(SetPtMgrNum)%Name))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -976,7 +1129,7 @@ IF (NumDualSchSetPtMgrs.GT.0) ALLOCATE(DualSchSetPtMgr(NumDualSchSetPtMgrs)) ! A
 cCurrentModuleObject='SetpointManager:Scheduled:DualSetpoint'
 
 DO SetPtMgrNum = 1,NumDualSchSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -993,20 +1146,23 @@ DO SetPtMgrNum = 1,NumDualSchSetPtMgrs
     DualSchSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   DualSchSetPtMgr(SetPtMgrNum)%SchedHi = cAlphaArgs(3)
   DualSchSetPtMgr(SetPtMgrNum)%SchedPtrHi = GetScheduleIndex(cAlphaArgs(3))
   IF (DualSchSetPtMgr(SetPtMgrNum)%SchedPtrHi == 0) THEN
     IF (lAlphaFieldBlanks(3)) THEN
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(3))//  &
-         ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", blank required field.')
+      Call ShowContinueError('..required field '//trim(cAlphaFieldNames(3)))
     ELSE
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(3))//  &
-         ' entered ='//TRIM(cAlphaArgs(3))// &
-         ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     END IF
     ErrorsFound=.TRUE.
   ENDIF
@@ -1014,19 +1170,21 @@ DO SetPtMgrNum = 1,NumDualSchSetPtMgrs
   DualSchSetPtMgr(SetPtMgrNum)%SchedPtrLo = GetScheduleIndex(cAlphaArgs(4))
   IF (DualSchSetPtMgr(SetPtMgrNum)%SchedPtrLo == 0) THEN
     IF (lAlphaFieldBlanks(4)) THEN
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(4))//  &
-         ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", blank required field.')
+      Call ShowContinueError('..required field '//trim(cAlphaFieldNames(4)))
     ELSE
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(4))//  &
-         ' entered ='//TRIM(cAlphaArgs(4))// &
-         ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     END IF
     ErrorsFound=.TRUE.
   ENDIF
   DualSchSetPtMgr(SetPtMgrNum)%CtrlNodeListName = cAlphaArgs(5)
   NodeListError=.false.
   CALL GetNodeNums(DualSchSetPtMgr(SetPtMgrNum)%CtrlNodeListName,NumNodes,NodeNums,NodeListError, &
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
 
   IF (.not. NodeListError) THEN
     NumNodesCtrld = NumNodes
@@ -1038,9 +1196,10 @@ DO SetPtMgrNum = 1,NumDualSchSetPtMgrs
     DO CtrldNodeNum = 1,NumNodesCtrld
       DualSchSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
-  ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = ' &
-                              //TRIM(DualSchSetPtMgr(SetPtMgrNum)%Name))
+  ELSE  ! check getnodenums/nodelist
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1065,7 +1224,7 @@ IF (NumOutAirSetPtMgrs.GT.0) ALLOCATE(OutAirSetPtMgr(NumOutAirSetPtMgrs)) ! Allo
 cCurrentModuleObject='SetpointManager:OutdoorAirReset'
 
 DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1082,8 +1241,10 @@ DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
     OutAirSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   OutAirSetPtMgr(SetPtMgrNum)%OutLowSetPt1     = rNumericArgs(1)
@@ -1092,7 +1253,7 @@ DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
   OutAirSetPtMgr(SetPtMgrNum)%OutHigh1         = rNumericArgs(4)
   OutAirSetPtMgr(SetPtMgrNum)%CtrlNodeListName = cAlphaArgs(3)
   IF (OutAirSetPtMgr(SetPtMgrNum)%OutHigh1 < OutAirSetPtMgr(SetPtMgrNum)%OutLow1) THEN
-    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid setpoints.')
     CALL ShowContinueError('...'//trim(cNumericFieldNames(4))//  &
          '=['//trim(RoundSigDigits(OutAirSetPtMgr(SetPtMgrNum)%OutHigh1,1))//'] is less than '//  &
          trim(cNumericFieldNames(2))//  &
@@ -1108,7 +1269,7 @@ DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
     OutAirSetPtMgr(SetPtMgrNum)%OutHighSetPt2 = rNumericArgs(7)
     OutAirSetPtMgr(SetPtMgrNum)%OutHigh2      = rNumericArgs(8)
     IF (OutAirSetPtMgr(SetPtMgrNum)%OutHigh2 < OutAirSetPtMgr(SetPtMgrNum)%OutLow2) THEN
-      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid setpoints.')
       CALL ShowContinueError('...'//trim(cNumericFieldNames(8))//  &
            '=['//trim(RoundSigDigits(OutAirSetPtMgr(SetPtMgrNum)%OutHigh2,1))//'] is less than '//  &
            trim(cNumericFieldNames(6))//  &
@@ -1124,7 +1285,8 @@ DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
   END IF
   NodeListError=.false.
   CALL GetNodeNums(OutAirSetPtMgr(SetPtMgrNum)%CtrlNodeListName,NumNodes,NodeNums,NodeListError, &
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.not. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(OutAirSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1135,8 +1297,9 @@ DO SetPtMgrNum = 1,NumOutAirSetPtMgrs
       OutAirSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '// &
-                           TRIM(OutAirSetPtMgr(SetPtMgrNum)%Name))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1161,7 +1324,7 @@ IF (NumSZRhSetPtMgrs.GT.0) ALLOCATE(SingZoneRhSetPtMgr(NumSZRhSetPtMgrs)) ! Allo
 cCurrentModuleObject='SetpointManager:SingleZone:Reheat'
 
 DO SetPtMgrNum = 1,NumSZRhSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1178,8 +1341,10 @@ DO SetPtMgrNum = 1,NumSZRhSetPtMgrs
     SingZoneRhSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   SingZoneRhSetPtMgr(SetPtMgrNum)%ControlZoneName = cAlphaArgs(3)
@@ -1200,7 +1365,8 @@ DO SetPtMgrNum = 1,NumSZRhSetPtMgrs
                NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(6),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(6))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(SingZoneRhSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1211,15 +1377,18 @@ DO SetPtMgrNum = 1,NumSZRhSetPtMgrs
       SingZoneRhSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(6))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
   ! get the actual zone number of the control zone
   SingZoneRhSetPtMgr(SetPtMgrNum)%ControlZoneNum = FindItemInList(cAlphaArgs(3),Zone%Name,NumOfZones)
   IF (SingZoneRhSetPtMgr(SetPtMgrNum)%ControlZoneNum == 0) THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Zone not found='//TRIM(cAlphaArgs(3))//  &
-                         ', for Setpoint Manager='//TRIM(cAlphaArgs(1)))
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
   SingZoneRhSetPtMgr(SetPtMgrNum)%SetPt = 0.0
@@ -1245,7 +1414,7 @@ IF (NumSZHtSetPtMgrs.GT.0) ALLOCATE(SingZoneHtSetPtMgr(NumSZHtSetPtMgrs)) ! Allo
 cCurrentModuleObject='SetpointManager:SingleZone:Heating'
 
 DO SetPtMgrNum = 1,NumSZHtSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1262,8 +1431,10 @@ DO SetPtMgrNum = 1,NumSZHtSetPtMgrs
     SingZoneHtSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   SingZoneHtSetPtMgr(SetPtMgrNum)%ControlZoneName = cAlphaArgs(3)
@@ -1284,7 +1455,8 @@ DO SetPtMgrNum = 1,NumSZHtSetPtMgrs
                NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(6),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(6))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(SingZoneHtSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1295,15 +1467,18 @@ DO SetPtMgrNum = 1,NumSZHtSetPtMgrs
       SingZoneHtSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(6))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
   ! get the actual zone number of the control zone
   SingZoneHtSetPtMgr(SetPtMgrNum)%ControlZoneNum = FindItemInList(cAlphaArgs(3),Zone%Name,NumOfZones)
   IF (SingZoneHtSetPtMgr(SetPtMgrNum)%ControlZoneNum == 0) THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Zone not found='//TRIM(cAlphaArgs(3))//  &
-                         ', for Setpoint Manager='//TRIM(cAlphaArgs(1)))
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
   SingZoneHtSetPtMgr(SetPtMgrNum)%SetPt = 0.0
@@ -1328,7 +1503,7 @@ IF (NumSZClSetPtMgrs.GT.0) ALLOCATE(SingZoneClSetPtMgr(NumSZClSetPtMgrs)) ! Allo
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:SingleZone:Cooling'
 DO SetPtMgrNum = 1,NumSZClSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1345,8 +1520,10 @@ DO SetPtMgrNum = 1,NumSZClSetPtMgrs
     SingZoneClSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   SingZoneClSetPtMgr(SetPtMgrNum)%ControlZoneName = cAlphaArgs(3)
@@ -1367,7 +1544,8 @@ DO SetPtMgrNum = 1,NumSZClSetPtMgrs
                NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(6),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(6))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(SingZoneClSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1378,15 +1556,18 @@ DO SetPtMgrNum = 1,NumSZClSetPtMgrs
       SingZoneClSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(6))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
   ! get the actual zone number of the control zone
   SingZoneClSetPtMgr(SetPtMgrNum)%ControlZoneNum = FindItemInList(cAlphaArgs(3),Zone%Name,NumOfZones)
   IF (SingZoneClSetPtMgr(SetPtMgrNum)%ControlZoneNum == 0) THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Zone not found='//TRIM(cAlphaArgs(3))//  &
-                         ', for Setpoint Manager='//TRIM(cAlphaArgs(1)))
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
   SingZoneClSetPtMgr(SetPtMgrNum)%SetPt = 0.0
@@ -1412,7 +1593,7 @@ IF (NumSZMinHumSetPtMgrs.GT.0) ALLOCATE(SZMinHumSetPtMgr(NumSZMinHumSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:SingleZone:Humidity:Minimum'
 DO SetPtMgrNum = 1,NumSZMinHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1428,21 +1609,24 @@ DO SetPtMgrNum = 1,NumSZMinHumSetPtMgrs
   SZMinHumSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinHumRat
 
   IF(cAlphaArgs(2) .NE. '')THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Control Variable='//TRIM(cAlphaArgs(2)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
-    CALL ShowContinueError('Deprecated Field in Object -- Control variable.  Please leave blank.')
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('Deprecated Field in Object.  Please leave blank.')
     Call ShowContinueError('Please note that this field in this object will be deleted in future versions.')
   END IF
   IF(cAlphaArgs(3) .NE. '')THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//', schedule found='//TRIM(cAlphaArgs(3)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
-    CALL ShowContinueError('Deprecated Field in Object -- Schedule.  Please leave blank.')
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+    CALL ShowContinueError('Deprecated Field in Object.  Please leave blank.')
     Call ShowContinueError('Please note that this field in this object will be deleted in future versions.')
   END IF
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(4),NumNodes,NodeNums,NodeListError, & ! nodes whose min humidity ratio will be set
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(4))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(SZMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1453,23 +1637,30 @@ DO SetPtMgrNum = 1,NumSZMinHumSetPtMgrs
       SZMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(4))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
   ErrInList=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,ErrInList, & ! nodes of zones whose humidity is being controlled
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Sensor,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Sensor,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (ErrInList) THEN
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
   NumZones = NumNodes
   SZMinHumSetPtMgr(SetPtMgrNum)%NumZones = NumZones
   ! only allow one control zone for now
   IF (NumNodes > 1) THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//':Only 1st Node used from:'//TRIM(cAlphaArgs(5)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", entered nodelist.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+    Call ShowContinueError('..only one control zone is allowed.')
     ErrorsFound=.TRUE.
   END IF
   ALLOCATE(SZMinHumSetPtMgr(SetPtMgrNum)%ZoneNodes(NumZones))
@@ -1503,7 +1694,7 @@ IF (NumSZMaxHumSetPtMgrs.GT.0) ALLOCATE(SZMaxHumSetPtMgr(NumSZMaxHumSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:SingleZone:Humidity:Maximum'
 DO SetPtMgrNum = 1,NumSZMaxHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1519,21 +1710,24 @@ DO SetPtMgrNum = 1,NumSZMaxHumSetPtMgrs
   SZMaxHumSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MaxHumRat
 
   IF(cAlphaArgs(2) .NE. '')THEN
-    CALL ShowWarningError(TRIM(cCurrentModuleObject)//', Control Variable='//TRIM(cAlphaArgs(2)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
-    CALL ShowContinueError('Deprecated Field in Object -- Control variable.  Please leave blank.')
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('Deprecated Field in Object.  Please leave blank.')
     Call ShowContinueError('Please note that this field in this object will be deleted in future versions.')
   END IF
   IF(cAlphaArgs(3) .NE. '')THEN
-    CALL ShowWarningError(TRIM(cCurrentModuleObject)//', schedule found='//TRIM(cAlphaArgs(3)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
-    CALL ShowContinueError('Deprecated Field in Object -- Schedule.  Please leave blank.')
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+    CALL ShowContinueError('Deprecated Field in Object.  Please leave blank.')
     Call ShowContinueError('Please note that this field in this object will be deleted in future versions.')
   END IF
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(4),NumNodes,NodeNums,NodeListError, & ! nodes whose max humidity ratio will be set
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(4))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(SZMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1544,23 +1738,30 @@ DO SetPtMgrNum = 1,NumSZMaxHumSetPtMgrs
       SZMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(4))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
   ErrInList=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,ErrInList, & ! nodes of zones whose humidity is being controlled
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Sensor,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Sensor,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (ErrInList) THEN
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
   NumZones = NumNodes
   SZMaxHumSetPtMgr(SetPtMgrNum)%NumZones = NumZones
   ! only allow one control zone for now
   IF (NumNodes > 1) THEN
-    CALL ShowSevereError(TRIM(cCurrentModuleObject)//':Only 1st Node used from:'//TRIM(cAlphaArgs(5)))
-    CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", entered nodelist.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
+    Call ShowContinueError('..only one control zone is allowed.')
     ErrorsFound=.TRUE.
   END IF
   ALLOCATE(SZMaxHumSetPtMgr(SetPtMgrNum)%ZoneNodes(NumZones))
@@ -1595,7 +1796,7 @@ IF (NumMixedAirSetPtMgrs.GT.0) ALLOCATE(MixedAirSetPtMgr(NumMixedAirSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:MixedAir'
 DO SetPtMgrNum = 1,NumMixedAirSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1613,8 +1814,10 @@ DO SetPtMgrNum = 1,NumMixedAirSetPtMgrs
     MixedAirSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   MixedAirSetPtMgr(SetPtMgrNum)%RefNode = &
@@ -1628,7 +1831,8 @@ DO SetPtMgrNum = 1,NumMixedAirSetPtMgrs
                NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(6),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(6))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MixedAirSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1639,7 +1843,9 @@ DO SetPtMgrNum = 1,NumMixedAirSetPtMgrs
       MixedAirSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(6))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1647,13 +1853,15 @@ DO SetPtMgrNum = 1,NumMixedAirSetPtMgrs
            MixedAirSetPtMgr(SetPtMgrNum)%CtrlNodes,MixedAirSetPtMgr(SetPtMgrNum)%NumCtrlNodes)
   IF (Found > 0) THEN
     IF (MixedAirSetPtMgr(SetPtMgrNum)%NumCtrlNodes > 1) THEN
-      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//', Reference Node is the same as '//  &
-                            'one of the nodes in SetPoint Node List')
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", reference node.')
+      CALL ShowContinueError('..Reference Node is the same as one of the nodes in SetPoint NodeList')
     ELSE
-      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//', Reference Node is the same as '//  &
-                            'the SetPoint Node')
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", reference node.')
+      CALL ShowContinueError('..Reference Node is the same as the SetPoint Node')
     ENDIF
-    CALL ShowContinueError('Node Name='//TRIM(NodeID(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)))
+    CALL ShowContinueError('Reference Node Name="'//TRIM(NodeID(MixedAirSetPtMgr(SetPtMgrNum)%RefNode))//'".')
   ENDIF
 
   AllSetPtMgrNum = SetPtMgrNum + NumSchSetPtMgrs + NumDualSchSetPtMgrs + NumOutAirSetPtMgrs + NumSZRhSetPtMgrs + &
@@ -1677,7 +1885,7 @@ IF (NumOAPretreatSetPtMgrs.GT.0) ALLOCATE(OAPretreatSetPtMgr(NumOAPretreatSetPtM
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:OutdoorAirPretreat'
 DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1704,8 +1912,10 @@ DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
       OAPretreatSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinHumRat
     CASE DEFAULT
       ! should not come here if idd type choice and key list is working
-      CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                           //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+      CALL ShowContinueError('..Valid values are "Temperature","HumidityRatio","MaximumHumidityRatio" or "MinimumHumidityRatio".')
       ErrorsFound = .TRUE.
   END SELECT
 
@@ -1731,12 +1941,12 @@ DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
   ! Because a zero humidity ratio setpoint is a special value indicating "off" or "no load"
   ! must not allow MinSetHumRat or MaxSetHumRat to be <=0.0
   IF (OAPretreatSetPtMgr(SetPtMgrNum)%MinSetHumRat .LE. 0.0) THEN
-    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//' = '// TRIM(cAlphaArgs(1)))
+    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid value.')
     CALL ShowContinueError('Minimum setpoint humidity ratio <=0.0, resetting to 0.00001')
     OAPretreatSetPtMgr(SetPtMgrNum)%MinSetHumRat = 0.00001d0
   ENDIF
   IF (OAPretreatSetPtMgr(SetPtMgrNum)%MaxSetHumRat .LE. 0.0) THEN
-    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//' = '// TRIM(cAlphaArgs(1)))
+    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid value.')
     CALL ShowContinueError('Maximum setpoint humidity ratio <=0.0, resetting to 0.00001')
     OAPretreatSetPtMgr(SetPtMgrNum)%MaxSetHumRat = 0.00001
   ENDIF
@@ -1755,7 +1965,8 @@ DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
                NodeType_Air,NodeConnectionType_Sensor,1,ObjectIsNotParent)
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(7),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(7))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(OAPretreatSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1766,7 +1977,9 @@ DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
       OAPretreatSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(7))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1774,13 +1987,15 @@ DO SetPtMgrNum = 1,NumOAPretreatSetPtMgrs
            OAPretreatSetPtMgr(SetPtMgrNum)%CtrlNodes,OAPretreatSetPtMgr(SetPtMgrNum)%NumCtrlNodes)
   IF (Found > 0) THEN
     IF (OAPretreatSetPtMgr(SetPtMgrNum)%NumCtrlNodes > 1) THEN
-      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//', Reference Node is the same as '//  &
-                            'one of the nodes in SetPoint Node List')
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", reference node.')
+      CALL ShowContinueError('..Reference Node is the same as one of the nodes in SetPoint NodeList')
     ELSE
-      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//', Reference Node is the same as '//  &
-                            'the SetPoint Node')
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", reference node.')
+      CALL ShowContinueError('..Reference Node is the same as the SetPoint Node')
     ENDIF
-    CALL ShowContinueError('Node Name='//TRIM(NodeID(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)))
+    CALL ShowContinueError('Reference Node Name="'//TRIM(NodeID(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode))//'".')
   ENDIF
 
   AllSetPtMgrNum = SetPtMgrNum + NumSchSetPtMgrs + NumDualSchSetPtMgrs + NumOutAirSetPtMgrs + NumSZRhSetPtMgrs + &
@@ -1805,7 +2020,7 @@ IF (NumWarmestSetPtMgrs.GT.0) ALLOCATE(WarmestSetPtMgr(NumWarmestSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:Warmest'
 DO SetPtMgrNum = 1,NumWarmestSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1822,8 +2037,10 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrs
     WarmestSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   WarmestSetPtMgr(SetPtMgrNum)%AirLoopName = cAlphaArgs(3)
@@ -1838,18 +2055,21 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrs
          '=['//trim(RoundSigDigits(WarmestSetPtMgr(SetPtMgrNum)%MinSetTemp,1))//'].')
   ENDIF
 
-  SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+  SELECT CASE(MakeUPPERCase(cAlphaArgs(4)))
     CASE('MAXIMUMTEMPERATURE')
         WarmestSetPtMgr(SetPtMgrNum)%Strategy = MaxTemp
     CASE DEFAULT
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect strategy: '//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+      CALL ShowContinueError('..Valid value is "MaximumTemperature".')
       ErrorsFound=.TRUE.
   END SELECT
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(WarmestSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1860,7 +2080,9 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrs
       WarmestSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1886,7 +2108,7 @@ IF (NumColdestSetPtMgrs.GT.0) ALLOCATE(ColdestSetPtMgr(NumColdestSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:Coldest'
 DO SetPtMgrNum = 1,NumColdestSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1903,8 +2125,10 @@ DO SetPtMgrNum = 1,NumColdestSetPtMgrs
     ColdestSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   ColdestSetPtMgr(SetPtMgrNum)%AirLoopName = cAlphaArgs(3)
@@ -1919,18 +2143,21 @@ DO SetPtMgrNum = 1,NumColdestSetPtMgrs
          '=['//trim(RoundSigDigits(ColdestSetPtMgr(SetPtMgrNum)%MinSetTemp,1))//'].')
   ENDIF
 
-  SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+  SELECT CASE(MakeUPPERCase(cAlphaArgs(4)))
     CASE('MINIMUMTEMPERATURE')
         ColdestSetPtMgr(SetPtMgrNum)%Strategy = MinTemp
     CASE DEFAULT
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect strategy: '//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+      CALL ShowContinueError('..Valid value is "MinimumTemperature".')
       ErrorsFound=.TRUE.
   END SELECT
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,NodeListError, & ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(ColdestSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -1941,7 +2168,9 @@ DO SetPtMgrNum = 1,NumColdestSetPtMgrs
       ColdestSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -1967,7 +2196,7 @@ IF (NumWarmestSetPtMgrsTempFlow.GT.0) ALLOCATE(WarmestSetPtMgrTempFlow(NumWarmes
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:WarmestTemperatureFlow'
 DO SetPtMgrNum = 1,NumWarmestSetPtMgrsTempFlow
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1984,8 +2213,10 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrsTempFlow
     WarmestSetPtMgrTempFlow(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' Named '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     Errorsfound = .TRUE.
   ENDIF
   WarmestSetPtMgrTempFlow(SetPtMgrNum)%AirLoopName = cAlphaArgs(3)
@@ -2006,20 +2237,23 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrsTempFlow
     '=['//trim(RoundSigDigits(WarmestSetPtMgrTempFlow(SetPtMgrNum)%MinTurndown,2))//'] is greater than 0.8;')
     CALL ShowContinueError('...typical values for '//trim(cNumericFieldNames(3))//' are less than 0.8.')
   END IF
-  SELECT CASE(MakeUPPERCase(TRIM(cAlphaArgs(4))))
+  SELECT CASE(MakeUPPERCase(cAlphaArgs(4)))
     CASE('TEMPERATUREFIRST')
         WarmestSetPtMgrTempFlow(SetPtMgrNum)%Strategy = TempFirst
     CASE('FLOWFIRST')
         WarmestSetPtMgrTempFlow(SetPtMgrNum)%Strategy = FlowFirst
     CASE DEFAULT
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//': incorrect strategy: '//TRIM(cAlphaArgs(4)))
-      CALL ShowContinueError('Occurs in Setpoint Manager='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
+      CALL ShowContinueError('..Valid values are "TemperatureFirst" or "FlowFirst".')
       ErrorsFound=.TRUE.
   END SELECT
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(WarmestSetPtMgrTempFlow(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2030,7 +2264,9 @@ DO SetPtMgrNum = 1,NumWarmestSetPtMgrsTempFlow
       WarmestSetPtMgrTempFlow(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2056,7 +2292,7 @@ IF (NumRABFlowSetPtMgrs.GT.0) ALLOCATE(RABFlowSetPtMgr(NumRABFlowSetPtMgrs))
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:ReturnAirBypassFlow'
 DO SetPtMgrNum = 1,NumRABFlowSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2076,8 +2312,10 @@ DO SetPtMgrNum = 1,NumRABFlowSetPtMgrs
     RABFlowSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MassFlow
   ELSE
     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid value is "Temperature".')
     ErrorsFound = .TRUE.
   ENDIF
   RABFlowSetPtMgr(SetPtMgrNum)%AirLoopName = cAlphaArgs(3)
@@ -2086,12 +2324,13 @@ DO SetPtMgrNum = 1,NumRABFlowSetPtMgrs
   RABFlowSetPtMgr(SetPtMgrNum)%SchedPtr    = GetScheduleIndex(cAlphaArgs(4))
   IF (RABFlowSetPtMgr(SetPtMgrNum)%SchedPtr == 0) THEN
     IF (lAlphaFieldBlanks(4)) THEN
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(4))//  &
-         ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", blank required field.')
+      Call ShowContinueError('..required field '//trim(cAlphaFieldNames(4)))
     ELSE
-      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(4))//  &
-         ' entered ='//TRIM(cAlphaArgs(4))// &
-         ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+         '", invalid field.')
+      Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     END IF
     ErrorsFound=.TRUE.
   ENDIF
@@ -2120,7 +2359,7 @@ IF (NumMZClgAverageSetPtMGrs.GT.0) ALLOCATE(MZAverageCoolingSetPtMgr(NumMZClgAve
   ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:Cooling:Average'
 DO SetPtMgrNum = 1, NumMZClgAverageSetPtMGrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2149,7 +2388,8 @@ DO SetPtMgrNum = 1, NumMZClgAverageSetPtMGrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZAverageCoolingSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2160,7 +2400,9 @@ DO SetPtMgrNum = 1, NumMZClgAverageSetPtMGrs
       MZAverageCoolingSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2187,7 +2429,7 @@ IF (NumMZHtgAverageSetPtMGrs.GT.0) ALLOCATE(MZAverageHeatingSetPtMgr(NumMZHtgAve
   ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:Heating:Average'
 DO SetPtMgrNum = 1, NumMZHtgAverageSetPtMGrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2216,7 +2458,8 @@ DO SetPtMgrNum = 1, NumMZHtgAverageSetPtMGrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZAverageHeatingSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2227,7 +2470,9 @@ DO SetPtMgrNum = 1, NumMZHtgAverageSetPtMGrs
       MZAverageHeatingSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2253,7 +2498,7 @@ IF (NumMZAverageMinHumSetPtMgrs.GT.0) ALLOCATE(MZAverageMinHumSetPtMgr(NumMZAver
   ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:MinimumHumidity:Average'
 DO SetPtMgrNum = 1, NumMZAverageMinHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2282,7 +2527,8 @@ DO SetPtMgrNum = 1, NumMZAverageMinHumSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZAverageMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2293,7 +2539,9 @@ DO SetPtMgrNum = 1, NumMZAverageMinHumSetPtMgrs
       MZAverageMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2319,7 +2567,7 @@ IF (NumMZAverageMaxHumSetPtMgrs.GT.0) ALLOCATE(MZAverageMaxHumSetPtMgr(NumMZAver
   ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:MaximumHumidity:Average'
 DO SetPtMgrNum = 1, NumMZAverageMaxHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2348,7 +2596,8 @@ DO SetPtMgrNum = 1, NumMZAverageMaxHumSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZAverageMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2359,7 +2608,9 @@ DO SetPtMgrNum = 1, NumMZAverageMaxHumSetPtMgrs
       MZAverageMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2386,7 +2637,7 @@ IF (NumMZMinHumSetPtMgrs.GT.0) ALLOCATE(MZMinHumSetPtMgr(NumMZMinHumSetPtMgrs))
 ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:Humidity:Minimum'
 DO SetPtMgrNum = 1, NumMZMinHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2415,7 +2666,8 @@ DO SetPtMgrNum = 1, NumMZMinHumSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2426,7 +2678,9 @@ DO SetPtMgrNum = 1, NumMZMinHumSetPtMgrs
       MZMinHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2453,7 +2707,7 @@ IF (NumMZMaxHumSetPtMgrs.GT.0) ALLOCATE(MZMaxHumSetPtMgr(NumMZMaxHumSetPtMgrs))
 ! Input the data for each setpoint manager
 cCurrentModuleObject= 'SetpointManager:MultiZone:Humidity:Maximum'
 DO SetPtMgrNum = 1, NumMZMaxHumSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2482,7 +2736,8 @@ DO SetPtMgrNum = 1, NumMZMaxHumSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(3),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Air,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(MZMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2493,7 +2748,9 @@ DO SetPtMgrNum = 1, NumMZMaxHumSetPtMgrs
       MZMaxHumSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2521,7 +2778,7 @@ IF (NumFollowOATempSetPtMgrs.GT.0) ALLOCATE(FollowOATempSetPtMgr(NumFollowOATemp
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:FollowOutdoorAirTemperature'
 DO SetPtMgrNum = 1,NumFollowOATempSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2542,8 +2799,10 @@ DO SetPtMgrNum = 1,NumFollowOATempSetPtMgrs
     FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinTemp
   ELSE
      ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(2))// ' = ' //TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid values are "Temperature","MaximumTemperature" or "MinimumTemperature".')
     ErrorsFound = .TRUE.
   ENDIF
   FollowOATempSetPtMgr(SetPtMgrNum)%RefTempType = cAlphaArgs(3)
@@ -2552,9 +2811,10 @@ DO SetPtMgrNum = 1,NumFollowOATempSetPtMgrs
   ELSEIF (SameString(FollowOATempSetPtMgr(SetPtMgrNum)%RefTempType,'OutdoorAirDryBulb')) THEN
     FollowOATempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefTempType_DryBulb
   ELSE
-     ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(3))// ' = ' //TRIM(cAlphaArgs(3)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+    CALL ShowContinueError('..Valid values are "OutdoorAirWetBulb" or "OutdoorAirDryBulb".')
     ErrorsFound = .TRUE.
   ENDIF
   FollowOATempSetPtMgr(SetPtMgrNum)%Offset     = rNumericArgs(1)
@@ -2570,7 +2830,8 @@ DO SetPtMgrNum = 1,NumFollowOATempSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(4),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Water,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(4))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(FollowOATempSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2581,7 +2842,9 @@ DO SetPtMgrNum = 1,NumFollowOATempSetPtMgrs
       FollowOATempSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(4))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2609,7 +2872,7 @@ IF (NumFollowSysNodeTempSetPtMgrs.GT.0) ALLOCATE(FollowSysNodeTempSetPtMgr(NumFo
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:FollowSystemNodeTemperature'
 DO SetPtMgrNum = 1,NumFollowSysNodeTempSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2630,8 +2893,10 @@ DO SetPtMgrNum = 1,NumFollowSysNodeTempSetPtMgrs
     FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinTemp
   ELSE
      ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(2))// ' = ' //TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid values are "Temperature","MaximumTemperature" or "MinimumTemperature".')
     ErrorsFound = .TRUE.
   ENDIF
   FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum = &
@@ -2644,8 +2909,10 @@ DO SetPtMgrNum = 1,NumFollowSysNodeTempSetPtMgrs
     FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefTempType_DryBulb
   ELSE
      ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(4))// ' = ' //TRIM(cAlphaArgs(4)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+    CALL ShowContinueError('..Valid values are "NodeWetBulb" or "NodeDryBulb".')
     ErrorsFound = .TRUE.
   ENDIF
   FollowSysNodeTempSetPtMgr(SetPtMgrNum)%Offset     = rNumericArgs(1)
@@ -2661,7 +2928,8 @@ DO SetPtMgrNum = 1,NumFollowSysNodeTempSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(5),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Water,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(5))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2672,7 +2940,9 @@ DO SetPtMgrNum = 1,NumFollowSysNodeTempSetPtMgrs
       FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(5))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2701,7 +2971,7 @@ IF (NumGroundTempSetPtMgrs.GT.0) ALLOCATE(GroundTempSetPtMgr(NumGroundTempSetPtM
   ! Input the data for each Setpoint Manager
 cCurrentModuleObject='SetpointManager:FollowGroundTemperature'
 DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2722,8 +2992,10 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_MinTemp
   ELSE
      ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(2))// ' = ' //TRIM(cAlphaArgs(2)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+    CALL ShowContinueError('..Valid values are "Temperature","MaximumTemperature" or "MinimumTemperature".')
     ErrorsFound = .TRUE.
   ENDIF
   GroundTempSetPtMgr(SetPtMgrNum)%RefGroundTempObjType = cAlphaArgs(3)
@@ -2731,7 +3003,7 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefGroundTempObjType_BuildingSurface
     IF (NoSurfaceGroundTempObjWarning) THEN
       IF (.not. GroundTempObjInput) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// ' requires '//  &
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" requires '//  &
                               '"Site:GroundTemperature:BuildingSurface" in the input.')
         CALL ShowContinueError('Defaults, constant throughout the year of ('//TRIM(RoundSigDigits(GroundTemp,1))// &
                            ') will be used.')
@@ -2742,7 +3014,7 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefGroundTempObjType_Shallow
     IF (NoShallowGroundTempObjWarning) THEN
       IF (.not. GroundTemp_SurfaceObjInput) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// ' requires '//  &
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" requires '//  &
                               '"Site:GroundTemperature:Shallow" in the input.')
         CALL ShowContinueError('Defaults, constant throughout the year of ('//TRIM(RoundSigDigits(GroundTemp_Surface,1))// &
                            ') will be used.')
@@ -2753,7 +3025,7 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefGroundTempObjType_Deep
     IF (NoDeepGroundTempObjWarning) THEN
       IF (.not. GroundTemp_DeepObjInput) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// ' requires '//  &
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" requires '//  &
                               '"Site:GroundTemperature:Deep" in the input.')
         CALL ShowContinueError('Defaults, constant throughout the year of ('//TRIM(RoundSigDigits(GroundTemp_Deep,1))// &
                            ') will be used.')
@@ -2764,7 +3036,7 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefGroundTempObjType_FCfactorMethod
     IF (NoFCGroundTempObjWarning) THEN
       IF (.not. FCGroundTemps) THEN
-        CALL ShowWarningError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// ' requires '//  &
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'" requires '//  &
                               '"Site:GroundTemperature:FCfactorMethod" in the input.')
         CALL ShowContinueError('Defaults, constant throughout the year of ('//TRIM(RoundSigDigits(GroundTempFC,1))// &
                            ') will be used.')
@@ -2773,8 +3045,11 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
     ENDIF
   ELSE
      ! should not come here if idd type choice and key list is working
-    CALL ShowSevereError(' found invalid '//TRIM(cAlphaFieldNames(3))// ' = ' //TRIM(cAlphaArgs(3)) &
-                         //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
+    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+       '", invalid field.')
+    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'".')
+    CALL ShowContinueError('..Valid values are "Site:GroundTemperature:BuildingSurface", "Site:GroundTemperature:Shallow",')
+    CALL ShowContinueError('     "Site:GroundTemperature:Deep" or "Site:GroundTemperature:FCfactorMethod".')
     ErrorsFound = .TRUE.
   ENDIF
   GroundTempSetPtMgr(SetPtMgrNum)%Offset     = rNumericArgs(1)
@@ -2790,7 +3065,8 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(cAlphaArgs(4),NumNodes,NodeNums,NodeListError, &  ! setpoint nodes
-       NodeType_Water,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(4))
   IF (.NOT. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(GroundTempSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2801,7 +3077,9 @@ DO SetPtMgrNum = 1,NumGroundTempSetPtMgrs
       GroundTempSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(4))//' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+!    CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
+!       '", invalid field.')
+!    Call ShowContinueError('..invalid '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'".')
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2828,10 +3106,10 @@ IF (ErrorsFound) THEN
 ENDIF
 
 DO SetPtMgrNum = 1,NumWarmestSetPtMgrsTempFlow
-    CALL SetupOutputVariable('Critical Zone for Warmest Temp Flow Control[-]', &
+    CALL SetupOutputVariable('Setpoint Manager Warmest Temperature Critical Zone Number []', &
                              WarmestSetPtMgrTempFlow(SetPtMgrNum)%CritZoneNum,'System',&
                              'Average',WarmestSetPtMgrTempFlow(SetPtMgrNum)%Name)
-    CALL SetupOutputVariable('Turndown for Warmest Temp Flow Control[-]', &
+    CALL SetupOutputVariable('Setpoint Manager Warmest Temperature Turndown Flow Fraction []', &
                              WarmestSetPtMgrTempFlow(SetPtMgrNum)%Turndown,'System',&
                              'Average',WarmestSetPtMgrTempFlow(SetPtMgrNum)%Name)
 END DO
@@ -2844,7 +3122,7 @@ IF (NumCondEntSetPtMgrs.GT.0) ALLOCATE(CondEntSetPtMgr(NumCondEntSetPtMgrs)) ! A
 cCurrentModuleObject='SetpointManager:CondenserEnteringReset'
 
 DO SetPtMgrNum = 1,NumCondEntSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2885,7 +3163,8 @@ DO SetPtMgrNum = 1,NumCondEntSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(CondEntSetPtMgr(SetPtMgrNum)%CtrlNodeListName,NumNodes,NodeNums,NodeListError, &
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(7))
   IF (.not. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(CondEntSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2896,8 +3175,8 @@ DO SetPtMgrNum = 1,NumCondEntSetPtMgrs
       CondEntSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '// &
-                           TRIM(CondEntSetPtMgr(SetPtMgrNum)%Name))
+!    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '// &
+!                           TRIM(CondEntSetPtMgr(SetPtMgrNum)%Name))
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2931,7 +3210,7 @@ IF (NumIdealCondEntSetPtMgrs.GT.0) ALLOCATE(IdealCondEntSetPtMgr(NumIdealCondEnt
 cCurrentModuleObject='SetpointManager:CondenserEnteringReset:Ideal'
 
 DO SetPtMgrNum = 1,NumIdealCondEntSetPtMgrs
-  CALL GetObjectItem(TRIM(cCurrentModuleObject),SetPtMgrNum,cAlphaArgs,NumAlphas,&
+  CALL GetObjectItem(cCurrentModuleObject,SetPtMgrNum,cAlphaArgs,NumAlphas,&
                      rNumericArgs,NumNums,IOStat,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                      AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2947,7 +3226,6 @@ DO SetPtMgrNum = 1,NumIdealCondEntSetPtMgrs
   IF (SameString(IdealCondEntSetPtMgr(SetPtMgrNum)%CtrlVarType,'Temperature')) THEN
     IdealCondEntSetPtMgr(SetPtMgrNum)%CtrlTypeMode = iCtrlVarType_Temp
   ELSE
-    ! should not come here if idd type choice and key list is working
     CALL ShowSevereError(' found invalid control type of '//TRIM(cAlphaArgs(2)) &
                          //' in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)) )
     ErrorsFound = .TRUE.
@@ -2958,7 +3236,8 @@ DO SetPtMgrNum = 1,NumIdealCondEntSetPtMgrs
 
   NodeListError=.false.
   CALL GetNodeNums(IdealCondEntSetPtMgr(SetPtMgrNum)%CtrlNodeListName,NumNodes,NodeNums,NodeListError, &
-       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent)
+       NodeType_Unknown,TRIM(cCurrentModuleObject),cAlphaArgs(1),NodeConnectionType_Setpoint,1,ObjectIsNotParent,  &
+       InputFieldName=cAlphaFieldNames(3))
   IF (.not. NodeListError) THEN
     NumNodesCtrld = NumNodes
     ALLOCATE(IdealCondEntSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNodesCtrld))
@@ -2969,8 +3248,8 @@ DO SetPtMgrNum = 1,NumIdealCondEntSetPtMgrs
       IdealCondEntSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrldNodeNum) = NodeNums(CtrldNodeNum)
     END DO
   ELSE
-    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '// &
-                           TRIM(IdealCondEntSetPtMgr(SetPtMgrNum)%Name))
+!    CALL ShowContinueError('Invalid '//trim(cAlphaFieldNames(3))//' in '//TRIM(cCurrentModuleObject)//' = '// &
+!                           TRIM(IdealCondEntSetPtMgr(SetPtMgrNum)%Name))
     ErrorsFound=.TRUE.
   ENDIF
 
@@ -2991,6 +3270,18 @@ DO SetPtMgrNum = 1,NumIdealCondEntSetPtMgrs
   AllSetPtMgr(AllsetPtMgrNum)%NumCtrlNodes = IdealCondEntSetPtMgr(SetPtMgrNum)%NumCtrlNodes
 
 END DO
+
+DEALLOCATE(cAlphaFieldNames)
+DEALLOCATE(cAlphaArgs)
+DEALLOCATE(lAlphaFieldBlanks)
+DEALLOCATE(cNumericFieldNames)
+DEALLOCATE(rNumericArgs)
+DEALLOCATE(lNumericFieldBlanks)
+
+IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Errors found in input.  Program terminates.')
+ENDIF
+
 RETURN
 
 END SUBROUTINE GetSetPointManagerInputs
@@ -3212,7 +3503,6 @@ SUBROUTINE InitSetPointManagers
   USE InputProcessor, ONLY: SameString
   USE DataEnvironment, ONLY: GroundTemp_Deep, GroundTemp,GroundTemp_Surface, GroundTempFC
   USE OutAirNodeManager,     ONLY: CheckOutAirNodeNumber
-
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -4025,10 +4315,10 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
               Node(NodeNum)%TempSetPoint = &
                        GetCurrentScheduleValue(SchSetPtMgr(SetPtMgrNum)%SchedPtr)
         CASE(iCtrlVarType_MaxTemp)
-              Node(NodeNum)%TempMax = &
+              Node(NodeNum)%TempSetPointHi = &
                        GetCurrentScheduleValue(SchSetPtMgr(SetPtMgrNum)%SchedPtr)
         CASE(iCtrlVarType_MinTemp)
-              Node(NodeNum)%TempMin = &
+              Node(NodeNum)%TempSetPointLo = &
                        GetCurrentScheduleValue(SchSetPtMgr(SetPtMgrNum)%SchedPtr)
         CASE(iCtrlVarType_HumRat)
               Node(NodeNum)%HumRatSetPoint = &
@@ -4104,7 +4394,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,SingZoneRhSetPtMgr(SetPtMgrNum)%NumCtrlNodes
       NodeNum = SingZoneRhSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
      IF (SingZoneRhSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the setpoint
       END IF
     END DO
   END DO
@@ -4117,7 +4407,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,SingZoneHtSetPtMgr(SetPtMgrNum)%NumCtrlNodes
       NodeNum = SingZoneHtSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
      IF (SingZoneHtSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the setpoint
       END IF
     END DO
   END DO
@@ -4130,7 +4420,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,SingZoneClSetPtMgr(SetPtMgrNum)%NumCtrlNodes
       NodeNum = SingZoneClSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
      IF (SingZoneClSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the setpoint
       END IF
     END DO
   END DO
@@ -4140,15 +4430,15 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%MassFlowRate = 0.0
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%MassFlowRate = 0.0
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%MassFlowRate = 0.0
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%Temp = 20.
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%Temp = 20.
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%Temp = 20.
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%Temp = 20.d0
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%Temp = 20.d0
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%Temp = 20.d0
     Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%HumRat = OutHumRat
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%HumRat = OutHumRat
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%HumRat = OutHumRat
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%Quality = 1.0
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%Quality = 1.0
-    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%Quality = 1.0
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%Quality = 1.0d0
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%Quality = 1.0d0
+    Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%Quality = 1.0d0
     Node(MixedAirSetPtMgr(SetPtMgrNum)%RefNode)%Press = OutBaroPress
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanInNode)%Press = OutBaroPress
     Node(MixedAirSetPtMgr(SetPtMgrNum)%FanOutNode)%Press = OutBaroPress
@@ -4169,18 +4459,18 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%MassFlowRate = 0.0
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%MassFlowRate = 0.0
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%MassFlowRate = 0.0
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%Temp = 20.
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%Temp = 20.
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%Temp = 20.
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%Temp = 20.
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%Temp = 20.d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%Temp = 20.d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%Temp = 20.d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%Temp = 20.d0
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%HumRat = OutHumRat
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%HumRat = OutHumRat
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%HumRat = OutHumRat
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%HumRat = OutHumRat
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%Quality = 1.0
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%Quality = 1.0
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%Quality = 1.0
-    Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%Quality = 1.0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%Quality = 1.0d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%Quality = 1.0d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%Quality = 1.0d0
+    Node(OAPretreatSetPtMgr(SetPtMgrNum)%ReturnInNode)%Quality = 1.0d0
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%RefNode)%Press = OutBaroPress
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%MixedOutNode)%Press = OutBaroPress
     Node(OAPretreatSetPtMgr(SetPtMgrNum)%OAInNode)%Press = OutBaroPress
@@ -4210,7 +4500,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,WarmestSetPtMgr(SetPtMgrNum)%NumCtrlNodes
       NodeNum = WarmestSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
       IF (WarmestSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the setpoint
       END IF
     END DO
   END DO
@@ -4219,7 +4509,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,ColdestSetPtMgr(SetPtMgrNum)%NumCtrlNodes
       NodeNum = ColdestSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
       IF (ColdestSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the setpoint
       END IF
     END DO
   END DO
@@ -4228,7 +4518,7 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
     DO CtrlNodeIndex=1,WarmestSetPtMgrTempFlow(SetPtMgrNum)%NumCtrlNodes
       NodeNum = WarmestSetPtMgrTempFlow(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
       IF (WarmestSetPtMgrTempFlow(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
-        Node(NodeNum)%TempSetPoint = 20. ! Set the temperature setpoint
+        Node(NodeNum)%TempSetPoint = 20.d0 ! Set the temperature setpoint
         IF (WarmestSetPtMgrTempFlow(SetPtMgrNum)%AirLoopNum /= 0) THEN
           AirLoopFlow(WarmestSetPtMgrTempFlow(SetPtMgrNum)%AirLoopNum)%ReqSupplyFrac = 1. ! PH 10/09/04 Set the flow
           AirLoopControlInfo(WarmestSetPtMgrTempFlow(SetPtMgrNum)%AirLoopNum)%LoopFlowRateSet = .TRUE.  ! PH 10/09/04 Set the flag
@@ -4299,17 +4589,17 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
         IF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = OutWetBulbTemp ! Set the setpoint
         ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = OutWetBulbTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = OutWetBulbTemp ! Set the setpoint
         ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = OutWetBulbTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = OutWetBulbTemp ! Set the setpoint
         END IF
       ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefTempType_DryBulb) THEN
         IF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = OutDryBulbTemp ! Set the setpoint
         ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = OutDryBulbTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = OutDryBulbTemp ! Set the setpoint
         ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = OutDryBulbTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = OutDryBulbTemp ! Set the setpoint
         END IF
       END IF
     END DO
@@ -4320,29 +4610,38 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
       NodeNum = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlNodes(CtrlNodeIndex) ! Get the node number
       IF (CheckOutAirNodeNumber(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum)) THEN
         IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefTempType_WetBulb) THEN
+          Node(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum)%SPMNodeWetbulbRepReq = .TRUE.
           IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
             Node(NodeNum)%TempSetPoint = OutWetBulbTemp ! Set the setpoint
           ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-            Node(NodeNum)%TempMax = OutWetBulbTemp ! Set the setpoint
+            Node(NodeNum)%TempSetPointHi = OutWetBulbTemp ! Set the setpoint
           ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-            Node(NodeNum)%TempMin = OutWetBulbTemp ! Set the setpoint
+            Node(NodeNum)%TempSetPointLo = OutWetBulbTemp ! Set the setpoint
           END IF
         ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefTempType_DryBulb) THEN
           IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
             Node(NodeNum)%TempSetPoint = OutDryBulbTemp ! Set the setpoint
           ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-            Node(NodeNum)%TempMax = OutDryBulbTemp ! Set the setpoint
+            Node(NodeNum)%TempSetPointHi = OutDryBulbTemp ! Set the setpoint
           ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-            Node(NodeNum)%TempMin = OutDryBulbTemp ! Set the setpoint
+            Node(NodeNum)%TempSetPointLo = OutDryBulbTemp ! Set the setpoint
           END IF
         ENDIF
       ELSE
+        ! If reference node is a water node, then set RefTypeMode to NodeDryBulb
+        IF (Node(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum)%FluidType .EQ. NodeType_Water) THEN
+          FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefTypeMode = iRefTempType_DryBulb
+        ELSEIF (Node(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum)%FluidType .EQ. NodeType_Air) THEN
+          IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefTempType_WetBulb) THEN
+            Node(FollowSysNodeTempSetPtMgr(SetPtMgrNum)%RefNodeNum)%SPMNodeWetbulbRepReq = .TRUE.
+          ENDIF
+        ENDIF
         IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = 20.0d0 ! Set the setpoint
         ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = 20.0d0 ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = 20.0d0 ! Set the setpoint
         ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = 20.0d0 ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = 20.0d0 ! Set the setpoint
         END IF
       END IF
     END DO
@@ -4355,33 +4654,33 @@ IF ( (BeginEnvrnFlag .and. MyEnvrnFlag) .or. MyOneTimeFlag2) THEN
         IF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = GroundTemp ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = GroundTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = GroundTemp ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = GroundTemp ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = GroundTemp ! Set the setpoint
         END IF
       ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefGroundTempObjType_Shallow) THEN
         IF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = GroundTemp_Surface ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = GroundTemp_Surface ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = GroundTemp_Surface ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = GroundTemp_Surface ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = GroundTemp_Surface ! Set the setpoint
         END IF
       ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefGroundTempObjType_Deep) THEN
         IF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = GroundTemp_Deep ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = GroundTemp_Deep ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = GroundTemp_Deep ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = GroundTemp_Deep ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = GroundTemp_Deep ! Set the setpoint
         END IF
       ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%RefTypeMode == iRefGroundTempObjType_FCfactorMethod) THEN
         IF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
           Node(NodeNum)%TempSetPoint = GroundTempFC ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-          Node(NodeNum)%TempMax = GroundTempFC ! Set the setpoint
+          Node(NodeNum)%TempSetPointHi = GroundTempFC ! Set the setpoint
         ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-          Node(NodeNum)%TempMin = GroundTempFC ! Set the setpoint
+          Node(NodeNum)%TempSetPointLo = GroundTempFC ! Set the setpoint
         END IF
       END IF
     END DO
@@ -7024,9 +7323,9 @@ DO SetPtMgrNum=1,NumSchSetPtMgrs
     CASE (iCtrlVarType_Temp)
       Node(NodeNum)%TempSetPoint         = SchSetPtMgr(SetPtMgrNum)%SetPt
     CASE (iCtrlVarType_MaxTemp)
-      Node(NodeNum)%TempMax              = SchSetPtMgr(SetPtMgrNum)%SetPt
+      Node(NodeNum)%TempSetPointHi              = SchSetPtMgr(SetPtMgrNum)%SetPt
     CASE (iCtrlVarType_MinTemp)
-      Node(NodeNum)%TempMin              = SchSetPtMgr(SetPtMgrNum)%SetPt
+      Node(NodeNum)%TempSetPointLo              = SchSetPtMgr(SetPtMgrNum)%SetPt
     CASE (iCtrlVarType_HumRat)
       Node(NodeNum)%HumRatSetPoint       = SchSetPtMgr(SetPtMgrNum)%SetPt
     CASE (iCtrlVarType_MaxHumRat)
@@ -7291,9 +7590,9 @@ DO SetPtMgrNum=1,NumFollowOATempSetPtMgrs
     IF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
       Node(NodeNum)%TempSetPoint = FollowOATempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-      Node(NodeNum)%TempMax = FollowOATempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointHi = FollowOATempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (FollowOATempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-      Node(NodeNum)%TempMin = FollowOATempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointLo = FollowOATempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     END IF
   END DO
 END DO
@@ -7306,9 +7605,9 @@ DO SetPtMgrNum=1,NumFollowSysNodeTempSetPtMgrs
     IF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
       Node(NodeNum)%TempSetPoint = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-      Node(NodeNum)%TempMax = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointHi = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (FollowSysNodeTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-      Node(NodeNum)%TempMin = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointLo = FollowSysNodeTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     END IF
   END DO
 END DO
@@ -7321,9 +7620,9 @@ DO SetPtMgrNum=1,NumGroundTempSetPtMgrs
     IF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_Temp) THEN
       Node(NodeNum)%TempSetPoint = GroundTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MaxTemp) THEN
-      Node(NodeNum)%TempMax = GroundTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointHi = GroundTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     ELSEIF (GroundTempSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType_MinTemp) THEN
-      Node(NodeNum)%TempMin = GroundTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
+      Node(NodeNum)%TempSetPointLo = GroundTempSetPtMgr(SetPtMgrNum)%SetPt ! Set the temperature setpoint
     END IF
   END DO
 END DO
@@ -7501,6 +7800,12 @@ INTEGER, INTENT(IN)  ::  SetPtType
 INTEGER SetPtMgrNum
 INTEGER NumNode
 
+ ! First time called, get the input for all the setpoint managers
+ IF (GetInputFlag) THEN
+   CALL GetSetPointManagerInputs
+   GetInputFlag = .FALSE.
+ END IF
+
  IsNodeOnSetPtManager = .FALSE.
 
  DO SetPtMgrNum = 1, NumSchSetPtMgrs
@@ -7517,6 +7822,70 @@ INTEGER NumNode
  RETURN
 
 END FUNCTION IsNodeOnSetPtManager
+
+LOGICAL FUNCTION NodeHasSPMCtrlVarType(NodeNum,iCtrlVarType)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Chandan Sharma
+          !       DATE WRITTEN   March 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Determines if a particular node is acted upon by a specific setpoint manager
+
+          ! METHODOLOGY EMPLOYED:
+          ! Cycle through all setpoint managers and find if the node has a specific control type
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+INTEGER, INTENT(IN) ::  NodeNum
+INTEGER, INTENT(IN) ::  iCtrlVarType
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER SetPtMgrNum           ! loop counter for each set point manager
+INTEGER NumNode               ! loop counter for each node and specific control type
+
+          ! FLOW:
+
+! First time called, get the input for all the setpoint managers
+IF (GetInputFlag) THEN
+  CALL GetSetPointManagerInputs
+  GetInputFlag = .FALSE.
+END IF
+
+! Initialize to false that node is not controlled by set point manager
+ NodeHasSPMCtrlVarType = .FALSE.
+
+ SPMLoop: DO SetPtMgrNum = 1, NumAllSetPtMgrs
+   DO NumNode = 1, AllSetPtMgr(SetPtMgrNum)%NumCtrlNodes
+    IF(NodeNum == AllSetPtMgr(SetPtMgrNum)%CtrlNodes(NumNode)) THEN
+      IF(AllSetPtMgr(SetPtMgrNum)%CtrlTypeMode == iCtrlVarType)THEN
+!       If specific control type is found, it doesn't matter if there are other of same type.
+        NodeHasSPMCtrlVarType = .TRUE.
+        EXIT SPMLoop
+      END IF
+    END IF
+   END DO
+ END DO SPMLoop
+
+ RETURN
+
+END FUNCTION NodeHasSPMCtrlVarType
 
 SUBROUTINE CheckIFAnyIdealCondEntSetPoint
 
@@ -7561,7 +7930,7 @@ SUBROUTINE CheckIFAnyIdealCondEntSetPoint
   CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
 
   cCurrentModuleObject = 'SetpointManager:CondenserEnteringReset:Ideal'
-  NumIdealCondEntSetPtMgrs  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumIdealCondEntSetPtMgrs  = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumIdealCondEntSetPtMgrs > 0 ) THEN
     AnyIdealCondEntSetPointInModel = .TRUE.
@@ -7575,7 +7944,7 @@ END SUBROUTINE CheckIFAnyIdealCondEntSetPoint
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

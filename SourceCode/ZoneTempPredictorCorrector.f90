@@ -300,7 +300,7 @@ SUBROUTINE GetZoneAirSetpoints
   USE InputProcessor
   USE ScheduleManager, ONLY: GetScheduleIndex, CheckScheduleValueMinMax, GetScheduleMinValue, GetScheduleMaxValue,  &
                              CheckScheduleValue
-  USE General, ONLY: TrimSigDigits, FindNumberInList
+  USE General, ONLY: TrimSigDigits, FindNumberInList, RoundSigDigits, CheckCreatedZoneItemName
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -308,7 +308,7 @@ SUBROUTINE GetZoneAirSetpoints
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetZoneAirSetpoints: '
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -376,13 +376,13 @@ SUBROUTINE GetZoneAirSetpoints
 
           ! FLOW:
   cCurrentModuleObject=cZControlTypes(iZC_TStat)
-  NumTStatStatements = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumTStatStatements = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(TStatObjects(NumTStatStatements))
 
 ! Pre-scan for use of Zone lists in TStat statements (i.e. Global application of TStat)
   NumTempControlledZones=0
   DO Item=1,NumTStatStatements
-    CALL GetObjectItem(trim(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -432,7 +432,7 @@ SUBROUTINE GetZoneAirSetpoints
 
     TempControlledZoneNum = 0
     DO Item = 1, NumTStatStatements
-      CALL GetObjectItem(trim(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                          NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       DO Item1=1,TStatObjects(Item)%NumOfZones
@@ -464,8 +464,15 @@ SUBROUTINE GetZoneAirSetpoints
         IF (.not. TStatObjects(Item)%ZoneListActive) THEN
           TempControlledZone(TempControlledZoneNum)%Name = cAlphaArgs(1)
         ELSE
-          TempControlledZone(TempControlledZoneNum)%Name =   &
-             trim(Zone(ZoneList(TStatObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//' '//trim(TStatObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,cCurrentModuleObject,  &
+                                        Zone(ZoneList(TStatObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(TStatObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        TStatObjects(Item)%Name,     &
+                                        TempControlledZone%Name,           &
+                                        TempControlledZoneNum-1,                       &
+                                        TempControlledZone(TempControlledZoneNum)%Name,            &
+                                        ErrFlag)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         TempControlledZone(TempControlledZoneNum)%ControlTypeSchedName = cAlphaArgs(3)
@@ -520,12 +527,12 @@ SUBROUTINE GetZoneAirSetpoints
   ENDIF ! Check on number of TempControlledZones
 
   cCurrentModuleObject=ValidControlTypes(SglHeatSetPoint)
-  NumSingleTempHeatingControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleTempHeatingControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleTempHeatingControls .GT. 0) ALLOCATE(SetPointSingleHeating(NumSingleTempHeatingControls))
 
   DO SingleTempHeatingControlNum = 1, NumSingleTempHeatingControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleTempHeatingControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,SingleTempHeatingControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -548,12 +555,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleTempHeatingControlNum
 
   cCurrentModuleObject=ValidControlTypes(SglCoolSetPoint)
-  NumSingleTempCoolingControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleTempCoolingControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleTempCoolingControls .GT. 0) ALLOCATE(SetPointSingleCooling(NumSingleTempCoolingControls))
 
   DO SingleTempCoolingControlNum = 1, NumSingleTempCoolingControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleTempCoolingControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,SingleTempCoolingControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -576,12 +583,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleTempCoolingControlNum
 
   cCurrentModuleObject=ValidControlTypes(SglHCSetPoint)
-  NumSingleTempHeatCoolControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleTempHeatCoolControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleTempHeatCoolControls .GT. 0) ALLOCATE(SetPointSingleHeatCool(NumSingleTempHeatCoolControls))
 
   DO SingleTempHeatCoolControlNum = 1, NumSingleTempHeatCoolControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleTempHeatCoolControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,SingleTempHeatCoolControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     SetPointSingleHeatCool(SingleTempHeatCoolControlNum)%Name = cAlphaArgs(1)
@@ -596,12 +603,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleTempHeatCoolControlNum
 
   cCurrentModuleObject=ValidControlTypes(DualSetPoint)
-  NumDualTempHeatCoolControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumDualTempHeatCoolControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumDualTempHeatCoolControls .GT. 0) ALLOCATE(SetPointDualHeatCool(NumDualTempHeatCoolControls))
 
   DO DualTempHeatCoolControlNum = 1, NumDualTempHeatCoolControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),DualTempHeatCoolControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,DualTempHeatCoolControlNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -858,12 +865,12 @@ SUBROUTINE GetZoneAirSetpoints
   IF (ALLOCATED(TStatControlTypes)) DEALLOCATE(TStatControlTypes)
   ! This starts the Humidity Control Get Input section
   cCurrentModuleObject=cZControlTypes(iZC_HStat)
-  NumHumidityControlZones = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumHumidityControlZones = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumHumidityControlZones .GT. 0) ALLOCATE(HumidityControlZone(NumHumidityControlZones))
 
   DO HumidControlledZoneNum = 1, NumHumidityControlZones
-    CALL GetObjectItem(trim(cCurrentModuleObject),HumidControlledZoneNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,HumidControlledZoneNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -916,14 +923,14 @@ SUBROUTINE GetZoneAirSetpoints
 
   ! Start to read Thermal comfort control objects
   cCurrentModuleObject=cZControlTypes(iZC_TCTStat)
-  NumComfortTStatStatements = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumComfortTStatStatements = GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(ComfortTStatObjects(NumComfortTStatStatements))
 
 ! Pre-scan for use of Zone lists in TStat statements (i.e. Global application of TStat)
   NumComfortControlledZones=0
   ErrFlag=.false.
   DO Item=1,NumComfortTStatStatements
-    CALL GetObjectItem(trim(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ! will not do much verifying -- that will come later.
@@ -976,7 +983,7 @@ SUBROUTINE GetZoneAirSetpoints
 
     ComfortControlledZoneNum=0
     DO Item = 1, NumComfortTStatStatements
-      CALL GetObjectItem(trim(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                          NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                          AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       DO Item1=1,ComfortTStatObjects(Item)%NumOfZones
@@ -1208,12 +1215,12 @@ SUBROUTINE GetZoneAirSetpoints
   ! End of Thermal comfort control reading and checking
 
   cCurrentModuleObject=ValidComfortControlTypes(SglHeatSetPointFanger)
-  NumSingleFangerHeatingControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleFangerHeatingControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleFangerHeatingControls .GT. 0) ALLOCATE(SetPointSingleHeatingFanger(NumSingleFangerHeatingControls))
 
   DO SingleFangerHeatingControlNum = 1, NumSingleFangerHeatingControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleFangerHeatingControlNum,  &
+    CALL GetObjectItem(cCurrentModuleObject,SingleFangerHeatingControlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1245,12 +1252,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleFangerHeatingControlNum
 
   cCurrentModuleObject=ValidComfortControlTypes(SglCoolSetPointFanger)
-  NumSingleFangerCoolingControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleFangerCoolingControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleFangerCoolingControls .GT. 0) ALLOCATE(SetPointSingleCoolingFanger(NumSingleFangerCoolingControls))
 
   DO SingleFangerCoolingControlNum = 1, NumSingleFangerCoolingControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleFangerCoolingControlNum,  &
+    CALL GetObjectItem(cCurrentModuleObject,SingleFangerCoolingControlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1283,12 +1290,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleFangerCoolingControlNum
 
   cCurrentModuleObject=ValidComfortControlTypes(SglHCSetPointFanger)
-  NumSingleFangerHeatCoolControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumSingleFangerHeatCoolControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumSingleFangerHeatCoolControls .GT. 0) ALLOCATE(SetPointSingleHeatCoolFanger(NumSingleFangerHeatCoolControls))
 
   DO SingleFangerHeatCoolControlNum = 1, NumSingleFangerHeatCoolControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),SingleFangerHeatCoolControlNum,  &
+    CALL GetObjectItem(cCurrentModuleObject,SingleFangerHeatCoolControlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1322,12 +1329,12 @@ SUBROUTINE GetZoneAirSetpoints
   END DO ! SingleFangerHeatCoolControlNum
 
   cCurrentModuleObject=ValidComfortControlTypes(DualSetPointFanger)
-  NumDualFangerHeatCoolControls = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumDualFangerHeatCoolControls = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumDualFangerHeatCoolControls .GT. 0) ALLOCATE(SetPointDualHeatCoolFanger(NumDualFangerHeatCoolControls))
 
   DO DualFangerHeatCoolControlNum = 1, NumDualFangerHeatCoolControls
-    CALL GetObjectItem(trim(cCurrentModuleObject),DualFangerHeatCoolControlNum,  &
+    CALL GetObjectItem(cCurrentModuleObject,DualFangerHeatCoolControlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1619,14 +1626,14 @@ SUBROUTINE GetZoneAirSetpoints
 
   ! Get the Zone Air Capacitance Multiplier for use in the Predictor-Corrrector Procedure
   cCurrentModuleObject='ZoneCapacitanceMultiplier:ResearchSpecial'
-  NumNums=GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumNums=GetNumObjectsFound(cCurrentModuleObject)
   IF (NumNums == 0) THEN
     ZoneVolCapMultpSens  = 1.d0
     ZoneVolCapMultpMoist = 1.d0
     ZoneVolCapMultpCO2   = 1.d0
     ZoneVolCapMultpGenContam = 1.0d0
   ELSE
-    CALL GetObjectItem(trim(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ZoneVolCapMultpSens  = rNumericArgs(1)
@@ -1642,13 +1649,13 @@ SUBROUTINE GetZoneAirSetpoints
 701 FORMAT( 'Zone Volume Capacitance Multiplier,' , F8.3,' ,', F8.3,',', F8.3,',', F8.3)
 
   cCurrentModuleObject=cZControlTypes(iZC_OTTStat)
-  NumOpTempControlledZones =  GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumOpTempControlledZones =  GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOpTempControlledZones > 0) then
     AnyOpTempControl = .TRUE.
 
     DO OpTempContrlNum = 1, NumOpTempControlledZones
-       CALL GetObjectItem(trim(cCurrentModuleObject),OpTempContrlNum,  &
+       CALL GetObjectItem(cCurrentModuleObject,OpTempContrlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1786,13 +1793,13 @@ SUBROUTINE GetZoneAirSetpoints
 
   ! Overcool dehumidificaton GetInput starts here
   cCurrentModuleObject=cZControlTypes(iZC_TandHStat)
-  NumTempAndHumidityControlledZones =  GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumTempAndHumidityControlledZones =  GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumTempAndHumidityControlledZones > 0) THEN
     AnyZoneTempAndHumidityControl = .TRUE.
 
     DO TempHumidityCntrlNum = 1, NumTempAndHumidityControlledZones
-       CALL GetObjectItem(TRIM(cCurrentModuleObject),TempHumidityCntrlNum,  &
+       CALL GetObjectItem(cCurrentModuleObject,TempHumidityCntrlNum,  &
                        cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1986,7 +1993,7 @@ SUBROUTINE InitZoneAirSetpoints
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='InitZoneAirSetpoints: '
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -2148,48 +2155,48 @@ SUBROUTINE InitZoneAirSetpoints
 
     ! CurrentModuleObject='Zone'
     DO Loop = 1, NumOfZones
-      CALL SetupOutputVariable('Zone/Sys Sensible Heating Energy [J]',SNLoadHeatEnergy(Loop), &
+      CALL SetupOutputVariable('Zone Air System Sensible Heating Energy [J]',SNLoadHeatEnergy(Loop), &
                                'System','Sum',Zone(Loop)%Name,ResourceTypeKey='ENERGYTRANSFER', &
                                 EndUseKey='Heating',GroupKey='Building',ZoneKey=Zone(Loop)%Name, &
                                 ZoneMult=Zone(Loop)%Multiplier, &
                                 ZoneListMult=Zone(Loop)%ListMultiplier)
-      CALL SetupOutputVariable('Zone/Sys Sensible Cooling Energy [J]',SNLoadCoolEnergy(Loop), &
+      CALL SetupOutputVariable('Zone Air System Sensible Cooling Energy [J]',SNLoadCoolEnergy(Loop), &
                                'System','Sum',Zone(Loop)%Name,ResourceTypeKey='ENERGYTRANSFER', &
                                 EndUseKey='Cooling',GroupKey='Building',ZoneKey=Zone(Loop)%Name, &
                                 ZoneMult=Zone(Loop)%Multiplier, &
                                 ZoneListMult=Zone(Loop)%ListMultiplier)
-      CALL SetupOutputVariable('Zone/Sys Sensible Heating Rate [W]',SNLoadHeatRate(Loop),'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Sensible Cooling Rate [W]',SNLoadCoolRate(Loop),'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Air Temperature [C]',Zt(Loop),'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Air Temperature at Thermostat [C]',TempTstatAir(Loop),'System','Average',Zone(Loop)%Name)
+      CALL SetupOutputVariable('Zone Air System Sensible Heating Rate [W]',SNLoadHeatRate(Loop),'System','Average',Zone(Loop)%Name)
+      CALL SetupOutputVariable('Zone Air System Sensible Cooling Rate [W]',SNLoadCoolRate(Loop),'System','Average',Zone(Loop)%Name)
+      CALL SetupOutputVariable('Zone Air Temperature [C]',Zt(Loop),'System','Average',Zone(Loop)%Name)
+      CALL SetupOutputVariable('Zone Thermostat Air Temperature [C]',TempTstatAir(Loop),'System','Average',Zone(Loop)%Name)
       CALL SetupOutputVariable('Zone Air Humidity Ratio []',ZoneAirHumRat(Loop),'System','Average',Zone(Loop)%Name)
       CALL SetupOutputVariable('Zone Air Relative Humidity [%]',ZoneAirRelHum(Loop),'System', &
                                'Average',Zone(Loop)%Name)
       ! This output variable is for the predicted Heating/Cooling load for the zone which can be compared to actual load
       ! These report variables are not multiplied by zone and group multipliers
-      CALL SetupOutputVariable('Zone/Sys Sensible Load Predicted [W]', SNLoadPredictedRate(Loop), &
+      CALL SetupOutputVariable('Zone Predicted Sensible Load to Setpoint Heat Transfer Rate [W]', SNLoadPredictedRate(Loop), &
                                'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Sensible Load to Heating Setpoint Predicted [W]', &
+      CALL SetupOutputVariable('Zone Predicted Sensible Load to Heating Setpoint Heat Transfer Rate [W]', &
                                 SNLoadPredictedHSPRate(Loop), &
                                'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Sensible Load to Cooling Setpoint Predicted [W]', &
+      CALL SetupOutputVariable('Zone Predicted Sensible Load to Cooling Setpoint Heat Transfer Rate [W]', &
                                 SNLoadPredictedCSPRate(Loop), &
                                'System','Average',Zone(Loop)%Name)
       ! This output variable is for the predicted moisture load for the zone with humidity controlled specified.
-      CALL SetupOutputVariable('Zone/Sys Moisture Load Rate Predicted [kgWater/s]', MoisturePredictedRate(Loop), &
+      CALL SetupOutputVariable('Zone Predicted Moisture Load Moisture Transfer Rate [kgWater/s]', MoisturePredictedRate(Loop), &
                                'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Moisture Load Rate Predicted to humidifying setpoint [kgWater/s]', &
+      CALL SetupOutputVariable('Zone Predicted Moisture Load to Humidifying Setpoint Moisture Transfer Rate [kgWater/s]', &
                                ZoneSysMoistureDemand(Loop)%OutputRequiredToHumidifyingSP,'System','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Moisture Load Rate Predicted to dehumidifying setpoint [kgWater/s]', &
+      CALL SetupOutputVariable('Zone Predicted Moisture Load to Dehumidifying Setpoint Moisture Transfer Rate [kgWater/s]', &
                                ZoneSysMoistureDemand(Loop)%OutputRequiredToDehumidifyingSP,'System','Average',Zone(Loop)%Name)
       ! Zone thermostat setpoints
-      CALL SetupOutputVariable('Zone/Sys Thermostat Control Type', &
+      CALL SetupOutputVariable('Zone Thermostat Control Type []', &
                                 TempControlType(Loop), &
                                'Zone','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Thermostat Heating Setpoint [C]', &
+      CALL SetupOutputVariable('Zone Thermostat Heating Setpoint Temperature [C]', &
                                 ZoneThermostatSetPointLo(Loop), &
                                'Zone','Average',Zone(Loop)%Name)
-      CALL SetupOutputVariable('Zone/Sys Thermostat Cooling Setpoint [C]', &
+      CALL SetupOutputVariable('Zone Thermostat Cooling Setpoint Temperature [C]', &
                                 ZoneThermostatSetPointHi(Loop), &
                                'Zone','Average',Zone(Loop)%Name)
 
@@ -2200,36 +2207,36 @@ SUBROUTINE InitZoneAirSetpoints
      ! CurrentModuleObject='ZoneControl:Thermostat:ThermalComfort'
       DO Loop = 1, NumComfortControlledZones
         ZoneNum = ComfortControlledZone(Loop)%ActualZoneNum
-        CALL SetupOutputVariable('Zone/Sys Thermal Comfort Control Type', &
+        CALL SetupOutputVariable('Zone Thermal Comfort Control Type []', &
                                 ComfortControlType(ZoneNum), 'Zone','Average',Zone(ZoneNum)%Name)
-        CALL SetupOutputVariable('Zone/Sys Thermal Comfort Control Fanger Low PMV', &
+        CALL SetupOutputVariable('Zone Thermal Comfort Control Fanger Low Setpoint PMV []', &
                                 ZoneComfortControlsFanger(ZoneNum)%LowPMV, 'Zone','Average',Zone(ZoneNum)%Name)
-        CALL SetupOutputVariable('Zone/Sys Thermal Comfort Control Fanger High PMV', &
+        CALL SetupOutputVariable('Zone Thermal Comfort Control Fanger High Setpoint PMV []', &
                                 ZoneComfortControlsFanger(ZoneNum)%HighPMV, 'Zone','Average',Zone(ZoneNum)%Name)
       END DO
     End If
 
     ! CurrentModuleObject='ZoneList'
     DO Loop = 1, NumOfZoneLists
-      CALL SetupOutputVariable('Zone List Sensible Heating Energy[J]',ListSNLoadHeatEnergy(Loop), &
+      CALL SetupOutputVariable('Zone List Sensible Heating Energy [J]',ListSNLoadHeatEnergy(Loop), &
                                'System','Sum',ZoneList(Loop)%Name)
-      CALL SetupOutputVariable('Zone List Sensible Cooling Energy[J]',ListSNLoadCoolEnergy(Loop), &
+      CALL SetupOutputVariable('Zone List Sensible Cooling Energy [J]',ListSNLoadCoolEnergy(Loop), &
                                'System','Sum',ZoneList(Loop)%Name)
-      CALL SetupOutputVariable('Zone List Sensible Heating Rate[W]',ListSNLoadHeatRate(Loop),'System','Average',  &
+      CALL SetupOutputVariable('Zone List Sensible Heating Rate [W]',ListSNLoadHeatRate(Loop),'System','Average',  &
                                 ZoneList(Loop)%Name)
-      CALL SetupOutputVariable('Zone List Sensible Cooling Rate[W]',ListSNLoadCoolRate(Loop),'System','Average',  &
+      CALL SetupOutputVariable('Zone List Sensible Cooling Rate [W]',ListSNLoadCoolRate(Loop),'System','Average',  &
                                 ZoneList(Loop)%Name)
     END DO ! Loop
 
     ! CurrentModuleObject='ZoneGroup'
     DO Loop = 1, NumOfZoneGroups
-      CALL SetupOutputVariable('Zone Group Sensible Heating Energy[J]',GroupSNLoadHeatEnergy(Loop), &
+      CALL SetupOutputVariable('Zone Group Sensible Heating Energy [J]',GroupSNLoadHeatEnergy(Loop), &
                                'System','Sum',ZoneGroup(Loop)%Name)
-      CALL SetupOutputVariable('Zone Group Sensible Cooling Energy[J]',GroupSNLoadCoolEnergy(Loop), &
+      CALL SetupOutputVariable('Zone Group Sensible Cooling Energy [J]',GroupSNLoadCoolEnergy(Loop), &
                                'System','Sum',ZoneGroup(Loop)%Name)
-      CALL SetupOutputVariable('Zone Group Sensible Heating Rate[W]',GroupSNLoadHeatRate(Loop),'System','Average',  &
+      CALL SetupOutputVariable('Zone Group Sensible Heating Rate [W]',GroupSNLoadHeatRate(Loop),'System','Average',  &
                                    ZoneGroup(Loop)%Name)
-      CALL SetupOutputVariable('Zone Group Sensible Cooling Rate[W]',GroupSNLoadCoolRate(Loop),'System','Average',  &
+      CALL SetupOutputVariable('Zone Group Sensible Cooling Rate [W]',GroupSNLoadCoolRate(Loop),'System','Average',  &
                                    ZoneGroup(Loop)%Name)
     END DO ! Loop
 
@@ -2322,7 +2329,7 @@ SUBROUTINE InitZoneAirSetpoints
   DO Loop = 1, NumTempControlledZones
     IF (ZoneEquipInputsFilled .and. .not. ControlledZonesChecked) THEN
       IF (.not. VerifyControlledZoneForThermostat(TempControlledZone(Loop)%ZoneName)) THEN
-        CALL ShowSevereError('Zone="'//TRIM(TempControlledZone(Loop)%ZoneName)//'" has specified a'//  &
+        CALL ShowSevereError(RoutineName//'Zone="'//TRIM(TempControlledZone(Loop)%ZoneName)//'" has specified a'//  &
                              ' Thermostatic control but is not a controlled zone.')
         CALL ShowContinueError('...must have a ZoneHVAC:EquipmentConnections specification for this zone.')
         ErrorsFound=.true.
@@ -2380,7 +2387,7 @@ SUBROUTINE InitZoneAirSetpoints
   DO Loop = 1, NumComfortControlledZones
     IF (ZoneEquipInputsFilled .and. .not. ControlledZonesChecked) THEN
       IF (.not. VerifyControlledZoneForThermostat(ComfortControlledZone(Loop)%ZoneName)) THEN
-        CALL ShowSevereError('Zone="'//TRIM(ComfortControlledZone(Loop)%ZoneName)//'" has specified a'//  &
+        CALL ShowSevereError(RoutineName//'Zone="'//TRIM(ComfortControlledZone(Loop)%ZoneName)//'" has specified a'//  &
                              ' Comfort control but is not a controlled zone.')
         CALL ShowContinueError('...must have a ZoneHVAC:EquipmentConnections specification for this zone.')
         ErrorsFound=.true.
@@ -5107,8 +5114,12 @@ FUNCTION VerifyThermostatInZone(ZoneName) RESULT (HasThermostat)
     CALL GetZoneAirSetpoints
     GetZoneAirInputFlag = .FALSE.
   END IF
-  IF (FindItemInList(ZoneName,TempControlledZone%ZoneName,NumTempControlledZones) > 0) THEN
-    HasThermostat=.true.
+  IF (NumTempControlledZones > 0) THEN
+    IF (FindItemInList(ZoneName,TempControlledZone%ZoneName,NumTempControlledZones) > 0) THEN
+      HasThermostat=.true.
+    ELSE
+      HasThermostat=.false.
+    ENDIF
   ELSE
     HasThermostat=.false.
   ENDIF
@@ -5225,11 +5236,11 @@ IF (SetupOscillationOutputFlag) THEN
   !set up zone by zone variables
   ! CurrentModuleObject='Zone'
   DO iZone = 1, NumOfZones
-    CALL SetupOutputVariable('Time Zone Temperature Oscillating[hr]',ZoneTempOscillate(iZone), &
+    CALL SetupOutputVariable('Zone Oscillating Temperatures Time [hr]',ZoneTempOscillate(iZone), &
                               'System','Sum',Zone(iZone)%Name)
   END DO
   !set up a variable covering all zones
-  CALL SetupOutputVariable('Time Any Zone Temperature Oscillating[hr]',AnyZoneTempOscillate, &
+  CALL SetupOutputVariable('Facility Any Zone Oscillating Temperatures Time [hr]',AnyZoneTempOscillate, &
                               'System','Sum','Facility')
   SetupOscillationOutputFlag = .FALSE.
 END IF
@@ -5399,7 +5410,7 @@ SUBROUTINE CalcZoneAirComfortSetpoints
           ! FLOW:
    ! Call thermal comfort module to read zone control comfort object
    IF (FirstTimeFlag) THEN
-     CALL ManageThermalComfort
+     CALL ManageThermalComfort(InitializeOnly=.true.)
      FirstTimeFlag = .FALSE.
    END IF
 
@@ -5909,7 +5920,7 @@ END SUBROUTINE AdjustCoolingSetPointforTempAndHumidityControl
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

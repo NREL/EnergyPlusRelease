@@ -267,13 +267,13 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 
   MyOneTimeFlag = .false.
   cCurrentModuleObject = 'WaterUse:Storage'
-  NumWaterStorageTanks=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumWaterStorageTanks=GetNumObjectsFound(cCurrentModuleObject)
   IF (NumWaterStorageTanks > 0) THen
     AnyWaterSystemsInModel=.true.
     IF (.NOT.(Allocated(WaterStorage))) Allocate(WaterStorage(NumWaterStorageTanks))
 
     DO Item=1,NumWaterStorageTanks
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       AnyWaterSystemsInModel=.true.
       WaterStorage(Item)%Name = cAlphaArgs(1)
@@ -417,14 +417,14 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
   ENDIF ! num water storage tanks > 0
 
   cCurrentModuleObject = 'WaterUse:RainCollector'
-  NumRainCollectors = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumRainCollectors = GetNumObjectsFound(cCurrentModuleObject)
   If (NumRainCollectors > 0) then
     IF (.NOT.(Allocated(RainCollector))) Allocate(RainCollector(NumRainCollectors))
     ! allow exensible reference to surfaces.
     AnyWaterSystemsInModel=.true.
 
     DO Item=1,NumRainCollectors
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       RainCollector(Item)%Name = cAlphaArgs(1)
       Call VerifyName( cAlphaArgs(1), RainCollector%Name, Item -1, IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Named ')
@@ -525,12 +525,12 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
   ENDIF  ! (NumRainCollectors > 0)
 
   cCurrentModuleObject = 'WaterUse:Well'
-  NumGroundWaterWells=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumGroundWaterWells=GetNumObjectsFound(cCurrentModuleObject)
   If (NumGroundWaterWells > 0) Then
     AnyWaterSystemsInModel=.true.
     Allocate(GroundwaterWell(NumGroundWaterWells))
     DO Item=1,NumGroundWaterWells
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                     AlphaBlank=lAlphaFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       GroundwaterWell(Item)%Name = cAlphaArgs(1)
       Call VerifyName( cAlphaArgs(1), GroundwaterWell%Name, Item -1, IsNotOK,IsBlank,TRIM(cCurrentModuleObject)//' Name')
@@ -634,7 +634,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
   ENDIF
 
   cCurrentModuleObject = 'Site:Precipitation'
-  NumSiteRainFall=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSiteRainFall=GetNumObjectsFound(cCurrentModuleObject)
   IF (NumsiteRainFall > 1) THEN ! throw error
     Call ShowSevereError('Only one '//TRIM(cCurrentModuleObject)//' object is allowed')
     errorsfound = .true.
@@ -642,7 +642,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 
   If (NumSiteRainFall == 1) then
     AnyWaterSystemsInModel=.true.
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
 
     If (SameString(cAlphaArgs(1), 'ScheduleAndDesignLevel') ) then
       RainFall%ModeID = RainSchedDesign
@@ -668,7 +668,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
   ENDIF
 
   cCurrentModuleObject = 'RoofIrrigation'
-  NumIrrigation = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumIrrigation = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumIrrigation > 1) THEN
     Call ShowSevereError('Only one '//TRIM(cCurrentModuleObject)//' object is allowed')
     errorsFound = .true.
@@ -676,7 +676,7 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 
   IF (NumIrrigation == 1) THEN
     AnyIrrigationInModel = .true.
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
     IF (SameString(cAlphaArgs(1), 'Schedule') ) THEN
       Irrigation%ModeID = IrrSchedDesign
     ELSEIF ( SameString(cAlphaArgs(1), 'SmartSchedule')) THEN
@@ -729,39 +729,39 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
  ! <SetupOutputVariables here...>, CurrentModuleObject='WaterUse:Storage'
   DO Item=1,NumWaterStorageTanks
         ! this next one is a measure of the state of water in the tank, not a flux of m3 that needs to be summed
-    CALL SetupOutputVariable('Storage Tank Volume [m3]', &
+    CALL SetupOutputVariable('Water System Storage Tank Volume [m3]', &
         WaterStorage(item)%ThisTimeStepVolume,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Net Volumetric Flow Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Storage Tank Net Volume Flow Rate [m3/s]', &
         WaterStorage(item)%NetVdot,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Inlet Volumetric Flow Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Storage Tank Inlet Volume Flow Rate [m3/s]', &
         WaterStorage(item)%VdotToTank,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Outlet Volumetric Flow Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Storage Tank Outlet Volume Flow Rate [m3/s]', &
         WaterStorage(item)%VdotFromTank,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Mains Water [m3]', &
+    CALL SetupOutputVariable('Water System Storage Tank Mains Water Volume [m3]', &
         WaterStorage(item)%MainsDrawVol,'System','Sum',WaterStorage(item)%Name, &
           ResourceTypeKey='MainsWater', &
           EndUseKey='WaterSystem', &
           EndUseSubKey=WaterStorage(item)%QualitySubCategoryName, &
           GroupKey='System')
-    CALL SetupOutputVariable('Storage Tank Mains Water Volumetric Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Storage Tank Mains Water Volume Flow Rate [m3/s]', &
         WaterStorage(item)%MainsDrawVdot,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Water Temperature [C]', &
+    CALL SetupOutputVariable('Water System Storage Tank Water Temperature [C]', &
         WaterStorage(item)%Twater,'System','Average',WaterStorage(item)%Name)
-    CALL SetupOutputVariable('Storage Tank Overflow Volumetric Flow Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Storage Tank Overflow Volume Flow Rate [m3/s]', &
         WaterStorage(item)%VdotOverflow,'System','Average',WaterStorage(item)%Name)
     If (WaterStorage(item)%OverflowMode  == OverflowDiscarded) Then
-      CALL SetupOutputVariable('Storage Tank Overflow Water [m3]', &
+      CALL SetupOutputVariable('Water System Storage Tank Overflow Water Volume [m3]', &
         WaterStorage(item)%VolOverflow,'System','Sum',WaterStorage(item)%Name)
      !     ResourceTypeKey='Water',  &
      !     EndUseKey='WaterSystems', &
      !     EndUseSubkey=WaterStorage(item)%QualitySubCategoryName ,&
      !     GroupKey='System')
     ELSE
-      CALL SetupOutputVariable('Storage Tank Overflow Water [m3]', &
+      CALL SetupOutputVariable('Water System Storage Tank Overflow Water Volume [m3]', &
         WaterStorage(item)%VolOverflow,'System','Sum',WaterStorage(item)%Name)
 
     ENDIF
-    CALL SetupOutputVariable('Storage Tank Overflow Temperature [C]', &
+    CALL SetupOutputVariable('Water System Storage Tank Overflow Temperature [C]', &
         WaterStorage(item)%TwaterOverflow,'System','Average',WaterStorage(item)%Name)
 
   ENDDO
@@ -769,21 +769,21 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
   If (NumSiteRainFall ==1) Then  ! CurrentModuleObject='Site:Precipitation'
     CALL SetupOutputVariable('Site Precipitation Rate [m/s]', &
          RainFall%CurrentRate,'System','Average','Site:Precipitation')
-    CALL SetupOutputVariable('Site Precipitation [m]', &
+    CALL SetupOutputVariable('Site Precipitation Depth [m]', &
          RainFall%CurrentAmount,'System','Sum','Site:Precipitation')
   endif
 
   If (NumIrrigation ==1) Then   ! CurrentModuleObject='RoofIrrigation'
-    CALL SetupOutputVariable('Roof Irrigation Scheduled Amount [m]', &
+    CALL SetupOutputVariable('Water System Roof Irrigation Scheduled Depth [m]', &
          Irrigation%ScheduledAmount,'System','Sum','RoofIrrigation')
-    CALL SetupOutputVariable('Roof Irrigation Actual Amount [m]', &
+    CALL SetupOutputVariable('Water System Roof Irrigation Actual Depth [m]', &
          Irrigation%ActualAmount,'System','Sum','RoofIrrigation')
   endif
 
   DO Item =1, NumRainCollectors  ! CurrentModuleObject='WaterUse:RainCollector'
-    CALL SetupOutputVariable('Rainwater Collector Volumetric Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Rainwater Collector Volume Flow Rate [m3/s]', &
        RainCollector(item)%VdotAvail,'System','Average',RainCollector(item)%Name)
-    CALL SetupOutputVariable('Rainwater Collector Water [m3]', &
+    CALL SetupOutputVariable('Water System Rainwater Collector Volume [m3]', &
        RainCollector(item)%VolCollected, 'System', 'Sum', RainCollector(item)%Name , &
        ResourceTypeKey='OnSiteWater', EndUseKey='Rainwater', GroupKey='System')
 
@@ -791,16 +791,16 @@ If( (MyOneTimeFlag).AND. (.NOT.( WaterSystemGetInputCalled)) ) THEN  !big block 
 
 
   Do Item =1, NumGroundWaterWells  ! CurrentModuleObject='WaterUse:Well'
-    CALL SetupOutputVariable('Groundwater Well Requested Volumetric Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Groundwater Well Requested Volume Flow Rate [m3/s]', &
        GroundwaterWell(item)%VdotRequest,'System','Average',GroundwaterWell(item)%Name)
-    CALL SetupOutputVariable('Groundwater Well Volumetric Rate [m3/s]', &
+    CALL SetupOutputVariable('Water System Groundwater Well Volume Flow Rate [m3/s]', &
        GroundwaterWell(item)%VdotDelivered,'System','Average',GroundwaterWell(item)%Name)
-    CALL SetupOutputVariable('Groundwater Well Volume [m3]', &
+    CALL SetupOutputVariable('Water System Groundwater Well Volume [m3]', &
        GroundwaterWell(item)%VolDelivered,'System','Sum',GroundwaterWell(item)%Name, &
        ResourceTypeKey='OnSiteWater', EndUseKey='Wellwater', GroupKey='System')
-    CALL SetupOutputVariable('Groundwater Well Pumping Power [W]', &
+    CALL SetupOutputVariable('Water System Groundwater Well Pump Electric Power [W]', &
        GroundwaterWell(item)%PumpPower,'System','Average',GroundwaterWell(item)%Name)
-    CALL SetupOutputVariable('Groundwater Well Pumping Energy [J]', &
+    CALL SetupOutputVariable('Water System Groundwater Well Pump Electric Energy [J]', &
        GroundwaterWell(item)%PumpEnergy,'System','Sum',GroundwaterWell(item)%Name, &
        ResourceTypeKey='Electricity', EndUseKey='WaterSystems', GroupKey='System')
 
@@ -1815,7 +1815,7 @@ END SUBROUTINE ReportWaterManager
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

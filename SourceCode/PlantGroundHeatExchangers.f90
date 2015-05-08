@@ -337,7 +337,7 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
                                        GlheInletTemp, &
                                        PlantLoop(VerticalGlhe(GlheNum)%LoopNum)%FluidIndex, &
                                        'CalcVerticalGroundHeatExchanger')
-                                       
+
   Tground      = VerticalGlhe(GlheNum)%TempGround
   FluidDensity = GetDensityGlycol(PlantLoop(VerticalGlhe(GlheNum)%LoopNum)%FluidName, &
                                        GlheInletTemp, &
@@ -386,12 +386,12 @@ SUBROUTINE CalcVerticalGroundHeatExchanger(GlheNum)
     TriggerDesignDayReset = .TRUE.
   ENDIF
 
-  IF (CurrentSimTime .LE. 0.0)THEN 
+  IF (CurrentSimTime .LE. 0.0)THEN
     PrevTimeSteps = 0.0 ! this resets history when rounding 24:00 hours during warmup avoids hard crash later
     GlheOutletTemp = GlheInletTemp
     GlheMassFlowRate = MDotActual
     CALL CalcAggregateLoad(GlheNum)     !Just allocates and initializes PrevHour array
-    RETURN 
+    RETURN
   END IF
 
   ! Store currentsimtime in PrevTimeSteps only if a time step occurs
@@ -753,7 +753,7 @@ SUBROUTINE GetGroundheatExchangerInput
 
             !GET NUMBER OF ALL EQUIPMENT TYPES
     cCurrentModuleObject = 'GroundHeatExchanger:Vertical'
-    NumVerticalGlhes = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumVerticalGlhes = GetNumObjectsFound(cCurrentModuleObject)
 
     Allocated = .FALSE.
 
@@ -769,7 +769,7 @@ SUBROUTINE GetGroundheatExchangerInput
     CheckEquipName=.true.
 
     DO GlheNum = 1 , NumVerticalGlhes
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),GlheNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
+        CALL GetObjectItem(cCurrentModuleObject,GlheNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -802,7 +802,7 @@ SUBROUTINE GetGroundheatExchangerInput
         !load borehole data
     VerticalGlhe(GlheNum)%DesignFlow        = rNumericArgs(1)
     CALL RegisterPlantCompDesignFlow (VerticalGlhe(GlheNum)%GlheInletNodeNum, VerticalGlhe(GlheNum)%DesignFlow)
-    
+
     VerticalGlhe(GlheNum)%NumBoreholes      = rNumericArgs(2)
     VerticalGlhe(GlheNum)%BoreholeLength    = rNumericArgs(3)
     VerticalGlhe(GlheNum)%BoreholeRadius    = rNumericArgs(4)
@@ -829,7 +829,7 @@ SUBROUTINE GetGroundheatExchangerInput
       CALL ShowContinueError('...Radius will be <=0.')
       ErrorsFound=.true.
     ENDIF
-    
+
     IF (VerticalGlhe(GlheNum)%MaxSimYears < MaxNumberSimYears) THEN
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//trim(VerticalGlhe(GlheNum)%Name)//  &
          '", invalid value in field.')
@@ -881,17 +881,17 @@ SUBROUTINE GetGroundheatExchangerInput
 
         !Set up report variables
   DO GlheNum = 1, NumVerticalGlhes
-    CALL SetupOutputVariable('Ground Heat Exchanger Average Borehole Temperature[C]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Average Borehole Temperature [C]', &
           VerticalGlheReport(GlheNum)%GlheBoreholeTemp,'System','Average',VerticalGlhe(GlheNum)%Name)
-    CALL SetupOutputVariable('Ground Heat Exchanger Heat Transfer[W]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Heat Transfer Rate [W]', &
           VerticalGlheReport(GlheNum)%QGlhe,'System','Average',VerticalGlhe(GlheNum)%Name)
-    CALL SetupOutputVariable('Ground Heat Exchanger Inlet Temp[C]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Inlet Temperature [C]', &
           VerticalGlheReport(GlheNum)%GlheInletTemp,'System','Average',VerticalGlhe(GlheNum)%Name)
-    CALL SetupOutputVariable('Ground Heat Exchanger Outlet Temp[C]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Outlet Temperature [C]', &
           VerticalGlheReport(GlheNum)%GlheOutletTemp,'System','Average',VerticalGlhe(GlheNum)%Name)
-    CALL SetupOutputVariable('Ground Heat Exchanger Mass Flow Rate[kg/s]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Mass Flow Rate [kg/s]', &
           VerticalGlheReport(GlheNum)%GlheMassFlowRate,'System','Average',VerticalGlhe(GlheNum)%Name)
-    CALL SetupOutputVariable('Ground Heat Exchanger Average Fluid Temp[C]', &
+    CALL SetupOutputVariable('Ground Heat Exchanger Average Fluid Temperature [C]', &
           VerticalGlheReport(GlheNum)%GlheAveFluidTemp,'System','Average',VerticalGlhe(GlheNum)%Name)
   END DO
 
@@ -976,12 +976,12 @@ END SUBROUTINE GetGroundheatExchangerInput
     BholeRadius = VerticalGlhe(GlheNum)%BoreholeRadius
     K_Ground    = VerticalGlhe(GlheNum)%KGround
     Cp_Ground   = VerticalGlhe(GlheNum)%CpRhoGround
-    
+
     Cp_Fluid    = GetSpecificHeatGlycol(PlantLoop(VerticalGlhe(GlheNum)%LoopNum)%FluidName, &
                                        GlheInletTemp, &
                                        PlantLoop(VerticalGlhe(GlheNum)%LoopNum)%FluidIndex, &
                                        'CalcVerticalGroundHeatExchanger')
-    
+
     Tground     = VerticalGlhe(GlheNum)%TempGround
     K_Grout     = VerticalGlhe(GlheNum)%KGrout
     K_Pipe      = VerticalGlhe(GlheNum)%KPipe
@@ -1286,7 +1286,7 @@ SUBROUTINE InitBoreholeHXSimVars(GlheNum,Runflag)
                                  VerticalGlhe(GlheNum)%LoopSideNum, &
                                  VerticalGlhe(GlheNum)%BranchNum, &
                                  VerticalGlhe(GlheNum)%CompNum)
-     
+
       LastQnSubHr = 0.0
       Node(VerticalGlhe(GlheNum)%GlheInletNodeNum)%Temp                  = VerticalGlhe(GlheNum)%TempGround
       Node(VerticalGlhe(GlheNum)%GlheOutletNodeNum)%Temp                 = VerticalGlhe(GlheNum)%TempGround
@@ -1346,7 +1346,7 @@ SUBROUTINE UpdateVerticalGroundHeatExchanger(RunFlag, Num)
   USE PlantUtilities, ONLY: SafeCopyPlantNode
   USE DataPlant,  ONLY: PlantLoop
   USE FluidProperties, ONLY: GetSpecificHeatGlycol, GetDensityGlycol
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1377,7 +1377,7 @@ SUBROUTINE UpdateVerticalGroundHeatExchanger(RunFlag, Num)
   GlheOutletNode                            = VerticalGlhe(Num)%GlheOutletNodeNum
 
   CALL SafeCopyPlantNode(GlheInletNode, GlheOutletNode)
-  
+
   Node(GlheOutletNode)%Temp                 = GlheOutletTemp
   Node(GlheOutletNode)%Enthalpy             = GlheOutletTemp * GetSpecificHeatGlycol( &
                                                      PlantLoop(VerticalGlhe(Num)%LoopNum)%FluidName, &
@@ -1393,7 +1393,7 @@ SUBROUTINE UpdateVerticalGroundHeatExchanger(RunFlag, Num)
   VerticalGlheReport(Num)%GlheInletTemp     = GlheInletTemp
   VerticalGlheReport(Num)%GlheMassFlowRate  = GlheMassFlowRate
   VerticalGlheReport(Num)%GlheAveFluidTemp  = GlheAveFluidTemp
- 
+
     IF (GlhedeltaTemp > DeltaTempLimit .AND. NumErrorCalls < NumVerticalGlhes .AND. .NOT. Warmupflag) THEN
       FluidDensity = GetDensityGlycol(PlantLoop(VerticalGlhe(Num)%LoopNum)%FluidName, &
                                        GlheInletTemp, &
@@ -1416,7 +1416,7 @@ END SUBROUTINE UpdateVerticalGroundHeatExchanger
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -7,6 +7,7 @@ MODULE ScheduleManager
           !       MODIFIED       January 2003 -- added sub-hourly schedule possibility (and interval scheduling)
           !                      J. Glazer January 2005 -- added Schedule:File
           !                      Michael Wetter February 2010 -- added Schedule for external Interface
+          !                      L Lawrie - October 2012 - added sub-hourly option for Schedule:File
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -239,7 +240,9 @@ SUBROUTINE ProcessScheduleInput
   INTEGER NumIntDaySchedules     ! Number of "interval" dayschedules
   INTEGER NumExternalInterfaceSchedules ! Number of "PtolemyServer ExternalInterface" "compact" Schedules
   INTEGER NumExternalInterfaceFunctionalMockupUnitImportSchedules ! Number of "FunctionalMockupUnitImport ExternalInterface"
-                                                            ! "compact" Schedules ! added for FMI
+                                                            ! "compact" Schedules ! added for FMU Import
+  INTEGER NumExternalInterfaceFunctionalMockupUnitExportSchedules ! Number of "FunctionalMockupUnitExport ExternalInterface"
+                                                            ! "compact" Schedules ! added for FMU Export
   INTEGER NumLstDaySchedules     ! Number of "list" dayschedules
   INTEGER NumRegDaySchedules     ! Number of hourly+interval+list dayschedules
   INTEGER NumRegWeekSchedules    ! Number of "regular" Weekschedules
@@ -308,99 +311,115 @@ SUBROUTINE ProcessScheduleInput
   INTEGER :: endLine
   CHARACTER(len=1) :: ColumnSep
   LOGICAL :: firstLine
-
+  LOGICAL :: FileIntervalInterpolated
+  INTEGER :: rowLimitCount
+  INTEGER :: skiprowCount
+  INTEGER :: curcolCount
+  INTEGER :: numHourlyValues
+  INTEGER :: numerrors
+  INTEGER :: ifld
+  INTEGER :: hrLimitCount
 
 
   MaxNums=1 ! Need at least 1 number because it's used as a local variable in the Schedule Types loop
   MaxAlps=0
 
   CurrentModuleObject='ScheduleTypeLimits'
-  NumScheduleTypes=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumScheduleTypes=GetNumObjectsFound(CurrentModuleObject)
   IF (NumScheduleTypes > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Day:Hourly'
-  NumHrDaySchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumHrDaySchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumHrDaySchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Day:Interval'
-  NumIntDaySchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumIntDaySchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumIntDaySchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Day:List'
-  NumLstDaySchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumLstDaySchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumLstDaySchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Week:Daily'
-  NumRegWeekSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumRegWeekSchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumRegWeekSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Week:Compact'
-  NumCptWeekSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCptWeekSchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumCptWeekSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Year'
-  NumRegSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumRegSchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumRegSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Compact'
-  NumCptSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCptSchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumCptSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas+1)
   ENDIF
   CurrentModuleObject='Schedule:File'
-  NumCommaFileSchedules = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCommaFileSchedules = GetNumObjectsFound(CurrentModuleObject)
   IF (NumCommaFileSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='Schedule:Constant'
-  NumConstantSchedules = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumConstantSchedules = GetNumObjectsFound(CurrentModuleObject)
   IF (NumConstantSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas)
   ENDIF
   CurrentModuleObject='ExternalInterface:Schedule'
-  NumExternalInterfaceSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumExternalInterfaceSchedules=GetNumObjectsFound(CurrentModuleObject)
   ! added for FMI
   IF (NumCptSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas+1)
   ENDIF
+  ! added for FMU Import
   CurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Schedule'
-  NumExternalInterfaceFunctionalMockupUnitImportSchedules=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumExternalInterfaceFunctionalMockupUnitImportSchedules=GetNumObjectsFound(CurrentModuleObject)
   IF (NumCptSchedules > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
+    MaxNums=MAX(MaxNums,NumNumbers)
+    MaxAlps=MAX(MaxAlps,NumAlphas+1)
+  ENDIF
+  ! added for FMU Export
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnitExport:To:Schedule'
+  NumExternalInterfaceFunctionalMockupUnitExportSchedules=GetNumObjectsFound(CurrentModuleObject)
+  IF (NumCptSchedules > 0) THEN
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
     MaxNums=MAX(MaxNums,NumNumbers)
     MaxAlps=MAX(MaxAlps,NumAlphas+1)
   ENDIF
   CurrentModuleObject='Output:Schedules'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),Count,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,Count,NumAlphas,NumNumbers)
   MaxNums=MAX(MaxNums,NumNumbers)
   MaxAlps=MAX(MaxAlps,NumAlphas)
 
@@ -423,7 +442,7 @@ SUBROUTINE ProcessScheduleInput
   CurrentModuleObject='Schedule:Compact'
   MaxNums1=0
   DO LoopIndex=1,NumCptSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status)
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status)
     ! # 'THROUGH" => Number of additional week schedules
     ! # 'FOR' => Number of additional day schedules
     DO Count=3,NumAlphas
@@ -452,11 +471,17 @@ SUBROUTINE ProcessScheduleInput
   ! add week and day schedules for each ExternalInterface:Schedule schedule
   AddWeekSch = AddWeekSch + NumExternalInterfaceSchedules * 366 !number of days/year because need a week for each day
   AddDaySch = AddDaySch + NumExternalInterfaceSchedules  !one day schedule for ExternalInterface to update during run time
-  ! added for FMI
+  ! added for FMU Import
   ! add week and day schedules for each ExternalInterface:FunctionalMockupUnitImport:Schedule
   AddWeekSch = AddWeekSch + NumExternalInterfaceFunctionalMockupUnitImportSchedules * 366 !number of days/year
                                                                                     !because need a week for each day
   AddDaySch = AddDaySch + NumExternalInterfaceFunctionalMockupUnitImportSchedules  ! one day schedule for ExternalInterface
+                                                                             ! to update during run time
+  ! added for FMU Export
+  ! add week and day schedules for each ExternalInterface:FunctionalMockupUnitExport:Schedule
+  AddWeekSch = AddWeekSch + NumExternalInterfaceFunctionalMockupUnitExportSchedules * 366 !number of days/year
+                                                                                    !because need a week for each day
+  AddDaySch = AddDaySch + NumExternalInterfaceFunctionalMockupUnitExportSchedules  ! one day schedule for ExternalInterface
                                                                              ! to update during run time
 
 
@@ -464,8 +489,10 @@ SUBROUTINE ProcessScheduleInput
   NumRegDaySchedules=NumHrDaySchedules+NumIntDaySchedules+NumLstDaySchedules
   NumDaySchedules=NumRegDaySchedules+AddDaySch
   NumWeekSchedules=NumRegWeekSchedules+NumCptWeekSchedules+AddWeekSch
-  NumSchedules = NumRegSchedules + NumCptSchedules + NumCommaFileSchedules + NumConstantSchedules + NumExternalInterfaceSchedules &
-                   + NumExternalInterfaceFunctionalMockupUnitImportSchedules
+  NumSchedules = NumRegSchedules + NumCptSchedules + NumCommaFileSchedules &
+                   + NumConstantSchedules + NumExternalInterfaceSchedules &
+                   + NumExternalInterfaceFunctionalMockupUnitImportSchedules &
+                   + NumExternalInterfaceFunctionalMockupUnitExportSchedules
 
 !!  Most initializations in the schedule data structures are taken care of in
 !!  the definitions (see above)
@@ -498,7 +525,7 @@ SUBROUTINE ProcessScheduleInput
 
   CurrentModuleObject='ScheduleTypeLimits'
   DO LoopIndex=1,NumScheduleTypes
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -566,7 +593,7 @@ SUBROUTINE ProcessScheduleInput
   Count=0
   CurrentModuleObject='Schedule:Day:Hourly'
   DO LoopIndex=1,NumHrDaySchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -630,7 +657,7 @@ SUBROUTINE ProcessScheduleInput
 
   CurrentModuleObject='Schedule:Day:Interval'
   DO LoopIndex=1,NumIntDaySchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -725,7 +752,7 @@ SUBROUTINE ProcessScheduleInput
 
   CurrentModuleObject='Schedule:Day:List'
   DO LoopIndex=1,NumLstDaySchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -793,8 +820,6 @@ SUBROUTINE ProcessScheduleInput
     ENDIF
 
     IF (MOD(60,MinutesPerItem) /= 0) THEN
-      WRITE(CFld,*) MinutesPerItem
-      CFld=ADJUSTL(CFld)
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1)))
       CALL ShowContinueError('Requested '//TRIM(cNumericFields(1))//' field value ('//  &
          TRIM(RoundSigDigits(MinutesPerItem))//') not evenly divisible into 60')
@@ -868,7 +893,7 @@ SUBROUTINE ProcessScheduleInput
 
   CurrentModuleObject='Schedule:Week:Daily'
   DO LoopIndex=1,NumRegWeekSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -897,7 +922,7 @@ SUBROUTINE ProcessScheduleInput
   Count=NumRegWeekSchedules
   CurrentModuleObject='Schedule:Week:Compact'
   DO LoopIndex=1,NumCptWeekSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -951,7 +976,7 @@ SUBROUTINE ProcessScheduleInput
 
   CurrentModuleObject='Schedule:Year'
   DO LoopIndex=1,NumRegSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1064,7 +1089,7 @@ SUBROUTINE ProcessScheduleInput
   AddDaySch=NumRegDaySchedules
   CurrentModuleObject='Schedule:Compact'
   DO LoopIndex=1,NumCptSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1305,9 +1330,6 @@ Until:  DO
 
   END DO
 
-  DEALLOCATE(MinuteValue)
-  DEALLOCATE(SetMinuteValue)
-
 !  Schedule:File,
 !   \min-fields 5
 !         \memo A Schedule:File points to a text computer file that has 8760-8784 hours of data.
@@ -1335,21 +1357,34 @@ Until:  DO
 !         \default 8760
 !         \minimum 8760
 !         \maximum 8784
-!    A4 ; \field Column Separator
+!    A4 , \field Column Separator
 !         \type choice
 !         \key Comma
 !         \key Tab
 !         \key Fixed
 !         \key Semicolon
 !         \default Comma
+!    A5 , \field Interpolate to Timestep
+!         \note when the interval does not match the user specified timestep a "Yes" choice will average between the intervals request (to
+!         \note timestep resolution.  a "No" choice will use the interval value at the simulation timestep without regard to if it matches
+!         \note the boundary or not.
+!         \type choice
+!         \key Yes
+!         \key No
+!         \default No
+!    N4 ; \field Minutes per Item
+!         \note Must be evenly divisible into 60
+!         \type integer
+!         \minimum 1
+!         \maximum 60
 
 ! continue adding to SchNum,AddWeekSch,AddDaySch
   IF (NumCommaFileSchedules > 0) THEN
-    ALLOCATE(hourlyFileValues(8784))
+    ALLOCATE(hourlyFileValues(8784*60))   ! sized to accomodate any interval for schedule file.
   ENDIF
   CurrentModuleObject='Schedule:File'
   DO LoopIndex=1,NumCommaFileSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1363,7 +1398,9 @@ Until:  DO
     Schedule(SchNum)%Name=Alphas(1)
     ! Validate ScheduleType
     IF (NumScheduleTypes > 0) THEN
-      CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
+      CheckIndex=0
+      IF (.not. lAlphaBlanks(2)) &
+           CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
       IF (CheckIndex == 0) THEN
         IF (.not. lAlphaBlanks(2)) THEN
           CALL ShowWarningError('ProcessScheduleInput: For '//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
@@ -1378,6 +1415,11 @@ Until:  DO
       ENDIF
     ENDIF
     hourlyFileValues = 0 !set default values to zero
+
+    ! Numbers(1) - which column
+    curcolCount=Numbers(1)
+    ! Numbers(2) - number of rows to skip
+    skiprowCount=Numbers(2)
     IF (Numbers(3) == 0) Numbers(3)=8760
     IF (Numbers(3) /= 8760 .and. Numbers(3) /= 8784) THEN
       CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
@@ -1404,9 +1446,78 @@ Until:  DO
       CYCLE
     ENDIF
 
+    ! Depending on value of "Interpolate" field, the value for each time step in each hour gets processed:
+    FileIntervalInterpolated=.false.
+    IF (lAlphaBlanks(5)) Alphas(5)='NO'
+    IF (Alphas(5) /= 'NO' .and. Alphas(5) /= 'YES') THEN
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+         'Invalid value for "'//TRIM(cAlphaFields(5))//'" field="'//TRIM(Alphas(5))//'"')
+      ErrorsFound=.true.
+    ELSEIF (Alphas(5) /= 'YES') THEN  ! No validation done on the value of the interpolation field
+      FileIntervalInterpolated=.false.
+    ELSE
+      FileIntervalInterpolated=.true.
+    ENDIF
+
+    ! is it a sub-hourly schedule or not?
+    MinutesPerItem=60
+    IF (NumNumbers > 3) THEN
+      MinutesPerItem=INT(Numbers(4))
+      NumExpectedItems=1440/MinutesPerItem
+      IF (MOD(60,MinutesPerItem) /= 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1)))
+        CALL ShowContinueError('Requested '//TRIM(cNumericFields(4))//' field value ('//  &
+           TRIM(RoundSigDigits(MinutesPerItem))//') not evenly divisible into 60')
+        ErrorsFound=.true.
+        CYCLE
+      ENDIF
+    ENDIF
+
+    numHourlyValues=Numbers(3)
+    rowLimitCount=(Numbers(3)*60)/MinutesPerItem
+    hrLimitCount=60/MinutesPerItem
+
+!    ! Number of numbers in the Numbers list okay to process
+!    Hr=1
+!    CurMinute=MinutesPerItem
+!    SCount=1
+!    DO NumFields=2,NumNumbers
+!      MinuteValue(Hr,SCount:CurMinute)=Numbers(NumFields)
+!      SCount=CurMinute+1
+!      CurMinute=CurMinute+MinutesPerItem
+!      IF (CurMinute > 60) THEN
+!        CurMinute=MinutesPerItem
+!        SCount=1
+!        Hr=Hr+1
+!      ENDIF
+!    ENDDO
+!
+!    ! Now parcel into TS Value....
+!
+!    IF (DaySchedule(Count)%IntervalInterpolated) THEN
+!      DO Hr=1,24
+!        SCount=1
+!        CurMinute=MinutesPerTimeStep
+!        DO TS=1,NumOfTimeStepInHour
+!          DaySchedule(Count)%TSValue(Hr,TS)=SUM(MinuteValue(Hr,SCount:CurMinute))/REAL(MinutesPerTimeStep,r64)
+!          SCount=CurMinute+1
+!          CurMinute=CurMinute+MinutesPerTimeStep
+!        ENDDO
+!      ENDDO
+!    ELSE
+!      DO Hr=1,24
+!        CurMinute=MinutesPerTimeStep
+!        DO TS=1,NumOfTimeStepInHour
+!          DaySchedule(Count)%TSValue(Hr,TS)=MinuteValue(Hr,CurMinute)
+!          Curminute=CurMinute+MinutesPerTimeStep
+!        ENDDO
+!      ENDDO
+!    ENDIF
+
     CALL CheckForActualFileName(Alphas(3),FileExists,TempFullFileName)
 
 !    INQUIRE(file=Alphas(3),EXIST=FileExists)
+! Setup file reading parameters
     StripCR=.false.
     IF (.not. FileExists) THEN
       CALL DisplayString('Missing '//TRIM(Alphas(3)))
@@ -1441,10 +1552,12 @@ Until:  DO
         ENDIF
       ENDIF
       BACKSPACE(Unit=SchdFile)
-      ! skip lines if any need to be skipped.
+
+ ! skip lines if any need to be skipped.
+      numerrors=0
       rowCnt = 0
       read_stat=0
-      IF (Numbers(2) > 0) THEN
+      IF (skiprowCount > 0) THEN  ! Numbers(2) has number of rows to skip
         DO WHILE (read_stat == 0) !end of file
           READ(UNIT=SchdFile, FMT="(A)", IOSTAT=read_stat) LineIn
           IF (StripCR) THEN
@@ -1454,11 +1567,13 @@ Until:  DO
             ENDIF
           ENDIF
           rowCnt = rowCnt + 1
-          IF (rowCnt == (Numbers(2))) THEN
+          IF (rowCnt == skiprowCount) THEN
             EXIT
           END IF
         END DO
       ENDIF
+
+!  proper number of lines are skipped.  read the file
       ! for the rest of the lines read from the file
       rowCnt = 0
       firstLine=.true.
@@ -1502,61 +1617,105 @@ Until:  DO
             endif
             EXIT
           END IF
-          IF (colCnt .EQ. Numbers(1)) EXIT
+          IF (colCnt .EQ. curcolCount) EXIT
         END DO
-        IF (colCnt .EQ. Numbers(1)) THEN
+        IF (colCnt .EQ. curcolCount) THEN
           columnValue = ProcessNumber(subString,errflag)
-          IF (errflag) columnValue = 0
+          IF (errflag) THEN
+            numerrors=numerrors+1
+            columnValue = 0
+          ENDIF
         ELSE
           columnValue = 0
         END IF
         hourlyFileValues(rowCnt) = columnValue
-        IF (rowCnt .EQ. Numbers(3)) EXIT
+        IF (rowCnt .EQ. rowLimitCount) EXIT
       END DO
       CLOSE(SchdFile)
-      IF (rowCnt .LT. 8760) THEN
+
+      ! schedule values have been filled into the hourlyFileValues array.
+
+      IF (numerrors > 0) THEN
         CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
-           '" less than 8760 hourly values read from file.')
-        CALL ShowContinueError('..Number read='//TRIM(TrimSigDigits(rowCnt))//'.')
+           '" '//trim(RoundSigDigits(numerrors))//' records had errors - these values are set to 0.')
+        CALL ShowContinueError('Use Output:Diagnostics,DisplayExtraWarnings; to see individual records in error.')
+      ENDIF
+      IF (rowCnt < rowLimitCount) THEN
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+           '" less than '//trim(RoundSigDigits(numHourlyValues))//' hourly values read from file.')
+        CALL ShowContinueError('..Number read='//TRIM(TrimSigDigits((rowCnt*60)/MinutesPerItem))//'.')
       END IF
-      IF (rowCnt < Numbers(3)) THEN
+      IF (rowCnt < rowLimitCount) THEN
         CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
            '" less than specified hourly values read from file.')
-        CALL ShowContinueError('..Specified Number of Hourly Values='//TRIM(TrimSigDigits(Numbers(3),0))//  &
-               ' Actual number of hourly values included='//TRIM(TrimSigDigits(rowCnt)))
+        CALL ShowContinueError('..Specified Number of Hourly Values='//TRIM(TrimSigDigits(numHourlyValues,0))//  &
+               ' Actual number of hourly values included='//TRIM(TrimSigDigits((rowCnt*60)/MinutesPerItem)))
       ENDIF
-      ! process the hourly data into the normal schedule data structures
+      ! process the data into the normal schedule data structures
       ! note -- schedules are ALWAYS 366 days so some special measures have to be done at 29 Feb "day of year" (60)
       iDay=0
       hDay=0
+      ifld=0
       DO
         ! create string of which day of year
         iDay=iDay+1
         hDay=hDay+1
         IF (iDay > 366) EXIT
-        WRITE(ExtraField,*) iDay
-        ExtraField=ADJUSTL(ExtraField)
+        ExtraField=RoundSigDigits(iDay)
         ! increment both since a week schedule is being defined for each day so that a day is valid
         ! no matter what the day type that is used in a design day.
         AddWeekSch = AddWeekSch + 1
         AddDaySch = AddDaySch + 1
         ! define week schedule
-        WeekSchedule(AddWeekSch)%Name=TRIM(Alphas(1))//'_wk_'//TRIM(ExtraField)
+        WeekSchedule(AddWeekSch)%Name=TRIM(Alphas(1))//'_wk_'//ExtraField
         ! for all day types point the week schedule to the newly defined day schedule
         DO kDayType = 1, MaxDayTypes
           WeekSchedule(AddWeekSch)%DaySchedulePointer(kDayType) = AddDaySch
         END DO
         ! day schedule
-        DaySchedule(AddDaySch)%Name=TRIM(Alphas(1))//'_dy_'//TRIM(ExtraField)
+        DaySchedule(AddDaySch)%Name=TRIM(Alphas(1))//'_dy_'//ExtraField
         DaySchedule(AddDaySch)%ScheduleTypePtr = Schedule(SchNum)%ScheduleTypePtr
         ! schedule is pointing to the week schedule
         Schedule(SchNum)%WeekSchedulePointer(iDay) = AddWeekSch
-        DO jHour = 1, 24
-          curHrVal = hourlyFileValues((hDay - 1) * 24 + jHour)
-          DO TS=1,NumOfTimeStepInHour
-            DaySchedule(AddDaySch)%TSValue(jHour,TS) = curHrVal
+        IF (MinutesPerItem == 60) THEN
+          DO jHour = 1, 24
+            ifld=ifld+1
+            curHrVal = hourlyFileValues(ifld) ! hourlyFileValues((hDay - 1) * 24 + jHour)
+            DO TS=1,NumOfTimeStepInHour
+              DaySchedule(AddDaySch)%TSValue(jHour,TS) = curHrVal
+            END DO
           END DO
-        END DO
+        ELSE  ! Minutes Per Item < 60
+          DO Hr=1,24
+            CurMinute=MinutesPerItem
+            SCount=1
+            DO NumFields=1,hrLimitCount
+              ifld=ifld+1
+              MinuteValue(Hr,SCount:CurMinute)=hourlyFileValues(ifld)
+              SCount=CurMinute+1
+              CurMinute=CurMinute+MinutesPerItem
+            ENDDO
+          ENDDO
+          IF (FileIntervalInterpolated) THEN
+            DO Hr=1,24
+              SCount=1
+              CurMinute=MinutesPerTimeStep
+              DO TS=1,NumOfTimeStepInHour
+                DaySchedule(AddDaySch)%TSValue(Hr,TS)=SUM(MinuteValue(Hr,SCount:CurMinute))/REAL(MinutesPerTimeStep,r64)
+                SCount=CurMinute+1
+                CurMinute=CurMinute+MinutesPerTimeStep
+              ENDDO
+            ENDDO
+          ELSE
+            DO Hr=1,24
+              CurMinute=MinutesPerTimeStep
+              DO TS=1,NumOfTimeStepInHour
+                DaySchedule(AddDaySch)%TSValue(Hr,TS)=MinuteValue(Hr,CurMinute)
+                Curminute=CurMinute+MinutesPerTimeStep
+              ENDDO
+            ENDDO
+          ENDIF
+        ENDIF
         IF (iDay == 59 .and. rowCnt < 8784) THEN   ! 28 Feb
           ! Dup 28 Feb to 29 Feb (60)
           iDay=iDay+1
@@ -1575,10 +1734,13 @@ Until:  DO
     DEALLOCATE(hourlyFileValues)
   ENDIF
 
+  DEALLOCATE(MinuteValue)
+  DEALLOCATE(SetMinuteValue)
+
   ! Constant Schedules
   CurrentModuleObject='Schedule:Constant'
   DO LoopIndex=1,NumConstantSchedules
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1633,7 +1795,7 @@ Until:  DO
   CurrentModuleObject='ExternalInterface:Schedule'
   DO LoopIndex=1,NumExternalInterfaceSchedules
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1684,11 +1846,11 @@ Until:  DO
     CALL ExternalInterfaceSetSchedule(AddDaySch, Numbers(1))
 
   ENDDO
-  ! added for FMI
+  ! added for FMU Import
   CurrentModuleObject='ExternalInterface:FunctionalMockupUnitImport:To:Schedule'
   DO LoopIndex=1,NumExternalInterfaceFunctionalMockupUnitImportSchedules
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1748,6 +1910,71 @@ Until:  DO
 
   ENDDO
 
+  ! added for FMU Export
+  CurrentModuleObject='ExternalInterface:FunctionalMockupUnitExport:To:Schedule'
+  DO LoopIndex=1,NumExternalInterfaceFunctionalMockupUnitExportSchedules
+
+    CALL GetObjectItem(CurrentModuleObject,LoopIndex,Alphas,NumAlphas,Numbers,NumNumbers,Status, &
+                   AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
+                   AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
+    IsNotOK=.false.
+    IsBlank=.false.
+
+    IF (NumExternalInterfaceSchedules .GE. 1) THEN
+     CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank, 'The schedule object with the name "' &
+              //TRIM(Alphas(1))//'" is defined as an ExternalInterface:Schedule and ' &
+              //'ExternalInterface:FunctionalMockupUnitExport:To:Schedule. This will cause the schedule to be overwritten' &
+              //' by PtolemyServer and FunctionalMockUpUnitExport.')
+    ELSE
+      CALL VerifyName(Alphas(1),Schedule(1:NumSchedules)%Name,SchNum,IsNotOK,IsBlank,TRIM(CurrentModuleObject)//' Name')
+    END IF
+      IF (IsNotOK) THEN
+        ErrorsFound=.true.
+        IF (IsBlank) Alphas(1)='xxxxx'
+      ENDIF
+
+    SchNum=SchNum+1
+    Schedule(SchNum)%Name=Alphas(1)
+
+    ! Validate ScheduleType
+    CheckIndex=FindIteminList(Alphas(2),ScheduleType(1:NumScheduleTypes)%Name,NumScheduleTypes)
+    IF (CheckIndex == 0) THEN
+        IF (.not. lAlphaBlanks(2)) THEN
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+             '", '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//  &
+             '" not found -- will not be validated')
+        ELSE
+          CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+             '", Blank '//TRIM(cAlphaFields(2))//' input -- will not be validated.')
+        ENDIF
+    ELSE
+      Schedule(SchNum)%ScheduleTypePtr=CheckIndex
+    ENDIF
+    AddWeekSch=AddWeekSch+1
+    WeekSchedule(AddWeekSch)%Name=TRIM(Alphas(1))
+    WeekSchedule(AddWeekSch)%Used=.true.
+    DO Hr=1,366
+      Schedule(SchNum)%WeekSchedulePointer(Hr)=AddWeekSch
+    ENDDO
+    AddDaySch=AddDaySch+1
+    DaySchedule(AddDaySch)%Name=TRIM(Alphas(1))
+    DaySchedule(AddDaySch)%ScheduleTypePtr=Schedule(SchNum)%ScheduleTypePtr
+    DaySchedule(AddDaySch)%Used=.true.
+    DO Hr = 1, MaxDayTypes
+      WeekSchedule(AddWeekSch)%DaySchedulePointer(Hr) = AddDaySch
+    END DO
+!   Initialize the ExternalInterface day schedule for the ExternalInterface compact schedule.
+!   It will be overwritten during run time stepping after the warm up period
+    IF (NumNumbers<1) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//  &
+         '", initial value is not numeric or is missing. Fix idf file.')
+      NumErrorFlag=.true.
+    ENDIF
+    CALL ExternalInterfaceSetSchedule(AddDaySch, Numbers(1))
+
+  ENDDO
+
+
   ! Validate by ScheduleType
   DO SchNum=1,NumSchedules
     NumPointer=Schedule(SchNum)%ScheduleTypePtr
@@ -1767,12 +1994,12 @@ Until:  DO
 
   IF (NumScheduleTypes+NumDaySchedules+NumWeekSchedules+NumSchedules > 0) THEN  ! Report to EIO file
     CurrentModuleObject='Output:Schedules'
-    NumFields=GetNumObjectsFound(TRIM(CurrentModuleObject))
+    NumFields=GetNumObjectsFound(CurrentModuleObject)
 
 !    RptSchedule=.false.
     RptLevel=1
     DO Count=1,NumFields
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,Status)
+      CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,Status)
 !      RptSchedule=.true.
 
       SELECT CASE (Alphas(1))
@@ -2818,10 +3045,10 @@ SUBROUTINE ProcessIntervalFields(Untils,Numbers,NumUntils,NumNumbers,MinuteValue
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   CHARACTER(len=*), DIMENSION(:), INTENT(IN) :: Untils
-  REAL(r64), DIMENSION(:), INTENT(IN)             :: Numbers
+  REAL(r64), DIMENSION(:), INTENT(IN)        :: Numbers
   INTEGER, INTENT(IN)                        :: NumUntils
   INTEGER, INTENT(IN)                        :: NumNumbers
-  REAL(r64), DIMENSION(24,60), INTENT(OUT)        :: MinuteValue
+  REAL(r64), DIMENSION(24,60), INTENT(OUT)   :: MinuteValue
   LOGICAL, DIMENSION(24,60), INTENT(OUT)     :: SetMinuteValue
   LOGICAL, INTENT(INOUT)                     :: ErrorsFound
   CHARACTER(len=*), INTENT(IN)               :: DayScheduleName  ! Name (used for errors)
@@ -2875,9 +3102,9 @@ UntilLoop:  DO Count=1,NumUntils
       ENDIF
     ENDIF
     IF (Pos /= 0 .and. Pos == 1) THEN
-      CALL DecodeHHMMField(Untils(Count)(sFld:),HHField,MMField,ErrorsFound,DayScheduleName)
+      CALL DecodeHHMMField(Untils(Count)(sFld:),HHField,MMField,ErrorsFound,DayScheduleName,Untils(Count))
     ELSEIF (Pos == 0) THEN
-      CALL DecodeHHMMField(Untils(Count),HHField,MMField,ErrorsFound,DayScheduleName)
+      CALL DecodeHHMMField(Untils(Count),HHField,MMField,ErrorsFound,DayScheduleName,Untils(Count))
     ELSE  ! Until found but wasn't first field
       CALL ShowSevereError('ProcessScheduleInput: ProcessIntervalFields, '//  &
                 'Invalid "Until" field encountered='//TRIM(Untils(Count)))
@@ -2967,7 +3194,7 @@ UntilLoop:  DO Count=1,NumUntils
 
 END SUBROUTINE ProcessIntervalFields
 
-SUBROUTINE DecodeHHMMField(FieldValue,RetHH,RetMM,ErrorsFound,DayScheduleName)
+SUBROUTINE DecodeHHMMField(FieldValue,RetHH,RetMM,ErrorsFound,DayScheduleName,FullFieldValue)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda K Lawrie
@@ -2996,9 +3223,10 @@ SUBROUTINE DecodeHHMMField(FieldValue,RetHH,RetMM,ErrorsFound,DayScheduleName)
   INTEGER, INTENT(OUT)         :: RetMM       ! Returned "minute"
   LOGICAL, INTENT(INOUT)       :: ErrorsFound ! True if errors found in this field
   CHARACTER(len=*), INTENT(IN) :: DayScheduleName ! originating day schedule name
+  CHARACTER(len=*), INTENT(IN) :: FullFieldValue  ! Full Input field value
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: hhmmFormat='(I2.2)'
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -3009,37 +3237,67 @@ SUBROUTINE DecodeHHMMField(FieldValue,RetHH,RetMM,ErrorsFound,DayScheduleName)
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER Pos  ! Position value for scanning the Field
   CHARACTER(len=LEN(FieldValue)) String
-  INTEGER IOS
+  INTEGER :: IOS
+  REAL(r64) :: rRetHH       ! real Returned "hour"
+  REAL(r64) :: rRetMM       ! real Returned "minute"
+  LOGICAL :: nonIntegral
+  CHARACTER(len=2) :: hHour
+  CHARACTER(len=2) :: mMinute
 
   String=ADJUSTL(FieldValue)
   Pos=INDEX(String,':')
+  nonIntegral=.false.
   IF (Pos == 0) THEN
     CALL ShowSevereError('ProcessScheduleInput: DecodeHHMMField, '//  &
-          'Invalid "until" field submitted (no : separator in hh:mm)='//TRIM(String))
+          'Invalid "until" field submitted (no : separator in hh:mm)='//TRIM(ADJUSTL(FullFieldValue)))
     CALL ShowContinueError('Occurred in Day Schedule='//TRIM(DayScheduleName))
     ErrorsFound=.true.
     RETURN
   ELSEIF (Pos == 1) THEN
     RetHH=0
   ELSE
-    READ(String(1:Pos-1),*,IOSTAT=IOS) RetHH
-    IF (IOS /=0) THEN
+    READ(String(1:Pos-1),*,IOSTAT=IOS) rRetHH
+    RetHH=INT(rRetHH)
+    IF (REAL(RetHH,r64) /= rRetHH .or. IOS /= 0 .or. rRetHH < 0.0d0) THEN
+      IF (REAL(RetHH,r64) /= rRetHH .and. rRetHH >= 0.0d0) THEN
+        CALL ShowWarningError('ProcessScheduleInput: DecodeHHMMField, '//  &
+               'Invalid "until" field submitted (non-integer numeric in HH)='//TRIM(ADJUSTL(FullFieldValue)))
+        CALL ShowContinueError('Other errors may result. Occurred in Day Schedule='//TRIM(DayScheduleName))
+        nonIntegral=.true.
+      ELSE
+        CALL ShowSevereError('ProcessScheduleInput: DecodeHHMMField, '//  &
+               'Invalid "until" field submitted (invalid numeric in HH)='//TRIM(ADJUSTL(FullFieldValue)))
+        CALL ShowContinueError('Field values must be integer and represent hours:minutes. Occurred in Day Schedule='//  &
+           TRIM(DayScheduleName))
+        ErrorsFound=.true.
+        RETURN
+      ENDIF
+    ENDIF
+  ENDIF
+
+  String=String(Pos+1:)
+  READ(String,*,IOSTAT=IOS) rRetMM
+  RetMM=INT(rRetMM)
+  IF (REAL(RetMM,r64) /= rRetMM .or. IOS /=0 .or. rRetMM < 0.0d0) THEN
+    IF (REAL(RetMM,r64) /= rRetMM .and. rRetMM >= 0.0d0) THEN
+      CALL ShowWarningError('ProcessScheduleInput: DecodeHHMMField, '//  &
+             'Invalid "until" field submitted (non-integer numeric in MM)='//TRIM(ADJUSTL(FullFieldValue)))
+      CALL ShowContinueError('Other errors may result. Occurred in Day Schedule='//TRIM(DayScheduleName))
+      nonIntegral=.true.
+    ELSE
       CALL ShowSevereError('ProcessScheduleInput: DecodeHHMMField, '//  &
-             'Invalid "until" field submitted (invalid numeric in HH)='//TRIM(String))
-      CALL ShowContinueError('Occurred in Day Schedule='//TRIM(DayScheduleName))
+               'Invalid "until" field submitted (invalid numeric in MM)='//TRIM(ADJUSTL(FullFieldValue)))
+      CALL ShowContinueError('Field values must be integer and represent hours:minutes. Occurred in Day Schedule='//  &
+         TRIM(DayScheduleName))
       ErrorsFound=.true.
       RETURN
     ENDIF
   ENDIF
 
-  String=String(Pos+1:)
-  READ(String,*,IOSTAT=IOS) RetMM
-  IF (IOS /=0) THEN
-    CALL ShowSevereError('ProcessScheduleInput: DecodeHHMMField, '//  &
-             'Invalid "until" field submitted (invalid numeric in MM)='//TRIM(String))
-    CALL ShowContinueError('Occurred in Day Schedule='//TRIM(DayScheduleName))
-    ErrorsFound=.true.
-    RETURN
+  IF (nonIntegral) THEN
+    write(hHour,hhmmFormat) RetHH
+    write(mMinute,hhmmFormat) RetMM
+    CALL ShowContinueError('Until value to be used will be: '//hhour//':'//mMinute)
   ENDIF
 
   RETURN
@@ -3305,28 +3563,36 @@ LOGICAL FUNCTION dCheckScheduleValueMinMax1(ScheduleIndex,MinString,Minimum) !,M
   LOGICAL :: MinValueOk
   LOGICAL :: MaxValueOk
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-      MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
         MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+          MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
   ENDIF
 
   !  Min/max for schedule has been set.  Test.
@@ -3405,28 +3671,36 @@ LOGICAL FUNCTION dCheckScheduleValueMinMax2(ScheduleIndex,MinString,Minimum,MaxS
     RunOnceOnly = .FALSE.
   END IF
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValMin
-    MaxValue=DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValMax
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMin)
-      MaxValue=MAX(MaxValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMax)
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValMin
+      MaxValue=DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValMax
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMin)
         MaxValue=MAX(MaxValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMax)
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMin)
+          MaxValue=MAX(MaxValue,DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValMax)
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
   ENDIF
 
   !  Min/max for schedule has been set.  Test.
@@ -3499,28 +3773,36 @@ LOGICAL FUNCTION rCheckScheduleValueMinMax1(ScheduleIndex,MinString,Minimum)
   LOGICAL :: MinValueOk
   LOGICAL :: MaxValueOk
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-      MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
         MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+          MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
   ENDIF
 
   !  Min/max for schedule has been set.  Test.
@@ -3589,28 +3871,36 @@ LOGICAL FUNCTION rCheckScheduleValueMinMax2(ScheduleIndex,MinString,Minimum,MaxS
   LOGICAL :: MinValueOk
   LOGICAL :: MaxValueOk
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-      MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
         MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+          MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
   ENDIF
 
   !  Min/max for schedule has been set.  Test.
@@ -3677,20 +3967,28 @@ LOGICAL FUNCTION rCheckScheduleValue(ScheduleIndex,Value)
   INTEGER DayT  ! Day Type Loop control
   INTEGER WkSch ! Pointer for WeekSchedule value
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  rCheckScheduleValue=.false.
+
+  IF (ScheduleIndex == -1) THEN
+    rCheckScheduleValue=(Value == 1.0)
+  ELSEIF (ScheduleIndex == 0) THEN
+    rCheckScheduleValue=(Value == 0.0)
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValue called with ScheduleIndex out of range')
   ENDIF
 
-  rCheckScheduleValue=.false.
-DayLoop:  DO Loop=1,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
-        IF (ANY(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue == Value)) THEN
-          rCheckScheduleValue=.true.
-          EXIT DayLoop
-        ENDIF
-      ENDDO
-    ENDDO DayLoop
+  IF (ScheduleIndex > 0) THEN
+    rCheckScheduleValue=.false.
+  DayLoop:  DO Loop=1,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          IF (ANY(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue == Value)) THEN
+            rCheckScheduleValue=.true.
+            EXIT DayLoop
+          ENDIF
+        ENDDO
+      ENDDO DayLoop
+  ENDIF
 
   RETURN
 
@@ -3738,20 +4036,27 @@ LOGICAL FUNCTION iCheckScheduleValue(ScheduleIndex,Value)
   INTEGER DayT  ! Day Type Loop control
   INTEGER WkSch ! Pointer for WeekSchedule value
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  iCheckScheduleValue=.false.
+  IF (ScheduleIndex == -1) THEN
+    iCheckScheduleValue=(Value == 1)
+  ELSEIF (ScheduleIndex == 0) THEN
+    iCheckScheduleValue=(Value == 0)
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleValue called with ScheduleIndex out of range')
   ENDIF
 
-  iCheckScheduleValue=.false.
-DayLoop:  DO Loop=1,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
-        IF (ANY(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue == REAL(Value,r64))) THEN
-          iCheckScheduleValue=.true.
-          EXIT DayLoop
-        ENDIF
-      ENDDO
-    ENDDO DayLoop
+  IF (ScheduleIndex > 0) THEN
+
+  DayLoop:  DO Loop=1,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          IF (ANY(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue == REAL(Value,r64))) THEN
+            iCheckScheduleValue=.true.
+            EXIT DayLoop
+          ENDIF
+        ENDDO
+      ENDDO DayLoop
+  ENDIF
 
   RETURN
 
@@ -3804,12 +4109,20 @@ LOGICAL FUNCTION rCheckDayScheduleValueMinMax(ScheduleIndex,Minimum,MinString,Ma
   LOGICAL :: MinValueOk
   LOGICAL :: MaxValueOk
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
     CALL ShowFatalError('CheckDayScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  MinValue=MINVAL(DaySchedule(ScheduleIndex)%TSValue)
-  MaxValue=MAXVAL(DaySchedule(ScheduleIndex)%TSValue)
+  IF (ScheduleIndex > 0) THEN
+    MinValue=MINVAL(DaySchedule(ScheduleIndex)%TSValue)
+    MaxValue=MAXVAL(DaySchedule(ScheduleIndex)%TSValue)
+  ENDIF
 
   !  Min/max for schedule has been set.  Test.
   MinValueOk=.true.
@@ -3886,12 +4199,20 @@ LOGICAL FUNCTION sCheckDayScheduleValueMinMax(ScheduleIndex,Minimum,MinString,Ma
   LOGICAL :: MinValueOk
   LOGICAL :: MaxValueOk
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumDaySchedules) THEN
     CALL ShowFatalError('CheckDayScheduleValueMinMax called with ScheduleIndex out of range')
   ENDIF
 
-  MinValue=MINVAL(DaySchedule(ScheduleIndex)%TSValue)
-  MaxValue=MAXVAL(DaySchedule(ScheduleIndex)%TSValue)
+  IF (ScheduleIndex > 0) THEN
+    MinValue=MINVAL(DaySchedule(ScheduleIndex)%TSValue)
+    MaxValue=MAXVAL(DaySchedule(ScheduleIndex)%TSValue)
+  ENDIF
 
   !  Min/max for schedule has been set.  Test.
   MinValueOk=.true.
@@ -3963,39 +4284,43 @@ FUNCTION HasFractionalScheduleValue(ScheduleIndex) RESULT(HasFractions)
   INTEGER Hour
   INTEGER TStep
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1 .or. ScheduleIndex == 0) THEN
+    CONTINUE
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('HasFractionalScheduleValue called with ScheduleIndex out of range')
   ENDIF
 
   HasFractions=.false.
 
-  WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-  DayTLoop: DO DayT=1,MaxDayTypes
-    DO Hour=1,24
-      DO TStep=1,NumOfTimeStepInHour
-        IF (DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) > 0.0d0 .and.  &
-            DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) < 1.0d0) THEN
-          HasFractions=.true.
-          EXIT DayTLoop
-        ENDIF
-      ENDDO
-    ENDDO
-  ENDDO DayTLoop
-  IF (.not. HasFractions) THEN
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DayTLoop2: DO DayT=1,MaxDayTypes
-        DO Hour=1,24
-          DO TStep=1,NumOfTimeStepInHour
-            IF (DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) > 0.0d0 .and.  &
-                DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) < 1.0d0) THEN
-              HasFractions=.true.
-              EXIT DayTLoop2
-            ENDIF
-          ENDDO
+  IF (ScheduleIndex > 0) THEN
+    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+    DayTLoop: DO DayT=1,MaxDayTypes
+      DO Hour=1,24
+        DO TStep=1,NumOfTimeStepInHour
+          IF (DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) > 0.0d0 .and.  &
+              DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) < 1.0d0) THEN
+            HasFractions=.true.
+            EXIT DayTLoop
+          ENDIF
         ENDDO
-      ENDDO DayTLoop2
-    ENDDO
+      ENDDO
+    ENDDO DayTLoop
+    IF (.not. HasFractions) THEN
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DayTLoop2: DO DayT=1,MaxDayTypes
+          DO Hour=1,24
+            DO TStep=1,NumOfTimeStepInHour
+              IF (DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) > 0.0d0 .and.  &
+                  DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue(Hour,TStep) < 1.0d0) THEN
+                HasFractions=.true.
+                EXIT DayTLoop2
+              ENDIF
+            ENDDO
+          ENDDO
+        ENDDO DayTLoop2
+      ENDDO
+    ENDIF
   ENDIF
 
   RETURN
@@ -4045,32 +4370,42 @@ FUNCTION GetScheduleMinValue(ScheduleIndex) RESULT(MinimumValue)
   INTEGER DayT
   INTEGER Loop
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
-    CALL ShowFatalError('CheckScheduleMinValue called with ScheduleIndex out of range')
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+    CALL ShowFatalError('GetScheduleMinValue called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-      MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
         MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
-  ENDIF
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+          MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
 
-  !  Min/max for schedule has been set.
-  MinimumValue=Schedule(ScheduleIndex)%MinValue
+    !  Min/max for schedule has been set.
+    MinimumValue=Schedule(ScheduleIndex)%MinValue
+  ELSE
+    MinimumValue=MinValue
+  ENDIF
 
   RETURN
 
@@ -4119,33 +4454,43 @@ FUNCTION GetScheduleMaxValue(ScheduleIndex) RESULT(MaximumValue)
   INTEGER DayT
   INTEGER Loop
 
-  IF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
+  IF (ScheduleIndex == -1) THEN
+    MinValue = 1.0
+    MaxValue = 1.0
+  ELSEIF (ScheduleIndex == 0) THEN
+    MinValue = 0.0
+    MaxValue = 0.0
+  ELSEIF (ScheduleIndex < 1 .or. ScheduleIndex > NumSchedules) THEN
     CALL ShowFatalError('CheckScheduleMaxValue called with ScheduleIndex out of range')
   ENDIF
 
-  IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
-    WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
-    MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
-    DO DayT=2,MaxDayTypes
-      MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-      MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
-    ENDDO
-    DO Loop=2,366
-      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
-      DO DayT=1,MaxDayTypes
+  IF (ScheduleIndex > 0) THEN
+    IF (.not. Schedule(ScheduleIndex)%MaxMinSet) THEN  ! Set Minimum/Maximums for this schedule
+      WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(1)
+      MinValue=MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      MaxValue=MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(1))%TSValue)
+      DO DayT=2,MaxDayTypes
         MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
         MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
       ENDDO
-    ENDDO
-    Schedule(ScheduleIndex)%MaxMinSet=.true.
-    Schedule(ScheduleIndex)%MinValue=MinValue
-    Schedule(ScheduleIndex)%MaxValue=MaxValue
+      DO Loop=2,366
+        WkSch=Schedule(ScheduleIndex)%WeekSchedulePointer(Loop)
+        DO DayT=1,MaxDayTypes
+          MinValue=MIN(MinValue,MINVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+          MaxValue=MAX(MaxValue,MAXVAL(DaySchedule(WeekSchedule(WkSch)%DaySchedulePointer(DayT))%TSValue))
+        ENDDO
+      ENDDO
+      Schedule(ScheduleIndex)%MaxMinSet=.true.
+      Schedule(ScheduleIndex)%MinValue=MinValue
+      Schedule(ScheduleIndex)%MaxValue=MaxValue
+    ENDIF
+
+    !  Min/max for schedule has been set.
+
+    MaximumValue=Schedule(ScheduleIndex)%MaxValue
+  ELSE
+    MaximumValue=MaxValue
   ENDIF
-
-  !  Min/max for schedule has been set.
-
-  MaximumValue=Schedule(ScheduleIndex)%MaxValue
 
   RETURN
 
@@ -4538,7 +4883,7 @@ END FUNCTION GetNumberOfSchedules
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

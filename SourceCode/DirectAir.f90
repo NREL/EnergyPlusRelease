@@ -187,7 +187,7 @@ SUBROUTINE GetDirectAirInput
           ! USE STATEMENTS:
     USE InputProcessor,    ONLY: GetNumObjectsFound, GetObjectItem, VerifyName
     USE NodeInputManager,  ONLY: GetOnlySingleNode
-    USE DataGlobals,       ONLY: AnyEnergyManagementSystemInModel
+    USE DataGlobals,       ONLY: AnyEnergyManagementSystemInModel, ScheduleAlwaysOn
     USE DataInterfaces,    ONLY: SetupOutputVariable, SetupEMSActuator, SetupEMSInternalVariable
     USE DataZoneEquipment, ONLY: ZoneEquipConfig
     USE SplitterComponent, ONLY: SplitterCond, NumSplitters
@@ -223,7 +223,7 @@ INTEGER :: SplitNum
 
 cCurrentModuleObject='AirTerminal:SingleDuct:Uncontrolled'
 
-NumDirectAir = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+NumDirectAir = GetNumObjectsFound(cCurrentModuleObject)
 
 IF (NumDirectAir.GT.0) THEN
 
@@ -233,7 +233,7 @@ IF (NumDirectAir.GT.0) THEN
 
   DO DirectAirNum=1,NumDirectAir
     DirectAir(DirectAirNum)%cObjectName = cCurrentModuleObject ! push Object Name into data array
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),DirectAirNum,cAlphaArgs,NumAlphas,&
+    CALL GetObjectItem(cCurrentModuleObject,DirectAirNum,cAlphaArgs,NumAlphas,&
                        rNumericArgs,NumNums,IOSTAT,NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -245,25 +245,21 @@ IF (NumDirectAir.GT.0) THEN
     ENDIF
     DirectAir(DirectAirNum)%EquipID = cAlphaArgs(1)
     DirectAir(DirectAirNum)%Schedule = cAlphaArgs(2)
-    DirectAir(DirectAirNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
-    IF (DirectAir(DirectAirNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaFieldBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-           ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-      ELSE
-        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': Invalid '//TRIM(cAlphaFieldNames(2))//  &
-           ' entered ='//TRIM(cAlphaArgs(2))// &
-           ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+    IF (lAlphaFieldBlanks(2)) THEN
+      DirectAir(DirectAirNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      DirectAir(DirectAirNum)%SchedPtr = GetScheduleIndex(cAlphaArgs(2))
+      IF (DirectAir(DirectAirNum)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", invalid data.')
+        CALL ShowContinueError('..invalid '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'".')
+        ErrorsFound=.true.
       END IF
-
-      ErrorsFound=.true.
-
     END IF
                   ! Direct air is a problem for node connections since it only has a single node
                   ! make this an outlet
     DirectAir(DirectAirNum)%ZoneSupplyAirNode = &
                GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFieldNames(3))
     !Load the maximum volume flow rate
     DirectAir(DirectAirNum)%MaxAirVolFlowRate = rNumericArgs(1)
 
@@ -302,13 +298,13 @@ ENDIF
 
 !Setup output for the Direct Air Units.  This allows a comparison with
 DO Loop=1,NumDirectAir
-  CALL SetupOutputVariable('Direct Air Sensible Heating Energy[J]',DirectAir(Loop)%HeatEnergy,'System','Sum', &
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Heating Energy [J]',DirectAir(Loop)%HeatEnergy,'System','Sum', &
                                             DirectAir(Loop)%EquipID)
-  CALL SetupOutputVariable('Direct Air Sensible Cooling Energy[J]',DirectAir(Loop)%CoolEnergy,'System','Sum', &
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Cooling Energy [J]',DirectAir(Loop)%CoolEnergy,'System','Sum', &
                                             DirectAir(Loop)%EquipID)
-  CALL SetupOutputVariable('Direct Air Sensible Heating Rate[W]',DirectAir(Loop)%HeatRate,'System','Average', &
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Heating Rate [W]',DirectAir(Loop)%HeatRate,'System','Average', &
                                             DirectAir(Loop)%EquipID)
-  CALL SetupOutputVariable('Direct Air Sensible Cooling Rate[W]',DirectAir(Loop)%CoolRate,'System','Average', &
+  CALL SetupOutputVariable('Zone Air Terminal Sensible Cooling Rate [W]',DirectAir(Loop)%CoolRate,'System','Average', &
                                             DirectAir(Loop)%EquipID)
 
   IF ( AnyEnergyManagementSystemInModel ) THEN
@@ -600,10 +596,9 @@ SUBROUTINE CalcDirectAir(DirectAirNum,ControlledZoneNum,SensOutputProvided,LatOu
                                    - PsyHFnTdbW(Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%Temp, &
                                             Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat))
 
-    SpecHumOut = Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%HumRat / &
-                 (1.0d0 + Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%HumRat)
-    SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat / &
-                 (1.0d0 + Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat)
+!   CR9155 Remove specific humidity calculations
+    SpecHumOut = Node(DirectAir(DirectAirNum)%ZoneSupplyAirNode)%HumRat 
+    SpecHumIn  = Node(ZoneEquipConfig(ControlledZoneNum)%ZoneNode)%HumRat 
 
     LatOutputProvided = MassFlowRate * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s
 
@@ -649,7 +644,7 @@ END SUBROUTINE ReportDirectAir
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

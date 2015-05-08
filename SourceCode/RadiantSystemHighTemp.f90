@@ -31,7 +31,7 @@ MODULE HighTempRadiantSystem
   ! USE STATEMENTS:
   ! Use statements for data only modules
 USE DataPrecisionGlobals
-USE DataGlobals,       ONLY : MaxNameLength, BeginTimeStepFlag, SysSizingCalc
+USE DataGlobals,       ONLY : MaxNameLength, BeginTimeStepFlag, SysSizingCalc, ScheduleAlwaysOn
 USE DataInterfaces,    ONLY : ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, SetupOutputVariable,  &
                               CalcHeatBalanceOutsideSurf, CalcHeatBalanceInsideSurf
 USE DataHVACGlobals,   ONLY: SmallLoad
@@ -43,14 +43,24 @@ IMPLICIT NONE         ! Enforce explicit typing of all variables
 PRIVATE ! Everything private unless explicitly made public
 
   ! MODULE PARAMETER DEFINITIONS:
-CHARACTER(LEN=*), PARAMETER :: Gas = 'Gas'
-CHARACTER(LEN=*), PARAMETER :: Electric = 'Electric'
-CHARACTER(len=*), PARAMETER :: MATControl = 'MeanAirTemperature'                   ! Control for using mean air temperature
-CHARACTER(len=*), PARAMETER :: MRTControl = 'MeanRadiantTemperature'               ! Control for using mean radiant temperature
-CHARACTER(len=*), PARAMETER :: OperativeControl = 'OperativeTemperature'           ! Control for using operative temperature
-CHARACTER(len=*), PARAMETER :: MATSPControl = 'MeanAirTemperatureSetpoint'         ! Control for to MAT setpoint
-CHARACTER(len=*), PARAMETER :: MRTSPControl = 'MeanRadiantTemperatureSetpoint'     ! Control for to MRT setpoint
-CHARACTER(len=*), PARAMETER :: OperativeSPControl = 'OperativeTemperatureSetpoint' ! Control for operative temperature setpoint
+CHARACTER(LEN=*), PARAMETER :: cGas = 'Gas'
+CHARACTER(LEN=*), PARAMETER :: cNaturalGas = 'NaturalGas'
+CHARACTER(LEN=*), PARAMETER :: cElectric = 'Electric'
+CHARACTER(LEN=*), PARAMETER :: cElectricity = 'Electricity'
+INTEGER, PARAMETER :: Gas=1
+INTEGER, PARAMETER :: Electric=2
+CHARACTER(len=*), PARAMETER :: cMATControl = 'MeanAirTemperature'                   ! Control for using mean air temperature
+CHARACTER(len=*), PARAMETER :: cMRTControl = 'MeanRadiantTemperature'               ! Control for using mean radiant temperature
+CHARACTER(len=*), PARAMETER :: cOperativeControl = 'OperativeTemperature'           ! Control for using operative temperature
+CHARACTER(len=*), PARAMETER :: cMATSPControl = 'MeanAirTemperatureSetpoint'         ! Control for to MAT setpoint
+CHARACTER(len=*), PARAMETER :: cMRTSPControl = 'MeanRadiantTemperatureSetpoint'     ! Control for to MRT setpoint
+CHARACTER(len=*), PARAMETER :: cOperativeSPControl = 'OperativeTemperatureSetpoint' ! Control for operative temperature setpoint
+INTEGER, PARAMETER :: MATControl=1001
+INTEGER, PARAMETER :: MRTControl=1002
+INTEGER, PARAMETER :: OperativeControl=1003
+INTEGER, PARAMETER :: MATSPControl=1004
+INTEGER, PARAMETER :: MRTSPControl=1005
+INTEGER, PARAMETER :: OperativeSPControl=1006
 
 
   ! DERIVED TYPE DEFINITIONS:
@@ -61,15 +71,15 @@ TYPE HighTempRadiantSystemData
   INTEGER                        :: SchedPtr          =0   ! index to schedule
   CHARACTER(len=MaxNameLength)   :: ZoneName          =' ' ! Name of zone the system is serving
   INTEGER                        :: ZonePtr           =0   ! Point to this zone in the Zone derived type
+  INTEGER                        :: HeaterType        =0   ! Type of heater (gas or electric)
   REAL(r64)                      :: MaxPowerCapac     =0.0 ! Maximum capacity of the radiant heater in Watts
-  CHARACTER(len=MaxNameLength)   :: HeaterType        =' ' ! Type of heater (gas or electric)
   REAL(r64)                      :: CombustionEffic   =0.0 ! Combustion efficiency (only valid for a gas heater)
   REAL(r64)                      :: FracRadiant       =0.0 ! Fraction of heater power that is given off as radiant heat
   REAL(r64)                      :: FracLatent        =0.0 ! Fraction of heater power that is given off as latent heat
   REAL(r64)                      :: FracLost          =0.0 ! Fraction of heater power that is lost to the outside environment
   REAL(r64)                      :: FracConvect       =0.0 ! Fraction of heater power that is given off as convective heat
                                                            ! (by definition this is 1 minus the sum of all other fractions)
-  CHARACTER(len=MaxNameLength)   :: ControlType       =' ' ! Control type for the system (MAT, MRT, or op temp)
+  INTEGER                        :: ControlType       =0   ! Control type for the system (MAT, MRT, or op temp)
   REAL(r64)                      :: ThrottlRange      =0.0 ! Throttling range for heating [C]
   CHARACTER(len=MaxNameLength)   :: SetptSched        =' ' ! Schedule name for the zone setpoint temperature
   INTEGER                        :: SetptSchedPtr     =0   ! Schedule index for the zone setpoint temperature
@@ -287,7 +297,7 @@ SUBROUTINE GetHighTempRadiantSystem
           ! Obtain all of the user data related to high temperature radiant systems...
   DO Item = 1, NumOfHighTempRadSys
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -302,17 +312,16 @@ SUBROUTINE GetHighTempRadiantSystem
     HighTempRadSys(Item)%Name = cAlphaArgs(1)
 
     HighTempRadSys(Item)%SchedName = cAlphaArgs(2)
-    HighTempRadSys(Item)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-    IF (HighTempRadSys(Item)%SchedPtr == 0) THEN
-      IF (lAlphaFieldBlanks(2)) THEN
-        CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                             ' is required, missing for '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(cAlphaArgs(1)))
-      ELSE
+    IF (lAlphaFieldBlanks(2)) THEN
+      HighTempRadSys(Item)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      HighTempRadSys(Item)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+      IF (HighTempRadSys(Item)%SchedPtr == 0) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                             ' entered ='//TRIM(cAlphaArgs(2))// &
                             ' for '//TRIM(cAlphaFieldNames(1))//' = '//TRIM(cAlphaArgs(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
 
     HighTempRadSys(Item)%ZoneName = cAlphaArgs(3)
@@ -325,9 +334,13 @@ SUBROUTINE GetHighTempRadiantSystem
 
     HighTempRadSys(Item)%MaxPowerCapac = rNumericArgs(1)
 
-    IF (SameString(cAlphaArgs(4),Gas)) THEN
+    IF (SameString(cAlphaArgs(4),cNaturalGas)) THEN
       HighTempRadSys(Item)%HeaterType = Gas
-    ELSE IF (SameString(cAlphaArgs(4),Electric)) THEN
+    ELSE IF (SameString(cAlphaArgs(4),cElectricity)) THEN
+      HighTempRadSys(Item)%HeaterType = Electric
+    ELSE IF (SameString(cAlphaArgs(4),cGas)) THEN
+      HighTempRadSys(Item)%HeaterType = Gas
+    ELSE IF (SameString(cAlphaArgs(4),cElectric)) THEN
       HighTempRadSys(Item)%HeaterType = Electric
     ELSE
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(4))//' = '//TRIM(cAlphaArgs(4)))
@@ -400,17 +413,17 @@ SUBROUTINE GetHighTempRadiantSystem
     END IF
 
           ! Process the temperature control type
-    IF (SameString(cAlphaArgs(5),MATControl)) THEN
+    IF (SameString(cAlphaArgs(5),cMATControl)) THEN
       HighTempRadSys(Item)%ControlType = MATControl
-    ELSE IF (SameString(cAlphaArgs(5),MRTControl)) THEN
+    ELSE IF (SameString(cAlphaArgs(5),cMRTControl)) THEN
       HighTempRadSys(Item)%ControlType = MRTControl
-    ELSE IF (SameString(cAlphaArgs(5),OperativeControl)) THEN
+    ELSE IF (SameString(cAlphaArgs(5),cOperativeControl)) THEN
       HighTempRadSys(Item)%ControlType = OperativeControl
-    ELSE IF (SameString(cAlphaArgs(5),MATSPControl)) THEN
+    ELSE IF (SameString(cAlphaArgs(5),cMATSPControl)) THEN
       HighTempRadSys(Item)%ControlType = MATSPControl
-    ELSE IF (SameString(cAlphaArgs(5),MRTSPControl)) THEN
+    ELSE IF (SameString(cAlphaArgs(5),cMRTSPControl)) THEN
       HighTempRadSys(Item)%ControlType = MRTSPControl
-    ELSE IF (SameString(cAlphaArgs(5),OperativeSPControl)) THEN
+    ELSE IF (SameString(cAlphaArgs(5),cOperativeSPControl)) THEN
       HighTempRadSys(Item)%ControlType = OperativeSPControl
     ELSE
       CALL ShowWarningError('Invalid '//TRIM(cAlphaFieldNames(5))//' = '//TRIM(cAlphaArgs(5)))
@@ -511,26 +524,26 @@ SUBROUTINE GetHighTempRadiantSystem
 
           ! Set up the output variables for high temperature radiant heaters
   DO Item = 1, NumOfHighTempRadSys
-    CALL SetupOutputVariable('High Temperature Radiant Heating Rate[W]',   &
+    CALL SetupOutputVariable('Zone Radiant HVAC Heating Rate [W]',   &
                               HighTempRadSys(Item)%HeatPower,'System','Average',  &
                               HighTempRadSys(Item)%Name)
-    CALL SetupOutputVariable('High Temperature Radiant Heating Energy[J]',    &
+    CALL SetupOutputVariable('Zone Radiant HVAC Heating Energy [J]',    &
                               HighTempRadSys(Item)%HeatEnergy,'System','Sum', &
                               HighTempRadSys(Item)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
     IF (HighTempRadSys(Item)%HeaterType == Gas) THEN
-      CALL SetupOutputVariable('High Temperature Radiant Gas Consumption Rate[W]', &
+      CALL SetupOutputVariable('Zone Radiant HVAC Gas Rate [W]', &
                                 HighTempRadSys(Item)%GasPower,'System','Average',  &
                                 HighTempRadSys(Item)%Name)
-      CALL SetupOutputVariable('High Temperature Radiant Gas Consumption[J]',  &
+      CALL SetupOutputVariable('Zone Radiant HVAC Gas Energy [J]',  &
                                 HighTempRadSys(Item)%GasEnergy,'System','Sum', &
                                 HighTempRadSys(Item)%Name,                     &
                                 ResourceTypeKey='Gas',EndUseKey='Heating',GroupKey='System')
     ELSE IF (HighTempRadSys(Item)%HeaterType == Electric) THEN
-      CALL SetupOutputVariable('High Temperature Radiant Electric Power[W]',       &
+      CALL SetupOutputVariable('Zone Radiant HVAC Electric Power [W]',       &
                                 HighTempRadSys(Item)%ElecPower,'System','Average', &
                                 HighTempRadSys(Item)%Name)
-      CALL SetupOutputVariable('High Temperature Radiant Electric Consumption[J]', &
+      CALL SetupOutputVariable('Zone Radiant HVAC Electric Energy [J]', &
                                 HighTempRadSys(Item)%ElecEnergy,'System','Sum',    &
                                 HighTempRadSys(Item)%Name,                         &
                                 ResourceTypeKey='ELECTRICITY',EndUseKey='Heating',GroupKey='System')
@@ -1406,7 +1419,7 @@ END FUNCTION SumHATsurf
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

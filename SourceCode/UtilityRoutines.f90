@@ -322,7 +322,7 @@ SUBROUTINE EndEnergyPlus
   USE DataInterfaces, ONLY: ShowMessage
   USE General, ONLY: RoundSigDigits
   USE SolarShading, ONLY: ReportSurfaceErrors
-  USE ExternalInterface, ONLY: NumExternalInterfaces, CloseSocket
+  USE ExternalInterface, ONLY: NumExternalInterfaces, CloseSocket, haveExternalInterfaceBCVTB
   USE SQLiteProcedures, ONLY: UpdateSQLiteSimulationRecord, WriteOutputToSQLite
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -410,7 +410,7 @@ SUBROUTINE EndEnergyPlus
   CALL CloseOutOpenFiles
   ! Close the ExternalInterface socket. This call also sends the flag "1" to the ExternalInterface,
   ! indicating that E+ finished its simulation
-  IF (NumExternalInterfaces > 0) CALL CloseSocket(1)
+  IF ((NumExternalInterfaces > 0).AND. haveExternalInterfaceBCVTB) CALL CloseSocket(1)
   STOP 'EnergyPlus Completed Successfully.'
 
   RETURN
@@ -1812,7 +1812,7 @@ END SUBROUTINE ShowRecurringErrors
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -265,7 +265,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
           ! USE STATEMENTS:
   USE InputProcessor,  ONLY: GetNumObjectsFound,GetObjectItem,FindItemInList,VerifyName,GetObjectDefMaxArgs
   USE ScheduleManager, ONLY: GetScheduleIndex,GetScheduleValuesForDay,CheckScheduleValueMinMax,GetScheduleMinValue,GetScheduleName
-  USE General,         ONLY: RoundSigDigits
+  USE General,         ONLY: RoundSigDigits,CheckCreatedZoneItemName
 !  USE DataIPShortCuts
   USE SystemAvailabilityManager, ONLY: GetHybridVentilationControlStatus
 
@@ -355,60 +355,60 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
        'Zone','Average',Zone(Loop)%Name)
     CALL SetupOutputVariable('Zone Mean Air Humidity Ratio [kgWater/kgDryAir]',ZnAirRpt(Loop)%MeanAirHumRat,  &
        'Zone','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance Internal Convective Gains Rate [W]',ZnAirRpt(Loop)%SumIntGains,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance Internal Convective Heat Gain Rate [W]',ZnAirRpt(Loop)%SumIntGains,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance Surface Convection Rate [W]',ZnAirRpt(Loop)%SumHADTsurfs,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance Surface Convection Rate [W]',ZnAirRpt(Loop)%SumHADTsurfs,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance Interzone Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDTzones,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance Interzone Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDTzones,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance Outdoor Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDtInfil,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance Outdoor Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDtInfil,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance System Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDTsystem,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance System Air Transfer Rate [W]',ZnAirRpt(Loop)%SumMCpDTsystem,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance System Convective Gains Rate [W]',ZnAirRpt(Loop)%SumNonAirSystem,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance System Convective Heat Gain Rate [W]',ZnAirRpt(Loop)%SumNonAirSystem,  &
        'System','Average',Zone(Loop)%Name)
-    CALL SetupOutputVariable('Zone Air Balance Air Energy Storage Rate [W]',ZnAirRpt(Loop)%CzdTdt,  &
+    CALL SetupOutputVariable('Zone Air Heat Balance Air Energy Storage Rate [W]',ZnAirRpt(Loop)%CzdTdt,  &
        'System','Average',Zone(Loop)%Name)
     IF (DisplayAdvancedReportVariables) THEN
-      CALL SetupOutputVariable('Zone Air Balance Deviation Rate [W]',ZnAirRpt(Loop)%imBalance,  &
+      CALL SetupOutputVariable('Zone Air Heat Balance Deviation Rate [W]',ZnAirRpt(Loop)%imBalance,  &
          'System','Average',Zone(Loop)%Name)
     ENDIF
   END DO
 
   cCurrentModuleObject='ZoneAirBalance:OutdoorAir'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=NumAlpha
   maxNumber=NumNumber
   cCurrentModuleObject='ZoneInfiltration:EffectiveLeakageArea'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneInfiltration:FlowCoefficient'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneInfiltration:DesignFlowRate'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneVentilation:DesignFlowRate'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneVentilation:WindandStackOpenArea'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneMixing'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneCrossMixing'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
   cCurrentModuleObject='ZoneRefrigerationDoorMixing'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),NumArgs,NumAlpha,NumNumber)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,NumArgs,NumAlpha,NumNumber)
   maxAlpha=MAX(NumAlpha,maxAlpha)
   maxNumber=MAX(NumNumber,maxNumber)
 
@@ -426,12 +426,12 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   lNumericFieldBlanks=.true.
 
   cCurrentModuleObject='ZoneAirBalance:OutdoorAir'
-  TotZoneAirBalance=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotZoneAirBalance=GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(ZoneAirBalance(TotZoneAirBalance))
 
   DO Loop=1,TotZoneAirBalance
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -506,36 +506,36 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     End If
 
     IF (ZoneAirBalance(Loop)%BalanceMethod == AirBalanceQuadrature) THEN
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Sensible Heat Loss [J]',  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Sensible Heat Loss Energy [J]',  &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceHeatLoss,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Sensible Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Sensible Heat Gain Energy [J]',  &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceHeatGain,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Latent Heat Loss [J]',  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Latent Heat Loss Energy [J]',  &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceLatentLoss,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Latent Heat Gain [J]', &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Latent Heat Gain Energy [J]', &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceLatentGain,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Total Heat Loss [J]', &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Total Heat Loss Energy [J]', &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceTotalLoss,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Total Heat Gain [J]',  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Total Heat Gain Energy [J]',  &
           ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceTotalGain,'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Volume Flow Rate Current Density [m3/s]',  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Current Density Volume Flow Rate [m3/s]',  &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceVdotCurDensity,   &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Volume Flow Rate Standard Density [m3/s]', &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Standard Density Volume Flow Rate [m3/s]', &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceVdotStdDensity,   &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Volume Current Density [m3]',              &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Current Density Volume [m3]',              &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceVolumeCurDensity, &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Volume Standard Density [m3]',             &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Standard Density Volume [m3]',             &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceVolumeStdDensity, &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Mass [kg]',ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceMass,  &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Mass [kg]',ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceMass,  &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Air Change Rate [ach]',                   &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Changes per Hour [ach]',                   &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceAirChangeRate,   &
                                  'System','Average',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name)
-      CALL SetupOutputVariable('ZoneAirBalance:OutdoorAir Fan Electric Consumption [J]',     &
+      CALL SetupOutputVariable('Zone Combined Outdoor Air Fan Electric Energy [J]',     &
                                   ZnAirRpt(ZoneAirBalance(Loop)%ZonePtr)%OABalanceFanElec,  &
                                  'System','Sum',Zone(ZoneAirBalance(Loop)%ZonePtr)%Name, &
                                   ResourceTypeKey='Electricity',GroupKey='Building', &
@@ -546,20 +546,20 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   END DO
 
   cCurrentModuleObject='ZoneInfiltration:EffectiveLeakageArea'
-  TotShermGrimsInfiltration=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotShermGrimsInfiltration=GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject='ZoneInfiltration:FlowCoefficient'
-  TotAIM2Infiltration=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotAIM2Infiltration=GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject='ZoneInfiltration:DesignFlowRate'
-  NumInfiltrationStatements=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumInfiltrationStatements=GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(InfiltrationObjects(NumInfiltrationStatements))
 
   TotDesignFlowInfiltration=0
   ErrFlag=.false.
   DO Item=1,NumInfiltrationStatements
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -611,7 +611,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     cCurrentModuleObject='ZoneInfiltration:DesignFlowRate'
     DO Item = 1, NumInfiltrationStatements
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -621,10 +621,16 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
           Infiltration(Loop)%Name = cAlphaArgs(1)
           Infiltration(Loop)%ZonePtr = InfiltrationObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          Infiltration(Loop)%Name =   &
-             trim(Zone(ZoneList(InfiltrationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//  &
-                ' '//trim(InfiltrationObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,cCurrentModuleObject,  &
+                                        Zone(ZoneList(InfiltrationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(InfiltrationObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        InfiltrationObjects(Item)%Name,     &
+                                        Infiltration%Name,           &
+                                        Loop-1,                       &
+                                        Infiltration(Loop)%Name,            &
+                                        ErrFlag)
           Infiltration(Loop)%ZonePtr = ZoneList(InfiltrationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         Infiltration(Loop)%ModelType = InfiltrationDesignFlowRate
@@ -798,7 +804,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   cCurrentModuleObject='ZoneInfiltration:EffectiveLeakageArea'
   InfiltCount=TotDesignFlowInfiltration
   DO Loop=1,TotShermGrimsInfiltration
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -859,7 +865,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
 
   cCurrentModuleObject='ZoneInfiltration:FlowCoefficient'
   DO Loop=1,TotAIM2Infiltration
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -925,28 +931,34 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     IF (Infiltration(Loop)%ZonePtr > 0 .AND. .NOT. Infiltration(Loop)%QuadratureSum) THEN
       IF (RepVarSet(Infiltration(Loop)%ZonePtr)) THEN
         RepVarSet(Infiltration(Loop)%ZonePtr)=.FALSE.
-        CALL SetupOutputVariable('Zone Infiltration Sensible Heat Loss [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilHeatLoss,  &
+        CALL SetupOutputVariable('Zone Infiltration Sensible Heat Loss Energy [J]',  &
+                                 ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilHeatLoss,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Sensible Heat Gain [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilHeatGain,  &
+        CALL SetupOutputVariable('Zone Infiltration Sensible Heat Gain Energy [J]',  &
+                                 ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilHeatGain,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Latent Heat Loss [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilLatentLoss,  &
+        CALL SetupOutputVariable('Zone Infiltration Latent Heat Loss Energy [J]', &
+                                  ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilLatentLoss,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Latent Heat Gain [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilLatentGain,  &
+        CALL SetupOutputVariable('Zone Infiltration Latent Heat Gain Energy [J]', &
+                                  ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilLatentGain,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Total Heat Loss [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilTotalLoss,  &
+        CALL SetupOutputVariable('Zone Infiltration Total Heat Loss Energy [J]',  &
+                                 ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilTotalLoss,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Total Heat Gain [J]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilTotalGain,  &
+        CALL SetupOutputVariable('Zone Infiltration Total Heat Gain Energy [J]',  &
+                                 ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilTotalGain,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Volume Flow Rate Current Density [m3/s]', &
+        CALL SetupOutputVariable('Zone Infiltration Current Density Volume Flow Rate [m3/s]', &
                                   ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilVdotCurDensity,  &
                                  'System','Average',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Volume Flow Rate Standard Density [m3/s]', &
+        CALL SetupOutputVariable('Zone Infiltration Standard Density Volume Flow Rate [m3/s]', &
                                   ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilVdotStdDensity,  &
                                  'System','Average',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Volume Current Density [m3]',  &
+        CALL SetupOutputVariable('Zone Infiltration Current Density Volume [m3]',  &
                                   ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilVolumeCurDensity,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Infiltration Volume Standard Density [m3]', &
+        CALL SetupOutputVariable('Zone Infiltration Standard Density Volume [m3]', &
                                   ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilVolumeStdDensity,  &
                                  'System','Sum',Zone(Infiltration(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Zone Infiltration Mass [kg]',ZnAirRpt(Infiltration(Loop)%ZonePtr)%InfilMass,  &
@@ -968,10 +980,10 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   RepVarSet = .TRUE.
 
   cCurrentModuleObject='ZoneVentilation:DesignFlowRate'
-  NumVentilationStatements=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumVentilationStatements=GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject='ZoneVentilation:WindandStackOpenArea'
-  TotWindAndStackVentilation=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotWindAndStackVentilation=GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(VentilationObjects(NumVentilationStatements))
 
@@ -979,7 +991,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   ErrFlag=.false.
   cCurrentModuleObject='ZoneVentilation:DesignFlowRate'
   DO Item=1,NumVentilationStatements
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK = .FALSE.
@@ -1031,7 +1043,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     cCurrentModuleObject='ZoneVentilation:DesignFlowRate'
     DO Item = 1, NumVentilationStatements
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+      CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1041,10 +1053,16 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
           Ventilation(Loop)%Name = cAlphaArgs(1)
           Ventilation(Loop)%ZonePtr = VentilationObjects(Item)%ZoneOrZoneListPtr
         ELSE
-          Ventilation(Loop)%Name =   &
-             trim(Zone(ZoneList(VentilationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name)//  &
-                ' '//trim(VentilationObjects(Item)%Name)
+          CALL CheckCreatedZoneItemName(RoutineName,cCurrentModuleObject,  &
+                                        Zone(ZoneList(VentilationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1))%Name,  &
+                                        ZoneList(VentilationObjects(Item)%ZoneOrZoneListPtr)%MaxZoneNameLength,  &
+                                        VentilationObjects(Item)%Name,     &
+                                        Ventilation%Name,           &
+                                        Loop-1,                       &
+                                        Infiltration(Loop)%Name,            &
+                                        ErrFlag)
           Ventilation(Loop)%ZonePtr = ZoneList(VentilationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
+          IF (ErrFlag) ErrorsFound=.true.
         ENDIF
 
         ! setup a flag if the outdoor air balance method is applied
@@ -1490,32 +1508,34 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         IF (Ventilation(Loop)%ZonePtr > 0) THEN
           IF (RepVarSet(Ventilation(Loop)%ZonePtr) .AND. .NOT. Ventilation(Loop)%QuadratureSum) THEN
             RepVarSet(Ventilation(Loop)%ZonePtr)=.FALSE.
-            CALL SetupOutputVariable('Zone Ventilation Sensible Heat Loss [J]',  &
+            CALL SetupOutputVariable('Zone Ventilation Sensible Heat Loss Energy [J]',  &
                ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilHeatLoss,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Sensible Heat Gain [J]',  &
+            CALL SetupOutputVariable('Zone Ventilation Sensible Heat Gain Energy [J]',  &
                ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilHeatGain,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Latent Heat Loss [J]',  &
+            CALL SetupOutputVariable('Zone Ventilation Latent Heat Loss Energy [J]',  &
                ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilLatentLoss,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Latent Heat Gain [J]',  &
+            CALL SetupOutputVariable('Zone Ventilation Latent Heat Gain Energy [J]',  &
                ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilLatentGain,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Total Heat Loss [J]',ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilTotalLoss,  &
+            CALL SetupOutputVariable('Zone Ventilation Total Heat Loss Energy [J]', &
+                                      ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilTotalLoss,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Total Heat Gain [J]',ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilTotalGain,  &
+            CALL SetupOutputVariable('Zone Ventilation Total Heat Gain Energy [J]', &
+                                      ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilTotalGain,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Volume Flow Rate Current Density [m3/s]',  &
+            CALL SetupOutputVariable('Zone Ventilation Current Density Volume Flow Rate [m3/s]',  &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilVdotCurDensity,   &
                                      'System','Average',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Volume Flow Rate Standard Density [m3/s]', &
+            CALL SetupOutputVariable('Zone Ventilation Standard Density Volume Flow Rate [m3/s]', &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilVdotStdDensity,   &
                                      'System','Average',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Volume Current Density [m3]',              &
+            CALL SetupOutputVariable('Zone Ventilation Current Density Volume [m3]',              &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilVolumeCurDensity, &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Volume Standard Density [m3]',             &
+            CALL SetupOutputVariable('Zone Ventilation Standard Density Volume [m3]',             &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilVolumeStdDensity, &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name)
             CALL SetupOutputVariable('Zone Ventilation Mass [kg]',ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilMass,  &
@@ -1523,13 +1543,13 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
             CALL SetupOutputVariable('Zone Ventilation Air Change Rate [ach]',                   &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilAirChangeRate,   &
                                      'System','Average',Zone(Ventilation(Loop)%ZonePtr)%Name)
-            CALL SetupOutputVariable('Zone Ventilation Fan Electric Consumption [J]',     &
+            CALL SetupOutputVariable('Zone Ventilation Fan Electric Energy [J]',     &
                                       ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilFanElec,  &
                                      'System','Sum',Zone(Ventilation(Loop)%ZonePtr)%Name, &
                                       ResourceTypeKey='Electricity',GroupKey='Building', &
                                       ZoneKey=Zone(Ventilation(Loop)%ZonePtr)%Name, &
                                       EndUseKey='Fans', EndUseSubKey='Ventilation (simple)')
-            CALL SetupOutputVariable('Zone Ventilation Inlet Air Temperature [C]', &
+            CALL SetupOutputVariable('Zone Ventilation Air Inlet Temperature [C]', &
                                      ZnAirRpt(Ventilation(Loop)%ZonePtr)%VentilAirTemp, &
                                      'System','Average',Zone(Ventilation(Loop)%ZonePtr)%Name)
           END IF
@@ -1548,7 +1568,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   VentiCount = TotDesignFlowVentilation
   DO Loop=1,TotWindAndStackVentilation
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1842,28 +1862,28 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
     IF (Ventilation(VentiCount)%ZonePtr > 0) THEN
       IF (RepVarSet(Ventilation(VentiCount)%ZonePtr) .AND. .NOT. Ventilation(Loop)%QuadratureSum) THEN
         RepVarSet(Ventilation(VentiCount)%ZonePtr)=.FALSE.
-        CALL SetupOutputVariable('Zone Ventilation Sensible Heat Loss [J]', &
+        CALL SetupOutputVariable('Zone Ventilation Sensible Heat Loss Energy [J]', &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilHeatLoss, 'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Sensible Heat Gain [J]', &
+        CALL SetupOutputVariable('Zone Ventilation Sensible Heat Gain Energy [J]', &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilHeatGain, 'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Latent Heat Loss [J]',  &
+        CALL SetupOutputVariable('Zone Ventilation Latent Heat Loss Energy [J]',  &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilLatentLoss,'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Latent Heat Gain [J]', &
+        CALL SetupOutputVariable('Zone Ventilation Latent Heat Gain Energy [J]', &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilLatentGain,'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Total Heat Loss [J]',  &
+        CALL SetupOutputVariable('Zone Ventilation Total Heat Loss Energy [J]',  &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilTotalLoss,'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Total Heat Gain [J]',  &
+        CALL SetupOutputVariable('Zone Ventilation Total Heat Gain Energy [J]',  &
              ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilTotalGain,'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Volume Flow Rate Current Density [m3/s]',  &
+        CALL SetupOutputVariable('Zone Ventilation Current Density Volume Flow Rate [m3/s]',  &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilVdotCurDensity,   &
                                  'System','Average',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Volume Flow Rate Standard Density [m3/s]', &
+        CALL SetupOutputVariable('Zone Ventilation Standard Density Volume Flow Rate [m3/s]', &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilVdotStdDensity,   &
                                  'System','Average',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Volume Current Density [m3]',              &
+        CALL SetupOutputVariable('Zone Ventilation Current Density Volume [m3]',              &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilVolumeCurDensity, &
                                  'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Volume Standard Density [m3]',             &
+        CALL SetupOutputVariable('Zone Ventilation Standard Density Volume [m3]',             &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilVolumeStdDensity, &
                                  'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
         CALL SetupOutputVariable('Zone Ventilation Mass [kg]',ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilMass,  &
@@ -1871,13 +1891,13 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
         CALL SetupOutputVariable('Zone Ventilation Air Change Rate [ach]',                   &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilAirChangeRate,   &
                                  'System','Average',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Ventilation Fan Electric Consumption [J]',     &
+        CALL SetupOutputVariable('Zone Ventilation Fan Electric Energy [J]',     &
                                   ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilFanElec,  &
                                  'System','Sum',Zone(Ventilation(VentiCount)%ZonePtr)%Name, &
                                   ResourceTypeKey='Electricity',GroupKey='Building', &
                                   ZoneKey=Zone(Ventilation(VentiCount)%ZonePtr)%Name, &
                                   EndUseKey='Fans', EndUseSubKey='Ventilation (simple)')
-        CALL SetupOutputVariable('Zone Ventilation Inlet Air Temperature [C]', &
+        CALL SetupOutputVariable('Zone Ventilation Air Inlet Temperature [C]', &
                                  ZnAirRpt(Ventilation(VentiCount)%ZonePtr)%VentilAirTemp, &
                                  'System','Average',Zone(Ventilation(VentiCount)%ZonePtr)%Name)
       END IF
@@ -1893,12 +1913,12 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   RepVarSet=.TRUE.
 
   cCurrentModuleObject='ZoneMixing'
-  TotMixing=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotMixing=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(Mixing(TotMixing))
 
   DO Loop=1,TotMixing
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2169,17 +2189,17 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Zone Mixing Mass [kg]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixMass,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixHeatLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixHeatLoss,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixHeatGain,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixHeatGain,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixLatentLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixLatentLoss,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixLatentGain,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixLatentGain,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Loss [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixTotalLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Loss Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixTotalLoss,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Gain [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixTotalGain,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Gain Energy [J]',ZnAirRpt(Mixing(Loop)%ZonePtr)%MixTotalGain,  &
                                  'System','Sum',Zone(Mixing(Loop)%ZonePtr)%Name)
       ENDIF
     ENDIF
@@ -2191,12 +2211,12 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   END DO
 
   cCurrentModuleObject='ZoneCrossMixing'
-  TotCrossMixing=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotCrossMixing=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(CrossMixing(TotCrossMixing))
 
   DO Loop=1,TotCrossMixing
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2466,17 +2486,17 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
         CALL SetupOutputVariable('Zone Mixing Mass [kg]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixMass,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixHeatLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixHeatLoss,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixHeatGain,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixHeatGain,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixLatentLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixLatentLoss,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixLatentGain,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixLatentGain,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Loss [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixTotalLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Loss Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixTotalLoss,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Gain [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixTotalGain,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Gain Energy [J]',ZnAirRpt(CrossMixing(Loop)%ZonePtr)%MixTotalGain,  &
                                  'System','Sum',Zone(CrossMixing(Loop)%ZonePtr)%Name)
       ENDIF
     ENDIF
@@ -2539,14 +2559,14 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
   ENDIF
 
   cCurrentModuleObject='ZoneRefrigerationDoorMixing'
-  TotRefDoorMixing=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotRefDoorMixing=GetNumObjectsFound(cCurrentModuleObject)
   IF(TotRefDoorMixing > 0) THEN
     ALLOCATE(RefDoorMixing(NumofZones))
     RefDoorMixing%NumRefDoorConnections = 0
 
     DO Loop=1,TotRefDoorMixing
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumNumber,IOStat, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2742,17 +2762,17 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
                                  'System','Sum',Zone(ZoneNumA)%Name)
         CALL SetupOutputVariable('Zone Mixing Mass [kg]',ZnAirRpt(ZoneNumA)%MixMass,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss [J]',ZnAirRpt(ZoneNumA)%MixHeatLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss Energy [J]',ZnAirRpt(ZoneNumA)%MixHeatLoss,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain [J]',ZnAirRpt(ZoneNumA)%MixHeatGain,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain Energy [J]',ZnAirRpt(ZoneNumA)%MixHeatGain,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss [J]',ZnAirRpt(ZoneNumA)%MixLatentLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss Energy [J]',ZnAirRpt(ZoneNumA)%MixLatentLoss,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain [J]',ZnAirRpt(ZoneNumA)%MixLatentGain,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain Energy [J]',ZnAirRpt(ZoneNumA)%MixLatentGain,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Loss [J]',ZnAirRpt(ZoneNumA)%MixTotalLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Loss Energy [J]',ZnAirRpt(ZoneNumA)%MixTotalLoss,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Gain [J]',ZnAirRpt(ZoneNumA)%MixTotalGain,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Gain Energy [J]',ZnAirRpt(ZoneNumA)%MixTotalGain,  &
                                  'System','Sum',Zone(ZoneNumA)%Name)
       ENDIF
     ENDIF
@@ -2769,17 +2789,17 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
                                  'System','Sum',Zone(ZoneNumB)%Name)
         CALL SetupOutputVariable('Zone Mixing Mass [kg]',ZnAirRpt(ZoneNumB)%MixMass,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss [J]',ZnAirRpt(ZoneNumB)%MixHeatLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Loss Energy [J]',ZnAirRpt(ZoneNumB)%MixHeatLoss,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain [J]',ZnAirRpt(ZoneNumB)%MixHeatGain,  &
+        CALL SetupOutputVariable('Zone Mixing Sensible Heat Gain Energy [J]',ZnAirRpt(ZoneNumB)%MixHeatGain,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss [J]',ZnAirRpt(ZoneNumB)%MixLatentLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Loss Energy [J]',ZnAirRpt(ZoneNumB)%MixLatentLoss,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain [J]',ZnAirRpt(ZoneNumB)%MixLatentGain,  &
+        CALL SetupOutputVariable('Zone Mixing Latent Heat Gain Energy [J]',ZnAirRpt(ZoneNumB)%MixLatentGain,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Loss [J]',ZnAirRpt(ZoneNumB)%MixTotalLoss,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Loss Energy [J]',ZnAirRpt(ZoneNumB)%MixTotalLoss,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
-        CALL SetupOutputVariable('Zone Mixing Total Heat Gain [J]',ZnAirRpt(ZoneNumB)%MixTotalGain,  &
+        CALL SetupOutputVariable('Zone Mixing Total Heat Gain Energy [J]',ZnAirRpt(ZoneNumB)%MixTotalGain,  &
                                  'System','Sum',Zone(ZoneNumB)%Name)
       ENDIF
     ENDIF
@@ -3132,7 +3152,7 @@ SUBROUTINE  GetRoomAirModelParameters(ErrFlag)
     ErrorsFound=.FALSE.
 
     cCurrentModuleObject = 'RoomAirModelType'
-    NumOfAirModels = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumOfAirModels = GetNumObjectsFound(cCurrentModuleObject)
     IF (NumOfAirModels.GT.NumOfZones) THEN
       CALL ShowSevereError('Too many '//TRIM(cCurrentModuleObject)//'.  Cannot exceed the number of Zones.')
       ErrorsFound=.TRUE.
@@ -3140,7 +3160,7 @@ SUBROUTINE  GetRoomAirModelParameters(ErrFlag)
 
 
     DO AirModelNum=1,NumOfAirModels
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),AirModelNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
+      CALL GetObjectItem(cCurrentModuleObject,AirModelNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,Status, &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ZoneNum=FindItemInList(cAlphaArgs(2),Zone%Name,NumOfZones)
       IF (ZoneNum /= 0) THEN
@@ -3638,7 +3658,7 @@ END SUBROUTINE ReportZoneMeanAirTemp
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

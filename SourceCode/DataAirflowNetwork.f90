@@ -46,6 +46,7 @@ INTEGER, PARAMETER :: CompTypeNum_TMU=14 ! Distribution system terminal unit com
 INTEGER, PARAMETER :: CompTypeNum_EXF=15 ! Zone exhaust fan
 INTEGER, PARAMETER :: CompTypeNum_HEX=16 ! Distribution system heat exchanger
 INTEGER, PARAMETER :: CompTypeNum_HOP=17 ! Horizontal opening component
+INTEGER, PARAMETER :: CompTypeNum_RVD=18 ! Reheat VAV terminal damper
 
 ! EPlus component Type
 INTEGER, PARAMETER :: EPlusTypeNum_SCN=1 ! Supply connection
@@ -54,6 +55,7 @@ INTEGER, PARAMETER :: EPlusTypeNum_RHT=3 ! Reheat terminal
 INTEGER, PARAMETER :: EPlusTypeNum_FAN=4 ! Fan
 INTEGER, PARAMETER :: EPlusTypeNum_COI=5 ! Heating or cooling coil
 INTEGER, PARAMETER :: EPlusTypeNum_HEX=6 ! Heat ecxchanger
+INTEGER, PARAMETER :: EPlusTypeNum_RVD=7 ! Reheat VAV terminal damper
 
 ! EPlus node type
 INTEGER, PARAMETER :: EPlusTypeNum_ZIN=1 ! Zone inlet node
@@ -66,6 +68,10 @@ INTEGER, PARAMETER :: EPlusTypeNum_FIN=7 ! Fan Inlet node
 INTEGER, PARAMETER :: EPlusTypeNum_FOU=8 ! Fan Outlet Node
 INTEGER, PARAMETER :: EPlusTypeNum_COU=9 ! Coil Outlet Node
 INTEGER, PARAMETER :: EPlusTypeNum_HXO=10 ! Heat exchanger Outlet Node
+INTEGER, PARAMETER :: EPlusTypeNum_DIN=11 ! Damper Inlet node
+INTEGER, PARAMETER :: EPlusTypeNum_DOU=12 ! Damper Outlet Node
+INTEGER, PARAMETER :: EPlusTypeNum_SPI=13 ! Splitter inlet Node
+INTEGER, PARAMETER :: EPlusTypeNum_SPO=14 ! Splitter Outlet Node
 
 INTEGER, PARAMETER :: iWPCCntr_Input=1
 INTEGER, PARAMETER :: iWPCCntr_SurfAvg=2
@@ -345,6 +351,7 @@ TYPE DisSysCompCVFProp ! Constant volume fan component
  INTEGER  :: FanIndex    = 0                 ! Fan index
  INTEGER  :: InletNode   = 0                 ! Inlet node number
  INTEGER  :: OutletNode  = 0                 ! Outlet node number
+ REAL(r64)     :: MaxAirMassFlowRate = 0.0d0        ! Max Specified MAss Flow Rate of Damper [kg/s]
 END TYPE DisSysCompCVFProp
 
 TYPE DisSysCompDetFanProp ! Detailed fan component
@@ -380,6 +387,8 @@ TYPE DisSysCompTermUnitProp ! Turminal unit component
  CHARACTER(len=MaxNameLength)  :: EPlusType = ' '  ! EnergyPlus coil type
  REAL(r64)     :: L           = 0.0d0               ! Air path length
  REAL(r64)     :: D           = 0.0d0               ! Air path hydraulic diameter
+ INTEGER       :: DamperInletNode = 0               ! Damper inlet node number
+ INTEGER       :: DamperOutletNode = 0              ! Damper outlet node number
 END TYPE DisSysCompTermUnitProp
 
 TYPE DisSysCompCPDProp ! Constant pressure drop component
@@ -438,6 +447,7 @@ TYPE AirflowNetworkLinkageProp ! AirflowNetwork linkage data
  INTEGER                       :: LinkNum       =0    ! Linkage number
  INTEGER                       :: DetOpenNum    =0    ! Large Opening number
  INTEGER                       :: ConnectionFlag = 0  ! Return and supply connection flag
+ LOGICAL                       :: VAVTermDamper = .FALSE. ! True if this component is a damper for a VAV terminal
 END TYPE AirflowNetworkLinkageProp
 
 TYPE AirflowNetworkNodeSimuData ! Node variable for simulation
@@ -590,10 +600,57 @@ LOGICAL, ALLOCATABLE, DIMENSION(:) :: AirflowNetworkZoneExhaustFan ! Logical to 
 LOGICAL :: AirflowNetworkFanActivated = .FALSE. ! Supply fan activation flag
 ! Multispeed HP only
 INTEGER :: MultiSpeedHPIndicator     = 0   ! Indicator for multispeed heat pump use
+! Addiitonal airflow needed for an VAV fan to compensate the leakage losses and supply pathway pressure losses [kg/s]
+REAL(r64) :: VAVTerminalRatio = 0.d0       ! The terminal flow ratio when a supply VAV fan reach its max flow rate
+LOGICAL :: VAVSystem = .FALSE.             ! This flag is used to represent a VAV system 
 
+TYPE AiflowNetworkReportProp
+ REAL(r64) :: MultiZoneInfiSenGainW =0.0d0
+ REAL(r64) :: MultiZoneInfiSenGainJ =0.0d0
+ REAL(r64) :: MultiZoneInfiSenLossW =0.0d0
+ REAL(r64) :: MultiZoneInfiSenLossJ =0.0d0
+ REAL(r64) :: MultiZoneMixSenGainW =0.0d0
+ REAL(r64) :: MultiZoneMixSenGainJ =0.0d0
+ REAL(r64) :: MultiZoneMixSenLossW =0.0d0
+ REAL(r64) :: MultiZoneMixSenLossJ =0.0d0
+ REAL(r64) :: MultiZoneInfiLatGainW =0.0d0
+ REAL(r64) :: MultiZoneInfiLatGainJ =0.0d0
+ REAL(r64) :: MultiZoneInfiLatLossW =0.0d0
+ REAL(r64) :: MultiZoneInfiLatLossJ =0.0d0
+ REAL(r64) :: MultiZoneMixLatGainW =0.0d0
+ REAL(r64) :: MultiZoneMixLatGainJ =0.0d0
+ REAL(r64) :: MultiZoneMixLatLossW =0.0d0
+ REAL(r64) :: MultiZoneMixLatLossJ =0.0d0
+ REAL(r64) :: LeakSenGainW =0.0d0
+ REAL(r64) :: LeakSenGainJ =0.0d0
+ REAL(r64) :: LeakSenLossW =0.0d0
+ REAL(r64) :: LeakSenLossJ =0.0d0
+ REAL(r64) :: LeakLatGainW =0.0d0
+ REAL(r64) :: LeakLatGainJ =0.0d0
+ REAL(r64) :: LeakLatLossW =0.0d0
+ REAL(r64) :: LeakLatLossJ =0.0d0
+ REAL(r64) :: CondSenGainW =0.0d0
+ REAL(r64) :: CondSenGainJ =0.0d0
+ REAL(r64) :: CondSenLossW =0.0d0
+ REAL(r64) :: CondSenLossJ =0.0d0
+ REAL(r64) :: DiffLatGainW =0.0d0
+ REAL(r64) :: DiffLatGainJ =0.0d0
+ REAL(r64) :: DiffLatLossW =0.0d0
+ REAL(r64) :: DiffLatLossJ =0.0d0
+ REAL(r64) :: TotalSenGainW =0.0d0
+ REAL(r64) :: TotalSenGainJ =0.0d0
+ REAL(r64) :: TotalSenLossW =0.0d0
+ REAL(r64) :: TotalSenLossJ =0.0d0
+ REAL(r64) :: TotalLatGainW =0.0d0
+ REAL(r64) :: TotalLatGainJ =0.0d0
+ REAL(r64) :: TotalLatLossW =0.0d0
+ REAL(r64) :: TotalLatLossJ =0.0d0
+END TYPE AiflowNetworkReportProp
+
+TYPE(AiflowNetworkReportProp), ALLOCATABLE, DIMENSION(:) :: AirflowNetworkReportData
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

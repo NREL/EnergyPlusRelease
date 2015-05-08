@@ -297,11 +297,13 @@ TYPE FurnaceEquipConditions
   REAL(r64):: CoolMassFlowRate(MaxSpedLevels) = 0  ! Supply air mass flow rate during cooling operation
   REAL(r64):: MSHeatingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in heating mode
   REAL(r64):: MSCoolingSpeedRatio(MaxSpedLevels) = 0  ! Fan speed ratio in cooling mode
-  INTEGER :: CompSpeedNum
-  REAL(r64)     :: CompSpeedRatio
-  INTEGER :: ErrIndexCyc
-  INTEGER :: ErrIndexVar
+  INTEGER :: CompSpeedNum=0
+  REAL(r64) :: CompSpeedRatio=0.0d0
+  INTEGER :: ErrIndexCyc=0
+  INTEGER :: ErrIndexVar=0
  ! end of the additional variables for variable speed water source heat pump
+  INTEGER :: WaterCyclingMode = 0    ! Heat Pump Coil water flow mode; See definitions in DataHVACGlobals,
+                                     ! 1=water cycling, 2=water constant, 3=water constant on demand (old mode)
 END TYPE FurnaceEquipConditions
 
   !MODULE VARIABLE DECLARATIONS:
@@ -325,7 +327,7 @@ END TYPE FurnaceEquipConditions
   INTEGER      :: AirLoopPass = 0             ! Number of air loop pass
   LOGICAL      :: HPDehumidificationLoadFlag = .FALSE. ! true if there is dehumidification load (heat pumps only)
   REAL(r64)    :: TempSteamIn       = 100.0d0   !  steam coil steam inlet temperature
-  !starting add varibles for variable speed water source heat pump
+  !starting add variables for variable speed water source heat pump
   REAL(r64)    :: SaveCompressorPLR      = 0.0  ! holds compressor PLR from active DX coil
   CHARACTER(len=MaxNameLength) :: CurrentModuleObject   ! Object type for getting and error messages
   !ending varibles for variable speed water source heat pump
@@ -740,13 +742,13 @@ SUBROUTINE SimFurnace(FurnaceName,FirstHVACIteration, AirLoopNum, CompIndex)
               Furnace(FurnaceNum)%CoolingCoilSensDemand, Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
               Furnace(FurnaceNum)%OpMode,Furnace(FurnaceNum)%WSHPRuntimeFrac, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &
               Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp, &
-              Furnace(FurnaceNum)%CoolPartLoadRatio)
+              Furnace(FurnaceNum)%CoolPartLoadRatio, FirstHVACIteration)
       CALL SimWatertoAirHPSimple(Blank, Furnace(FurnaceNum)%HeatingCoilIndex, &
               Furnace(FurnaceNum)%HeatingCoilSensDemand, dummy, Furnace(FurnaceNum)%OpMode,  &
               Furnace(FurnaceNum)%WSHPRuntimeFrac, &
               Furnace(FurnaceNum)%MaxONOFFCyclesperHour, Furnace(FurnaceNum)%HPTimeConstant, &
               Furnace(FurnaceNum)%FanDelayTime, CompOp, &
-              Furnace(FurnaceNum)%HeatPartLoadRatio)
+              Furnace(FurnaceNum)%HeatPartLoadRatio, FirstHVACIteration)
 
       IF (Furnace(FurnaceNum)%FanPlace .EQ. DrawThru) THEN
         CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
@@ -979,38 +981,38 @@ SUBROUTINE GetFurnaceInput
     MaxAlphas=0
 
     CurrentModuleObject  = 'AirLoopHVAC:Unitary:Furnace:HeatOnly'
-    NumHeatOnly          = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumHeatOnly          = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
     CurrentModuleObject  = 'AirLoopHVAC:Unitary:Furnace:HeatCool'
-    NumHeatCool          = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumHeatCool          = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
     CurrentModuleObject  = 'AirLoopHVAC:UnitaryHeatOnly'
-    NumUnitaryHeatOnly   = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumUnitaryHeatOnly   = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
     CurrentModuleObject  = 'AirLoopHVAC:UnitaryHeatCool'
-    NumUnitaryHeatCool   = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumUnitaryHeatCool   = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
     CurrentModuleObject  = 'AirLoopHVAC:UnitaryHeatPump:AirToAir'
-    NumHeatPump   = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumHeatPump   = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
     CurrentModuleObject  = 'AirLoopHVAC:UnitaryHeatPump:WaterToAir'
-    NumWaterToAirHeatPump = GetNumObjectsFound(TRIM(CurrentModuleObject))
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+    NumWaterToAirHeatPump = GetNumObjectsFound(CurrentModuleObject)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
     MaxNumbers=MAX(MaxNumbers,NumNumbers)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
 
@@ -1059,7 +1061,7 @@ SUBROUTINE GetFurnaceInput
         FurnaceNum  = HeatOnlyNum
         Furnace(FurnaceNum)%FurnaceType_Num = FurnaceType_Num
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),GetObjectNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+        CALL GetObjectItem(CurrentModuleObject,GetObjectNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1072,11 +1074,15 @@ SUBROUTINE GetFurnaceInput
         ENDIF
 
         Furnace(FurnaceNum)%Name            = Alphas(1)
-        Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
-        IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
-          CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
-          ErrorsFound=.TRUE.
+        IF (lAlphaBlanks(2)) THEN
+          Furnace(FurnaceNum)%SchedPtr        = ScheduleAlwaysOn
+        ELSE
+          Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
+          IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
 
 
@@ -1608,7 +1614,7 @@ SUBROUTINE GetFurnaceInput
         FurnaceNum  = HeatCoolNum + NumHeatOnly + NumUnitaryHeatOnly
         Furnace(FurnaceNum)%FurnaceType_Num = FurnaceType_Num
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),GetObjectNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+        CALL GetObjectItem(CurrentModuleObject,GetObjectNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1621,13 +1627,16 @@ SUBROUTINE GetFurnaceInput
         ENDIF
 
         Furnace(FurnaceNum)%Name            = Alphas(1)
-        Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
-        IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
-          CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
-          ErrorsFound=.TRUE.
+        IF (lAlphaBlanks(2)) THEN
+          Furnace(FurnaceNum)%SchedPtr        = ScheduleAlwaysOn
+        ELSE
+          Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
+          IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
-
 
         Furnace(FurnaceNum)%FurnaceInletNodeNum = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,CurrentModuleObject,Alphas(1), &
@@ -2789,7 +2798,7 @@ SUBROUTINE GetFurnaceInput
         FurnaceNum= NumHeatOnly + NumHeatCool + NumUnitaryHeatOnly + NumUnitaryHeatCool + HeatPumpNum
 
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HeatPumpNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+        CALL GetObjectItem(CurrentModuleObject,HeatPumpNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -2802,11 +2811,15 @@ SUBROUTINE GetFurnaceInput
         ENDIF
         Furnace(FurnaceNum)%FurnaceType_Num = UnitarySys_HeatPump_AirToAir
         Furnace(FurnaceNum)%Name            = Alphas(1)
-        Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
-        IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
-          CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
-          ErrorsFound=.TRUE.
+        IF (lAlphaBlanks(2)) THEN
+          Furnace(FurnaceNum)%SchedPtr        = ScheduleAlwaysOn
+        ELSE
+          Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
+          IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
 
 
@@ -3682,7 +3695,7 @@ SUBROUTINE GetFurnaceInput
 
         FurnaceNum= NumHeatOnly + NumHeatCool + NumUnitaryHeatOnly + NumUnitaryHeatCool + NumHeatPump + HeatPumpNum
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HeatPumpNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+        CALL GetObjectItem(CurrentModuleObject,HeatPumpNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -3695,13 +3708,16 @@ SUBROUTINE GetFurnaceInput
         ENDIF
         Furnace(FurnaceNum)%FurnaceType_Num = UnitarySys_HeatPump_WaterToAir
         Furnace(FurnaceNum)%Name            = Alphas(1)
-        Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
-        IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
-          CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
-          ErrorsFound=.TRUE.
+        IF (lAlphaBlanks(2)) THEN
+          Furnace(FurnaceNum)%SchedPtr        = ScheduleAlwaysOn
+        ELSE
+          Furnace(FurnaceNum)%SchedPtr        = GetScheduleIndex(Alphas(2))
+          IF (Furnace(FurnaceNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//' = '//TRIM(Alphas(1)))
+            CALL ShowContinueError('Illegal '//TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2)))
+            ErrorsFound=.TRUE.
+          ENDIF
         ENDIF
-
 
         Furnace(FurnaceNum)%FurnaceInletNodeNum = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
@@ -3941,10 +3957,27 @@ SUBROUTINE GetFurnaceInput
           ErrorsFound=.TRUE.
         END IF
 
+        IF (NumAlphas >= 18) THEN
+          ! get water flow mode info before CALL SetSimpleWSHPData
+          IF (SameString(Alphas(18),'Constant'))   Furnace(FurnaceNum)%WaterCyclingMode = WaterConstant
+          IF (SameString(Alphas(18),'Cycling'))   Furnace(FurnaceNum)%WaterCyclingMode = WaterCycling
+          IF (SameString(Alphas(18),'ConstantOnDemand'))   Furnace(FurnaceNum)%WaterCyclingMode = WaterConstantOnDemand
+             !default to draw through if not specified in input
+          IF (lAlphaBlanks(18))           Furnace(FurnaceNum)%WaterCyclingMode = WaterCycling
+        ELSE
+          Furnace(FurnaceNum)%WaterCyclingMode = WaterCycling
+        ENDIF
+        IF (Furnace(FurnaceNum)%WaterCyclingMode .EQ. 0) THEN
+          CALL ShowSevereError(TRIM(CurrentModuleObject)//' illegal '//TRIM(cAlphaFields(18))//' = '//TRIM(Alphas(18)))
+          CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(Furnace(FurnaceNum)%Name))
+          ErrorsFound = .TRUE.
+        END IF
+
+        ! end get water flow mode info
         IF (Alphas(8) == 'COIL:HEATING:WATERTOAIRHEATPUMP:EQUATIONFIT' .AND.   &
             Alphas(10) == 'COIL:COOLING:WATERTOAIRHEATPUMP:EQUATIONFIT') THEN
           Furnace(FurnaceNum)%WatertoAirHPType = WatertoAir_Simple
-          CALL SetSimpleWSHPData(Furnace(FurnaceNum)%CoolingCoilIndex,ErrorsFound, &
+          CALL SetSimpleWSHPData(Furnace(FurnaceNum)%CoolingCoilIndex,ErrorsFound,Furnace(FurnaceNum)%WaterCyclingMode, &
                                 CompanionHeatingCoilNum=Furnace(FurnaceNum)%HeatingCoilIndex)
         ELSE IF(Alphas(8) == 'COIL:HEATING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION' .AND. &
                 Alphas(10) == 'COIL:COOLING:WATERTOAIRHEATPUMP:PARAMETERESTIMATION') THEN
@@ -4478,7 +4511,7 @@ SUBROUTINE GetFurnaceInput
       DO HeatOnlyNum = 1,  NumHeatOnly
         FurnaceNum= HeatOnlyNum
         ! Setup Report variables for the Furnace that are not reported in the components themselves
-        CALL SetupOutputVariable('Furnace Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
         IF (AnyEnergyManagementSystemInModel) THEN
           CALL SetupEMSActuator('AirLoopHVAC:Unitary:Furnace:HeatOnly', Furnace(FurnaceNum)%Name,             &
@@ -4492,7 +4525,7 @@ SUBROUTINE GetFurnaceInput
       DO UnitaryHeatOnlyNum = NumHeatOnly + 1, NumHeatOnly + NumUnitaryHeatOnly
         FurnaceNum= UnitaryHeatOnlyNum
         ! Setup Report variables for Unitary System that are not reported in the components themselves
-        CALL SetupOutputVariable('Unitary System Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
         IF (AnyEnergyManagementSystemInModel) THEN
           CALL SetupEMSActuator('AirLoopHVAC:UnitaryHeatOnly', Furnace(FurnaceNum)%Name,             &
@@ -4506,9 +4539,9 @@ SUBROUTINE GetFurnaceInput
       DO HeatCoolNum = NumHeatOnly + NumUnitaryHeatOnly + 1,  NumHeatOnly + NumUnitaryHeatOnly + NumHeatCool
         FurnaceNum= HeatCoolNum
         ! Setup Report variables for the Furnace that are not reported in the components themselves
-        CALL SetupOutputVariable('Furnace Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Furnace Compressor Part-Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Compressor Part Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
 
         IF (AnyEnergyManagementSystemInModel) THEN
@@ -4536,9 +4569,9 @@ SUBROUTINE GetFurnaceInput
                               NumHeatOnly+NumHeatCool+NumUnitaryHeatOnly+NumUnitaryHeatCool
         FurnaceNum= UnitaryHeatCoolNum
         ! Setup Report variables for Unitary System that are not reported in the components themselves
-        CALL SetupOutputVariable('Unitary System Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary System Compressor Part-Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Compressor Part Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
         IF (AnyEnergyManagementSystemInModel) THEN
           CALL SetupEMSActuator('AirLoopHVAC:UnitaryHeatCool', Furnace(FurnaceNum)%Name,   &
@@ -4565,11 +4598,11 @@ SUBROUTINE GetFurnaceInput
       DO HeatPumpNum = NumHeatOnly+NumHeatCool+NumUnitaryHeatOnly+NumUnitaryHeatCool+1, NumFurnaces-NumWaterToAirHeatPump
         FurnaceNum= HeatPumpNum
         ! Setup Report variables for Unitary System that are not reported in the components themselves
-        CALL SetupOutputVariable('Unitary Heat Pump Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary Heat Pump Compressor Part-Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Compressor Part Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Heat Pump Dehumidification Induced Heating Demand Rate [W]', &
+        CALL SetupOutputVariable('Unitary System Dehumidification Induced Heating Demand Rate [W]', &
                                  Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate, 'System','Average', &
                                  Furnace(FurnaceNum)%Name)
 
@@ -4584,17 +4617,17 @@ SUBROUTINE GetFurnaceInput
       DO HeatPumpNum = NumHeatOnly+NumHeatCool+NumUnitaryHeatOnly+NumUnitaryHeatCool+NumHeatPump+1, NumFurnaces
         FurnaceNum= HeatPumpNum
         ! Setup Report variables for Unitary System that are not reported in the components themselves
-        CALL SetupOutputVariable('Unitary Heat Pump Fan Part-Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Fan Part Load Ratio []',Furnace(FurnaceNum)%FanPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary Heat Pump Compressor Part-Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
+        CALL SetupOutputVariable('Unitary System Compressor Part Load Ratio []',Furnace(FurnaceNum)%CompPartLoadRatio, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary Heat Pump Sensible Cooling Demand [W]',Furnace(FurnaceNum)%CoolingCoilSensDemand, &
+        CALL SetupOutputVariable('Unitary System Requested Sensible Cooling Rate [W]',Furnace(FurnaceNum)%CoolingCoilSensDemand, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary Heat Pump Latent Cooling Demand [W]',Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
+        CALL SetupOutputVariable('Unitary System Requested Latent Cooling Rate [W]',Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Unitary Heat Pump Heating Demand [W]',Furnace(FurnaceNum)%HeatingCoilSensDemand, &
+        CALL SetupOutputVariable('Unitary System Requested Heating Rate [W]',Furnace(FurnaceNum)%HeatingCoilSensDemand, &
                               'System','Average',Furnace(FurnaceNum)%Name)
-        CALL SetupOutputVariable('Heat Pump Dehumidification Induced Heating Demand Rate [W]', &
+        CALL SetupOutputVariable('Unitary System Dehumidification Induced Heating Demand Rate [W]', &
                                  Furnace(FurnaceNum)%DehumidInducedHeatingDemandRate, 'System','Average', &
                                  Furnace(FurnaceNum)%Name)
 
@@ -4793,7 +4826,7 @@ SUBROUTINE InitFurnace(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMode, ZoneLo
 
   IF ( .NOT. SysSizingCalc .AND. MySizeFlag(FurnaceNum)) THEN
     ! for each furnace, do the sizing once.
-    CALL SizeFurnace(FurnaceNum)
+    CALL SizeFurnace(FurnaceNum,FirstHVACIteration)
     Furnace(FurnaceNum)%ControlZoneMassFlowFrac = 1.0
 
     MySizeFlag(FurnaceNum) = .FALSE.
@@ -5826,7 +5859,7 @@ SUBROUTINE SetOnOffMassFlowRate(FurnaceNum, AirLoopNum, OnOffAirFlowRatio, OpMod
 
 END SUBROUTINE SetOnOffMassFlowRate
 
-SUBROUTINE SizeFurnace(FurnaceNum)
+SUBROUTINE SizeFurnace(FurnaceNum,FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -5865,6 +5898,7 @@ SUBROUTINE SizeFurnace(FurnaceNum)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   Integer, Intent(IN) :: FurnaceNum
+  LOGICAL, Intent(IN) :: FirstHVACIteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -5897,7 +5931,7 @@ SUBROUTINE SizeFurnace(FurnaceNum)
            Furnace(FurnaceNum)%CoolingCoilIndex, &
            Furnace(FurnaceNum)%CoolingCoilSensDemand, Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
            0,0.0d0, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !CoolPartLoadRatio
-           Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, 0, 0.0d0)
+           Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, 0, 0.0d0, FirstHVACIteration)
   ELSE IF (Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingWaterToAirHPVSEquationFit .OR. &
             Furnace(FurnaceNum)%CoolingCoilType_Num == Coil_CoolingAirToAirVariableSpeed ) THEN
     CALL SimVariableSpeedCoils(Blank,Furnace(FurnaceNum)%CoolingCoilIndex,&
@@ -7557,6 +7591,7 @@ SUBROUTINE CalcNewZoneHeatCoolFlowRates(FurnaceNum,FirstHVACIteration,CompOp,Zon
 
 !*********HVAC Scheduled OFF*************
     ! No heating or cooling or dehumidification
+!!!LKL discrepancy with < 0?
     IF(GetCurrentScheduleValue(Furnace(FurnaceNum)%SchedPtr) .eq. 0.0 .OR. &
        Node(FurnaceInletNode)%MassFlowRate .eq. 0.0) THEN
       Furnace(FurnaceNum)%MdotFurnace = 0.0d0
@@ -8219,14 +8254,16 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
               Furnace(FurnaceNum)%CoolingCoilIndex, &
               Furnace(FurnaceNum)%CoolingCoilSensDemand, Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
               FanOpMode,WSHPRuntimeFrac, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !CoolPartLoadRatio
-              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp, CoolPartLoadRatio)
+              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp,   &
+              CoolPartLoadRatio, FirstHVACIteration)
        Dummy=0.0d0
        !COIL:WATERTOAIRHPSIMPLE:HEATING
        CALL SimWatertoAirHPSimple(Blank, &
               Furnace(FurnaceNum)%HeatingCoilIndex, &
               Furnace(FurnaceNum)%HeatingCoilSensDemand, dummy, &
               FanOpMode,WSHPRuntimeFrac, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !HeatPartLoadRatio
-              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp, HeatPartLoadRatio)
+              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp,   &
+              HeatPartLoadRatio, FirstHVACIteration)
 !      Simulate the whole thing a second time so that the correct PLF required by the coils is used by the Fan. *******
        CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
      END IF
@@ -8236,14 +8273,16 @@ SUBROUTINE CalcFurnaceOutput(FurnaceNum,FirstHVACIteration,FanOpMode,CompOp,Cool
               Furnace(FurnaceNum)%CoolingCoilIndex, &
               Furnace(FurnaceNum)%CoolingCoilSensDemand, Furnace(FurnaceNum)%CoolingCoilLatentDemand, &
               FanOpMode,WSHPRuntimeFrac, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !CoolPartLoadRatio
-              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp, CoolPartLoadRatio)
+              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp,   &
+              CoolPartLoadRatio, FirstHVACIteration)
       Dummy=0.0d0
      !COIL:WATERTOAIRHPSIMPLE:HEATING
       CALL SimWatertoAirHPSimple(Blank, &
               Furnace(FurnaceNum)%HeatingCoilIndex, &
               Furnace(FurnaceNum)%HeatingCoilSensDemand, dummy, &
               FanOpMode,WSHPRuntimeFrac, Furnace(FurnaceNum)%MaxONOFFCyclesperHour, &  !HeatPartLoadRatio
-              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp, HeatPartLoadRatio)
+              Furnace(FurnaceNum)%HPTimeConstant, Furnace(FurnaceNum)%FanDelayTime, CompOp,   &
+              HeatPartLoadRatio, FirstHVACIteration)
 !     Simulate the draw-thru fan
       IF (Furnace(FurnaceNum)%FanPlace .EQ. BlowThru) THEN
         CALL SimulateFanComponents(Blank,FirstHVACIteration,Furnace(FurnaceNum)%FanIndex,FanSpeedRatio)
@@ -10705,7 +10744,7 @@ END SUBROUTINE SetOnOffMassFlowRateVSCoil
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

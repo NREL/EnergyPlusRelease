@@ -275,32 +275,34 @@ SUBROUTINE InitDaylightingDevices
       SumTZoneLengths=0.0
       DO TZoneNum = 1, TDDPipe(PipeNum)%NumOfTZones
         SumTZoneLengths = SumTZoneLengths + TDDPipe(PipeNum)%TZoneLength(TZoneNum)
-        
+
         CALL SetupZoneInternalGain(TDDPipe(PipeNum)%TZone(TZoneNum), &
                                    'DaylightingDevice:Tubular', &
                                    TDDPipe(PipeNum)%Name, &
                                    IntGainTypeOf_DaylightingDeviceTubular, &
                                    ConvectionGainRate = TDDPipe(PipeNum)%TZoneHeatGain(TZoneNum) )
-        
+
       END DO ! TZoneNum
 
       TDDPipe(PipeNum)%ExtLength = TDDPipe(PipeNum)%TotLength - SumTZoneLengths
 
       ! Setup report variables: CurrentModuleObject='DaylightingDevice:Tubular'
-      CALL SetupOutputVariable('TDD Transmitted Solar [W]', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Transmitted Solar Radiation Rate [W]', &
         TDDPipe(PipeNum)%TransmittedSolar,'Zone','Average', TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Pipe Absorbed Solar [W]', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Pipe Absorbed Solar Radiation Rate [W]', &
         TDDPipe(PipeNum)%PipeAbsorbedSolar,'Zone','Average', TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Heat Gain [W]', TDDPipe(PipeNum)%HeatGain,'Zone','Average', TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Heat Loss [W]', TDDPipe(PipeNum)%HeatLoss,'Zone','Average', TDDPipe(PipeNum)%Name)
+      CALL SetupOutputVariable('Tubular Daylighting Device Heat Gain Rate [W]',   &
+         TDDPipe(PipeNum)%HeatGain,'Zone','Average', TDDPipe(PipeNum)%Name)
+      CALL SetupOutputVariable('Tubular Daylighting Device Heat Loss Rate [W]',   &
+         TDDPipe(PipeNum)%HeatLoss,'Zone','Average', TDDPipe(PipeNum)%Name)
 
-      CALL SetupOutputVariable('TDD Beam Solar Transmittance []', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Beam Solar Transmittance []', &
         TDDPipe(PipeNum)%TransSolBeam,'Zone','Average', TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Beam Visible Transmittance []', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Beam Visible Transmittance []', &
         TDDPipe(PipeNum)%TransVisBeam,'Zone','Average', TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Diffuse Solar Transmittance []', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Diffuse Solar Transmittance []', &
         TDDPipe(PipeNum)%TransSolDiff,'Zone','Average',TDDPipe(PipeNum)%Name)
-      CALL SetupOutputVariable('TDD Diffuse Visible Transmittance []', &
+      CALL SetupOutputVariable('Tubular Daylighting Device Diffuse Visible Transmittance []', &
         TDDPipe(PipeNum)%TransVisDiff,'Zone','Average',TDDPipe(PipeNum)%Name)
 
     END DO ! PipeNum
@@ -409,13 +411,13 @@ SUBROUTINE GetTDDInput
 
           ! FLOW:
   cCurrentModuleObject='DaylightingDevice:Tubular'
-  NumOfTDDPipes = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfTDDPipes = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOfTDDPipes > 0) THEN
     ALLOCATE(TDDPipe(NumOfTDDPipes))
 
     DO PipeNum = 1, NumOfTDDPipes
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+      CALL GetObjectItem(cCurrentModuleObject,PipeNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ! Pipe name
@@ -450,7 +452,8 @@ SUBROUTINE GetTDDInput
 
         IF (Construct(Surface(SurfNum)%Construction)%TotGlassLayers > 1) THEN
           CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Dome '//TRIM(cAlphaArgs(2))//' construction must have only 1 layer.')
+            ':  Dome '//TRIM(cAlphaArgs(2))//' construction ('//  &
+            trim(Construct(Surface(SurfNum)%Construction)%Name)//') must have only 1 glass layer.')
           ErrorsFound = .TRUE.
         END IF
 
@@ -498,7 +501,17 @@ SUBROUTINE GetTDDInput
 
         IF (Construct(Surface(SurfNum)%Construction)%TotGlassLayers > 1) THEN
           CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Diffuser '//TRIM(cAlphaArgs(3))//' construction must have only 1 layer.')
+            ':  Diffuser '//TRIM(cAlphaArgs(3))//' construction ('//  &
+            trim(Construct(Surface(SurfNum)%Construction)%Name)//') must have only 1 glass layer.')
+          ErrorsFound = .TRUE.
+        END IF
+
+        IF (Construct(Surface(SurfNum)%Construction)%Transdiff <= 1.d-10) THEN
+          CALL ShowSevereError(trim(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
+            ':  Diffuser '//TRIM(cAlphaArgs(3))//' construction ('//  &
+            trim(Construct(Surface(SurfNum)%Construction)%Name)//') invalid value.')
+          CALL ShowContinueError('Diffuse solar transmittance of construction ['//  &
+             trim(RoundSigDigits(Construct(Surface(SurfNum)%Construction)%Transdiff,4))//'] too small for calculations.')
           ErrorsFound = .TRUE.
         END IF
 
@@ -671,7 +684,7 @@ SUBROUTINE GetShelfInput
 
           ! FLOW:
   cCurrentModuleObject='DaylightingDevice:Shelf'
-  NumOfShelf = GetNumObjectsFound(trim(cCurrentModuleObject))
+  NumOfShelf = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOfShelf > 0) THEN
     ALLOCATE(Shelf(NumOfShelf))
@@ -1535,9 +1548,9 @@ SUBROUTINE FigureTDDZoneGains
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   LOGICAL, SAVE :: MyEnvrnFlag = .TRUE.
   INTEGER   :: Loop
-  
+
   IF (NumOfTDDPipes == 0) RETURN
-  
+
   IF (BeginEnvrnFlag .AND. MyEnvrnFlag) THEN
     DO Loop = 1, NumOfTDDPipes
       TDDPipe(Loop)%TZoneHeatGain = 0.d0
@@ -1545,14 +1558,14 @@ SUBROUTINE FigureTDDZoneGains
     MyEnvrnFlag = .FALSE.
   ENDIF
   IF( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .TRUE.
-  
+
   RETURN
 
 END SUBROUTINE FigureTDDZoneGains
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

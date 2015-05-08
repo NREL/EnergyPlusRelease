@@ -53,6 +53,13 @@ INTEGER, PARAMETER :: BoilerTempModeNotSet = 100
 INTEGER, PARAMETER :: EnteringBoilerTemp   = 101
 INTEGER, PARAMETER :: LeavingBoilerTemp    = 102
 
+!Boiler flow modes
+INTEGER, PARAMETER :: FlowModeNotSet           = 200
+INTEGER, PARAMETER :: ConstantFlow             = 201
+INTEGER, PARAMETER :: NotModulated             = 202
+INTEGER, PARAMETER :: LeavingSetpointModulated = 203
+
+
   ! DERIVED TYPE DEFINITIONS
 TYPE BoilerSpecs
   CHARACTER(len=MaxNameLength) :: Name   =' '      ! user identifier
@@ -67,10 +74,9 @@ TYPE BoilerSpecs
   REAL(r64)      :: NomCap               = 0.0d0   ! W - design nominal capacity of Boiler
   REAL(r64)      :: Effic                = 0.0d0   ! boiler efficiency at design conditions
   REAL(r64)      :: TempDesBoilerOut     = 0.0d0   ! C - Boiler design outlet temperature
-  LOGICAL        :: ConstantFlow         = .FALSE. ! True if this is a Constant Flow Chiller
-  LOGICAL        :: VariableFlow         = .FALSE. ! True if this is a Variable Flow Chiller
-  LOGICAL        :: VariableFlowSetToLoop= .FALSE. ! True if the setpoint is missing at the outlet node
-  LOGICAL        :: VariableFlowErrDone  = .FALSE.  ! true if setpoint warning issued
+  INTEGER        :: FlowMode             = FlowModeNotSet ! one of 3 modes for componet flow during operation
+  LOGICAL        :: ModulatedFlowSetToLoop= .FALSE. ! True if the setpoint is missing at the outlet node
+  LOGICAL        :: ModulatedFlowErrDone  = .FALSE.  ! true if setpoint warning issued
   REAL(r64)      :: VolFlowRate          = 0.0d0   ! m3/s - Boiler water design volumetric flow rate
   REAL(r64)      :: DesMassFlowRate      = 0.0d0   ! kg/s - Boiler water design mass flow rate
   REAL(r64)      :: MassFlowRate         = 0.0d0   ! kg/s - Boiler water mass flow rate
@@ -253,7 +259,7 @@ SUBROUTINE GetBoilerInput
             ! USE STATEMENTS:
     USE DataGlobals,           ONLY: MaxNameLength
     USE DataGlobalConstants
-    USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName
+    USE InputProcessor,        ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, SameString
     USE DataIPShortCuts  ! Data for field names, blank numerics
     USE BranchNodeConnections, ONLY: TestCompSet
     USE NodeInputManager,      ONLY: GetOnlySingleNode
@@ -279,7 +285,7 @@ SUBROUTINE GetBoilerInput
 
             !GET NUMBER OF ALL EQUIPMENT
     cCurrentModuleObject = 'Boiler:HotWater'
-    NumBoilers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumBoilers = GetNumObjectsFound(cCurrentModuleObject)
 
 
     IF (NumBoilers<=0) THEN
@@ -301,7 +307,7 @@ SUBROUTINE GetBoilerInput
              !LOAD ARRAYS WITH CURVE FIT Boiler DATA
 
     DO BoilerNum = 1 , NumBoilers
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), BoilerNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT, &
+      CALL GetObjectItem(cCurrentModuleObject, BoilerNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT, &
                           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                           AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -352,6 +358,14 @@ SUBROUTINE GetBoilerInput
       CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
         BoilerFuelTypeForOutputVariable(BoilerNum) = 'Propane'
         Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('PROPANE')
+
+      CASE ('OTHERFUEL1')
+        BoilerFuelTypeForOutputVariable(BoilerNum) = 'OtherFuel1'
+        Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('OTHERFUEL1')
+
+      CASE ('OTHERFUEL2')
+        BoilerFuelTypeForOutputVariable(BoilerNum) = 'OtherFuel2'
+        Boiler(BoilerNum)%FuelType=AssignResourceTypeNum('OTHERFUEL2')
 
       CASE DEFAULT
         CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
@@ -463,16 +477,26 @@ SUBROUTINE GetBoilerInput
                NodeConnectionType_Outlet, 1, ObjectIsNotParent)
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(5),cAlphaArgs(6),'Hot Water Nodes')
 
-      If(cAlphaArgs(7) .eq. 'CONSTANTFLOW') Then
-         Boiler(BoilerNum)%ConstantFlow = .TRUE.
-         Boiler(BoilerNum)%VariableFlow = .FALSE.
-      Else If(cAlphaArgs(7) .eq. 'VARIABLEFLOW') Then
-         Boiler(BoilerNum)%ConstantFlow = .FALSE.
-         Boiler(BoilerNum)%VariableFlow = .TRUE.
-      Else  ! We will assume variable flow if not specified
-         Boiler(BoilerNum)%ConstantFlow = .FALSE.
-         Boiler(BoilerNum)%VariableFlow = .TRUE.
-      End If
+      SELECT CASE (TRIM(cAlphaArgs(7))) 
+      CASE ('CONSTANTFLOW')
+        Boiler(BoilerNum)%FlowMode  = ConstantFlow
+      CASE ('VARIABLEFLOW') ! backward compatible, clean out eventually
+        Boiler(BoilerNum)%FlowMode  = LeavingSetpointModulated
+        CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+        CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+      CASE ('LEAVINGSETPOINTMODULATED')
+         Boiler(BoilerNum)%FlowMode  = LeavingSetpointModulated
+      CASE ('NOTMODULATED')
+         Boiler(BoilerNum)%FlowMode  = NotModulated
+      CASE DEFAULT
+        CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+        CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+        CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+        CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+         ! We will assume variable flow if not specified
+         Boiler(BoilerNum)%FlowMode  = NotModulated
+      END SELECT
 
     END DO
 
@@ -481,30 +505,35 @@ SUBROUTINE GetBoilerInput
     ENDIF
 
   DO BoilerNum = 1, NumBoilers
-     CALL SetupOutputVariable('Boiler Heating Output Rate [W]', &
+     CALL SetupOutputVariable('Boiler Heating Rate [W]', &
           BoilerReport(BoilerNum)%BoilerLoad,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler Heating Output Energy [J]', &
+     CALL SetupOutputVariable('Boiler Heating Energy [J]', &
           BoilerReport(BoilerNum)%BoilerEnergy,'System','Sum',Boiler(BoilerNum)%Name,  &
                     ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BOILERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Consumption Rate [W]', &
-          BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Consumption [J]', &
+     IF (SameString(BoilerFuelTypeForOutputVariable(BoilerNum), 'Electric')) THEN
+       CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Power [W]', &
+            BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
+     ELSE
+       CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Rate [W]', &
+            BoilerReport(BoilerNum)%FuelUsed,'System','Average',Boiler(BoilerNum)%Name)
+     ENDIF
+     CALL SetupOutputVariable('Boiler ' // TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)) //' Energy [J]', &
           BoilerReport(BoilerNum)%FuelConsumed,'System','Sum',Boiler(BoilerNum)%Name,  &
                     ResourceTypeKey=TRIM(BoilerFuelTypeForOutputVariable(BoilerNum)),EndUseKey='Heating', &
                     EndUseSubKey='Boiler', GroupKey='Plant')
-     CALL SetupOutputVariable('Boiler Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Boiler Inlet Temperature [C]', &
           BoilerReport(BoilerNum)%BoilerInletTemp,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Boiler Outlet Temperature [C]', &
           BoilerReport(BoilerNum)%BoilerOutletTemp,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Boiler Mass Flow Rate [kg/s]', &
           BoilerReport(BoilerNum)%Mdot,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler Parasitic Electric Consumption Rate [W]', &
+     CALL SetupOutputVariable('Boiler Ancillary Electric Power [W]', &
           BoilerReport(BoilerNum)%ParasiticElecPower,'System','Average',Boiler(BoilerNum)%Name)
-     CALL SetupOutputVariable('Boiler Parasitic Electric Consumption [J]', &
+     CALL SetupOutputVariable('Boiler Ancillary Electric Energy [J]', &
           BoilerReport(BoilerNum)%ParasiticElecConsumption,'System','Sum',Boiler(BoilerNum)%Name, &
                     ResourceTypeKey='ELECTRICITY',EndUseKey='Heating',EndUseSubKey='Boiler Parasitic', &
                     GroupKey='Plant')
-     CALL SetupOutputVariable('Boiler Part-Load Ratio', &
+     CALL SetupOutputVariable('Boiler Part Load Ratio []', &
           BoilerReport(BoilerNum)%BoilerPLR,'System','Average',Boiler(BoilerNum)%Name)
   END DO
 
@@ -590,11 +619,12 @@ SUBROUTINE InitBoiler(BoilerNum)
       CALL ShowFatalError('InitBoiler: Program terminated due to previous condition(s).')
     ENDIF
 
-    IF (Boiler(BoilerNum)%VariableFlow) THEN
+    IF ((Boiler(BoilerNum)%FlowMode == LeavingSetpointModulated) .OR. (Boiler(BoilerNum)%FlowMode == ConstantFlow)) THEN
       ! reset flow priority
       PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopSide(Boiler(BoilerNum)%LoopSideNum)% &
           Branch(Boiler(BoilerNum)%BranchNum)%Comp(Boiler(BoilerNum)%CompNum)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
     ENDIF
+
     MyFlag(BoilerNum)=.FALSE.
   ENDIF
 
@@ -615,36 +645,36 @@ SUBROUTINE InitBoiler(BoilerNum)
                                  Boiler(BoilerNum)%CompNum)
 
 
-    IF (Boiler(BoilerNum)%VariableFlow) Then ! check if setpoint on outlet node
+    IF (Boiler(BoilerNum)%FlowMode == LeavingSetpointModulated) Then ! check if setpoint on outlet node
       IF ((Node(Boiler(BoilerNum)%BoilerOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(Boiler(BoilerNum)%BoilerOutletNodeNum)%TempSetPointLo == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. Boiler(BoilerNum)%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode Boiler named ' // &
+          IF (.NOT. Boiler(BoilerNum)%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode Boiler named ' // &
                                           TRIM(Boiler(BoilerNum)%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a boiler ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for Boiler. The simulation continues ... ')
-            Boiler(BoilerNum)%VariableFlowErrDone = .TRUE.
+            Boiler(BoilerNum)%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(Boiler(BoilerNum)%BoilerOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. Boiler(BoilerNum)%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode Boiler named ' // &
+            IF (.NOT. Boiler(BoilerNum)%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode Boiler named ' // &
                                           TRIM(Boiler(BoilerNum)%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a boiler ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the boiler outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the boiler outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for Boiler. The simulation continues ... ')
-              Boiler(BoilerNum)%VariableFlowErrDone = .TRUE.
+              Boiler(BoilerNum)%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
         ENDIF
-        Boiler(BoilerNum)%VariableFlowSetToLoop = .TRUE. ! this is for backward compatibility and could be removed
+        Boiler(BoilerNum)%ModulatedFlowSetToLoop = .TRUE. ! this is for backward compatibility and could be removed
       ENDIF
     ENDIF
 
@@ -657,7 +687,7 @@ SUBROUTINE InitBoiler(BoilerNum)
 
   ! every iteration inits.  (most in calc routine)
 
-  IF (Boiler(BoilerNum)%VariableFlow .AND. Boiler(BoilerNum)%VariableFlowSetToLoop) THEN
+  IF ((Boiler(BoilerNum)%FlowMode == LeavingSetpointModulated) .AND. Boiler(BoilerNum)%ModulatedFlowSetToLoop) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     SELECT CASE (PlantLoop(Boiler(BoilerNum)%LoopNum)%LoopDemandCalcScheme)
@@ -897,7 +927,7 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
   IF (PlantLoop(LoopNum)%Loopside(LoopSideNum)%FlowLock==0) THEN
       ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-    If (Boiler(BoilerNum)%ConstantFlow) Then
+    If ((Boiler(BoilerNum)%FlowMode == ConstantFlow ) .OR. (Boiler(BoilerNum)%FlowMode == NotModulated)) THEN
             ! Then find the flow rate and outlet temp
       BoilerMassFlowRate = BoilerMassFlowRateMax
       CALL SetComponentFlowRate(BoilerMassFlowRate, BoilerInletNode, BoilerOutletNode, &
@@ -914,7 +944,7 @@ SUBROUTINE CalcBoilerModel(BoilerNum,MyLoad,Runflag,EquipFlowCtrl)
 
       BoilerOutletTemp = BoilerDeltaTemp + Node(BoilerInletNode)%Temp
 
-    Else IF(Boiler(BoilerNum)%VariableFlow)Then
+    ELSE IF (Boiler(BoilerNum)%FlowMode == LeavingSetpointModulated) THEN
             ! Calculate the Delta Temp from the inlet temp to the boiler outlet setpoint
             ! Then find the flow rate and outlet temp
 
@@ -1154,7 +1184,7 @@ END SUBROUTINE UpdateBoilerRecords
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

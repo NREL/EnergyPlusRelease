@@ -125,8 +125,9 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   USE PlantManager,        ONLY: CheckIfAnyPlant
   USE CurveManager,        ONLY: InitCurveReporting
   USE DataTimings
-  USE DataSystemVariables, ONLY: DeveloperFlag, TimingFlag
+  USE DataSystemVariables, ONLY: DeveloperFlag, TimingFlag, FullAnnualRun
   USE SetPointManager,     ONLY: CheckIFAnyIdealCondEntSetPoint
+  USE Psychrometrics,      ONLY: InitializePsychRoutines
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -155,12 +156,14 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
           ! FLOW:
   CALL PostIPProcessing
 
+  CALL InitializePsychRoutines
+
   BeginSimFlag = .TRUE.
   BeginFullSimFlag = .FALSE.
   DoOutputReporting = .FALSE.
   DisplayPerfSimulationFlag=.false.
   DoWeatherInitReporting=.false.
-  RunPeriodsInInput=(GetNumObjectsFound('RunPeriod')>0 .or. GetNumObjectsFound('RunPeriod:CustomRange')>0)
+  RunPeriodsInInput=(GetNumObjectsFound('RunPeriod')>0 .or. GetNumObjectsFound('RunPeriod:CustomRange')>0 .or. FullAnnualRun)
   AskForConnectionsReport=.false.    ! set to false until sizing is finished
 
   CALL OpenOutputFiles
@@ -191,7 +194,7 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
 
   IF ((DoZoneSizing .or. DoSystemSizing .or. DoPlantSizing) .and.   &
       .not. (DoDesDaySim .or. (DoWeathSim .and. RunPeriodsInInput) ) ) THEN
-    CALL ShowWarningError('Input file has requested Sizing Calculations but no Simulations are requested '//  &
+    CALL ShowWarningError('ManageSimulation: Input file has requested Sizing Calculations but no Simulations are requested '//  &
        '(in SimulationControl object). Succeeding warnings/errors may be confusing.')
   ENDIF
   Available=.true.
@@ -494,7 +497,7 @@ SUBROUTINE GetProjectData
   ErrorsFound=.false.
 
   CurrentModuleObject='Version'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num == 1) THEN
     CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
@@ -521,10 +524,10 @@ SUBROUTINE GetProjectData
 
   ! Do Mini Gets on HB Algorithm and by-surface overrides
   CurrentModuleObject='HeatBalanceAlgorithm'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   CondFDAlgo=.false.
   IF (Num > 0) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     SELECT CASE (Alphas(1))
@@ -534,10 +537,10 @@ SUBROUTINE GetProjectData
     END SELECT
   ENDIF
   CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num > 0) THEN
     DO Item = 1, Num
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Item,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,Item,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       SELECT CASE (Alphas(2))
@@ -549,10 +552,10 @@ SUBROUTINE GetProjectData
     ENDDO
   ENDIF
   CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:MultipleSurface'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num > 0) THEN
     DO Item = 1, Num
-      CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       SELECT CASE (Alphas(3))
@@ -563,10 +566,10 @@ SUBROUTINE GetProjectData
     ENDDO
   ENDIF
   CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:SurfaceList'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num > 0) THEN
     DO Item = 1, Num
-      CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       SELECT CASE (cAlphaArgs(2))
@@ -577,10 +580,10 @@ SUBROUTINE GetProjectData
     ENDDO
   ENDIF
   CurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:Construction'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num > 0) THEN
     DO Item = 1, Num
-      CALL GetObjectItem(TRIM(CurrentModuleObject),1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
+      CALL GetObjectItem(CurrentModuleObject,1,cAlphaArgs,NumAlpha,Number,NumNumber,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       SELECT CASE (cAlphaArgs(2))
@@ -592,9 +595,9 @@ SUBROUTINE GetProjectData
   ENDIF
 
   CurrentModuleObject='Timestep'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     NumOfTimeStepInHour=Number(1)
@@ -645,9 +648,9 @@ SUBROUTINE GetProjectData
   MinutesPerTimeStep=TimeStepZone*60
 
   CurrentModuleObject='ConvergenceLimits'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   IF (Num == 1) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     MinInt=INT(Number(1))
@@ -690,9 +693,9 @@ SUBROUTINE GetProjectData
   DebugOutput = .FALSE.
   EvenDuringWarmup = .FALSE.
   CurrentModuleObject='Output:DebuggingData'
-  NumDebugOut = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDebugOut = GetNumObjectsFound(CurrentModuleObject)
   IF (NumDebugOut > 0) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat)
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat)
     IF (INT(Number(1)) == 1) THEN
       DebugOutput = .TRUE.
     END IF
@@ -702,9 +705,9 @@ SUBROUTINE GetProjectData
   END IF
 
   CurrentModuleObject='Output:Diagnostics'
-  Num=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num=GetNumObjectsFound(CurrentModuleObject)
   DO Num1=1,Num
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Num1,Alphas,NumAlpha,Number,NumNumber,IOStat)
+    CALL GetObjectItem(CurrentModuleObject,Num1,Alphas,NumAlpha,Number,NumNumber,IOStat)
     DO NumA=1,NumAlpha
       IF (SameString(Alphas(NumA),'DisplayExtraWarnings')) THEN
         DisplayExtraWarnings=.true.
@@ -761,9 +764,9 @@ SUBROUTINE GetProjectData
   ENDDO
 
   CurrentModuleObject='OutputControl:ReportingTolerances'
-  Num = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  Num = GetNumObjectsFound(CurrentModuleObject)
   IF (Num > 0) THEN
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (.not. lNumericFieldBlanks(1)) THEN
@@ -784,10 +787,10 @@ SUBROUTINE GetProjectData
   DoDesDaySim = .TRUE.
   DoWeathSim = .TRUE.
   CurrentModuleObject='SimulationControl'
-  NumRunControl = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumRunControl = GetNumObjectsFound(CurrentModuleObject)
   IF (NumRunControl > 0) THEN
     RunControlInInput=.true.
-    CALL GetObjectItem(TRIM(CurrentModuleObject),1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,1,Alphas,NumAlpha,Number,NumNumber,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IF (Alphas(1).EQ.'YES')  DoZoneSizing = .TRUE.
@@ -801,6 +804,7 @@ SUBROUTINE GetProjectData
     DoWeathSim=.false.
   ENDIF
   IF (FullAnnualRun) THEN
+    DoDesDaySim=.false.
     DoWeathSim=.true.
   ENDIF
 
@@ -857,7 +861,7 @@ SUBROUTINE GetProjectData
 741 Format(' Simulation Control',5(', ',A))
 
   Write(OutputFileInits,fmtA) '! <Output Reporting Tolerances>, Tolerance for Time Heating Setpoint Not Met, '//  &
-   'Tolerance for Time Cooling Setpoint Not Met'
+   'Tolerance for Zone Cooling Setpoint Not Met Time'
   Write(OutputFileInits,751) trim(RoundSigDigits(abs(deviationFromSetPtThresholdHtg),3)),  &
                              trim(RoundSigDigits(deviationFromSetPtThresholdClg,3))
 751 Format(' Output Reporting Tolerances',5(', ',A))
@@ -1186,14 +1190,16 @@ SUBROUTINE CloseOutputFiles
                              MaxIVariable,NumOfIVariable_Setup,NumOfIVariable_Sum,                       &
                              NumOfRVariable,NumOfIVariable,                                              &
                              NumEnergyMeters,NumVarMeterArrays,  &
-                             NumTotalRVariable,NumTotalIVariable
+                             NumTotalRVariable,NumTotalIVariable, NumReportList, InstMeterCacheSize
   USE OutputReportTabular, ONLY: maxUniqueKeyCount,MonthlyFieldSetInputCount
-  USE SolarShading, ONLY: maxNumberOfFigures
+  USE SolarShading, ONLY: maxNumberOfFigures, MAXHCArrayBounds
   USE DataRunTimeLanguage
   USE DataBranchNodeConnections, ONLY: NumOfNodeConnections, MaxNumOfNodeConnections
   USE DataHeatBalance, ONLY: CondFDRelaxFactor, HeatTransferAlgosUsed, UseCondFD, CondFDRelaxFactorInput
   USE General, ONLY: RoundSigDigits
   USE DataSystemVariables !, ONLY: MaxNumberOfThreads,NumberIntRadThreads,iEnvSetThreads
+  USE DataSurfaces, ONLY: MaxVerticesPerSurface
+  USE DataTimings
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1240,6 +1246,15 @@ SUBROUTINE CloseOutputFiles
   WRITE (EchoInputFile,*) 'NumVarMeterArrays=',NumVarMeterArrays
   WRITE (EchoInputFile,*) 'maxUniqueKeyCount=',maxUniqueKeyCount
   WRITE (EchoInputFile,*) 'maxNumberOfFigures=',maxNumberOfFigures
+  WRITE (EchoInputFile,*) 'MAXHCArrayBounds=',MAXHCArrayBounds
+  WRITE (EchoInputFile,*) 'MaxVerticesPerSurface=',MaxVerticesPerSurface
+  WRITE (EchoInputFile,*) 'NumReportList=',NumReportList
+  WRITE (EchoInputFile,*) 'InstMeterCacheSize=',InstMeterCacheSize
+  IF (SutherlandHodgman) THEN
+    WRITE (EchoInputFile,*) 'ClippingAlgorithm=SutherlandHodgman'
+  ELSE
+    WRITE (EchoInputFile,*) 'ClippingAlgorithm=ConvexWeilerAtherton'
+  ENDIF
   WRITE (EchoInputFile,*) 'MonthlyFieldSetInputCount=',MonthlyFieldSetInputCount
   WRITE (EchoInputFile,*) 'NumConsideredOutputVariables=',NumConsideredOutputVariables
   WRITE (EchoInputFile,*) 'MaxConsideredOutputVariables=',MaxConsideredOutputVariables
@@ -1253,6 +1268,24 @@ SUBROUTINE CloseOutputFiles
 
   WRITE (EchoInputFile,*) 'NumOfNodeConnections=',NumOfNodeConnections
   WRITE (EchoInputFile,*) 'MaxNumOfNodeConnections=',MaxNumOfNodeConnections
+#ifdef EP_Count_Calls
+  WRITE (EchoInputFile,*) 'NumShadow_Calls=',NumShadow_Calls
+  WRITE (EchoInputFile,*) 'NumShadowAtTS_Calls=',NumShadowAtTS_Calls
+  WRITE (EchoInputFile,*) 'NumClipPoly_Calls=',NumClipPoly_Calls
+  WRITE (EchoInputFile,*) 'NumInitSolar_Calls=',NumInitSolar_Calls
+  WRITE (EchoInputFile,*) 'NumAnisoSky_Calls=',NumAnisoSky_Calls
+  WRITE (EchoInputFile,*) 'NumDetPolyOverlap_Calls=',NumDetPolyOverlap_Calls
+  WRITE (EchoInputFile,*) 'NumCalcPerSolBeam_Calls=',NumCalcPerSolBeam_Calls
+  WRITE (EchoInputFile,*) 'NumDetShadowCombs_Calls=',NumDetShadowCombs_Calls
+  WRITE (EchoInputFile,*) 'NumIntSolarDist_Calls=',NumIntSolarDist_Calls
+  WRITE (EchoInputFile,*) 'NumIntRadExchange_Calls=',NumIntRadExchange_Calls
+  WRITE (EchoInputFile,*) 'NumIntRadExchangeZ_Calls=',NumIntRadExchangeZ_Calls
+  WRITE (EchoInputFile,*) 'NumIntRadExchangeMain_Calls=',NumIntRadExchangeMain_Calls
+  WRITE (EchoInputFile,*) 'NumIntRadExchangeOSurf_Calls=',NumIntRadExchangeOSurf_Calls
+  WRITE (EchoInputFile,*) 'NumIntRadExchangeISurf_Calls=',NumIntRadExchangeISurf_Calls
+  WRITE (EchoInputFile,*) 'NumMaxInsideSurfIterations=',NumMaxInsideSurfIterations
+  WRITE (EchoInputFile,*) 'NumCalcScriptF_Calls=',NumCalcScriptF_Calls
+#endif
 
   WRITE (OutputFileStandard,EndOfDataFormat)
   WRITE (OutputFileStandard,*) 'Number of Records Written=',StdOutputRecordCount
@@ -1376,7 +1409,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
 
           ! USE STATEMENTS:
   USE ExteriorEnergyUse,   ONLY: ManageExteriorEnergyUse
-  USE DataEnvironment ,    ONLY: EndMonthFlag
+  USE DataEnvironment ,    ONLY: EndMonthFlag, EnvironmentName
   USE InputProcessor,      ONLY: GetNumRangeCheckErrorsFound
   USE CostEstimateManager, ONLY: SimCostEstimate
   USE General, ONLY: TrimSigDigits
@@ -1430,7 +1463,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
 
         TimeStep = 1
 
-        IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - timestep 1')
+        IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - timestep 1:'//trim(EnvironmentName))
 
           BeginTimeStepFlag = .TRUE.
 
@@ -1454,7 +1487,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
           BeginFullSimFlag = .FALSE.
 
 !          ! do another timestep=1
-          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - 2nd timestep 1')
+          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - 2nd timestep 1:'//trim(EnvironmentName))
 
           CALL ManageWeather
 
@@ -1468,7 +1501,7 @@ SUBROUTINE SetupSimulation(ErrorsFound)
           TimeStep=NumOfTimeStepInHour
           EndEnvrnFlag   = .True.
 
-          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - hour 24 timestep 1')
+          IF (DeveloperFlag) CALL DisplayString('Initializing Simulation - hour 24 timestep 1:'//trim(EnvironmentName))
           CALL ManageWeather
 
           CALL ManageExteriorEnergyUse
@@ -1750,7 +1783,7 @@ SUBROUTINE ReportLoopConnections
       CALL ShowContinueError('  Inlet Node : '//TRIM(CompSets(Count)%InletNodeName))
       CALL ShowContinueError('  Outlet Node: '//TRIM(CompSets(Count)%OutletNodeName))
       NumNodeConnectionErrors=NumNodeConnectionErrors+1
-      IF (SameString(TRIM(CompSets(Count)%CType), 'SolarCollector:UnglazedTranspired') ) Then
+      IF (SameString(CompSets(Count)%CType, 'SolarCollector:UnglazedTranspired') ) Then
        CALL ShowContinueError('This report does not necessarily indicate a problem for a MultiSystem Transpired Collector')
       ENDIF
     ENDIF
@@ -2610,7 +2643,6 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   CHARACTER(len=10) :: cEnvValue
   INTEGER :: ios
-#ifdef HBIRE_USE_OMP
   INTEGER :: TotHTSurfs        ! Number of BuildingSurface:Detailed items to obtain
   INTEGER :: TotDetailedWalls  ! Number of Wall:Detailed items to obtain
   INTEGER :: TotDetailedRoofs  ! Number of RoofCeiling:Detailed items to obtain
@@ -2637,27 +2669,6 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
   INTEGER :: iIDFsetThreadsInput
   INTEGER :: NumAlphas
   INTEGER :: NumNumbers
-
-  MaxNumberOfThreads=MAXTHREADS()
-  Threading=.true.
-
-  cEnvValue=' '
-  CALL Get_Environment_Variable(cNumThreads,cEnvValue)
-  IF (cEnvValue /= Blank) THEN
-    lEnvSetThreadsInput=.true.
-    READ(cEnvValue,*,IOSTAT=ios) iEnvSetThreads
-    IF (ios /= 0) iEnvSetThreads=MaxNumberOfThreads
-    IF (iEnvSetThreads == 0) iEnvSetThreads=MaxNumberOfThreads
-  ENDIF
-
-  cEnvValue=' '
-  CALL Get_Environment_Variable(cepNumThreads,cEnvValue)
-  IF (cEnvValue /= Blank) THEN
-    lepSetThreadsInput=.true.
-    READ(cEnvValue,*,IOSTAT=ios) iepEnvSetThreads
-    IF (ios /= 0) iepEnvSetThreads=MaxNumberOfThreads
-    IF (iepEnvSetThreads == 0) iepEnvSetThreads=MaxNumberOfThreads
-  ENDIF
 
   ! Figure out how many surfaces there are.
   TotHTSurfs            =GetNumObjectsFound('BuildingSurface:Detailed')
@@ -2689,6 +2700,28 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
         TotRectUGWalls + TotRectRoofs + TotRectCeilings + TotRectIZCeilings + TotRectGCFloors +          &
         TotRectIntFloors + TotRectIZFloors
 
+#ifdef HBIRE_USE_OMP
+  MaxNumberOfThreads=MAXTHREADS()
+  Threading=.true.
+
+  cEnvValue=' '
+  CALL Get_Environment_Variable(cNumThreads,cEnvValue)
+  IF (cEnvValue /= Blank) THEN
+    lEnvSetThreadsInput=.true.
+    READ(cEnvValue,*,IOSTAT=ios) iEnvSetThreads
+    IF (ios /= 0) iEnvSetThreads=MaxNumberOfThreads
+    IF (iEnvSetThreads == 0) iEnvSetThreads=MaxNumberOfThreads
+  ENDIF
+
+  cEnvValue=' '
+  CALL Get_Environment_Variable(cepNumThreads,cEnvValue)
+  IF (cEnvValue /= Blank) THEN
+    lepSetThreadsInput=.true.
+    READ(cEnvValue,*,IOSTAT=ios) iepEnvSetThreads
+    IF (ios /= 0) iepEnvSetThreads=MaxNumberOfThreads
+    IF (iepEnvSetThreads == 0) iepEnvSetThreads=MaxNumberOfThreads
+  ENDIF
+
   cCurrentModuleObject='ProgramControl'
   IF (GetNumObjectsFound(cCurrentModuleObject) > 0) THEN
     CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,ios,  &
@@ -2702,7 +2735,7 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
       IF (lepSetThreadsInput)  iIDFsetThreads=iepEnvSetThreads
     ENDIF
     IF (iIDFSetThreads > MaxNumberOfThreads) THEN
-      CALL ShowWarningError('CheckThreading: Your chosen number of threads=['//trim(RoundSigDigits(iIDFSetThreadsInput))//  &
+      CALL ShowWarningError('CheckThreading: Your chosen number of threads=['//trim(RoundSigDigits(iIDFSetThreads))//  &
          '] is greater than the maximum number of threads=['//trim(RoundSigDigits(MaxNumberOfThreads))//'].')
       CALL ShowContinueError('...execution time for this run may be degraded.')
     ENDIF
@@ -2723,7 +2756,14 @@ use omp_lib, ONLY: omp_get_max_threads,omp_get_num_threads,omp_set_num_threads
   Threading=.false.
   cCurrentModuleObject='ProgramControl'
   IF (GetNumObjectsFound(cCurrentModuleObject) > 0) THEN
-    CALL ShowWarningError('CheckThreading: '//trim(cCurrentModuleObject)//' is not available in this version.')
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,ios,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+    iIDFsetThreadsInput=INT(rNumericArgs(1))
+    IF (iIDFsetThreads > 1) THEN
+      CALL ShowWarningError('CheckThreading: '//trim(cCurrentModuleObject)//' is not available in this version.')
+      CALL ShowContinueError('...user requested ['//trim(RoundSigDigits(iIDFsetThreadsInput))//'] threads.')
+    ENDIF
   ENDIF
   MaxNumberOfThreads=1
 #endif
@@ -2870,7 +2910,7 @@ END SUBROUTINE Resimulate
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

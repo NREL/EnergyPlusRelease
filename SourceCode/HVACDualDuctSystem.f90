@@ -23,7 +23,7 @@ Module DualDuct
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, &
-                           InitConvTemp, SysSizingCalc
+                           InitConvTemp, SysSizingCalc, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, SetupOutputVariable, &
                            ShowContinueError
 Use DataEnvironment, ONLY: StdRhoAir
@@ -82,21 +82,14 @@ TYPE DamperDesignParams
 
   INTEGER      :: ADUNum                      = 0   ! index of corresponding air distribution unit
 
-  REAL(r64)    :: ZoneFloorArea                 = 0.0D0 ! Zone floor area
   INTEGER      :: CtrlZoneNum                   = 0     ! Pointer to CtrlZone data structure
   INTEGER      :: ActualZoneNum                 = 0     ! Pointer to Zone data Structure
 
-  INTEGER      :: ZoneOutdoorAirMethod          = 0     ! Outdoor air method
   REAL(r64)    :: OutdoorAirFlowRate            = 0.0D0 ! report variable for TU outdoor air flow rate
   LOGICAL      :: NoOAFlowInputFromUser         = .TRUE. ! avoids OA calculation if no input specified by user
 
-  REAL(r64)    :: OAFlowPerPerson  = 0.0D0  !- Terminal unit requirement for OA per person [m3/person]
-  REAL(r64)    :: OAFlowPerArea    = 0.0D0  !- Terminal unit requirement for OA per zone area [m3/s - set in GetInput]
-  REAL(r64)    :: OAFlowPerZone    = 0.0D0  !- Terminal unit requirement for OA per zone [m3/s]
-  REAL(r64)    :: OAFlowACH        = 0.0D0  !- Terminal unit requirement for ACH (air changes per hour) [m3/s - set in GetInput]
-  INTEGER      :: OAFlowFracSchPtr = 0      !- Fraction schedule applied to total OA requirement
   INTEGER      :: OARequirementsPtr = 0     !- Index to DesignSpecification:OutdoorAir object
-  INTEGER      :: OAPerPersonMode   = PerPersonModeNotSet ! mode for how per person rates are determined, DCV or desing.
+  INTEGER      :: OAPerPersonMode   = PerPersonModeNotSet ! mode for how per person rates are determined, DCV or design.
   REAL(r64)    :: OAPerPersonByDesignLevel = 0.D0 ! store sum of people and per person rate, constant, m3/s
 
   INTEGER      :: AirLoopNum       = 0
@@ -366,7 +359,7 @@ SUBROUTINE GetDualDuctInput
 
         CurrentModuleObject=cCMO_DDConstantVolume
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -381,21 +374,25 @@ SUBROUTINE GetDualDuctInput
         Damper(DamperNum)%DamperName     = AlphArray(1)
         Damper(DamperNum)%DamperType     = DualDuct_ConstantVolume
         Damper(DamperNum)%Schedule       = AlphArray(2)
-        Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
-        IF (Damper(DamperNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
-                               '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Damper(DamperNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
+          IF (Damper(DamperNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
+                                 '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Damper(DamperNum)%OutletNodeNum = &
                GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Damper(DamperNum)%HotAirInletNodeNum = &
                GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Damper(DamperNum)%ColdAirInletNodeNum   = &
                GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(5))
 
         Damper(DamperNum)%MaxAirVolFlowRate = NumArray(1)
         Damper(DamperNum)%ZoneMinAirFrac = 0.0
@@ -430,9 +427,9 @@ SUBROUTINE GetDualDuctInput
 
         !Setup the Average damper Position output variable
         ! CurrentModuleObject='AirTerminal:DualDuct:ConstantVolume'
-        CALL SetupOutputVariable('Dual Duct Terminal Cold Air Damper Position []', Damper(DamperNum)%ColdAirDamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal Cold Supply Duct Damper Position []', Damper(DamperNum)%ColdAirDamperPosition, &
                               'System','Average',Damper(DamperNum)%DamperName)
-        CALL SetupOutputVariable('Dual Duct Terminal Hot Air Damper Position []', Damper(DamperNum)%HotAirDamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal Hot Supply Duct Damper Position []', Damper(DamperNum)%HotAirDamperPosition, &
                               'System','Average',Damper(DamperNum)%DamperName)
 
       END DO   ! end Number of Damper Loop
@@ -443,7 +440,7 @@ SUBROUTINE GetDualDuctInput
 
         CurrentModuleObject=cCMO_DDVariableVolume
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -458,21 +455,25 @@ SUBROUTINE GetDualDuctInput
         Damper(DamperNum)%DamperName     = AlphArray(1)
         Damper(DamperNum)%DamperType     = DualDuct_VariableVolume
         Damper(DamperNum)%Schedule       = AlphArray(2)
-        Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
-        IF (Damper(DamperNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
-                               '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Damper(DamperNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
+          IF (Damper(DamperNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
+                                 '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Damper(DamperNum)%OutletNodeNum = &
                GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Damper(DamperNum)%HotAirInletNodeNum = &
                GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Damper(DamperNum)%ColdAirInletNodeNum   = &
                GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(5))
 
         Damper(DamperNum)%MaxAirVolFlowRate = NumArray(1)
         Damper(DamperNum)%ZoneMinAirFrac = NumArray(2)
@@ -495,7 +496,6 @@ SUBROUTINE GetDualDuctInput
 
               Damper(DamperNum)%CtrlZoneNum   = CtrlZone
               Damper(DamperNum)%ActualZoneNum = ZoneEquipConfig(CtrlZone)%ActualZoneNum
-              Damper(DamperNum)%ZoneFloorArea = Zone(Damper(DamperNum)%ActualZoneNum)%FloorArea
 
             END IF
           END DO
@@ -509,36 +509,16 @@ SUBROUTINE GetDualDuctInput
             ErrorsFound=.true.
           ELSE
             Damper(DamperNum)%NoOAFlowInputFromUser = .FALSE.
-            Damper(DamperNum)%ZoneOutdoorAirMethod = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowMethod
-            Damper(DamperNum)%OAFlowPerPerson = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerPerson
-            Damper(DamperNum)%OAFlowPerZone   = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerZone
-            Damper(DamperNum)%OAFlowPerArea   = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerArea * &
-                                            Damper(DamperNum)%ZoneFloorArea
-            IF(Damper(DamperNum)%ActualZoneNum .GT. 0) THEN
-              ZoneNum = Damper(DamperNum)%ActualZoneNum
-              Damper(DamperNum)%OAFlowACH       = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowACH * &
-                                                    Zone(ZoneNum)%Volume / 3600.D0
-            ! Apply zone multipliers and zone list multipliers here instead of doing calculation each time step
-              Damper(DamperNum)%OAFlowPerPerson = Damper(DamperNum)%OAFlowPerPerson * &
-                                                    Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Damper(DamperNum)%OAFlowPerZone   = Damper(DamperNum)%OAFlowPerZone * &
-                                                    Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Damper(DamperNum)%OAFlowPerArea   = Damper(DamperNum)%OAFlowPerArea * &
-                                                    Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Damper(DamperNum)%OAFlowACH       = Damper(DamperNum)%OAFlowACH * &
-                                                    Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-            END IF
-            Damper(DamperNum)%OAFlowFracSchPtr = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowFracSchPtr
           END IF
         END IF
 
         !Setup the Average damper Position output variable
         ! CurrentModuleObject='AirTerminal:DualDuct:VAV'
-        CALL SetupOutputVariable('Dual Duct Terminal Cold Air Damper Position []', Damper(DamperNum)%ColdAirDamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal Cold Supply Duct Damper Position []', Damper(DamperNum)%ColdAirDamperPosition, &
                               'System','Average',Damper(DamperNum)%DamperName)
-        CALL SetupOutputVariable('Dual Duct Terminal Hot Air Damper Position []', Damper(DamperNum)%HotAirDamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal Hot Supply Duct Damper Position []', Damper(DamperNum)%HotAirDamperPosition, &
                               'System','Average',Damper(DamperNum)%DamperName)
-        CALL SetupOutputVariable('Dual Duct Terminal Outdoor Air Flow Rate [m3/s]', Damper(DamperNum)%OutdoorAirFlowRate, &
+        CALL SetupOutputVariable('Zone Air Terminal Outdoor Air Volume Flow Rate [m3/s]', Damper(DamperNum)%OutdoorAirFlowRate, &
                               'System','Average',Damper(DamperNum)%DamperName)
       END DO   ! end Number of Damper Loop
     END IF
@@ -548,7 +528,7 @@ SUBROUTINE GetDualDuctInput
 
         CurrentModuleObject=cCMO_DDVarVolOA
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -563,23 +543,27 @@ SUBROUTINE GetDualDuctInput
         Damper(DamperNum)%DamperName     = AlphArray(1)
         Damper(DamperNum)%DamperType     = DualDuct_OutdoorAir
         Damper(DamperNum)%Schedule       = AlphArray(2)
-        Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
-        IF (Damper(DamperNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
-                               '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Damper(DamperNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Damper(DamperNum)%SchedPtr       = GetScheduleIndex(AlphArray(2))
+          IF (Damper(DamperNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(CurrentModuleObject)//', "'//TRIM(Damper(DamperNum)%DamperName)//&
+                                 '" '//TRIM(cAlphaFields(2))//' = '//TRIM(AlphArray(2))//' not found.')
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Damper(DamperNum)%OutletNodeNum = &
                GetOnlySingleNode(AlphArray(3),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Damper(DamperNum)%OAInletNodeNum = &
                GetOnlySingleNode(AlphArray(4),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
 
         IF (.NOT. lAlphaBlanks(5)) THEN
           Damper(DamperNum)%RecircAirInletNodeNum   = &
                  GetOnlySingleNode(AlphArray(5),ErrorsFound,TRIM(CurrentModuleObject),AlphArray(1), &
-                              NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                              NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(5))
         ELSE
           ! for this model, we intentionally allow not using the recirc side
           Damper(DamperNum)%RecircIsUsed = .FALSE.
@@ -621,8 +605,6 @@ SUBROUTINE GetDualDuctInput
 
               Damper(DamperNum)%CtrlZoneNum   = CtrlZone
               Damper(DamperNum)%ActualZoneNum = ZoneEquipConfig(CtrlZone)%ActualZoneNum
-              Damper(DamperNum)%ZoneFloorArea = Zone(Damper(DamperNum)%ActualZoneNum)%FloorArea
-
             END IF
           END DO
         END DO
@@ -633,31 +615,9 @@ SUBROUTINE GetDualDuctInput
           ErrorsFound=.true.
         ELSE
           Damper(DamperNum)%NoOAFlowInputFromUser = .FALSE.
-          Damper(DamperNum)%ZoneOutdoorAirMethod = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowMethod
-          Damper(DamperNum)%OAFlowPerPerson = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerPerson
-          Damper(DamperNum)%OAFlowPerZone   = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerZone
-          Damper(DamperNum)%OAFlowPerArea   = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerArea * &
-                                          Damper(DamperNum)%ZoneFloorArea
-          IF(Damper(DamperNum)%ActualZoneNum .GT. 0) THEN
-            ZoneNum = Damper(DamperNum)%ActualZoneNum
-            Damper(DamperNum)%OAFlowACH       = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowACH * &
-                                            Zone(Damper(DamperNum)%ActualZoneNum)%Volume / 3600.D0
-          ! Apply zone multipliers and zone list multipliers here instead of doing calculation each time step
-            Damper(DamperNum)%OAFlowPerPerson = Damper(DamperNum)%OAFlowPerPerson * &
-                                                  Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-            Damper(DamperNum)%OAFlowPerZone   = Damper(DamperNum)%OAFlowPerZone * &
-                                                  Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-            Damper(DamperNum)%OAFlowPerArea   = Damper(DamperNum)%OAFlowPerArea * &
-                                                  Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-            Damper(DamperNum)%OAFlowACH       = Damper(DamperNum)%OAFlowACH * &
-                                                  Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-          END IF
-          Damper(DamperNum)%OAFlowFracSchPtr = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowFracSchPtr
-
 
           ! now fill design OA rate
           CALL CalcOAOnlyMassFlow (DamperNum, DummyOAFlow , MaxOAVolFlow = Damper(DamperNum)%DesignOAFlowRate)
-
 
           IF (Damper(DamperNum)%MaxAirVolFlowRate /= Autosize) THEN
             CALL ReportSizingOutput(CurrentModuleObject, Damper(DamperNum)%DamperName, &
@@ -682,14 +642,15 @@ SUBROUTINE GetDualDuctInput
         END IF
 
         IF (Damper(DamperNum)%OAPerPersonMode == PerPersonModeNotSet) THEN
-          IF ((Damper(DamperNum)%OAFlowPerPerson == 0.d0) .AND. (lAlphaBlanks(7))) THEN ! no worries
+          DummyOAFlow = OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerPerson
+          IF ((DummyOAFlow == 0.d0) .AND. (lAlphaBlanks(7))) THEN ! no worries
             ! do nothing, okay since no per person requirement involved
-          ELSEIF ((Damper(DamperNum)%OAFlowPerPerson > 0.d0) .AND. (lAlphaBlanks(7))) THEN ! missing input
+          ELSEIF ((DummyOAFlow > 0.d0) .AND. (lAlphaBlanks(7))) THEN ! missing input
             CALL ShowSevereError(TRIM(cAlphaFields(7))//' was blank.')
             CALL ShowContinueError('Occurs in '//cCMO_DDVarVolOA//' = '//TRIM(Damper(DamperNum)%DamperName))
             CALL ShowContinueError('Valid choices are "CurrentOccupancy" or "DesignOccupancy"')
             ErrorsFound=.true.
-          ELSEIF ((Damper(DamperNum)%OAFlowPerPerson > 0.d0) .AND. .NOT. (lAlphaBlanks(7))) THEN ! incorrect input
+          ELSEIF ((DummyOAFlow > 0.d0) .AND. .NOT. (lAlphaBlanks(7))) THEN ! incorrect input
             CALL ShowSevereError(TRIM(cAlphaFields(7))//' = '//TRIM(AlphArray(7))//' not a valid key choice.')
             CALL ShowContinueError('Occurs in '//cCMO_DDVarVolOA//' = '//TRIM(Damper(DamperNum)%DamperName))
             CALL ShowContinueError('Valid choices are "CurrentOccupancy" or "DesignOccupancy"')
@@ -698,12 +659,12 @@ SUBROUTINE GetDualDuctInput
         ENDIF
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('Dual Duct Outdoor Air Terminal Damper Position []', Damper(DamperNum)%OADamperPosition , &
+        CALL SetupOutputVariable('Zone Air Terminal Outdoor Air Duct Damper Position []', Damper(DamperNum)%OADamperPosition , &
                               'System','Average',Damper(DamperNum)%DamperName)
-        CALL SetupOutputVariable('Dual Duct Recirculated Air Terminal Damper Position []',   &
+        CALL SetupOutputVariable('Zone Air Terminal Recirculated Air Duct Damper Position []',   &
            Damper(DamperNum)%RecircAirDamperPosition , &
                               'System','Average',Damper(DamperNum)%DamperName)
-        CALL SetupOutputVariable('Dual Duct Outdoor Air Fraction []', Damper(DamperNum)%OAFraction, &
+        CALL SetupOutputVariable('Zone Air Terminal Outdoor Air Fraction []', Damper(DamperNum)%OAFraction, &
                               'System','Average',Damper(DamperNum)%DamperName)
 
       END DO   ! end Number of Damper Loop
@@ -815,7 +776,7 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
     MyAirLoopFlag = .TRUE.
     MyEnvrnFlag = .TRUE.
     MySizeFlag = .TRUE.
-    MassFlowSetToler = HVACFlowRateToler * 0.00001
+    MassFlowSetToler = HVACFlowRateToler * 0.00001d0
 
     MyOneTimeFlag = .false.
 
@@ -898,7 +859,8 @@ SUBROUTINE InitDualDuct(DamperNum,FirstHVACIteration)
       PeopleFlow = 0.d0
       DO Loop = 1, TotPeople
         IF (People(Loop)%ZonePtr /= Damper(DamperNum)%ActualZoneNum) CYCLE
-        PeopleFlow = PeopleFlow + People(Loop)%NumberOfPeople * Damper(DamperNum)%OAFlowPerPerson
+        PeopleFlow = PeopleFlow + &
+                     People(Loop)%NumberOfPeople * OARequirements(Damper(DamperNum)%OARequirementsPtr)%OAFlowPerPerson
       END DO
       Damper(DamperNum)%OAPerPersonByDesignLevel = PeopleFlow
 
@@ -1319,7 +1281,7 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
           !       AUTHOR         Richard J. Liesen
           !       DATE WRITTEN   Jan 2000
           !       MODIFIED       na
-          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor 
+          !                      TH 3/2012: added supply air flow adjustment based on zone maximum outdoor
           !                                 air fraction - a TRACE feature
           !       RE-ENGINEERED  na
 
@@ -1432,7 +1394,7 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
        MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
      ENDIF
-     
+
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail)
 
@@ -1446,7 +1408,7 @@ SUBROUTINE SimDualDuctVarVol(DamperNum, ZoneNum, ZoneNodeNum)
      IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
        MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
      ENDIF
-     
+
      MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
      MassFlow = MIN(MassFlow,&
          (DamperHotAirInlet(DamperNum)%AirMassFlowRateMaxAvail+DamperColdAirInlet(DamperNum)%AirMassFlowRateMaxAvail))
@@ -1841,19 +1803,18 @@ SUBROUTINE CalcOAMassFlow(DamperNum, SAMassFlow, AirLoopOAFrac)
 
           ! USE STATEMENTS:
    USE DataAirLoop,       ONLY: AirLoopFlow, AirLoopControlInfo
-   USE DataZoneEquipment, ONLY: ZoneEquipConfig
-   USE DataHeatBalance,   ONLY: ZoneIntGain, People, TotPeople
+   USE DataZoneEquipment, ONLY: ZoneEquipConfig, CalcDesignSpecificationOutdoorAir
    USE Psychrometrics,    ONLY: PsyRhoAirFnPbTdbW
 
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-    INTEGER, INTENT(IN)      :: DamperNum     ! index to terminal unit
-    REAL(r64), INTENT(INOUT) :: SAMassFlow    ! outside air based on optional user input
-    REAL(r64), INTENT(INOUT) :: AirLoopOAFrac ! outside air based on optional user input
+   INTEGER, INTENT(IN)      :: DamperNum     ! index to terminal unit
+   REAL(r64), INTENT(INOUT) :: SAMassFlow    ! outside air based on optional user input
+   REAL(r64), INTENT(INOUT) :: AirLoopOAFrac ! outside air based on optional user input
 
           ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
+   LOGICAL, PARAMETER   :: UseMinOASchFlag = .TRUE. ! Always use min OA schedule in calculations.
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1863,86 +1824,38 @@ SUBROUTINE CalcOAMassFlow(DamperNum, SAMassFlow, AirLoopOAFrac)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
    INTEGER   :: AirLoopNum        ! Index to air loop
-   REAL(r64) :: PeopleFlow        ! amount of OA based on occupants
    REAL(r64) :: RhoAir            ! density of terminal unit inlet air
-   REAL(r64) :: OAMassFlow        ! outside air flow rate (m3/s converted to kg/s at end of routine)
-   INTEGER   :: PeopleObjIndex    ! Index to people objects
+   REAL(r64) :: OAVolumeFlowRate  ! outside air volume flow rate (m3/s)
+   REAL(r64) :: OAMassFlow        ! outside air mass flow rate (kg/s)
 
-     ! initialize OA flow rate and OA report variable
-     SAMassFlow    = 0.0D0
-     AirLoopOAFrac = 0.0D0
-     AirLoopNum    = 0
-     OAMassFlow = 0.0d0
-     PeopleFlow = 0.0d0
-     IF(Damper(DamperNum)%CtrlZoneNum .GT. 0)AirLoopNum = ZoneEquipConfig(Damper(DamperNum)%CtrlZoneNum)%AirLoopNum
+   ! initialize OA flow rate and OA report variable
+   SAMassFlow    = 0.0D0
+   AirLoopOAFrac = 0.0D0
+   AirLoopNum    = 0
+   IF(Damper(DamperNum)%CtrlZoneNum .GT. 0)AirLoopNum = ZoneEquipConfig(Damper(DamperNum)%CtrlZoneNum)%AirLoopNum
 
-     ! Calculate the amount of OA based on optional user inputs
-     IF(AirLoopNum .GT. 0)THEN
-       AirLoopOAFrac = AirLoopFlow(AirLoopNum)%OAFrac
-       ! If no additional input from user, RETURN from subroutine
-       IF(Damper(DamperNum)%NoOAFlowInputFromUser)RETURN
-       ! Calculate outdoor air flow rate, zone multipliers are applied in GetInput
-       IF(AirLoopOAFrac .GT. 0.0D0)THEN
-         SELECT CASE(Damper(DamperNum)%ZoneOutdoorAirMethod)
-           CASE(OAFlowPPer)
-             ! Check if DCV is specified for this AirLoop
-!             OAMassFlow = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-             IF (AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag) THEN
-                OAMassFlow = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-             ELSE
-                DO PeopleObjIndex = 1, TotPeople
-                    IF (People(PeopleObjIndex)%ZonePtr == Damper(DamperNum)%ActualZoneNum) THEN
-                        OAMassFlow = OAMassFlow + People(PeopleObjIndex)%NumberOfPeople * Damper(DamperNum)%OAFlowPerPerson
-                    ENDIF
-                END DO
-             ENDIF
-           CASE(OAFlow)
-             OAMassFlow = Damper(DamperNum)%OAFlowPerZone
-           CASE(OAFlowPerArea)
-             OAMassFlow = Damper(DamperNum)%OAFlowPerArea
-           CASE(OAFlowACH)
-             OAMassFlow = Damper(DamperNum)%OAFlowACH
-           CASE(OAFlowSum, OAFlowMax)
-             ! Check if DCV is specified for this AirLoop
-!             PeopleFlow = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-             IF (AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag) THEN
-                PeopleFlow = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-             ELSE
-                DO PeopleObjIndex = 1, TotPeople
-                    IF (People(PeopleObjIndex)%ZonePtr == Damper(DamperNum)%ActualZoneNum) THEN
-                        PeopleFlow = PeopleFlow + People(PeopleObjIndex)%NumberOfPeople * Damper(DamperNum)%OAFlowPerPerson
-                    ENDIF
-                END DO
-             END IF
-             IF(Damper(DamperNum)%ZoneOutdoorAirMethod == OAFlowMax)THEN
-               OAMassFlow = MAX(PeopleFlow, Damper(DamperNum)%OAFlowPerZone,   &
-                                Damper(DamperNum)%OAFlowPerArea, Damper(DamperNum)%OAFlowACH)
-             ELSE
-               OAMassFlow = PeopleFlow + Damper(DamperNum)%OAFlowPerZone + Damper(DamperNum)%OAFlowPerArea +   &
-                          Damper(DamperNum)%OAFlowACH
-             END IF
-           CASE DEFAULT
-             OAMassFlow = 0.0D0
-         END SELECT
-         RhoAir = PsyRhoAirFnPbTdbW(Node(Damper(DamperNum)%OutletNodeNum)%Press, &
-                                    Node(Damper(DamperNum)%OutletNodeNum)%Temp, &
-                                    Node(Damper(DamperNum)%OutletNodeNum)%HumRat)
-         OAMassFlow = OAMassFlow * RhoAir
+   ! Calculate the amount of OA based on optional user inputs
+   IF(AirLoopNum .GT. 0)THEN
+     AirLoopOAFrac = AirLoopFlow(AirLoopNum)%OAFrac
+     ! If no additional input from user, RETURN from subroutine
+     IF(Damper(DamperNum)%NoOAFlowInputFromUser)RETURN
+     ! Calculate outdoor air flow rate, zone multipliers are applied in GetInput
+     IF(AirLoopOAFrac .GT. 0.0D0)THEN
+       OAVolumeFlowRate = CalcDesignSpecificationOutdoorAir(Damper(DamperNum)%OARequirementsPtr, &
+                          Damper(DamperNum)%ActualZoneNum, AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag, UseMinOASchFlag)
+       RhoAir = PsyRhoAirFnPbTdbW(Node(Damper(DamperNum)%OutletNodeNum)%Press, &
+                                  Node(Damper(DamperNum)%OutletNodeNum)%Temp, &
+                                  Node(Damper(DamperNum)%OutletNodeNum)%HumRat)
+       OAMassFlow = OAVolumeFlowRate * RhoAir
 
-         ! multiply the supply air flow based on OA requirements by the fractional schedule
-         ! multiplier is assumed to be 1 if the schedule name is not entered
-         IF(Damper(DamperNum)%OAFlowFracSchPtr .GT. 0)THEN
-           OAMassFlow = OAMassFlow * GetCurrentScheduleValue(Damper(DamperNum)%OAFlowFracSchPtr)
-         END IF
-
-         ! convert OA mass flow rate to supply air flow rate based on air loop OA fraction
-         SAMassFlow = OAMassFlow / AirLoopOAFrac
-
-       END IF
+       ! convert OA mass flow rate to supply air flow rate based on air loop OA fraction
+       SAMassFlow = OAMassFlow / AirLoopOAFrac
 
      END IF
 
-  RETURN
+   END IF
+
+   RETURN
 END SUBROUTINE CalcOAMassFlow
 
 SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
@@ -1964,9 +1877,7 @@ SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
           ! REFERENCES:
 
           ! USE STATEMENTS:
-  USE DataAirLoop,       ONLY: AirLoopFlow
-  USE DataZoneEquipment, ONLY: ZoneEquipConfig
-  USE DataHeatBalance,   ONLY: ZoneIntGain, People, TotPeople
+  USE DataZoneEquipment, ONLY: CalcDesignSpecificationOutdoorAir
   USE Psychrometrics,    ONLY: PsyRhoAirFnPbTdbW
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -1978,7 +1889,7 @@ SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
 
 
           ! FUNCTION PARAMETER DEFINITIONS:
-          ! na
+  LOGICAL, PARAMETER   :: UseMinOASchFlag = .TRUE. ! Always use min OA schedule in calculations.
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1988,133 +1899,45 @@ SUBROUTINE CalcOAOnlyMassFlow(DamperNum, OAMassFlow, MaxOAVolFlow)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
 
-  REAL(r64) :: PeopleFlow        ! amount of OA based on occupants
   REAL(r64) :: RhoAir            ! density of terminal unit inlet air
-  REAL(r64) :: OAVdot            ! temporary volume flow rate (m3/s)
-  REAL(r64) :: PeopleCount       ! temporary accumulator for people
-  INTEGER   :: Loop
-!  INTEGER   :: AirLoopNum        ! Index to air loop
-
-   ! initialize OA flow rate and OA report variable
-
-
+  REAL(r64) :: OAVolumeFlowRate  ! outside air volume flow rate (m3/s)
+  LOGICAL   :: UseOccSchFlag     ! TRUE = use actual occupancy, FALSE = use total zone people
+  LOGICAL   :: PerPersonNotSet
 
  ! Calculate the amount of OA based on optional user inputs
+  OAMassFlow   = 0.d0
 
   ! If no additional input from user, RETURN from subroutine
   IF(Damper(DamperNum)%NoOAFlowInputFromUser) THEN
     CALL ShowSevereError('CalcOAOnlyMassFlow: Problem in AirTerminal:DualDuct:VAV:OutdoorAir = ' // &
                          Trim(Damper(DamperNum)%DamperName) // ', check outdoor air specification' )
+    IF(PRESENT(MaxOAVolFlow))MaxOAVolFlow = 0.d0
     RETURN
   ENDIF
 
-  SELECT CASE(Damper(DamperNum)%ZoneOutdoorAirMethod)
-    CASE(OAFlowPPer)
-      IF (Damper(DamperNum)%OAPerPersonMode == PerPersonDCVByCurrentLevel) THEN
-        OAVdot = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-      ELSEIF (Damper(DamperNum)%OAPerPersonMode == PerPersonByDesignLevel ) THEN
-        OAVdot = 0.d0
-        DO Loop = 1, TotPeople
-          IF (People(Loop)%ZonePtr /= Damper(DamperNum)%ActualZoneNum) CYCLE
-          OAVdot = OAVdot + People(Loop)%NumberOfPeople * Damper(DamperNum)%OAFlowPerPerson
-        END DO
-      END IF
-    CASE(OAFlow)
-      OAVdot = Damper(DamperNum)%OAFlowPerZone
-    CASE(OAFlowPerArea)
-      OAVdot = Damper(DamperNum)%OAFlowPerArea
-    CASE(OAFlowACH)
-      OAVdot = Damper(DamperNum)%OAFlowACH
-    CASE(OAFlowSum, OAFlowMax)
-      SELECT CASE (Damper(DamperNum)%OAPerPersonMode)
+  IF (Damper(DamperNum)%OAPerPersonMode == PerPersonDCVByCurrentLevel) THEN
+    UseOccSchFlag   = .TRUE.
+    PerPersonNotSet = .FALSE.
+  ELSE
+    UseOccSchFlag   = .FALSE.
+    PerPersonNotSet = .FALSE.
+    IF (Damper(DamperNum)%OAPerPersonMode == PerPersonModeNotSet) PerPersonNotSet = .TRUE.
+  END IF
 
-      CASE (PerPersonDCVByCurrentLevel)
-        PeopleFlow = ZoneIntGain(Damper(DamperNum)%ActualZoneNum)%NOFOCC * Damper(DamperNum)%OAFlowPerPerson
-      CASE (PerPersonByDesignLevel )
-        PeopleFlow = Damper(DamperNum)%OAPerPersonByDesignLevel
-      CASE ( PerPersonModeNotSet)
-        PeopleFlow = 0.d0
-      END SELECT
+  OAVolumeFlowRate = CalcDesignSpecificationOutdoorAir(Damper(DamperNum)%OARequirementsPtr, &
+                       Damper(DamperNum)%ActualZoneNum, UseOccSchFlag, UseMinOASchFlag, PerPersonNotSet = PerPersonNotSet)
 
-      IF(Damper(DamperNum)%ZoneOutdoorAirMethod == OAFlowMax)THEN
-        OAVdot = MAX(PeopleFlow, Damper(DamperNum)%OAFlowPerZone,   &
-                            Damper(DamperNum)%OAFlowPerArea, Damper(DamperNum)%OAFlowACH)
-      ELSE
-        OAVdot = PeopleFlow + Damper(DamperNum)%OAFlowPerZone + Damper(DamperNum)%OAFlowPerArea +   &
-                      Damper(DamperNum)%OAFlowACH
-      END IF
-    CASE DEFAULT
-      OAVdot = 0.0D0
-  END SELECT
   RhoAir = PsyRhoAirFnPbTdbW(Node(Damper(DamperNum)%OutletNodeNum)%Press, &
                                 Node(Damper(DamperNum)%OutletNodeNum)%Temp, &
                                Node(Damper(DamperNum)%OutletNodeNum)%HumRat, &
                                'HVACDualDuctSystem:CalcOAOnlyMassFlow')
-  OAMassFlow = OAVdot * RhoAir
 
-  ! multiply the supply air flow based on OA requirements by the fractional schedule
-  ! multiplier is assumed to be 1 if the schedule name is not entered
-  IF(Damper(DamperNum)%OAFlowFracSchPtr .GT. 0)THEN
-    OAMassFlow = OAMassFlow * GetCurrentScheduleValue(Damper(DamperNum)%OAFlowFracSchPtr)
-  END IF
+  OAMassFlow = OAVolumeFlowRate * RhoAir
 
   IF (PRESENT(MaxOAVolFlow)) THEN
-    SELECT CASE(Damper(DamperNum)%ZoneOutdoorAirMethod)
-      CASE(OAFlowPPer)
-        !find design level for number of people
-        IF (Damper(DamperNum)%OAPerPersonMode == PerPersonDCVByCurrentLevel) THEN
-          PeopleCount = 0.d0
-          DO Loop = 1, TotPeople
-            IF (Damper(DamperNum)%ActualZoneNum /= People(Loop)%ZonePtr) CYCLE
-            PeopleCount = PeopleCount + People(Loop)%NumberOfPeople &
-                           * GetScheduleMaxValue(People(Loop)%NumberOfPeoplePtr )
-          ENDDO
-          MaxOAVolFlow = PeopleCount * Damper(DamperNum)%OAFlowPerPerson
-        ELSEIF (Damper(DamperNum)%OAPerPersonMode == PerPersonByDesignLevel ) THEN
-          PeopleCount = 0.d0
-          DO Loop = 1, TotPeople
-            IF (Damper(DamperNum)%ActualZoneNum /= People(Loop)%ZonePtr) CYCLE
-            PeopleCount = PeopleCount + People(Loop)%NumberOfPeople
-          ENDDO
-          MaxOAVolFlow = PeopleCount * Damper(DamperNum)%OAFlowPerPerson
-        ENDIF
-      CASE(OAFlow)
-        MaxOAVolFlow = Damper(DamperNum)%OAFlowPerZone
-      CASE(OAFlowPerArea)
-        MaxOAVolFlow = Damper(DamperNum)%OAFlowPerArea
-      CASE(OAFlowACH)
-        MaxOAVolFlow = Damper(DamperNum)%OAFlowACH
-      CASE(OAFlowSum, OAFlowMax)
-        IF (Damper(DamperNum)%OAPerPersonMode == PerPersonDCVByCurrentLevel) THEN
-          PeopleCount = 0.d0
-          DO Loop = 1, TotPeople
-            IF (Damper(DamperNum)%ActualZoneNum /= People(Loop)%ZonePtr) CYCLE
-            PeopleCount = PeopleCount + People(Loop)%NumberOfPeople  &
-                          * GetScheduleMaxValue(People(Loop)%NumberOfPeoplePtr )
-          ENDDO
-          PeopleFlow = PeopleCount * Damper(DamperNum)%OAFlowPerPerson
-        ELSEIF (Damper(DamperNum)%OAPerPersonMode == PerPersonByDesignLevel ) THEN
-          PeopleCount = 0.d0
-          DO Loop = 1, TotPeople
-            IF (Damper(DamperNum)%ActualZoneNum /= People(Loop)%ZonePtr) CYCLE
-            PeopleCount = PeopleCount + People(Loop)%NumberOfPeople
-          ENDDO
-          PeopleFlow = PeopleCount * Damper(DamperNum)%OAFlowPerPerson
-        ENDIF
-        IF(Damper(DamperNum)%ZoneOutdoorAirMethod == OAFlowMax)THEN
-          MaxOAVolFlow = MAX(PeopleFlow, Damper(DamperNum)%OAFlowPerZone,   &
-                              Damper(DamperNum)%OAFlowPerArea, Damper(DamperNum)%OAFlowACH)
-        ELSE
-          MaxOAVolFlow = PeopleFlow + Damper(DamperNum)%OAFlowPerZone + Damper(DamperNum)%OAFlowPerArea +   &
-                        Damper(DamperNum)%OAFlowACH
-        END IF
-      CASE DEFAULT
-        MaxOAVolFlow = 0.0D0
-    END SELECT
-    IF(Damper(DamperNum)%OAFlowFracSchPtr .GT. 0)THEN
-      MaxOAVolFlow = MaxOAVolFlow * GetScheduleMaxValue(Damper(DamperNum)%OAFlowFracSchPtr)
-    END IF
-
+    OAVolumeFlowRate = CalcDesignSpecificationOutdoorAir(Damper(DamperNum)%OARequirementsPtr, &
+                       Damper(DamperNum)%ActualZoneNum, UseOccSchFlag, UseMinOASchFlag, MaxOAVolFlowFlag = .TRUE.)
+    MaxOAVolFlow = OAVolumeFlowRate
   ENDIF
 
 
@@ -2483,7 +2306,7 @@ SUBROUTINE GetDualDuctOutdoorAirRecircUse(CompTypeName, CompName, RecircIsUsed )
 
         CurrentModuleObject=cCMO_DDVarVolOA
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,DamperIndex,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
         DamperNamesARR(DamperIndex) = AlphArray(1)
@@ -2513,7 +2336,7 @@ END SUBROUTINE GetDualDuctOutdoorAirRecircUse
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

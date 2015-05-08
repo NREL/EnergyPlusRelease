@@ -62,6 +62,14 @@ TYPE ParentListData
   LOGICAL                        :: InfoFilled        = .false. ! true when all information has been filled
 END TYPE
 
+TYPE EqNodeConnectionDef
+  CHARACTER(len=MaxNameLength)   :: NodeName       = Blank   ! Node Name of this node connection
+  CHARACTER(len=MaxNameLength)   :: ObjectType     = Blank   ! Object/Component Type of this node connection
+  CHARACTER(len=MaxNameLength)   :: ObjectName     = Blank   ! Name of the Object/Component Type of this node connection
+  CHARACTER(len=MaxNameLength)   :: InputFieldName = Blank   ! Input Field Name for this connection
+  CHARACTER(len=19)              :: ConnectionType = Blank   ! Connection Type (must be valid) for this node connection
+END TYPE
+
 
           ! MODULE VARIABLE DECLARATIONS:
 TYPE (ComponentListData), ALLOCATABLE,  &
@@ -71,14 +79,20 @@ INTEGER, PUBLIC                  :: NumNodeConnectionErrors=0 ! Count of node co
 TYPE (ParentListData), ALLOCATABLE, DIMENSION(:)       :: ParentNodeList
 TYPE (NodeConnectionDef), ALLOCATABLE, DIMENSION(:)    :: NodeConnections
 TYPE (NodeConnectionDef), ALLOCATABLE, DIMENSION(:)    :: tmpNodeConnections
+TYPE (EqNodeConnectionDef), ALLOCATABLE, DIMENSION(:)    :: tmpEqNodeConnections
+TYPE (EqNodeConnectionDef), ALLOCATABLE, DIMENSION(:)    :: AirTerminalNodeConnections
+
 INTEGER,PUBLIC  :: NumOfNodeConnections = 0
 INTEGER,PUBLIC  :: MaxNumOfNodeConnections = 0
 INTEGER         :: NodeConnectionAlloc = 1000
 INTEGER         :: NumOfActualParents=0
+INTEGER,PUBLIC  :: NumOfAirTerminalNodes = 0
+INTEGER,PUBLIC  :: MaxNumOfAirTerminalNodes = 0
+INTEGER         :: EqNodeConnectionAlloc = 100
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

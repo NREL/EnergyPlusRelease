@@ -33,7 +33,7 @@ TYPE PlantProfileData
   INTEGER                      :: TypeNum                  ! Plant Side Connection: 'TypeOf_Num' assigned in DataPlant  !DSU
   INTEGER                      :: WLoopNum     = 0         ! water plant loop index number                      !DSU
   INTEGER                      :: WLoopSideNum = 0         ! water plant loop side index                        !DSU
-  INTEGER                      :: WLoopBranchNum   = 0     ! water plant loop branch index                      !DSU            
+  INTEGER                      :: WLoopBranchNum   = 0     ! water plant loop branch index                      !DSU
   INTEGER                      :: WLoopCompNum     = 0     ! water plant loop component index                   !DSU
   LOGICAL                      :: Init = .TRUE.            ! Flag for initialization:  TRUE means do the init
   LOGICAL                      :: InitSizing = .TRUE.      ! Flag for initialization of plant sizing
@@ -49,7 +49,7 @@ TYPE PlantProfileData
   REAL(r64)                    :: VolFlowRate = 0.0        ! Volumetric flow rate (m3/s)
   REAL(r64)                    :: MassFlowRate = 0.0       ! Mass flow rate (kg/s)
   LOGICAL                      :: EMSOverrideMassFlow = .FALSE. !
-  REAL(r64)                    :: EMSMassFlowValue    = 0.0D0 ! 
+  REAL(r64)                    :: EMSMassFlowValue    = 0.0D0 !
 
   ! Report variables
   REAL(r64)                    :: Power = 0.0              ! Power required to meet the load (W)
@@ -104,8 +104,8 @@ SUBROUTINE SimulatePlantProfile(EquipTypeName,EquipName,EquipTypeNum,ProfileNum,
   CHARACTER(len=*), INTENT(IN) :: EquipName ! the user-defined name
   INTEGER, INTENT(IN)          :: EquipTypeNum ! the plant parameter ID for equipment model
   INTEGER, INTENT(INOUT)       :: ProfileNum ! the index for specific load profile
-  LOGICAL, INTENT(IN)          :: FirstHVACIteration 
-  LOGICAL, INTENT(IN)          :: InitLoopEquip ! flag indicating if called in special initialization mode. 
+  LOGICAL, INTENT(IN)          :: FirstHVACIteration
+  LOGICAL, INTENT(IN)          :: InitLoopEquip ! flag indicating if called in special initialization mode.
 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
@@ -122,14 +122,15 @@ SUBROUTINE SimulatePlantProfile(EquipTypeName,EquipName,EquipTypeNum,ProfileNum,
   IF (InitLoopEquip) THEN
     ProfileNum = FindItemInList(EquipName, PlantProfile%Name, NumOfPlantProfile)
     IF (ProfileNum /= 0) THEN
+      CALL InitPlantProfile(ProfileNum)
       RETURN
     ENDIF
-  
+
   ENDIF
 
   IF (ProfileNum /= 0) THEN
 
-    CALL InitPlantProfile(ProfileNum,FirstHVACIteration)
+    CALL InitPlantProfile(ProfileNum)
 
     IF (PlantProfile(ProfileNum)%MassFlowRate > 0.d0) THEN
 
@@ -152,7 +153,7 @@ SUBROUTINE SimulatePlantProfile(EquipTypeName,EquipName,EquipTypeNum,ProfileNum,
 
   ELSE
     CALL ShowFatalError('SimulatePlantProfile: plant load profile not found ='//Trim(EquipName))
-  
+
   ENDIF
 
 
@@ -200,13 +201,13 @@ SUBROUTINE GetPlantProfileInput
 
           ! FLOW:
   cCurrentModuleObject = 'LoadProfile:Plant'
-  NumOfPlantProfile = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfPlantProfile = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumOfPlantProfile > 0) THEN
     ALLOCATE(PlantProfile(NumOfPlantProfile))
 
     DO ProfileNum = 1, NumOfPlantProfile
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),ProfileNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,    &
+      CALL GetObjectItem(cCurrentModuleObject,ProfileNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,    &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
       ! PlantProfile name
@@ -218,7 +219,7 @@ SUBROUTINE GetPlantProfileInput
         IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
       END IF
       PlantProfile(ProfileNum)%Name = cAlphaArgs(1)
-      PlantProfile(ProfileNum)%TypeNum = TypeOf_PlantLoadProfile    ! parameter assigned in DataPlant !DSU  
+      PlantProfile(ProfileNum)%TypeNum = TypeOf_PlantLoadProfile    ! parameter assigned in DataPlant !DSU
 
       PlantProfile(ProfileNum)%InletNode = GetOnlySingleNode(cAlphaArgs(2),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
@@ -258,15 +259,15 @@ SUBROUTINE GetPlantProfileInput
                                'System','Sum',PlantProfile(ProfileNum)%Name, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='Heating',GroupKey='Plant')  ! is EndUseKey right?
 
-      CALL SetupOutputVariable('Plant Load Profile Hot Water Consumption [J]', PlantProfile(ProfileNum)%HeatingEnergy, &
+      CALL SetupOutputVariable('Plant Load Profile Heating Energy [J]', PlantProfile(ProfileNum)%HeatingEnergy, &
                                'System','Sum',PlantProfile(ProfileNum)%Name, &
                                 ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='Heating',GroupKey='Plant')
 
-      CALL SetupOutputVariable('Plant Load Profile Chilled Water Consumption [J]', PlantProfile(ProfileNum)%CoolingEnergy, &
+      CALL SetupOutputVariable('Plant Load Profile Cooling Energy [J]', PlantProfile(ProfileNum)%CoolingEnergy, &
                                'System','Sum',PlantProfile(ProfileNum)%Name, &
                                 ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='Cooling',GroupKey='Plant')
 
-      IF (AnyEnergyManagementSystemInModel) THEN 
+      IF (AnyEnergyManagementSystemInModel) THEN
         CALL SetupEMSActuator('Plant Load Profile', PlantProfile(ProfileNum)%Name, 'Mass Flow Rate' , '[kg/s]', &
                  PlantProfile(ProfileNum)%EMSOverrideMassFlow, PlantProfile(ProfileNum)%EMSMassFlowValue )
         CALL SetupEMSActuator('Plant Load Profile', PlantProfile(ProfileNum)%Name, 'Power' , '[W]', &
@@ -283,7 +284,7 @@ SUBROUTINE GetPlantProfileInput
 END SUBROUTINE GetPlantProfileInput
 
 
-SUBROUTINE InitPlantProfile(ProfileNum, FirstHVACIteration)
+SUBROUTINE InitPlantProfile(ProfileNum )
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Peter Graham Ellis
@@ -309,35 +310,34 @@ SUBROUTINE InitPlantProfile(ProfileNum, FirstHVACIteration)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN) :: ProfileNum
-  LOGICAL, INTENT(IN) :: FirstHVACIteration
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: InletNode
   INTEGER :: OutletNode
   REAL(r64) :: MaxFlowMultiplier
-  REAL(R64) :: FluidDensityInit 
+  REAL(R64) :: FluidDensityInit
   LOGICAL   :: errFlag
- 
+
           ! FLOW:
-          
+
   ! Do the one time initializations
-  IF(PlantProfile(ProfileNum)%SetLoopIndexFlag)THEN 
-    IF(ALLOCATED(PlantLoop))THEN 
+  IF(PlantProfile(ProfileNum)%SetLoopIndexFlag)THEN
+    IF(ALLOCATED(PlantLoop))THEN
       errFlag=.false.
-      CALL ScanPlantLoopsForObject(PlantProfile(ProfileNum)%Name, &  
-                                   PlantProfile(ProfileNum)%TypeNum, &  
-                                   PlantProfile(ProfileNum)%WLoopNum, &  
-                                   PlantProfile(ProfileNum)%WLoopSideNum, &   
-                                   PlantProfile(ProfileNum)%WLoopBranchNum, &   
+      CALL ScanPlantLoopsForObject(PlantProfile(ProfileNum)%Name, &
+                                   PlantProfile(ProfileNum)%TypeNum, &
+                                   PlantProfile(ProfileNum)%WLoopNum, &
+                                   PlantProfile(ProfileNum)%WLoopSideNum, &
+                                   PlantProfile(ProfileNum)%WLoopBranchNum, &
                                    PlantProfile(ProfileNum)%WLoopCompNum,   &
                                    errFlag=errFlag)
       IF (errFlag) THEN
         CALL ShowFatalError('InitPlantProfile: Program terminated for previous conditions.')
       ENDIF
 
-      PlantProfile(ProfileNum)%SetLoopIndexFlag = .FALSE.  
-    ENDIF 
-  ENDIF 
+      PlantProfile(ProfileNum)%SetLoopIndexFlag = .FALSE.
+    ENDIF
+  ENDIF
 
           ! FLOW:
   InletNode  = PlantProfile(ProfileNum)%InletNode
@@ -361,9 +361,9 @@ SUBROUTINE InitPlantProfile(ProfileNum, FirstHVACIteration)
     MaxFlowMultiplier = GetScheduleMaxValue(PlantProfile(ProfileNum)%FlowRateFracSchedule)
 
     CALL InitComponentNodes(0.d0, PlantProfile(ProfileNum)%PeakVolFlowRate*FluidDensityInit*MaxFlowMultiplier,  &
-                            InletNode,OutletNode, &    
+                            InletNode,OutletNode, &
                             PlantProfile(ProfileNum)%WLoopNum,PlantProfile(ProfileNum)%WLoopSideNum, &
-                            PlantProfile(ProfileNum)%WLoopBranchNum, PlantProfile(ProfileNum)%WLoopCompNum) 
+                            PlantProfile(ProfileNum)%WLoopBranchNum, PlantProfile(ProfileNum)%WLoopCompNum)
 
     PlantProfile(ProfileNum)%EMSOverrideMassFlow = .FALSE.
     PlantProfile(ProfileNum)%EMSMassFlowValue    = 0.d0
@@ -377,30 +377,28 @@ SUBROUTINE InitPlantProfile(ProfileNum, FirstHVACIteration)
 
   PlantProfile(ProfileNum)%InletTemp = Node(InletNode)%Temp
   PlantProfile(ProfileNum)%Power = GetCurrentScheduleValue(PlantProfile(ProfileNum)%LoadSchedule)
-  
+
   IF (PlantProfile(ProfileNum)%EMSOverridePower) PlantProfile(ProfileNum)%Power = PlantProfile(ProfileNum)%EMSPowerValue
 
   FluidDensityInit = GetDensityGlycol(PlantLoop(PlantProfile(ProfileNum)%WLoopNum)%FluidName,  &
                                   PlantProfile(ProfileNum)%InletTemp, &
                                   PlantLoop(PlantProfile(ProfileNum)%WLoopNum)%FluidIndex,'InitPlantProfile')
 
-!DSU? don't need?  IF (FirstHVACIteration) THEN
   ! Get the scheduled mass flow rate
   PlantProfile(ProfileNum)%VolFlowRate = PlantProfile(ProfileNum)%PeakVolFlowRate *   &
                                          GetCurrentScheduleValue(PlantProfile(ProfileNum)%FlowRateFracSchedule)
 
 
   PlantProfile(ProfileNum)%MassFlowRate = PlantProfile(ProfileNum)%VolFlowRate * FluidDensityInit
-  
+
   IF (PlantProfile(ProfileNum)%EMSOverrideMassFlow) &
            PlantProfile(ProfileNum)%MassFlowRate =  PlantProfile(ProfileNum)%EMSMassFlowValue
-!DSU? don't need?   END IF 
-  
+
     ! Request the mass flow rate from the plant component flow utility routine
-  CALL SetComponentFlowRate(PlantProfile(ProfileNum)%MassFlowRate,InletNode,OutletNode, &  
+  CALL SetComponentFlowRate(PlantProfile(ProfileNum)%MassFlowRate,InletNode,OutletNode, &
             PlantProfile(ProfileNum)%WLoopNum,PlantProfile(ProfileNum)%WLoopSideNum, &
-            PlantProfile(ProfileNum)%WLoopBranchNum, PlantProfile(ProfileNum)%WLoopCompNum) 
-    
+            PlantProfile(ProfileNum)%WLoopBranchNum, PlantProfile(ProfileNum)%WLoopCompNum)
+
   PlantProfile(ProfileNum)%VolFlowRate = PlantProfile(ProfileNum)%MassFlowRate / FluidDensityInit
 
   RETURN
@@ -441,7 +439,7 @@ SUBROUTINE UpdatePlantProfile(ProfileNum)
   Node(OutletNode)%Temp = PlantProfile(ProfileNum)%OutletTemp
 
   !DSU? enthalpy? quality etc? central routine? given inlet node, fluid type, delta T, properly fill all node vars?
-  
+
   RETURN
 
 END SUBROUTINE UpdatePlantProfile
@@ -487,7 +485,7 @@ END SUBROUTINE ReportPlantProfile
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -1647,7 +1647,7 @@ END SUBROUTINE InitAirflowNetworkData
           ! USE STATEMENTS:
           USE DataLoopNode, ONLY: Node
           USE DataAirLoop,  ONLY: LoopSystemOnMassFlowrate,LoopSystemOffMassFlowrate,LoopFanOperationMode,LoopCompCycRatio
-          USE DataHVACGlobals, ONLY: FanType_SimpleOnOff
+          USE DataHVACGlobals, ONLY: FanType_SimpleOnOff, FanType_SimpleConstVolume, FanType_SimpleVAV 
 
           IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -1677,7 +1677,10 @@ END SUBROUTINE InitAirflowNetworkData
 
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-         INTEGER CompNum
+          INTEGER CompNum, k,k1
+          REAL(r64) :: SumTermFlow  ! Sum of all Terminal flows [kg/s]
+          REAL(r64) :: SumFracSuppLeak  ! Sum of all supply leaks as a fraction of supply fan flow rate
+          Integer Node1, Node2
 
       ! FLOW:
       CompNum = AirflowNetworkCompData(J)%TypeNum
@@ -1692,7 +1695,7 @@ END SUBROUTINE InitAirflowNetworkData
             F(1) = LoopSystemOnMassFlowrate*LoopCompCycRatio+LoopSystemOffMassFlowrate*(1.0d0-LoopCompCycRatio)
           End If
         End If
-      Else
+      Else If (DisSysCompCVFData(CompNum)%FanTypeNum .eq. FanType_SimpleConstVolume) Then
         If (DisSysCompCVFData(CompNum)%FlowRate > 0) Then
           F(1) = DisSysCompCVFData(CompNum)%FlowRate*DisSysCompCVFData(CompNum)%Ctrl
         Else
@@ -1700,6 +1703,33 @@ END SUBROUTINE InitAirflowNetworkData
         End If
         If (MultiSpeedHPIndicator .EQ. 2) Then
           F(1) = LoopSystemOnMassFlowrate
+        End If
+      Else If (DisSysCompCVFData(CompNum)%FanTypeNum .eq. FanType_SimpleVAV) Then
+        ! Check VAV termals with a damper
+        SumTermFlow = 0.d0
+        SumFracSuppLeak = 0.d0
+        Do k=1,NetworkNumOfLinks
+          If (AirflowNetworkLinkageData(k)%VAVTermDamper) Then
+            k1 = AirflowNetworkNodeData(AirflowNetworkLinkageData(k)%NodeNums(1))%EPlusNodeNum
+            If (Node(k1)%MassFlowRate .GT. 0.0) Then
+              SumTermFlow = SumTermFlow + Node(k1)%MassFlowRate
+            End If
+          End If
+          If (AirflowNetworkCompData(AirflowNetworkLinkageData(k)%CompNum)%CompTypeNum == CompTypeNum_ELR) then
+            ! Calculate supply leak sensible losses           
+            Node1 = AirflowNetworkLinkageData(k)%NodeNums(1)
+            Node2 = AirflowNetworkLinkageData(k)%NodeNums(2)
+            if ((AirflowNetworkNodeData(Node2)%EPlusZoneNum > 0) .AND. (AirflowNetworkNodeData(Node1)%EPlusNodeNum == 0)) Then 
+              SumFracSuppLeak = SumFracSuppLeak + &
+                DisSysCompELRData(AirflowNetworkCompData(AirflowNetworkLinkageData(k)%CompNum)%TypeNum)%ELR
+            End If
+          End If
+        End Do
+        F(1) = SumTermFlow/(1.d0-SumFracSuppLeak)
+        VAVTerminalRatio = 0.d0
+        If (F(1) .GT. DisSysCompCVFData(CompNum)%MaxAirMassFlowRate) Then
+          VAVTerminalRatio = DisSysCompCVFData(CompNum)%MaxAirMassFlowRate/F(1)
+          F(1) = DisSysCompCVFData(CompNum)%MaxAirMassFlowRate
         End If
       End If
       DF(1) = 0.0
@@ -2509,7 +2539,7 @@ END SUBROUTINE InitAirflowNetworkData
           ! na
 
           ! USE STATEMENTS:
-          ! na
+          USE DataLoopNode, ONLY: Node
 
           IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2646,6 +2676,15 @@ END SUBROUTINE InitAirflowNetworkData
           DF(1) = 0.5d0*FT/PDROP
         END IF
       END IF
+      ! If damper, setup the airflows from nodal values calculated from teminal
+      If (AirflowNetworkLinkageData(I)%VAVTermDamper) Then
+        F(1) = Node(DisSysCompTermUnitData(CompNum)%DamperInletNode)%MassFlowrate
+        If (VAVTerminalRatio .gt. 0.d0) Then
+          F(1) = F(1)*VAVTerminalRatio
+        End If
+        DF(1) = 0.0
+      End IF
+
 !
   901 FORMAT(A5,I3,6X,4E16.7)
 
@@ -4940,7 +4979,7 @@ END SUBROUTINE InitAirflowNetworkData
 !*****************************************************************************************
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

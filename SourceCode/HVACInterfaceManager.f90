@@ -117,7 +117,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)    :: AirLoopNum          ! airloop number for which air loop this is
-  INTEGER, INTENT(IN)    :: CalledFrom          ! 
+  INTEGER, INTENT(IN)    :: CalledFrom          !
   INTEGER, INTENT(IN)    :: OutletNode          ! Node number for the outlet of the side of the loop just simulated
   INTEGER, INTENT(IN)    :: InletNode           ! Node number for the inlet of the side that needs the outlet node data
   LOGICAL, INTENT(INOUT) :: OutOfToleranceFlag  ! True when the other side of the loop need to be (re)simulated
@@ -147,7 +147,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
   AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .FALSE.
 
   SELECT CASE (CalledFrom)
-  
+
   CASE (CalledFromAirSystemDemandSide)
 
     TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACFlowDemandToSupplyTolValue
@@ -175,22 +175,22 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
       AirLoopConvergence(AirLoopNum)%HVACTempNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     END IF
-    
+
     TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue
     AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue(1) = ABS(DeltaEnergy)
     AirLoopConvergence(AirLoopNum)%HVACEnergyDemandToSupplyTolValue(2:ConvergLogStackDepth) &
                     =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-    ENDIF 
-    
+    ENDIF
+
     TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue
     AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(1) = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
     AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(2:ConvergLogStackDepth) &
         =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpyDemandToSupplyTolValue(1) > HVACEnthalpyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -199,7 +199,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue(2:ConvergLogStackDepth) &
         =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACPressureDemandToSupplyTolValue(1) > HVACPressToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -238,17 +238,17 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
         =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-    ENDIF 
-    
+    ENDIF
+
     TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue
     AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(1) &
          = ABS(Node(OutletNode)%Enthalpy-Node(InletNode)%Enthalpy)
     AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
          =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck1ToDemandTolValue(1) > HVACEnthalpyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -258,7 +258,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue(2:ConvergLogStackDepth) &
          =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACPressureSupplyDeck1ToDemandTolValue(1) > HVACPressToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -299,9 +299,9 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACEnergySupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
           =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (ABS(DeltaEnergy) > HVACEnergyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnergyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
-    ENDIF 
+    ENDIF
 
     TmpRealARR = AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue
     AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(1) &
@@ -309,7 +309,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
           =  TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACEnthalpySupplyDeck2ToDemandTolValue(1) > HVACEnthalpyToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACEnthalpyNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -319,7 +319,7 @@ SUBROUTINE UpdateHVACInterface(AirLoopNum, CalledFrom, OutletNode,InletNode,OutO
     AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue(2:ConvergLogStackDepth) &
           = TmpRealARR(1:ConvergLogStackDepth-1)
     IF (AirLoopConvergence(AirLoopNum)%HVACPressueSupplyDeck2ToDemandTolValue(1) > HVACPressToler) THEN
-      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE. 
+      AirLoopConvergence(AirLoopNum)%HVACPressureNotConverged = .TRUE.
       OutOfToleranceFlag = .TRUE. ! Something has changed--resimulate the other side of the loop
     ENDIF
 
@@ -350,7 +350,7 @@ END SUBROUTINE UpdateHVACInterface
 
 !***************
 SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNode,OtherLoopSideInletNode,  &
-   OutOfToleranceFlag,FirstHVACIteration,CommonPipeType)
+   OutOfToleranceFlag,CommonPipeType)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Rick Strand
@@ -393,7 +393,6 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
   INTEGER, INTENT(IN)    :: LoopNum             ! The 'inlet/outlet node' loop number
   INTEGER, INTENT(IN)    :: ThisLoopSideNum   ! The 'outlet node' loopside number
   INTEGER, OPTIONAL, INTENT(IN) :: CommonPipeType
-  LOGICAL, INTENT(IN)   :: FirstHVACIteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -414,12 +413,12 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
   INTEGER         :: ThisLoopSideInletNode
   REAL(r64), DIMENSION(ConvergLogStackDepth) :: TmpRealARR
   INTEGER :: ZoneInSysIndex
-  
+
           ! FLOW:
 
     !reset out of tolerance flags
   PlantConvergence(LoopNum)%PlantMassFlowNotConverged = .FALSE.
-  PlantConvergence(LoopNum)%PlantTempNotConverged     = .FALSE. 
+  PlantConvergence(LoopNum)%PlantTempNotConverged     = .FALSE.
 
     !set the loopside inlet node
   ThisLoopSideInletNode  = PlantLoop(LoopNum)%LoopSide(ThisLoopSideNum)%NodeNumIn
@@ -438,7 +437,7 @@ SUBROUTINE UpdatePlantLoopInterface(LoopNum,ThisLoopSideNum,ThisLoopSideOutletNo
     !update the temperatures and flow rates
   IF(CommonPipeType == 1 .OR. CommonPipeType ==2)THEN
         !update the temperature
-    CALL UpdateCommonPipe(LoopNum, ThisLoopSideNum, CommonPipeType,FirstHVACIteration, MixedOutletTemp)
+    CALL UpdateCommonPipe(LoopNum, ThisLoopSideNum, CommonPipeType, MixedOutletTemp)
     Node(OtherLoopSideInletNode)%Temp = MixedOutletTemp
     TankOutletTemp = MixedOutletTemp
     IF (ThisLoopSideNum == DemandSide) THEN
@@ -619,7 +618,6 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
 
 
 ! This needs to be based on time to deal with system downstepping and repeated timesteps
-!  IF (FirstHVACIteration .AND. PlantLoop(LoopNum)%LoopSide(TankInletLoopSide)%DoTankUpdate)THEN
   TimeElapsed = (HourOfDay-1) + TimeStep * TimeStepZone + SysTimeElapsed
   IF (PlantLoop(LoopNum)%LoopSide(TankOutletLoopSide)%TimeElapsed /= TimeElapsed) THEN
     PlantLoop(LoopNum)%LoopSide(TankOutletLoopSide)%LastTempInterfaceTankOutlet &
@@ -687,7 +685,7 @@ SUBROUTINE UpdateHalfLoopInletTemp(LoopNum, TankInletLoopSide, TankOutletTemp)
 
 END SUBROUTINE UpdateHalfLoopInletTemp
 
-SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIteration, MixedOutletTemp)
+SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType, MixedOutletTemp)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Rick Strand
@@ -731,7 +729,6 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIt
   INTEGER, INTENT(IN)   :: CommonPipeType
   INTEGER, INTENT(IN)   :: TankInletLoopSide
   REAL(r64),INTENT(OUT) :: MixedOutletTemp
-  LOGICAL, INTENT(IN)   :: FirstHVACIteration
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -778,7 +775,6 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIt
   ENDIF
 
 ! This needs to be based on time to deal with system downstepping and repeated timesteps
-!  IF (FirstHVACIteration .AND. PlantLoop(LoopNum)%LoopSide(TankInletLoopSide)%DoTankUpdate)THEN
   TimeElapsed = (HourOfDay-1) + TimeStep * TimeStepZone + SysTimeElapsed
   IF (PlantLoop(LoopNum)%LoopSide(TankOutletLoopSide)%TimeElapsed /= TimeElapsed) THEN
     PlantLoop(LoopNum)%LoopSide(TankOutletLoopSide)%LastTempInterfaceTankOutlet &
@@ -840,10 +836,9 @@ SUBROUTINE UpdateCommonPipe(LoopNum,TankInletLoopSide,CommonPipeType,FirstHVACIt
     CALL ManageSingleCommonPipe(LoopNum,TankOutletLoopSide,TankAverageTemp, MixedOutletTemp)
         !2-way (controlled) common pipe simulation
   ELSE IF(CommonPipeType == CommonPipe_TwoWay) THEN
-!    CALL CheckTwoWayCommonPipeConditions(LoopNum,TankInletLoopSide,TankOutletTemp, PriLoopTempIn, SecLoopTempIn,&
-!                                   FirstHVACIteration)
 
-    CALL ManageTwoWayCommonPipe(LoopNum, TankOutletLoopSide, TankAverageTemp, FirstHVACIteration)
+
+    CALL ManageTwoWayCommonPipe(LoopNum, TankOutletLoopSide, TankAverageTemp)
     MixedOutletTemp = Node(TankOutletNode)%Temp
   END IF
 
@@ -1004,7 +999,7 @@ SUBROUTINE ManageSingleCommonPipe(LoopNum,LoopSide,TankOutletTemp, MixedOutletTe
 
 END SUBROUTINE ManageSingleCommonPipe
 
-SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIteration)
+SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         B. Griffith
@@ -1035,7 +1030,7 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
   INTEGER, INTENT(IN)    :: LoopNum
   INTEGER, INTENT(IN)    :: LoopSide
   REAL(r64), INTENT(IN)  :: TankOutletTemp
-  LOGICAL, INTENT(IN)    :: FirstHVACIteration
+
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   INTEGER, PARAMETER :: DemandLedPrimaryInletUpdate   = 101
@@ -1194,7 +1189,6 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
 
         ! eq. 3
         IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
-           !  .AND. FirstHVACIteration
              .AND. (CurCallingCase == SupplyLedPrimaryInletUpdate) )THEN
           ! MdotPri is a variable to be calculated and flow request needs to be made
           IF (ABS(TempCPPrimaryCntrlSetpoint  ) > DeltaTemptol) THEN
@@ -1249,7 +1243,6 @@ SUBROUTINE ManageTwoWayCommonPipe(LoopNum,LoopSide, TankOutletTemp, FirstHVACIte
 
         ! eq. 3
         IF ((PlantCommonPipe(LoopNum)%SupplySideInletPumpType == VariableFlow) &
-            !  .AND. FirstHVACIteration  &
               .AND. (CurCallingCase == DemandLedPrimaryInletUpdate)) THEN
           ! MdotPri is a variable to be calculated and flow request made
           IF (ABS(TempPriOutTankOut - TempPriInlet ) > DeltaTemptol) THEN
@@ -1346,11 +1339,11 @@ SUBROUTINE SetupCommonPipes
 
       CASE (CommonPipe_Single)!Uncontrolled ('single') common pipe
         PlantCommonPipe(CurLoopNum)%CommonPipeType     = CommonPipe_Single
-        CALL SetupOutputVariable('Common Pipe Mass Flow Rate [Kg/s]', &
+        CALL SetupOutputVariable('Plant Common Pipe Mass Flow Rate [Kg/s]', &
           PlantCommonPipe(CurLoopNum)%Flow,'System','Average',PlantLoop(CurLoopNum)%Name)
-        CALL SetupOutputVariable('Common Pipe Flow Temperature [C]', &
+        CALL SetupOutputVariable('Plant Common Pipe Temperature [C]', &
           PlantCommonPipe(CurLoopNum)%Temp,'System','Average',PlantLoop(CurLoopNum)%Name)
-        CALL SetupOutputVariable('Common Pipe Flow Direction []', &
+        CALL SetupOutputVariable('Plant Common Pipe Flow Direction Status []', &
           PlantCommonPipe(CurLoopNum)%FlowDir,'System','Average',PlantLoop(CurLoopNum)%Name)
 
         IF (PlantLoop(CurLoopNum)%LoopSide(SupplySide)%Branch(1)%Comp(1)%TypeOf_Num == TypeOf_PumpVariableSpeed) THEN
@@ -1364,13 +1357,13 @@ SUBROUTINE SetupCommonPipes
 
       CASE (CommonPipe_TwoWay)!Controlled ('two-way') common pipe
         PlantCommonPipe(CurLoopNum)%CommonPipeType     = CommonPipe_TwoWay
-        CALL SetupOutputVariable('Primary Side Common Pipe Mass Flow Rate [Kg/s]', &
+        CALL SetupOutputVariable('Plant Common Pipe Primary Mass Flow Rate [kg/s]', &
           PlantCommonPipe(CurLoopNum)%PriCPLegFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
-        CALL SetupOutputVariable('Secondary Side Common Pipe Mass Flow Rate [Kg/s]', &
+        CALL SetupOutputVariable('Plant Common Pipe Secondary Mass Flow Rate [kg/s]', &
           PlantCommonPipe(CurLoopNum)%SecCPLegFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
-        CALL SetupOutputVariable('Primary to Secondary Mass Flow Rate [Kg/s]', &
+        CALL SetupOutputVariable('Plant Common Pipe Primary to Secondary Mass Flow Rate [kg/s]', &
            PlantCommonPipe(CurLoopNum)%PriToSecFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
-        CALL SetupOutputVariable('Secondary to Primary Mass Flow Rate [Kg/s]', &
+        CALL SetupOutputVariable('Plant Common Pipe Secondary to Primary Mass Flow Rate [kg/s]', &
            PlantCommonPipe(CurLoopNum)%SecToPriFlow,'System','Average',PlantLoop(CurLoopNum)%Name)
 
         ! check type of pump on supply side inlet
@@ -1405,7 +1398,7 @@ END SUBROUTINE SetupCommonPipes
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -113,55 +113,65 @@ SUBROUTINE CheckIFAnyEMS
   CHARACTER(len=MaxNameLength) :: cCurrentModuleObject
 
   cCurrentModuleObject = 'EnergyManagementSystem:Sensor'
-  NumSensors = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumSensors = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
-  numActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  numActuatorsUsed = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:ProgramCallingManager'
-  NumProgramCallManagers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumProgramCallManagers = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:Program'
-  NumErlPrograms = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumErlPrograms = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:Subroutine'
-  NumErlSubroutines = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumErlSubroutines = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:GlobalVariable'
-  NumUserGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumUserGlobalVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:OutputVariable'
-  NumEMSOutputVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumEMSOutputVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:MeteredOutputVariable'
-  NumEMSMeteredOutputVariables= GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumEMSMeteredOutputVariables= GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:CurveOrTableIndexVariable'
-  NumEMSCurveIndices   = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumEMSCurveIndices   = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'ExternalInterface:Variable'
-  NumExternalInterfaceGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumExternalInterfaceGlobalVariables = GetNumObjectsFound(cCurrentModuleObject)
 
-  ! added for FMI
+  ! added for FMUImport
   cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Variable'
-  NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables = GetNumObjectsFound(cCurrentModuleObject)
+
+  ! added for FMUExport
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitExport:To:Variable'
+  NumExternalInterfaceFunctionalMockupUnitExportGlobalVariables = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'ExternalInterface:Actuator'
-  NumExternalInterfaceActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumExternalInterfaceActuatorsUsed = GetNumObjectsFound(cCurrentModuleObject)
 
-  ! added for FMI
+  ! added for FMUImport
   cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
-  NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed = GetNumObjectsFound(cCurrentModuleObject)
+
+  ! added for FMUExport
+  cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitExport:To:Actuator'
+  NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'EnergyManagementSystem:ConstructionIndexVariable'
-  NumEMSConstructionIndices = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumEMSConstructionIndices = GetNumObjectsFound(cCurrentModuleObject)
 
-  ! added for FMI
+  ! added for FMU
   IF ((NumSensors + numActuatorsUsed + NumProgramCallManagers + NumErlPrograms + NumErlSubroutines &
       + NumUserGlobalVariables + NumEMSOutputVariables + NumEMSCurveIndices &
       + NumExternalInterfaceGlobalVariables + NumExternalInterfaceActuatorsUsed &
       + NumEMSConstructionIndices + NumEMSMeteredOutputVariables + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
-      + NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables) > 0 ) THEN
+      + NumExternalInterfaceFunctionalMockupUnitImportGlobalVariables   &
+      + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed &
+      + NumExternalInterfaceFunctionalMockupUnitExportGlobalVariables) > 0 ) THEN
     AnyEnergyManagementSystemInModel = .TRUE.
   ELSE
     AnyEnergyManagementSystemInModel = .FALSE.
@@ -287,7 +297,8 @@ SUBROUTINE ManageEMS(iCalledFrom, ProgramManagerToRun)
 
     ! Set actuated variables with new values
   DO ActuatorUsedLoop = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed
     ErlVariableNum = EMSActuatorUsed(ActuatorUsedLoop)%ErlVariableNum
     IF (.NOT. (ErlVariableNum >0)) CYCLE ! this can happen for good reason during sizing
 
@@ -621,7 +632,7 @@ SUBROUTINE GetEMSInput
     ALLOCATE(Sensor(NumSensors))
 
     DO SensorNum = 1, NumSensors
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), SensorNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT ,&
+      CALL GetObjectItem(cCurrentModuleObject, SensorNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, IOSTAT ,&
                       AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -682,27 +693,40 @@ SUBROUTINE GetEMSInput
 
   cCurrentModuleObject = 'EnergyManagementSystem:Actuator'
 
-  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed > 0) THEN
+  IF (numActuatorsUsed + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+                                                    + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed> 0) THEN
     ALLOCATE(EMSActuatorUsed(numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed))
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed))
     DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
-                            + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
+                            + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+                            + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed
        ! If we process the ExternalInterface actuators, all we need to do is to change the
        ! name of the module object, and shift the ActuatorNum in GetObjectItem
        IF ( ActuatorNum <= numActuatorsUsed ) THEN
-         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum, cAlphaArgs, NumAlphas, rNumericArgs, &
+         CALL GetObjectItem(cCurrentModuleObject, ActuatorNum, cAlphaArgs, NumAlphas, rNumericArgs, &
                NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
        ELSE IF ( ActuatorNum > numActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed + NumExternalInterfaceActuatorsUsed) THEN
          cCurrentModuleObject = 'ExternalInterface:Actuator'
-         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed, cAlphaArgs, NumAlphas, rNumericArgs, &
+         CALL GetObjectItem(cCurrentModuleObject, ActuatorNum-numActuatorsUsed, cAlphaArgs, NumAlphas, rNumericArgs, &
                NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
-       ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
-                              + NumExternalInterfaceActuatorsUsed   &
-                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed) THEN
+       ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND.   &
+                 ActuatorNum <= (numActuatorsUsed + NumExternalInterfaceActuatorsUsed +   &
+                                 NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed) ) THEN
          cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
-         CALL GetObjectItem(TRIM(cCurrentModuleObject), ActuatorNum-numActuatorsUsed-NumExternalInterfaceActuatorsUsed, &
+         CALL GetObjectItem(cCurrentModuleObject, ActuatorNum-numActuatorsUsed-NumExternalInterfaceActuatorsUsed, &
+                           cAlphaArgs, NumAlphas, rNumericArgs, &
+                           NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
+                           AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+        ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
+                              + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+                              + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed) THEN
+         cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitExport:To:Actuator'
+         CALL GetObjectItem(cCurrentModuleObject, ActuatorNum-numActuatorsUsed-NumExternalInterfaceActuatorsUsed &
+                           -NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed, &
                            cAlphaArgs, NumAlphas, rNumericArgs, &
                            NumNums, IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                            AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -768,12 +792,12 @@ SUBROUTINE GetEMSInput
   END IF
 
   cCurrentModuleObject = 'EnergyManagementSystem:InternalVariable'
-  NumInternalVariablesUsed  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumInternalVariablesUsed  = GetNumObjectsFound(cCurrentModuleObject)
   IF (NumInternalVariablesUsed > 0 ) THEN
     ALLOCATE(EMSInternalVarsUsed(NumInternalVariablesUsed))
 
     DO InternVarNum = 1, NumInternalVariablesUsed
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), InternVarNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, &
+      CALL GetObjectItem(cCurrentModuleObject, InternVarNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, &
                       IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -832,7 +856,7 @@ SUBROUTINE GetEMSInput
 
     DO CallManagerNum = 1, NumProgramCallManagers
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), CallManagerNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, &
+      CALL GetObjectItem(cCurrentModuleObject, CallManagerNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNums, &
                       IOSTAT, AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                       AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1058,9 +1082,9 @@ SUBROUTINE ProcessEMSInput(reportErrors)
 
   END DO  ! SensorNum
 
-  ! added for FMI
-  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed +   &
-     NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed
+  ! added for FMU
+  DO ActuatorNum = 1, numActuatorsUsed + NumExternalInterfaceActuatorsUsed &
+      + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed
      ! If we process the ExternalInterface actuators, all we need to do is to change the
 
     IF ( ActuatorNum <= numActuatorsUsed ) THEN
@@ -1070,6 +1094,11 @@ SUBROUTINE ProcessEMSInput(reportErrors)
     ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed .AND. ActuatorNum <= numActuatorsUsed &
                            + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed) THEN
       cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitImport:To:Actuator'
+    ELSE IF ( ActuatorNum > numActuatorsUsed + NumExternalInterfaceActuatorsUsed + &
+      NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed.AND. ActuatorNum <= numActuatorsUsed &
+      + NumExternalInterfaceActuatorsUsed + NumExternalInterfaceFunctionalMockupUnitImportActuatorsUsed &
+      + NumExternalInterfaceFunctionalMockupUnitExportActuatorsUsed) THEN
+      cCurrentModuleObject = 'ExternalInterface:FunctionalMockupUnitExport:To:Actuator'
     END IF
 
     IF (EMSActuatorUsed(ActuatorNum)%CheckedOkay) CYCLE
@@ -1869,11 +1898,11 @@ SUBROUTINE SetupThermostatActuators
 
   DO Loop = 1, NumComfortControlledZones
     CALL SetupEMSActuator('Zone Comfort Control',  ComfortControlledZone(loop)%ZoneName, &
-                           'Heating Setpoint', '[PMV]', &
+                           'Heating Setpoint', '[]', &
                            ComfortControlledZone(loop)%EMSOverrideHeatingSetpointOn, &
                            ComfortControlledZone(loop)%EMSOverrideHeatingSetpointValue)
     CALL SetupEMSActuator('Zone Comfort Control',  ComfortControlledZone(loop)%ZoneName, &
-                           'Cooling Setpoint', '[PMV]', &
+                           'Cooling Setpoint', '[]', &
                            ComfortControlledZone(loop)%EMSOverrideCoolingSetpointOn, &
                            ComfortControlledZone(loop)%EMSOverrideCoolingSetpointValue)
   ENDDO
@@ -2064,7 +2093,7 @@ END SUBROUTINE SetupZoneInfoAsInternalDataAvail
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

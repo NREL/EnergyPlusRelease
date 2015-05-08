@@ -898,7 +898,7 @@ SUBROUTINE DElightInputGenerator
                       ! RJH 2008-03-07: Set up DaylIllumAtRefPt for output for this DElight zone RefPt
 
                       ! CurrentModuleObject='Daylighting:DELight:ReferencePoint'
-                      CALL SetupOutputVariable('DElight Reference Point Daylight Illuminance [lux]', &
+                      CALL SetupOutputVariable('Daylighting Reference Point Illuminance [lux]', &
                         ZoneDaylight(izone)%DaylIllumAtRefPt(iNumRefPts), 'Zone', 'Average', &
                         AlphaArrayRefPt(1))
 
@@ -1152,7 +1152,7 @@ SUBROUTINE SetupDElightOutput4EPlus
         IF (ZoneDaylight(iZone)%TotalDElightRefPts >= 1) THEN
             ! Set up lighting power reduction factor for output for this DElight zone
             ! CurrentModuleObject='Daylighting:DELight:Controls'
-            CALL SetupOutputVariable('Ltg Power Multiplier from Daylighting []', &
+            CALL SetupOutputVariable('Daylighting Lighting Power Multiplier []', &
                 ZoneDaylight(iZone)%ZonePowerReductionFactor, 'Zone', 'Average', &
                 Zone(iZone)%Name)
         END IF
@@ -1228,7 +1228,7 @@ END FUNCTION ReplaceBlanksWithUnderscores
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -19,11 +19,12 @@ EXPORTS
   closeipc @17
   freeResource @18
   getepvariables @19
-  stackPop @20
-  stackPush @21
+  stackPopBCVTB @20
+  stackPushBCVTB @21
   getxmlvalues @22
   getnumberofxmlvalues @23
   getxmlvaluesf @24
   getxmlvalue @25
   check_variable_cfg_Validate @26
+  getepvariablesFMU @27
 

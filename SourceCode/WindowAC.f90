@@ -272,7 +272,7 @@ SUBROUTINE GetWindowAC
   USE General,               ONLY: TrimSigDigits
   USE DXCoils,               ONLY: GetDXCoilOutletNode => GetCoilOutletNode
   USE HVACHXAssistedCoolingCoil,  ONLY: GetDXHXAsstdCoilOutletNode => GetCoilOutletNode
-  USE DataGlobals,           ONLY: AnyEnergyManagementSystemInModel, NumOfZones
+  USE DataGlobals,           ONLY: AnyEnergyManagementSystemInModel, NumOfZones, ScheduleAlwaysOn
   USE DataInterfaces,        ONLY: SetupEMSActuator
   USE MixedAir,              ONLY: GetOAMixerIndex, GetOAMixerNodeNumbers
   USE DataHvacGlobals,       ONLY: FanType_SimpleConstVolume, FanType_SimpleVAV, FanType_SimpleOnOff, cFanTypes, ZoneComp
@@ -324,14 +324,14 @@ SUBROUTINE GetWindowAC
 ! find the number of each type of window AC unit
 CurrentModuleObject = 'ZoneHVAC:WindowAirConditioner'
 
-NumWindACCyc = GetNumObjectsFound(TRIM(CurrentModuleObject))
+NumWindACCyc = GetNumObjectsFound(CurrentModuleObject)
 NumWindAC = NumWindACCyc
 ! allocate the data structures
 ALLOCATE(WindAC(NumWindAC))
 ALLOCATE(CheckEquipName(NumWindAC))
 CheckEquipName=.true.
 
-CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 
 ALLOCATE(Alphas(NumAlphas))
 Alphas=' '
@@ -349,7 +349,7 @@ lNumericBlanks=.TRUE.
 ! loop over window AC units; get and load the input data
 DO WindACIndex = 1,NumWindACCyc
 
-  CALL GetObjectItem(TRIM(CurrentModuleObject),WindACIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+  CALL GetObjectItem(CurrentModuleObject,WindACIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                      NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                      AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -364,12 +364,16 @@ DO WindACIndex = 1,NumWindACCyc
   WindAC(WindACNum)%Name = Alphas(1)
   WindAC(WindACNum)%UnitType = WindowAC_UnitType ! 'ZoneHVAC:WindowAirConditioner'
   WindAC(WindACNum)%Sched = Alphas(2)
-  WindAC(WindACNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-  IF (WindAC(WindACNum)%SchedPtr .EQ. 0) THEN
-    CALL ShowSevereError(TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
-    CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(WindAC(WindACNum)%Name))
-    ErrorsFound=.TRUE.
-  END IF
+  IF (lAlphaBlanks(2)) THEN
+    WindAC(WindACNum)%SchedPtr = ScheduleAlwaysOn
+  ELSE
+    WindAC(WindACNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+    IF (WindAC(WindACNum)%SchedPtr .EQ. 0) THEN
+      CALL ShowSevereError(TRIM(CurrentModuleObject)//'="'//TRIM(WindAC(WindACNum)%Name)//'" invalid data.')
+      CALL ShowContinueError('invalid-not found '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
+      ErrorsFound=.TRUE.
+    END IF
+  ENDIF
   WindAC(WindACNum)%MaxAirVolFlow = Numbers(1)
   WindAC(WindACNum)%OutAirVolFlow = Numbers(2)
 
@@ -615,28 +619,39 @@ END IF
 
 DO WindACNum=1,NumWindAC
   ! Setup Report variables for the Fan Coils
-  CALL SetupOutputVariable('Window AC Total Zone Cooling Rate[W]',WindAC(WindACNum)%TotCoolEnergyRate,'System','Average',&
+  CALL SetupOutputVariable('Zone Window Air Conditioner Total Cooling Rate [W]', &
+                            WindAC(WindACNum)%TotCoolEnergyRate,'System','Average',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Total Cooling Energy [J]', &
+                            WindAC(WindACNum)%TotCoolEnergy,'System','Sum',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Sensible Cooling Rate [W]', &
+                            WindAC(WindACNum)%SensCoolEnergyRate,'System','Average',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Sensible Cooling Energy [J]', &
+                            WindAC(WindACNum)%SensCoolEnergy,'System','Sum',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Latent Cooling Rate [W]', &
+                           WindAC(WindACNum)%LatCoolEnergyRate,'System','Average',&
                            WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Total Zone Cooling Energy[J]',WindAC(WindACNum)%TotCoolEnergy,'System','Sum',&
+  CALL SetupOutputVariable('Zone Window Air Conditioner Latent Cooling Energy [J]', &
+                           WindAC(WindACNum)%LatCoolEnergy,'System','Sum',&
                            WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Sensible Zone Cooling Rate[W]',WindAC(WindACNum)%SensCoolEnergyRate,'System','Average',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Sensible Zone Cooling Energy[J]',WindAC(WindACNum)%SensCoolEnergy,'System','Sum',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Latent Zone Cooling Rate[W]',WindAC(WindACNum)%LatCoolEnergyRate,'System','Average',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Latent Zone Cooling Energy[J]',WindAC(WindACNum)%LatCoolEnergy,'System','Sum',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Electric Power[W]',WindAC(WindACNum)%ElecPower,'System','Average',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Electric Consumption[J]',WindAC(WindACNum)%ElecConsumption,'System','Sum',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Fan Part-Load Ratio',WindAC(WindACNum)%FanPartLoadRatio,'System','Average',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Compressor Part-Load Ratio',WindAC(WindACNum)%CompPartLoadRatio,'System','Average',&
-                           WindAC(WindACNum)%Name)
-  CALL SetupOutputVariable('Window AC Fan Availability Status',WindAC(WindACNum)%AvailStatus,'System','Average',&
-                           WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Electric Power [W]', &
+                            WindAC(WindACNum)%ElecPower,'System','Average',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Electric Energy [J]', &
+                            WindAC(WindACNum)%ElecConsumption,'System','Sum',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Fan Part Load Ratio []', &
+                            WindAC(WindACNum)%FanPartLoadRatio,'System','Average',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Compressor Part Load Ratio []', &
+                            WindAC(WindACNum)%CompPartLoadRatio,'System','Average',&
+                            WindAC(WindACNum)%Name)
+  CALL SetupOutputVariable('Zone Window Air Conditioner Fan Availability Status []', &
+                            WindAC(WindACNum)%AvailStatus,'System','Average',&
+                            WindAC(WindACNum)%Name)
   IF (AnyEnergyManagementSystemInModel) THEN
     CALL SetupEMSActuator('Window Air Conditioner', WindAC(WindACNum)%Name, 'Part Load Ratio' , '[fraction]', &
                            WindAC(WindACNum)%EMSOverridePartLoadFrac, WindAC(WindACNum)%EMSValueForPartLoadFrac )
@@ -1022,8 +1037,9 @@ QUnitOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat)   &
 SensCoolOut = AirMassFlow * (PsyHFnTdbW(Node(OutletNode)%Temp,MinHumRat) - &
                              PsyHFnTdbW(Node(InletNode)%Temp,MinHumRat))
 
-SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+! CR9155 Remove specific humidity calculations
+SpecHumOut = Node(OutletNode)%HumRat 
+SpecHumIn  = Node(InletNode)%HumRat 
 LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate, kg/s
 
 QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -1583,7 +1599,7 @@ END FUNCTION GetWindowACMixedAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -39,6 +39,7 @@ MODULE PlantPipingSystemsManager
     CHARACTER(len=*), PARAMETER :: ObjName_ug_GeneralDomain = 'PipingSystem:Underground:Domain'
     CHARACTER(len=*), PARAMETER :: objName_Circuit          = 'PipingSystem:Underground:PipeCircuit'
     CHARACTER(len=*), PARAMETER :: objName_Segment          = 'PipingSystem:Underground:PipeSegment'
+    CHARACTER(len=*), PARAMETER :: objName_HorizTrench      = 'GroundHeatExchanger:HorizontalTrench'
 
           ! MODULE INTERFACE DEFINITIONS:
     INTERFACE IssueSevereInputFieldError
@@ -222,7 +223,7 @@ SUBROUTINE SimPipingSystemCircuit(EquipName, EqNum, FirstHVACIteration, InitLoop
     INTEGER :: CircuitNum
     INTEGER :: DomainNum
     INTEGER :: NumOfPipeCircuits
-    
+
     !Read input if necessary
     IF (GetInputFlag) THEN
         CALL GetPipingSystemsInput()
@@ -325,6 +326,8 @@ SUBROUTINE GetPipingSystemsInput
     INTEGER                      :: NumPipeCircuits
     INTEGER                      :: NumPipeSegmentsInInput
     INTEGER                      :: NumCircuitsInThisDomain
+    INTEGER                      :: NumHorizontalTrenches
+    INTEGER                      :: NumSegmentsInHorizontalTrenches
     INTEGER                      :: DomainNum
     INTEGER                      :: TotalNumDomains
     INTEGER                      :: TotalNumCircuits
@@ -335,26 +338,33 @@ SUBROUTINE GetPipingSystemsInput
 
     !Read number of objects and allocate main data structures - first domains
     NumGeneralizedDomains=GetNumObjectsFound(ObjName_ug_GeneralDomain)
-    TotalNumDomains = NumGeneralizedDomains
+    NumHorizontalTrenches=GetNumObjectsFound(objName_HorizTrench)
+    TotalNumDomains = NumGeneralizedDomains + NumHorizontalTrenches
     ALLOCATE(PipingSystemDomains(TotalNumDomains))
 
     ! then circuits
     NumPipeCircuits=GetNumObjectsFound(ObjName_Circuit)
-    TotalNumCircuits = NumPipeCircuits
+    TotalNumCircuits = NumPipeCircuits + NumHorizontalTrenches
     ALLOCATE(PipingSystemCircuits(TotalNumCircuits))
 
     ! then segments
     NumPipeSegmentsInInput = GetNumObjectsFound(objName_Segment)
-    TotalNumSegments = NumPipeSegmentsInInput
+    NumSegmentsInHorizontalTrenches = GetNumSegmentsForHorizontalTrenches(NumHorizontalTrenches)
+    TotalNumSegments = NumPipeSegmentsInInput + NumSegmentsInHorizontalTrenches
     ALLOCATE(PipingSystemSegments(TotalNumSegments))
 
     !Read in raw inputs, don't try to interpret dependencies yet
     CALL ReadGeneralDomainInputs(1, NumGeneralizedDomains, ErrorsFound)
     CALL ReadPipeCircuitInputs(NumPipeCircuits, ErrorsFound)
     CALL ReadPipeSegmentInputs(NumPipeSegmentsInInput, ErrorsFound)
+    CALL ReadHorizontalTrenchInputs(NumGeneralizedDomains+1, NumPipeCircuits+1, NumPipeSegmentsInInput+1, &
+                                                                               NumHorizontalTrenches, ErrorsFound)
 
     !Report errors that are purely input problems
     IF (ErrorsFound) CALL ShowFatalError(RoutineName//': Preceding input errors cause program termination.')
+
+    !Setup output variables
+    CALL SetupAllOutputVariables(TotalNumSegments, TotalNumCircuits)
 
     !Validate CIRCUIT-SEGMENT cross references
     DO CircuitCtr = LBOUND(PipingSystemCircuits, 1), UBOUND(PipingSystemCircuits, 1)
@@ -364,7 +374,7 @@ SUBROUTINE GetPipingSystemsInput
                                            UBOUND(PipingSystemCircuits(CircuitCtr)%PipeSegmentNames, 1)
 
             ThisSegmentName = PipingSystemCircuits(CircuitCtr)%PipeSegmentNames(ThisCircuitPipeSegmentCounter)
-            ThisSegmentIndex = FindItemInList(ThisSegmentName,PipingSystemSegments%Name,NumPipeSegmentsInInput)
+            ThisSegmentIndex = FindItemInList(ThisSegmentName,PipingSystemSegments%Name,TotalNumSegments)
             IF (ThisSegmentIndex > 0) THEN
                 PipingSystemCircuits(CircuitCtr)%PipeSegmentIndeces(ThisCircuitPipeSegmentCounter) = ThisSegmentIndex
                 PipingSystemSegments(ThisSegmentIndex)%ParentCircuitIndex = CircuitCtr
@@ -372,6 +382,7 @@ SUBROUTINE GetPipingSystemsInput
                 CALL ShowSevereError(RoutineName//': Could not match a pipe segment for: '// &
                                      TRIM(ObjName_Circuit)//'='//TRIM(PipingSystemCircuits(CircuitCtr)%Name))
                 CALL ShowContinueError(RoutineName//': Looking for: '//TRIM(objName_Segment)//'='//TRIM(ThisSegmentName))
+                ErrorsFound = .TRUE.
             END IF
 
         END DO !Segment loop
@@ -379,7 +390,7 @@ SUBROUTINE GetPipingSystemsInput
     END DO !Circuit loop
 
     !Validate DOMAIN-CIRCUIT cross references
-    DO DomainNum = 1, NumGeneralizedDomains
+    DO DomainNum = 1, TotalNumDomains
 
         !Convenience
         NumCircuitsInThisDomain = SIZE(PipingSystemDomains(DomainNum)%CircuitNames)
@@ -452,6 +463,63 @@ SUBROUTINE GetPipingSystemsInput
   RETURN
 
 END SUBROUTINE GetPipingSystemsInput
+!*********************************************************************************************!
+
+!*********************************************************************************************!
+INTEGER FUNCTION GetNumSegmentsForHorizontalTrenches(NumHorizontalTrenches) RESULT(Total)
+
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+    USE InputProcessor, ONLY: GetObjectItem
+    USE DataIPShortCuts
+
+    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+    INTEGER, INTENT(IN) :: NumHorizontalTrenches
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+    INTEGER :: HorizontalCtr
+    INTEGER :: NumPipesInThisHorizontal
+    INTEGER :: NumAlphas, NumNumbers
+    INTEGER :: IOStatus
+
+    Total = 0
+
+    DO HorizontalCtr = 1, NumHorizontalTrenches
+
+        !Set up all the inputs for this domain object
+        CALL GetObjectItem(objName_HorizTrench,HorizontalCtr,cAlphaArgs,NumAlphas, &
+                             rNumericArgs,NumNumbers,IOStatus,  &
+                             AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                             AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+        NumPipesInThisHorizontal = rNumericArgs(3)
+
+        Total = Total + NumPipesInThisHorizontal
+
+    END DO
+
+  RETURN
+
+END FUNCTION
 !*********************************************************************************************!
 
 !*********************************************************************************************!
@@ -870,21 +938,6 @@ SUBROUTINE ReadPipeCircuitInputs(NumPipeCircuits, ErrorsFound)
             PipingSystemCircuits(PipeCircuitCounter)%PipeSegmentNames(ThisCircuitPipeSegmentCounter) = cAlphaArgs(CurIndex)
         END DO
 
-        CALL SetupOutputVariable('Piping System fluid mass flow rate[kg/s]',      &
-                                 PipingSystemCircuits(PipeCircuitCounter)%CurCircuitFlowRate,'Plant','Average',   &
-                                 PipingSystemCircuits(PipeCircuitCounter)%Name)
-
-        CALL SetupOutputVariable('Piping System Circuit inlet fluid temperature[C]',      &
-                                 PipingSystemCircuits(PipeCircuitCounter)%InletTemperature,'Plant','Average',   &
-                                 PipingSystemCircuits(PipeCircuitCounter)%Name)
-        CALL SetupOutputVariable('Piping System Circuit outlet fluid temperature[C]',      &
-                                 PipingSystemCircuits(PipeCircuitCounter)%OutletTemperature,'Plant','Average',   &
-                                 PipingSystemCircuits(PipeCircuitCounter)%Name)
-
-        CALL SetupOutputVariable('Piping System Circuit fluid heat loss[W]',      &
-                                 PipingSystemCircuits(PipeCircuitCounter)%FluidHeatLoss,'Plant','Average',   &
-                                 PipingSystemCircuits(PipeCircuitCounter)%Name)
-
     END DO !All pipe circuits in input
 
   RETURN
@@ -973,22 +1026,451 @@ SUBROUTINE ReadPipeSegmentInputs(NumPipeSegmentsInInput, ErrorsFound)
                                      cAlphaArgs(CurIndex), 'Invalid flow direction, use one of the available keys.', ErrorsFound)
         END SELECT
 
-        CALL SetupOutputVariable('Piping System Segment inlet fluid temperature[C]',      &
-                                 PipingSystemSegments(SegmentCtr)%InletTemperature,'Plant','Average',   &
-                                 PipingSystemSegments(SegmentCtr)%Name)
-        CALL SetupOutputVariable('Piping System Segment outlet fluid temperature[C]',      &
-                                 PipingSystemSegments(SegmentCtr)%OutletTemperature,'Plant','Average',   &
-                                 PipingSystemSegments(SegmentCtr)%Name)
-
-        CALL SetupOutputVariable('Piping System Segment fluid heat loss[W]',      &
-                                 PipingSystemSegments(SegmentCtr)%FluidHeatLoss,'Plant','Average',   &
-                                 PipingSystemSegments(SegmentCtr)%Name)
     END DO
 
   RETURN
 
 END SUBROUTINE
 !*********************************************************************************************!
+
+!*********************************************************************************************!
+SUBROUTINE ReadHorizontalTrenchInputs(StartingDomainNumForHorizontal, StartingCircuitNumForHorizontal, &
+                              StartingSegmentNumForHorizontal, NumHorizontalTrenchesInInput, ErrorsFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+    USE InputProcessor, ONLY: GetObjectItem, VerifyName
+    USE DataInterfaces, ONLY: SetupOutputVariable
+    USE DataIPShortCuts
+    USE DataGlobals, ONLY: SecsInDay
+    USE DataLoopNode
+    USE NodeInputManager,      ONLY : GetOnlySingleNode
+    USE BranchNodeConnections, ONLY : TestCompSet
+    USE DataEnvironment, ONLY: PubGroundTempSurfFlag, PubGroundTempSurface
+
+    IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+    INTEGER, INTENT(IN)     :: StartingDomainNumForHorizontal
+    INTEGER, INTENT(IN)     :: StartingCircuitNumForHorizontal
+    INTEGER, INTENT(IN)     :: StartingSegmentNumForHorizontal
+    INTEGER, INTENT(IN)     :: NumHorizontalTrenchesInInput
+    LOGICAL, INTENT(IN OUT) :: ErrorsFound
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+    CHARACTER(len=*), PARAMETER :: RoutineName = 'ReadHorizontalTrenchInputs'
+    INTEGER, PARAMETER          :: MonthsInYear = 12
+    REAL(r64), PARAMETER        :: LargeNumber = 10000.0d0
+    REAL(r64), PARAMETER        :: AvgDaysInMonth = 365.0d0/12.0d0
+
+          ! DERIVED TYPE DEFINITIONS:
+    TYPE HorizontalTrenchData
+        CHARACTER(len=MaxNameLength) :: ObjName                   = ''
+        CHARACTER(len=MaxNameLength) :: InletNodeName             = ''
+        CHARACTER(len=MaxNameLength) :: OutletNodeName            = ''
+        REAL(r64)                    :: AxialLength               = 0.0
+        REAL(r64)                    :: PipeID                    = 0.0
+        REAL(r64)                    :: PipeOD                    = 0.0
+        INTEGER                      :: NumPipes                  = 0
+        REAL(r64)                    :: BurialDepth               = 0.0
+        REAL(r64)                    :: DesignFlowRate            = 0.0
+        REAL(r64)                    :: SoilConductivity          = 0.0
+        REAL(r64)                    :: SoilDensity               = 0.0
+        REAL(r64)                    :: SoilSpecificHeat          = 0.0
+        REAL(r64)                    :: PipeConductivity          = 0.0
+        REAL(r64)                    :: PipeDensity               = 0.0
+        REAL(r64)                    :: PipeSpecificHeat          = 0.0
+        REAL(r64)                    :: InterPipeSpacing          = 0.0
+        REAL(r64)                    :: MoistureContent           = 0.0
+        REAL(r64)                    :: SaturationMoistureContent = 0.0
+        REAL(r64)                    :: KusudaAvgSurfTemp         = 0.0
+        REAL(r64)                    :: KusudaAvgAmplitude        = 0.0
+        REAL(r64)                    :: KusudaPhaseShift          = 0.0
+        REAL(r64)                    :: EvapotranspirationCoeff   = 0.0
+        LOGICAL                      :: UseGroundTempDataForKusuda= .FALSE.
+        REAL(r64)                    :: MinSurfTemp               = 0.0
+        INTEGER                      :: MonthOfMinSurfTemp        = 0
+    END TYPE
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+    INTEGER :: HorizontalGHXCtr
+    INTEGER :: NumAlphas  ! Number of Alphas for each GetObjectItem call
+    INTEGER :: NumNumbers ! Number of Numbers for each GetObjectItem call
+    INTEGER :: IOStatus   ! Used in GetObjectItem
+    INTEGER :: CurIndex
+    LOGICAL :: IsNotOK
+    LOGICAL :: IsBlank
+    TYPE(HorizontalTrenchData), DIMENSION(NumHorizontalTrenchesInInput) :: HGHX
+    INTEGER :: DomainCtr
+    INTEGER :: CircuitCtr
+    INTEGER :: SegmentCtr
+    INTEGER :: NumPipeSegments
+    INTEGER :: ThisCircuitPipeSegmentCounter
+    INTEGER :: MonthIndex
+
+    ! initialize these counters properly so they can be incremented within the DO loop
+    DomainCtr = StartingDomainNumForHorizontal - 1
+    CircuitCtr= StartingCircuitNumForHorizontal - 1
+    SegmentCtr= StartingSegmentNumForHorizontal - 1
+
+    ! For each horizontal, we need to process the inputs into a local array of derived type,
+    !  then resolve each one, creating definitions for a pipe domain, pipe circuit, and series of pipe segments
+    ! This way, the outer get input routines can handle it as though they were generalized routines
+
+    !Read in all pipe segments
+    DO HorizontalGHXCtr = 1, NumHorizontalTrenchesInInput
+
+        !Increment the domain and circuit counters here
+        DomainCtr = DomainCtr + 1
+        CircuitCtr = CircuitCtr + 1
+
+        !Read all inputs for this pipe segment
+        CALL GetObjectItem(objName_HorizTrench,HorizontalGHXCtr,cAlphaArgs,NumAlphas, &
+                 rNumericArgs,NumNumbers,IOStatus,  &
+                 AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                 AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+
+        !Get the name, validate
+        HGHX(HorizontalGHXCtr)%ObjName = cAlphaArgs(1)
+        IsNotOK=.FALSE.
+        IsBlank=.FALSE.
+        CALL VerifyName(cAlphaArgs(1),HGHX%ObjName,HorizontalGHXCtr-1,IsNotOK,IsBlank,TRIM(objName_HorizTrench)//' Name')
+        IF (IsNotOK) THEN
+            ErrorsFound = .TRUE.
+            cAlphaArgs(1) = 'Duplicate name encountered'
+        ELSEIF (IsBlank) THEN
+            ErrorsFound = .TRUE.
+            cAlphaArgs(1) = 'Blank name encountered'
+        ENDIF
+
+        !Read in the rest of the inputs into the local type for clarity during transition
+        HGHX(HorizontalGHXCtr)%InletNodeName             = cAlphaArgs(2)
+        HGHX(HorizontalGHXCtr)%OutletNodeName            = cAlphaArgs(3)
+        HGHX(HorizontalGHXCtr)%DesignFlowRate            = rNumericArgs(1)
+        HGHX(HorizontalGHXCtr)%AxialLength               = rNumericArgs(2)
+        HGHX(HorizontalGHXCtr)%NumPipes                  = rNumericArgs(3)
+        HGHX(HorizontalGHXCtr)%InterPipeSpacing          = rNumericArgs(4)
+        HGHX(HorizontalGHXCtr)%PipeID                    = rNumericArgs(5)
+        HGHX(HorizontalGHXCtr)%PipeOD                    = rNumericArgs(6)
+        HGHX(HorizontalGHXCtr)%BurialDepth               = rNumericArgs(7)
+        HGHX(HorizontalGHXCtr)%SoilConductivity          = rNumericArgs(8)
+        HGHX(HorizontalGHXCtr)%SoilDensity               = rNumericArgs(9)
+        HGHX(HorizontalGHXCtr)%SoilSpecificHeat          = rNumericArgs(10)
+        HGHX(HorizontalGHXCtr)%PipeConductivity          = rNumericArgs(11)
+        HGHX(HorizontalGHXCtr)%PipeDensity               = rNumericArgs(12)
+        HGHX(HorizontalGHXCtr)%PipeSpecificHeat          = rNumericArgs(13)
+        HGHX(HorizontalGHXCtr)%MoistureContent           = rNumericArgs(14)
+        HGHX(HorizontalGHXCtr)%SaturationMoistureContent = rNumericArgs(15)
+        HGHX(HorizontalGHXCtr)%KusudaAvgSurfTemp         = rNumericArgs(16)
+        HGHX(HorizontalGHXCtr)%KusudaAvgAmplitude        = rNumericArgs(17)
+        HGHX(HorizontalGHXCtr)%KusudaPhaseShift          = rNumericArgs(18)
+        HGHX(HorizontalGHXCtr)%EvapotranspirationCoeff   = rNumericArgs(19)
+        HGHX(HorizontalGHXCtr)%UseGroundTempDataForKusuda= lNumericFieldBlanks(16) &
+                                                           .OR.lNumericFieldBlanks(17) &
+                                                           .OR.lNumericFieldBlanks(18)
+
+        !******* We'll first set up the domain ********
+        !the extents will be: Zmax = axial length; Ymax = burial depth*2; Xmax = (NumPipes+1)*HorizontalPipeSpacing
+        PipingSystemDomains(DomainCtr)%IsActuallyPartOfAHorizontalTrench = .TRUE.
+        WRITE(PipingSystemDomains(DomainCtr)%Name, '("HorizontalTrenchDomain",I4)') HorizontalGHXCtr
+        PipingSystemDomains(DomainCtr)%Extents%Xmax = (REAL(HGHX(HorizontalGHXCtr)%NumPipes) + 1.0d0) * &
+                                                                            HGHX(HorizontalGHXCtr)%InterPipeSpacing
+        PipingSystemDomains(DomainCtr)%Extents%Ymax = 2.0d0 * HGHX(HorizontalGHXCtr)%BurialDepth
+        PipingSystemDomains(DomainCtr)%Extents%Zmax = HGHX(HorizontalGHXCtr)%AxialLength
+
+        !set up the mesh with some default parameters
+        PipingSystemDomains(DomainCtr)%Mesh%X%RegionMeshCount  = 4
+        PipingSystemDomains(DomainCtr)%Mesh%X%MeshDistribution = MeshDistribution_Uniform
+        PipingSystemDomains(DomainCtr)%Mesh%Y%RegionMeshCount  = 4
+        PipingSystemDomains(DomainCtr)%Mesh%Y%MeshDistribution = MeshDistribution_Uniform
+        PipingSystemDomains(DomainCtr)%Mesh%Z%RegionMeshCount  = 4
+        PipingSystemDomains(DomainCtr)%Mesh%Z%MeshDistribution = MeshDistribution_Uniform
+
+        !Soil properties
+        PipingSystemDomains(DomainCtr)%GroundProperties%Conductivity = HGHX(HorizontalGHXCtr)%SoilConductivity
+        PipingSystemDomains(DomainCtr)%GroundProperties%Density      = HGHX(HorizontalGHXCtr)%SoilDensity
+        PipingSystemDomains(DomainCtr)%GroundProperties%SpecificHeat = HGHX(HorizontalGHXCtr)%SoilSpecificHeat
+
+        !Moisture properties
+        PipingSystemDomains(DomainCtr)%Moisture%Theta_Liq = HGHX(HorizontalGHXCtr)%MoistureContent / 100.0d0
+        PipingSystemDomains(DomainCtr)%Moisture%Theta_Sat = HGHX(HorizontalGHXCtr)%SaturationMoistureContent / 100.0d0
+
+        !Farfield model parameters
+        IF (.NOT. HGHX(HorizontalGHXCtr)%UseGroundTempDataForKusuda) THEN
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = HGHX(HorizontalGHXCtr)%KusudaAvgSurfTemp
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = HGHX(HorizontalGHXCtr)%KusudaAvgAmplitude
+            PipingSystemDomains(DomainCtr)%Farfield%PhaseShiftOfMinGroundTempDays = HGHX(HorizontalGHXCtr)%KusudaPhaseShift
+        ELSE
+            !If ground temp data was not brought in manually in GETINPUT,
+            ! then we must get it from the surface ground temperatures
+
+            IF (.NOT. PubGroundTempSurfFlag) THEN
+                CALL ShowSevereError("Input problem for "//objName_HorizTrench//"="//HGHX(HorizontalGHXCtr)%ObjName)
+                CALL ShowContinueError("No Site:GroundTemperature:Shallow object found in the input file")
+                CALL ShowContinueError("This is required for the horizontal ground heat exchanger if farfield parameters are")
+                CALL ShowContinueError(" not directly entered into the input object.")
+                ErrorsFound = .TRUE.
+            END IF
+
+            !Calculate Average Ground Temperature for all 12 months of the year:
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = 0.0
+            DO MonthIndex = 1, MonthsInYear
+                PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = &
+                                 PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature + PubGroundTempSurface(MonthIndex)
+            END DO
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature = &
+                                 PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature / MonthsInYear
+
+            !Calculate Average Amplitude from Average:
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = 0.0
+            DO MonthIndex = 1, MonthsInYear
+                PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = &
+                            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude + &
+                            ABS(PubGroundTempSurface(MonthIndex) - PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperature)
+            END DO
+            PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude = &
+                                             PipingSystemDomains(DomainCtr)%Farfield%AverageGroundTemperatureAmplitude /MonthsInYear
+
+            !Also need to get the month of minimum surface temperature to set phase shift for Kusuda and Achenbach:
+            HGHX(HorizontalGHXCtr)%MonthOfMinSurfTemp = 0
+            HGHX(HorizontalGHXCtr)%MinSurfTemp = LargeNumber !Set high month 1 temp will be lower and actually get updated
+            DO MonthIndex = 1, MonthsInYear
+                IF (PubGroundTempSurface(MonthIndex) <= HGHX(HorizontalGHXCtr)%MinSurfTemp) THEN
+                    HGHX(HorizontalGHXCtr)%MonthOfMinSurfTemp = MonthIndex
+                    HGHX(HorizontalGHXCtr)%MinSurfTemp = PubGroundTempSurface(MonthIndex)
+                END IF
+            END DO
+            PipingSystemDomains(DomainCtr)%Farfield%PhaseShiftOfMinGroundTempDays = &
+                            HGHX(HorizontalGHXCtr)%MonthOfMinSurfTemp * AvgDaysInMonth
+        END IF
+
+        !Unit conversion
+        PipingSystemDomains(DomainCtr)%Farfield%PhaseShiftOfMinGroundTemp = &
+                    PipingSystemDomains(DomainCtr)%Farfield%PhaseShiftOfMinGroundTempDays * SecsInDay
+
+        !Other parameters
+        PipingSystemDomains(DomainCtr)%SimControls%Convergence_CurrentToPrevIteration = 0.001
+        PipingSystemDomains(DomainCtr)%SimControls%MaxIterationsPerTS = 250
+
+        !additional evapotranspiration parameter, min/max validated by IP
+        PipingSystemDomains(DomainCtr)%Moisture%GroundCoverCoefficient = HGHX(HorizontalGHXCtr)%EvapotranspirationCoeff
+
+        !Allocate the circuit placeholder arrays
+        ALLOCATE(PipingSystemDomains(DomainCtr)%CircuitNames(1))
+        ALLOCATE(PipingSystemDomains(DomainCtr)%CircuitIndeces(1))
+        PipingSystemDomains(DomainCtr)%CircuitNames(1) = HGHX(HorizontalGHXCtr)%ObjName
+
+        !******* We'll next set up the circuit ********
+        PipingSystemCircuits(CircuitCtr)%IsActuallyPartOfAHorizontalTrench = .TRUE.
+        PipingSystemCircuits(CircuitCtr)%Name = HGHX(HorizontalGHXCtr)%ObjName
+
+        !Read pipe thermal properties
+        PipingSystemCircuits(CircuitCtr)%PipeProperties%Conductivity = HGHX(HorizontalGHXCtr)%PipeConductivity
+        PipingSystemCircuits(CircuitCtr)%PipeProperties%Density      = HGHX(HorizontalGHXCtr)%PipeDensity
+        PipingSystemCircuits(CircuitCtr)%PipeProperties%SpecificHeat = HGHX(HorizontalGHXCtr)%PipeSpecificHeat
+
+        !Pipe sizing
+        PipingSystemCircuits(CircuitCtr)%PipeSize%InnerDia = HGHX(HorizontalGHXCtr)%PipeID
+        PipingSystemCircuits(CircuitCtr)%PipeSize%OuterDia = HGHX(HorizontalGHXCtr)%PipeOD
+        IF (   PipingSystemCircuits(CircuitCtr)%PipeSize%InnerDia >= &
+               PipingSystemCircuits(CircuitCtr)%PipeSize%OuterDia) THEN
+            !CurIndex = 5
+            !CALL IssueSevereInputFieldError(RoutineName, ObjName_Circuit, cAlphaArgs(1), cAlphaFieldNames(CurIndex), &
+            !                            cAlphaArgs(CurIndex), 'Outer diameter must be greater than inner diameter.', ErrorsFound)
+        END IF
+
+        !Read design flow rate, validated positive by IP
+        PipingSystemCircuits(CircuitCtr)%DesignVolumeFlowRate = HGHX(HorizontalGHXCtr)%DesignFlowRate
+
+        !Read inlet and outlet node names and validate them
+        PipingSystemCircuits(CircuitCtr)%InletNodeName = HGHX(HorizontalGHXCtr)%InletNodeName
+        PipingSystemCircuits(CircuitCtr)%InletNodeNum  = GetOnlySingleNode( &
+                                PipingSystemCircuits(CircuitCtr)%InletNodeName,ErrorsFound, &
+                                TRIM(objName_HorizTrench),HGHX(HorizontalGHXCtr)%ObjName, &
+                                NodeType_Water,NodeConnectionType_Inlet, 1, ObjectIsNotParent)
+        IF (PipingSystemCircuits(CircuitCtr)%InletNodeNum == 0) THEN
+            CurIndex = 2
+            !CALL IssueSevereInputFieldError(RoutineName, ObjName_Circuit, cAlphaArgs(1), cAlphaFieldNames(CurIndex), &
+            !                                cAlphaArgs(CurIndex), 'Bad node name.', ErrorsFound)
+        END IF
+        PipingSystemCircuits(CircuitCtr)%OutletNodeName = HGHX(HorizontalGHXCtr)%OutletNodeName
+        PipingSystemCircuits(CircuitCtr)%OutletNodeNum  = GetOnlySingleNode( &
+                                PipingSystemCircuits(CircuitCtr)%OutletNodeName, ErrorsFound, &
+                                TRIM(objName_HorizTrench),HGHX(HorizontalGHXCtr)%ObjName, &
+                                NodeType_Water,NodeConnectionType_Outlet, 1, ObjectIsNotParent)
+        IF (PipingSystemCircuits(CircuitCtr)%OutletNodeNum == 0) THEN
+            CurIndex = 3
+            !CALL IssueSevereInputFieldError(RoutineName, ObjName_Circuit, cAlphaArgs(1), cAlphaFieldNames(CurIndex), &
+            !                                cAlphaArgs(CurIndex), 'Bad node name.', ErrorsFound)
+        END IF
+        CALL TestCompSet(TRIM(objName_HorizTrench), &
+                        HGHX(HorizontalGHXCtr)%ObjName, &
+                        PipingSystemCircuits(CircuitCtr)%InletNodeName, &
+                        PipingSystemCircuits(CircuitCtr)%OutletNodeName, &
+                        'Piping System Circuit Nodes')
+
+        !Convergence tolerance values, validated by IP
+        PipingSystemCircuits(CircuitCtr)%Convergence_CurrentToPrevIteration = 0.001
+        PipingSystemCircuits(CircuitCtr)%MaxIterationsPerTS = 100
+
+        !Radial mesh inputs, validated by IP
+        ! -- mesh thickness should be considered slightly dangerous until mesh dev engine can trap erroneous values
+        PipingSystemCircuits(CircuitCtr)%NumRadialCells = 4
+        PipingSystemCircuits(CircuitCtr)%RadialMeshThickness = PipingSystemCircuits(CircuitCtr)%PipeSize%InnerDia / 2.0d0
+
+        !Read number of pipe segments for this circuit, allocate arrays
+        NumPipeSegments = HGHX(HorizontalGHXCtr)%NumPipes
+        ALLOCATE(PipingSystemCircuits(CircuitCtr)%PipeSegmentIndeces(NumPipeSegments))
+        ALLOCATE(PipingSystemCircuits(CircuitCtr)%PipeSegmentNames(NumPipeSegments))
+
+        !Hard-code the segments
+        DO ThisCircuitPipeSegmentCounter = 1, NumPipeSegments
+            WRITE(PipingSystemCircuits(CircuitCtr)%PipeSegmentNames(ThisCircuitPipeSegmentCounter), &
+                    '("HorizontalTrenchCircuit",I4,"Segment",I4)') HorizontalGHXCtr, ThisCircuitPipeSegmentCounter
+        END DO
+
+        !******* Then we'll do the segments *******!
+        DO ThisCircuitPipeSegmentCounter = 1, NumPipeSegments
+            SegmentCtr = SegmentCtr + 1
+            WRITE(PipingSystemSegments(SegmentCtr)%Name, '("HorizontalTrenchCircuit",I4,"Segment",I4)') &
+                                                                             HorizontalGHXCtr, ThisCircuitPipeSegmentCounter
+
+            PipingSystemSegments(SegmentCtr)%IsActuallyPartOfAHorizontalTrench = .TRUE.
+            PipingSystemSegments(SegmentCtr)%PipeLocation = &
+                                       PointF( ThisCircuitPipeSegmentCounter*HGHX(HorizontalGHXCtr)%InterPipeSpacing, &
+                                               HGHX(HorizontalGHXCtr)%BurialDepth )
+
+            IF (MOD(ThisCircuitPipeSegmentCounter, 2) /= 0) THEN
+                PipingSystemSegments(SegmentCtr)%FlowDirection = SegmentFlow_IncreasingZ
+            ELSE
+                PipingSystemSegments(SegmentCtr)%FlowDirection = SegmentFlow_DecreasingZ
+            END IF
+
+        END DO
+
+    END DO
+
+  RETURN
+
+END SUBROUTINE
+!*********************************************************************************************!
+
+SUBROUTINE SetupAllOutputVariables(TotalNumSegments, TotalNumCircuits)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Edwin Lee
+          !       DATE WRITTEN   September 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! <description>
+
+          ! METHODOLOGY EMPLOYED:
+          ! <description>
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+    USE DataInterfaces, ONLY: SetupOutputVariable
+
+    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+    INTEGER, INTENT(IN) :: TotalNumSegments
+    INTEGER, INTENT(IN) :: TotalNumCircuits
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+    INTEGER :: PipeCircuitCounter
+    INTEGER :: SegmentCtr
+
+    DO SegmentCtr = 1, TotalNumSegments
+
+        IF (.NOT. PipingSystemSegments(SegmentCtr)%IsActuallyPartOfAHorizontalTrench) THEN
+
+            CALL SetupOutputVariable('Pipe Segment Inlet Temperature [C]',      &
+                                     PipingSystemSegments(SegmentCtr)%InletTemperature,'Plant','Average',   &
+                                     PipingSystemSegments(SegmentCtr)%Name)
+            CALL SetupOutputVariable('Pipe Segment Outlet Temperature [C]',      &
+                                     PipingSystemSegments(SegmentCtr)%OutletTemperature,'Plant','Average',   &
+                                     PipingSystemSegments(SegmentCtr)%Name)
+
+            CALL SetupOutputVariable('Pipe Segment Fluid Heat Transfer Rate [W]',      &
+                                     PipingSystemSegments(SegmentCtr)%FluidHeatLoss,'Plant','Average',   &
+                                     PipingSystemSegments(SegmentCtr)%Name)
+
+        END IF
+
+    END DO
+
+    DO PipeCircuitCounter = 1, TotalNumCircuits
+
+        IF (.NOT. PipingSystemCircuits(PipeCircuitCounter)%IsActuallyPartOfAHorizontalTrench) THEN
+
+            CALL SetupOutputVariable('Pipe Circuit Mass Flow Rate [kg/s]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%CurCircuitFlowRate,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+            CALL SetupOutputVariable('Pipe Circuit Inlet Temperature [C]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%InletTemperature,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+            CALL SetupOutputVariable('Pipe Circuit Outlet Temperature [C]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%OutletTemperature,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+            CALL SetupOutputVariable('Pipe Circuit Fluid Heat Transfer Rate [W]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%FluidHeatLoss,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+        ELSE ! it is a horizontal trench
+
+            CALL SetupOutputVariable('Ground Heat Exchanger Mass Flow Rate [kg/s]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%CurCircuitFlowRate,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+            CALL SetupOutputVariable('Ground Heat Exchanger Inlet Temperature [C]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%InletTemperature,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+            CALL SetupOutputVariable('Ground Heat Exchanger Outlet Temperature [C]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%OutletTemperature,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+            CALL SetupOutputVariable('Ground Heat Exchanger Fluid Heat Transfer Rate [W]',      &
+                                     PipingSystemCircuits(PipeCircuitCounter)%FluidHeatLoss,'Plant','Average',   &
+                                     PipingSystemCircuits(PipeCircuitCounter)%Name)
+
+        END IF
+
+    END DO
+
+  RETURN
+
+END SUBROUTINE
+
 
 !*********************************************************************************************!
 SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
@@ -1010,7 +1492,8 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
 
           ! USE STATEMENTS:
     USE DataHVACGlobals,   ONLY : TimeStepSys, SysTimeElapsed
-    USE DataPlant, ONLY: ScanPlantLoopsForObject, TypeOf_PipingSystemPipeCircuit, PlantLoop
+    USE DataPlant, ONLY: ScanPlantLoopsForObject, TypeOf_PipingSystemPipeCircuit, PlantLoop, &
+                        TypeOf_GrndHtExchgHorizTrench
     USE DataGlobals,       ONLY : BeginSimFlag, BeginEnvrnFlag, DayOfSim, HourOfDay, &
                                   TimeStep, TimeStepZone, SecInHour, InitConvTemp
     USE DataLoopNode, ONLY: Node
@@ -1040,14 +1523,21 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
     INTEGER :: SegCtr
     INTEGER :: SegmentIndex
     REAL(r64) :: rho
+    INTEGER :: TypeToLookFor
 
     !Do any one-time initializations
     IF (PipingSystemCircuits(CircuitNum)%NeedToFindOnPlantLoop) THEN
 
         errFlag = .FALSE.
 
+        IF (PipingSystemCircuits(CircuitNum)%IsActuallyPartOfAHorizontalTrench) THEN
+            TypeToLookFor = TypeOf_GrndHtExchgHorizTrench
+        ELSE
+            TypeToLookFor = TypeOf_PipingSystemPipeCircuit
+        END IF
+
         CALL ScanPlantLoopsForObject(PipingSystemCircuits(CircuitNum)%Name, &
-                                     TypeOf_PipingSystemPipeCircuit, &
+                                     TypeToLookFor, &
                                      PipingSystemCircuits(CircuitNum)%LoopNum, &
                                      PipingSystemCircuits(CircuitNum)%LoopSideNum, &
                                      PipingSystemCircuits(CircuitNum)%BranchNum, &
@@ -1099,7 +1589,7 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
                                                            + (hourofday - 1)               &
                                                            + (timestep - 1) * timestepZone &
                                                            + SysTimeElapsed
-    
+
     !There are also some inits that are "close to one time" inits...(one-time in standalone, each envrn in E+)
     IF(     (BeginSimFlag   .AND. PipingSystemDomains(DomainNum)%BeginSimInit) &
        .OR. (BeginEnvrnFlag .AND. PipingSystemDomains(DomainNum)%BeginSimEnvrn)) THEN
@@ -1108,10 +1598,10 @@ SUBROUTINE InitPipingSystems(DomainNum, CircuitNum)
         ! being based on the inlet temperature, which wasn't updated until later
         InletNodeNum = PipingSystemCircuits(CircuitNum)%InletNodeNum
         PipingSystemCircuits(CircuitNum)%CurCircuitInletTemp = Node(InletNodeNum)%Temp
-        PipingSystemCircuits(CircuitNum)%InletTemperature = PipingSystemCircuits(CircuitNum)%CurCircuitInletTemp 
+        PipingSystemCircuits(CircuitNum)%InletTemperature = PipingSystemCircuits(CircuitNum)%CurCircuitInletTemp
 
         CALL DoOneTimeInitializations(DomainNum, CircuitNum)
-                
+
         PipingSystemDomains(DomainNum)%BeginSimInit = .FALSE.
         PipingSystemDomains(DomainNum)%BeginSimEnvrn = .FALSE.
 
@@ -4453,12 +4943,6 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     b_SC = 2.0d0 * Pi * (DayOfYear - 81.0d0)/364.0d0
     Sc   = 0.1645d0 * SIN(2.0d0 * b_SC) - 0.1255d0 * COS(b_SC) - 0.025d0 * SIN(b_SC)
     Hour_Angle = Pi / 12.0d0 * ( ( (HourOfDay - 0.5d0) + 0.06667d0 * (StMeridian_Degrees - Longitude_Degrees) + Sc) - 12.0d0)
-    !Parentheses:              1 2 3                 3               3                                      3     2         1
-
-    !For HOUR_INADAY-0.5 not HOUR_INADAY+0.5, as HOUR_INADAY from 0 to 1, it shows 1 not zero here.
-    !Lz longitude of the centre of the local time zone [degrees west of Greenwich].
-    ! For example, Lz = 75, 90, 105 and 120° for the Eastern, Central, Rocky Mountain and Pacific time zones (United States)
-    !and Lz = 0° for Greenwich, 330° for Cairo (Egypt), and 255° for Bangkok (Thailand),
 
     ! Calculate sunset something, and constrain to a minimum of 0.000001
     X_sunset = 1.0d0 - TAN(Latitude_Radians)**2.0d0 * TAN(Declination)**2.0d0
@@ -4509,7 +4993,7 @@ REAL(r64) FUNCTION EvaluateGroundSurfaceTemperature(DomainNum, cell) RESULT(RetV
     ! Constrain Ratio_SO
     Ratio_SO = MIN(Ratio_SO, 1.0d0)
     Ratio_SO = MAX(Ratio_SO, 0.3d0)
-    
+
     ! Calculate another Q term, [MJ/hr-min]
     AbsorbedIncidentSolar_MJhrmin = ABSOR_CORRECTED * IncidentSolar_MJhrmin
 
@@ -6110,6 +6594,7 @@ SUBROUTINE SimulateFluidCell(ThisCell, FlowRate, ConvectionCoefficient, Entering
     REAL(r64), INTENT(IN) :: EnteringFluidTemp
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+    REAL(r64) :: Beta
     REAL(r64) :: Numerator
     REAL(r64) :: Denominator
     REAL(r64) :: TotalPipeResistance
@@ -6139,6 +6624,8 @@ SUBROUTINE SimulateFluidCell(ThisCell, FlowRate, ConvectionCoefficient, Entering
     PipeCellInnerRadius = ThisCell%PipeCellData%Pipe%InnerRadius
     PipeCellTemperature = ThisCell%PipeCellData%Pipe%MyBase%Temperature
 
+    Beta = ThisCell%PipeCellData%Fluid%MyBase%Beta
+
     !'add effects from this cell history
     Numerator = Numerator + FluidCellTemperature_PrevTimeStep
     Denominator = Denominator + 1
@@ -6148,16 +6635,16 @@ SUBROUTINE SimulateFluidCell(ThisCell, FlowRate, ConvectionCoefficient, Entering
                     (2 * PI * Depth(ThisCell) * PipeCellConductivity)
     ConvectiveResistance = 1 / (ConvectionCoefficient * 2 * PI * PipeCellInnerRadius * Depth(ThisCell))
     TotalPipeResistance = PipeConductionResistance + ConvectiveResistance
-    Numerator = Numerator + (1 / TotalPipeResistance) * PipeCellTemperature
-    Denominator = Denominator + (1 / TotalPipeResistance)
+    Numerator = Numerator + (Beta / TotalPipeResistance) * PipeCellTemperature
+    Denominator = Denominator + (Beta / TotalPipeResistance)
 
     !'add effects from upstream flow
     EnteringFluidConductance = 0.0d0
     IF (FlowRate > 0.0d0) THEN
         UpstreamResistance = 1 / (FlowRate * FluidCellSpecificHeat)
-        EnteringFluidConductance = ( (1/UpstreamResistance) - (0.5*TotalPipeResistance) )
-        Numerator = Numerator + EnteringFluidConductance * EnteringFluidTemp
-        Denominator = Denominator + EnteringFluidConductance
+        !EnteringFluidConductance = ( (1/UpstreamResistance) - (0.5*TotalPipeResistance) )
+        Numerator = Numerator + (Beta / UpstreamResistance) * EnteringFluidTemp
+        Denominator = Denominator + (Beta / UpstreamResistance)
     END IF
 
     !'calculate new temperature
@@ -6968,7 +7455,7 @@ END SUBROUTINE
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright Â© 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -5,6 +5,8 @@ MODULE OutdoorAirUnit
   !       AUTHOR         Young Tae Chae, Rick Strand
   !       DATE WRITTEN   AUG. 2009
   !       MODIFIED
+  !                      Feb 2013 Bereket Nigusse, FSEC
+  !                        Added DX Coil Model For 100% OA systems
   !       RE-ENGINEERED  na
 
   ! PURPOSE OF THIS MODULE:
@@ -327,7 +329,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
                                        GetSteamCoilMaxFlowRate=>GetCoilMaxWaterFlowRate, GetSteamCoilIndex, &
                                        GetCoilSteamInletNode
   USE FluidProperties,          ONLY : FindRefrigerant
-  USE DataGlobals,              ONLY : NumOfZones
+  USE DataGlobals,              ONLY : NumOfZones, ScheduleAlwaysOn
   USE DataHeatBalance,          ONLY : Zone, Construct
   USE DataSizing,               ONLY : AutoSize
   USE ScheduleManager,          ONLY : GetScheduleIndex
@@ -348,6 +350,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
   USE Fans,                     ONLY : GetFanIndex, GetFanType, GetFanAvailSchPtr
   USE DataHVACGlobals,          ONLY : cFanTypes, ZoneComp
   USE DataZoneEquipment,        ONLY : OutdoorAirUnit_Num
+  USE HVACDXSystem,             ONLY : CheckDXCoolingCoilInOASysExists
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -424,7 +427,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
 
 
   CurrentModuleObject = CurrentModuleObjects(CO_OAUnit)
-  NumofOAUnits = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumofOAUnits = GetNumObjectsFound(CurrentModuleObject)
 
   ALLOCATE(OutAirUnit(NumofOAUnits))
   ALLOCATE(MyOneTimeErrorFlag(NumofOAUnits))
@@ -434,7 +437,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
 
   DO OAUnitNum=1,NumofOAUnits
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),OAUnitNum,cAlphaArgs,NumAlphas,NumArray,NumNums,IOSTAT, &
+    CALL GetObjectItem(CurrentModuleObject,OAUnitNum,cAlphaArgs,NumAlphas,NumArray,NumNums,IOSTAT, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -451,17 +454,15 @@ SUBROUTINE GetOutdoorAirUnitInputs
 
 !A2
     OutAirUnit(OAUnitNum)%SchedName = cAlphaArgs(2)
-    OutAirUnit(OAUnitNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-! convert schedule name to pointer
-    IF (OutAirUnit(OAUnitNum)%SchedPtr== 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
-           trim(cAlphaArgs(2))//' is required but input is blank.')
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      OutAirUnit(OAUnitNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      OutAirUnit(OAUnitNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))  ! convert schedule name to pointer
+      IF (OutAirUnit(OAUnitNum)%SchedPtr== 0) THEN
         CALL ShowSevereError(trim(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid '//   &
            trim(cAlphaArgs(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+        ErrorsFound = .TRUE.
       END IF
-      ErrorsFound = .TRUE.
     END IF
 
 !A3
@@ -794,6 +795,8 @@ SUBROUTINE GetOutdoorAirUnitInputs
 
           CASE('COILSYSTEM:COOLING:DX')
             OutAirUnit(OAUnitNum)%OAEquip(CompNum)%ComponentType_Num= DXSystem
+            ! set the data for 100% DOAS DX cooling coil
+            CALL CheckDXCoolingCoilInOASysExists(OutAirUnit(OAUnitNum)%OAEquip(CompNum)%ComponentName)
 
           CASE('COILSYSTEM:HEATING:DX')
             OutAirUnit(OAUnitNum)%OAEquip(CompNum)%ComponentType_Num= DXHeatPumpSystem
@@ -801,7 +804,7 @@ SUBROUTINE GetOutdoorAirUnitInputs
   ! Heat recovery
           CASE('HEATEXCHANGER:AIRTOAIR:FLATPLATE')
             OutAirUnit(OAUnitNum)%OAEquip(CompNum)%ComponentType_Num= HeatXchngr
-            
+
           CASE('HEATEXCHANGER:AIRTOAIR:SENSIBLEANDLATENT')
             OutAirUnit(OAUnitNum)%OAEquip(CompNum)%ComponentType_Num= HeatXchngr
   !        CASE('HEATEXCHANGER:DESICCANT:BALANCEDFLOW')
@@ -898,52 +901,52 @@ SUBROUTINE GetOutdoorAirUnitInputs
 
   ! Setup Report variables for the zone outdoor air unit CurrentModuleObject='ZoneHVAC:OutdoorAirUnit'
   DO OAUnitNum = 1, NumOfOAUnits
-    CALL SetupOutputVariable('Outdoor Air Unit Total Heating Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Total Heating Rate [W]',        &
                              OutAirUnit(OAUnitNum)%TotHeatingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Total Heating Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Total Heating Energy [J]',        &
                              OutAirUnit(OAUnitNum)%TotHeatingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Sensible Heating Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Sensible Heating Rate [W]',        &
                              OutAirUnit(OAUnitNum)%SensHeatingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Sensible Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Sensible Heating Energy [J]',        &
                              OutAirUnit(OAUnitNum)%SensHeatingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Latent Heating Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Latent Heating Rate [W]',        &
                              OutAirUnit(OAUnitNum)%LatHeatingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Latent Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Latent Heating Energy [J]',        &
                              OutAirUnit(OAUnitNum)%LatHeatingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Total Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Total Cooling Rate [W]',        &
                              OutAirUnit(OAUnitNum)%TotCoolingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Total Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Total Cooling Energy [J]',        &
                              OutAirUnit(OAUnitNum)%TotCoolingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Sensible Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Sensible Cooling Rate [W]',        &
                              OutAirUnit(OAUnitNum)%SensCoolingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Sensible Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Sensible Cooling Energy [J]',        &
                              OutAirUnit(OAUnitNum)%SensCoolingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Latent Cooling Rate [W]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Latent Cooling Rate [W]',        &
                              OutAirUnit(OAUnitNum)%LatCoolingRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Latent Cooling Energy [J]',        &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Latent Cooling Energy [J]',        &
                              OutAirUnit(OAUnitNum)%LatCoolingEnergy,'System', &
                              'Sum', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Air Mass Flow Rate [kg/s]',   &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Air Mass Flow Rate [kg/s]',   &
                              OutAirUnit(OAUnitNum)%AirMassFlow,'System','Average', &
                              OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Fan Electric Rate [W]',  &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Fan Electric Power [W]',  &
                              OutAirUnit(OAUnitNum)%ElecFanRate,'System', &
                              'Average', OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Fan Electric Consumption [J]',   &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Fan Electric Energy [J]',   &
                             OutAirUnit(OAUnitNum)%ElecFanEnergy,'System','Sum', &
                              OutAirUnit(OAUnitNum)%Name)
-    CALL SetupOutputVariable('Outdoor Air Unit Fan Availability Status',OutAirUnit(OAUnitNum)%AvailStatus, &
+    CALL SetupOutputVariable('Zone Outdoor Air Unit Fan Availability Status []',OutAirUnit(OAUnitNum)%AvailStatus, &
                              'System','Average',OutAirUnit(OAUnitNum)%Name)
 !! Note that the outdoor air unit fan electric is NOT metered because this value is already metered through the fan component
 
@@ -1936,8 +1939,9 @@ SUBROUTINE CalcOutdoorAirUnit(OAUnitNum,ZoneNum,FirstHVACIteration,PowerMet,LatO
   ZoneAirEnt = PsyHFnTdbW(Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%Temp,MinHumRat) ! zone air enthalpy
   QUnitOut = AirMassFlow*(AirInEnt-ZoneAirEnt)                 ! Senscooling
 
-  SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-  SpecHumIn  = Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%HumRat / (1.0d0 + Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(OutletNode)%HumRat 
+  SpecHumIn  = Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%HumRat 
   LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
   ZoneAirEnT=PsyHFnTdbW(Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%Temp,Node(OutAirUnit(OAUnitNum)%ZoneNodeNum)%HumRat)
@@ -2773,7 +2777,7 @@ END FUNCTION GetOutdoorAirUnitReturnAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

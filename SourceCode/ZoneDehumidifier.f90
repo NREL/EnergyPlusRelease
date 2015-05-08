@@ -38,7 +38,7 @@ MODULE ZoneDehumidifier
           ! USE STATEMENTS:
 USE DataPrecisionGlobals
 USE DataLoopNode
-USE DataGlobals, ONLY: MaxNameLength, BeginEnvrnFlag, SecInHour
+USE DataGlobals, ONLY: MaxNameLength, BeginEnvrnFlag, SecInHour, ScheduleAlwaysOn
 USE DataInterfaces, ONLY: ShowWarningError, ShowSevereError, ShowFatalError, ShowContinueError, &
                        SetupOutputVariable, ShowRecurringWarningErrorAtEnd, ShowContinueErrorTimeSTamp
 USE DataEnvironment, ONLY: OutBaroPress, StdBaroPress
@@ -319,7 +319,7 @@ SUBROUTINE GetZoneDehumidifierInput
   ALLOCATE(CheckEquipName(NumDehumidifiers))
   CheckEquipName=.true.
 
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
 
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
@@ -337,7 +337,7 @@ SUBROUTINE GetZoneDehumidifierInput
 
   DO ZoneDehumidIndex=1,NumDehumidifiers
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),ZoneDehumidIndex,Alphas,NumAlphas, &
+    CALL GetObjectItem(CurrentModuleObject,ZoneDehumidIndex,Alphas,NumAlphas, &
                        Numbers,NumNumbers,IOStatus,  &
                        AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                        AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -356,11 +356,15 @@ SUBROUTINE GetZoneDehumidifierInput
     ZoneDehumid(ZoneDehumidIndex)%UnitType_Num = ZoneDehumidUnit     ! 'ZoneHVAC:Dehumidifier:DX' = 1
 
     ! A2,  \field Availability Schedule Name
-    ZoneDehumid(ZoneDehumidIndex)%SchedPtr = GetScheduleIndex(Alphas(2))  ! Convert schedule name to pointer
-    IF (ZoneDehumid(ZoneDehumidIndex)%SchedPtr .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
-      CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneDehumid(ZoneDehumidIndex)%Name))
-      ErrorsFound=.TRUE.
+    IF (lAlphaBlanks(2)) THEN
+      ZoneDehumid(ZoneDehumidIndex)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      ZoneDehumid(ZoneDehumidIndex)%SchedPtr = GetScheduleIndex(Alphas(2))  ! Convert schedule name to pointer
+      IF (ZoneDehumid(ZoneDehumidIndex)%SchedPtr .EQ. 0) THEN
+        CALL ShowSevereError(TRIM(cAlphaFields(2))//' not found = '//TRIM(Alphas(2)))
+        CALL ShowContinueError('Occurs in '//TRIM(CurrentModuleObject)//' = '//TRIM(ZoneDehumid(ZoneDehumidIndex)%Name))
+        ErrorsFound=.TRUE.
+      ENDIF
     END IF
 
     ! A3 , \field Air Inlet Node Name
@@ -551,30 +555,31 @@ SUBROUTINE GetZoneDehumidifierInput
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
     CALL SetupOutputVariable('Zone Dehumidifier Sensible Heating Energy [J]',ZoneDehumid(ZoneDehumidIndex)%SensHeatingEnergy, &
                              'System','Sum',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Water Removal Rate [kg/s]',ZoneDehumid(ZoneDehumidIndex)%WaterRemovalRate, &
+    CALL SetupOutputVariable('Zone Dehumidifier Removed Water Mass Flow Rate [kg/s]', &
+                              ZoneDehumid(ZoneDehumidIndex)%WaterRemovalRate, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Water Removed [kg]',ZoneDehumid(ZoneDehumidIndex)%WaterRemoved, &
+    CALL SetupOutputVariable('Zone Dehumidifier Removed Water Mass [kg]',ZoneDehumid(ZoneDehumidIndex)%WaterRemoved, &
                              'System','Sum',ZoneDehumid(ZoneDehumidIndex)%Name)
     CALL SetupOutputVariable('Zone Dehumidifier Electric Power [W]',ZoneDehumid(ZoneDehumidIndex)%ElecPower, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Electric Consumption [J]',ZoneDehumid(ZoneDehumidIndex)%ElecConsumption, &
+    CALL SetupOutputVariable('Zone Dehumidifier Electric Energy [J]',ZoneDehumid(ZoneDehumidIndex)%ElecConsumption, &
                              'System','Sum',ZoneDehumid(ZoneDehumidIndex)%Name, &
                               ResourceTypeKey='Electric',EndUseKey='COOLING',GroupKey='System')
-    CALL SetupOutputVariable('Zone Dehumidifier Off-Cycle Parasitic Electric Power [W]', &
+    CALL SetupOutputVariable('Zone Dehumidifier Off Cycle Parasitic Electric Power [W]', &
                               ZoneDehumid(ZoneDehumidIndex)%OffCycleParasiticElecPower, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Off-Cycle Parasitic Electric Consumption [J]', &
+    CALL SetupOutputVariable('Zone Dehumidifier Off Cycle Parasitic Electric Energy [J]', &
                               ZoneDehumid(ZoneDehumidIndex)%OffCycleParasiticElecCons, &
                              'System','Sum',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Part-Load Ratio [-]',ZoneDehumid(ZoneDehumidIndex)%DehumidPLR, &
+    CALL SetupOutputVariable('Zone Dehumidifier Part Load Ratio []',ZoneDehumid(ZoneDehumidIndex)%DehumidPLR, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
-    CALL SetupOutputVariable('Zone Dehumidifier Runtime Fraction [-]',ZoneDehumid(ZoneDehumidIndex)%DehumidRTF, &
+    CALL SetupOutputVariable('Zone Dehumidifier Runtime Fraction []',ZoneDehumid(ZoneDehumidIndex)%DehumidRTF, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
     CALL SetupOutputVariable('Zone Dehumidifier Outlet Air Temperature [C]',ZoneDehumid(ZoneDehumidIndex)%OutletAirTemp, &
                              'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
 
     IF (ZoneDehumid(ZoneDehumidIndex)%CondensateCollectMode == CondensateToTank) THEN
-      CALL SetupOutputVariable('Zone Dehumidifier Condensate Volumetric Flow Rate [m3/s]', &
+      CALL SetupOutputVariable('Zone Dehumidifier Condensate Volume Flow Rate [m3/s]', &
                                 ZoneDehumid(ZoneDehumidIndex)%DehumidCondVolFlowRate, &
                                'System','Average',ZoneDehumid(ZoneDehumidIndex)%Name)
       CALL SetupOutputVariable('Zone Dehumidifier Condensate Volume [m3]',ZoneDehumid(ZoneDehumidIndex)%DehumidCondVol, &
@@ -1238,7 +1243,7 @@ END FUNCTION GetZoneDehumidifierNodeNumber
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

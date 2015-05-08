@@ -55,7 +55,7 @@ PRIVATE ! Everything private unless explicitly made public
   INTEGER, PARAMETER  :: TentativeTimeIndex = 3
 
   REAL(r64), PARAMETER :: InnerDeltaTime = 60.0d0 !one minute time step in seconds
-   
+
   ! DERIVED TYPE DEFINITIONS
 TYPE PipeHTData
   ! Input data
@@ -422,7 +422,7 @@ SUBROUTINE GetPipesHeatTransfer
   DO PipeItem = 1, NumOfPipeHTInt
     Item = Item+1
     ! get the object name
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -543,7 +543,7 @@ SUBROUTINE GetPipesHeatTransfer
   DO PipeItem = 1, NumOfPipeHTExt
     Item = Item + 1
     ! get the object name
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -642,7 +642,7 @@ SUBROUTINE GetPipesHeatTransfer
 
     Item = Item + 1
     ! get the object name
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,PipeItem,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -849,19 +849,19 @@ SUBROUTINE GetPipesHeatTransfer
   ! Set up the output variables CurrentModuleObject='Pipe:Indoor/Outdoor/Underground'
   DO Item = 1, NumOfPipeHT
 
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Heat Transfer Rate[W]',    &
+    CALL SetupOutputVariable('Pipe Fluid Heat Transfer Rate [W]',    &
                               PipeHTReport(Item)%FluidHeatLossRate,'Plant','Average', &
                               PipeHT(Item)%Name)
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Heat Transfer Energy[J]', &
+    CALL SetupOutputVariable('Pipe Fluid Heat Transfer Energy [J]', &
                               PipeHTReport(Item)%FluidHeatLossEnergy,'Plant','Sum',PipeHT(Item)%Name)
 
     IF(PipeHT(Item)%EnvironmentPtr .EQ. ZoneEnv)THEN
-      CALL SetupOutputVariable('Pipe Heat Transfer Environmental Heat Transfer Rate[W]',    &
+      CALL SetupOutputVariable('Pipe Ambient Heat Transfer Rate [W]',    &
                               PipeHTReport(Item)%EnvironmentHeatLossRate,'Plant','Average', &
                               PipeHT(Item)%Name)
-      CALL SetupOutputVariable('Pipe Heat Transfer Environmental Heat Transfer Energy[J]', &
+      CALL SetupOutputVariable('Pipe Ambient Heat Transfer Energy [J]', &
                               PipeHTReport(Item)%EnvHeatLossEnergy,'Plant','Sum',PipeHT(Item)%Name)
-                              
+
       CALL SetupZoneInternalGain(PipeHT(Item)%EnvrZonePtr, &
                      'Pipe:Indoor',  &
                      PipeHT(Item)%Name, &
@@ -870,16 +870,16 @@ SUBROUTINE GetPipesHeatTransfer
 
     ENDIF
 
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Mass Flow rate[kg/s]',      &
+    CALL SetupOutputVariable('Pipe Mass Flow Rate [kg/s]',      &
                               PipeHTReport(Item)%MassFlowRate,'Plant','Average',   &
                               PipeHT(Item)%Name)
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Volume Flow Rate[m3/s]',    &
+    CALL SetupOutputVariable('Pipe Volume Flow Rate [m3/s]',    &
                               PipeHTReport(Item)%VolumeFlowRate,'Plant','Average', &
                               PipeHT(Item)%Name)
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Inlet Temperature[C]',      &
+    CALL SetupOutputVariable('Pipe Inlet Temperature [C]',      &
                               PipeHTReport(Item)%FluidInletTemp,'Plant','Average', &
                               PipeHT(Item)%Name)
-    CALL SetupOutputVariable('Pipe Heat Transfer Fluid Outlet Temperature[C]',     &
+    CALL SetupOutputVariable('Pipe Outlet Temperature [C]',     &
                               PipeHTReport(Item)%FluidOutletTemp,'Plant','Average',&
                               PipeHT(Item)%Name)
   END DO
@@ -1101,7 +1101,7 @@ SUBROUTINE InitPipesHeatTransfer(PipeType,PipeHTNum,FirstHVACIteration)
     ! Since then, a large number of plant and component upgrades were performed.  As such, heat transfer pipes were
     !  re-tested on several locations of the demand side
     ! No problems were encountered placing the pipes on the demand side.  This restriction is removed unless there are any
-    !  problems encountered.  If problems are encountered, it is expected that this restriction will still be avoided, and 
+    !  problems encountered.  If problems are encountered, it is expected that this restriction will still be avoided, and
     !  the proper fix implemented to allow the pipes to be placed on the demand side
     !
     !  IF (PipeHT(PipeNum)%LoopSideNum == DemandSide) THEN
@@ -1944,13 +1944,13 @@ SUBROUTINE ReportPipesHeatTransfer(PipeHTNum)
   PipeHTReport(PipeHTNum)%FluidHeatLossEnergy     = FluidHeatLossRate * DeltaTime      ! DeltaTime is in seconds
   PipeHTReport(PipeHTNum)%PipeInletTemp           = PipeHT(PipeHTNum)%PipeTemp(1)
   PipeHTReport(PipeHTNum)%PipeOutletTemp          = PipeHT(PipeHTNum)%PipeTemp(PipeHT(PipeHTNum)%NumSections)
-  
+
   ! need to average the heat rate because it is now summing over multiple inner time steps
   PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate = EnvHeatLossRate / NumInnerTimeSteps
   PipeHTReport(PipeHTNum)%EnvHeatLossEnergy       = PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate * DeltaTime
 
   ! for zone heat gains, we assign the averaged heat rate over all inner time steps
-  IF (PipeHT(PipeHTNum)%EnvironmentPtr .EQ. ZoneEnv) THEN 
+  IF (PipeHT(PipeHTNum)%EnvironmentPtr .EQ. ZoneEnv) THEN
       PipeHT(PipeHTNum)%ZoneHeatGainRate = PipeHTReport(PipeHTNum)%EnvironmentHeatLossRate
   END IF
 
@@ -2000,11 +2000,11 @@ SUBROUTINE CalcZonePipesHeatGain
 ! this routine needs to model approx zone pipe gains for use during sizing
 !  IF(DoingSizing)THEN
 !    DO PipeNum = 1, NumOfPipeHT
-!    
-!      PipeHT(pipeNum)%ZoneHeatGainRate = 
-!    
+!
+!      PipeHT(pipeNum)%ZoneHeatGainRate =
+!
 !    ENDDO
-!  
+!
 !  ENDIF
 
 
@@ -2335,7 +2335,7 @@ End Function
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

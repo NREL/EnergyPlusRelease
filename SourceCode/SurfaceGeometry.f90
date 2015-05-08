@@ -1731,6 +1731,25 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
               CALL ShowContinueError('  Tilt='//TRIM(TrimSigDigits(Surface(Found)%Tilt,1))//  &
                                      ' in Surface='//TRIM(Surface(Found)%Name)//', Zone='//TRIM(Surface(Found)%ZoneName))
             ENDIF
+            ! check surface class match.  interzone surface.
+            IF ((Surface(SurfNum)%Class == SurfaceClass_Wall .and. Surface(Found)%Class /= SurfaceClass_Wall) .or.  &
+                (Surface(SurfNum)%Class /= SurfaceClass_Wall .and. Surface(Found)%Class == SurfaceClass_Wall) ) THEN
+              CALL ShowWarningError(RoutineName//'InterZone Surface Classes do not match as expected.')
+              CALL ShowContinueError('Surface="'//trim(Surface(SurfNum)%Name)//'", surface class='//  &
+                 TRIM(cSurfaceClass(Surface(SurfNum)%Class)))
+              CALL ShowContinueError('Adjacent Surface="'//trim(Surface(Found)%Name)//'", surface class='//  &
+                 TRIM(cSurfaceClass(Surface(Found)%Class)))
+              CALL ShowContinueError('Other errors/warnings may follow about these surfaces.')
+            ENDIF
+            IF ((Surface(SurfNum)%Class == SurfaceClass_Roof .and. Surface(Found)%Class /= SurfaceClass_Floor) .or.  &
+                (Surface(SurfNum)%Class /= SurfaceClass_Roof .and. Surface(Found)%Class == SurfaceClass_Floor) ) THEN
+              CALL ShowWarningError(RoutineName//'InterZone Surface Classes do not match as expected.')
+              CALL ShowContinueError('Surface="'//trim(Surface(SurfNum)%Name)//'", surface class='//  &
+                 TRIM(cSurfaceClass(Surface(SurfNum)%Class)))
+              CALL ShowContinueError('Adjacent Surface="'//trim(Surface(Found)%Name)//'", surface class='//  &
+                 TRIM(cSurfaceClass(Surface(Found)%Class)))
+              CALL ShowContinueError('Other errors/warnings may follow about these surfaces.')
+            ENDIF
             IF (Surface(SurfNum)%Class /= SurfaceClass_Roof .and. Surface(SurfNum)%Class /= SurfaceClass_Floor) THEN
               ! Walls, Windows, Doors, Glass Doors
               IF (Surface(SurfNum)%Class /= SurfaceClass_Wall) THEN
@@ -1749,7 +1768,8 @@ SUBROUTINE GetSurfaceData(ErrorsFound)
                   CALL ShowContinueError('  Azimuth='//TRIM(TrimSigDigits(Surface(Found)%Azimuth,1))//  &
                                          ', Tilt='//TRIM(TrimSigDigits(Surface(Found)%Tilt,1))//        &
                                          ', in Surface='//TRIM(Surface(Found)%Name)//', Zone='//TRIM(Surface(Found)%ZoneName))
-                  CALL ShowContinueError('..surface class of base surface='//TRIM(cSurfaceClass(Surface(SurfNum)%Class)))
+                  CALL ShowContinueError('..surface class of first surface='//TRIM(cSurfaceClass(Surface(SurfNum)%Class)))
+                  CALL ShowContinueError('..surface class of second surface='//TRIM(cSurfaceClass(Surface(Found)%Class)))
                 ENDIF
               ENDIF
             ELSE  ! Roofs, Floors
@@ -2357,14 +2377,14 @@ SUBROUTINE GetGeometryParameters(ErrorsFound)
   CHARACTER(len=150) :: OutMsg
 
   cCurrentModuleObject='GlobalGeometryRules'
-  NumStmt=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumStmt=GetNumObjectsFound(cCurrentModuleObject)
   OutMsg=' Surface Geometry,'
 
   SELECT CASE(NumStmt)
 
   CASE (1)
     ! This is the valid case
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,GAlphas,NAlphas,GNum,NNum,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,GAlphas,NAlphas,GNum,NNum,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2626,7 +2646,7 @@ SUBROUTINE GetDetShdSurfaceData(ErrorsFound,SurfNum,TotDetachedFixed,TotDetached
       ClassItem=SurfaceClass_Detached_B
     ENDIF
 
-    CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Loop,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(cCurrentModuleObject,Loop,NumAlphas,NumNumbers)
     IF (NumAlphas /= 2) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates'// &
                            'not = 2 Alpha Objects, Number Indicated='//  &
@@ -2635,7 +2655,7 @@ SUBROUTINE GetDetShdSurfaceData(ErrorsFound,SurfNum,TotDetachedFixed,TotDetached
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNumbers,IOSTAT,  &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2807,7 +2827,7 @@ SUBROUTINE GetRectDetShdSurfaceData(ErrorsFound,SurfNum,TotRectDetachedFixed,Tot
       ClassItem=SurfaceClass_Detached_B
     ENDIF
 
-    CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Loop,NumAlphas,NumNumbers)
+    CALL GetObjectDefMaxArgs(cCurrentModuleObject,Loop,NumAlphas,NumNumbers)
     IF (NumAlphas /= 1) THEN
       CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates'// &
                            'not = 1 Alpha Objects, Number Indicated='//  &
@@ -2816,7 +2836,7 @@ SUBROUTINE GetRectDetShdSurfaceData(ErrorsFound,SurfNum,TotRectDetachedFixed,Tot
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas, &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas, &
                          rNumericArgs,NumNumbers,IOSTAT,  &
                          AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                          AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -3051,7 +3071,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
       ClassItem=3
     ENDIF
 
-    CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Loop,SurfaceNumAlpha,SurfaceNumProp)
+    CALL GetObjectDefMaxArgs(cCurrentModuleObject,Loop,SurfaceNumAlpha,SurfaceNumProp)
     IF (Item == 1) THEN
       IF (SurfaceNumAlpha /= 8) THEN
         CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates '// &
@@ -3069,7 +3089,7 @@ SUBROUTINE GetHTSurfaceData(ErrorsFound,SurfNum,TotHTSurfs,TotDetailedWalls,TotD
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,SurfaceNumAlpha,rNumericArgs,SurfaceNumProp,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,SurfaceNumAlpha,rNumericArgs,SurfaceNumProp,IOSTAT,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ErrorInName=.false.
@@ -3524,7 +3544,7 @@ SUBROUTINE GetRectSurfaces(ErrorsFound,SurfNum,TotRectExtWalls,TotRectIntWalls,T
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ErrorInName=.false.
@@ -4018,7 +4038,7 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
   CALL GetWindowShadingControlData(ErrorsFound)
 
   cCurrentModuleObject='FenestrationSurface:Detailed'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Loop,SurfaceNumAlpha,SurfaceNumProp)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,Loop,SurfaceNumAlpha,SurfaceNumProp)
 
   IF (SurfaceNumAlpha /= 7) THEN
     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates '// &
@@ -4036,7 +4056,7 @@ SUBROUTINE GetHTSubSurfaceData(ErrorsFound,SurfNum,TotHTSubs,SubSurfCls,SubSurfI
   NeedToAddSurfaces=0
 
   DO Loop=1,TotHTSubs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,SurfaceNumAlpha,rNumericArgs,SurfaceNumProp,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,SurfaceNumAlpha,rNumericArgs,SurfaceNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorInName=.false.
@@ -4419,7 +4439,7 @@ SUBROUTINE GetRectSubSurfaces(ErrorsFound,SurfNum,TotWindows,TotDoors,TotGlazedD
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ErrorInName=.false.
@@ -4698,6 +4718,7 @@ SUBROUTINE CheckWindowShadingControlFrameDivider(cRoutineName,ErrorsFound,SurfNu
   INTEGER :: MatGap1           ! Material number of gap to left (outer side) of between-glass shade/blind
   INTEGER :: MatGap2           ! Material number of gap to right (inner side) of between-glass shade/blind
   INTEGER :: MatSh             ! Between-glass shade/blind material number
+  REAL(r64) :: MatGapCalc      ! Calculated MatGap diff for shaded vs non-shaded constructions
 
   ! If WindowShadingControl has been specified for this window --
   ! Set shaded construction number if shaded construction was specified in WindowShadingControl.
@@ -4830,36 +4851,40 @@ SUBROUTINE CheckWindowShadingControlFrameDivider(cRoutineName,ErrorsFound,SurfNu
         MatGap2 = Construct(ConstrNumSh)%LayerPoint(2*TotGlassLayers)
         MatSh = Construct(ConstrNumSh)%LayerPoint(2*TotGlassLayers-1)
         IF(WindowShadingControl(WSCptr)%ShadingType==WSC_ST_BetweenGlassBlind) THEN
-          IF(ABS(Material(MatGap)%Thickness-(Material(MatGap1)%Thickness+Material(MatGap2)%Thickness)) > 0.001d0) THEN
+          MatGapCalc=ABS(Material(MatGap)%Thickness-(Material(MatGap1)%Thickness+Material(MatGap2)%Thickness))
+          IF(MatGapCalc > 0.001d0) THEN
             CALL ShowSevereError(trim(cRoutineName)//': The gap width(s) for the unshaded window construction ' &
                   //TRIM(Construct(ConstrNum)%Name))
             CALL ShowContinueError('are inconsistent with the gap widths for shaded window construction ' &
                   //TRIM(Construct(ConstrNumSh)%Name))
             CALL ShowContinueError('for window '//TRIM(SurfaceTmp(SurfNum)%Name)//', which has a between-glass blind.')
             CALL ShowContinueError('..Material='//TRIM(Material(MatGap)%Name)//   &
-                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap)%Thickness,3))//' - (')
-            CALL ShowContinueError('..Material='//TRIM(Material(MatGap1)%Name)//  &
+                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap)%Thickness,3))//' -')
+            CALL ShowContinueError('..( Material='//TRIM(Material(MatGap1)%Name)//  &
                             ' thickness='//TRIM(RoundSigDigits(Material(MatGap1)%Thickness,3))//' +')
             CALL ShowContinueError('..Material='//TRIM(Material(MatGap2)%Name)//  &
-                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap2)%Thickness,3))//') >.001')
+                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap2)%Thickness,3))//' )=['//  &
+                            trim(RoundSigDigits(MatGapCalc,3))//'] >.001')
             ErrorsFound=.true.
           END IF
         ELSE  ! Between-glass shade
-          IF(ABS(Material(MatGap)%Thickness- &
-             (Material(MatGap1)%Thickness+Material(MatGap2)%Thickness+Material(MatSh)%Thickness)) > 0.001d0) THEN
+          MatGapCalc=ABS(Material(MatGap)%Thickness-  &
+                         (Material(MatGap1)%Thickness+Material(MatGap2)%Thickness+Material(MatSh)%Thickness))
+          IF(MatGapCalc > 0.001d0) THEN
             CALL ShowSevereError(trim(cRoutineName)//': The gap width(s) for the unshaded window construction ' &
                   //TRIM(Construct(ConstrNum)%Name))
             CALL ShowContinueError('are inconsistent with the gap widths for shaded window construction ' &
                   //TRIM(Construct(ConstrNumSh)%Name))
             CALL ShowContinueError('for window '//TRIM(SurfaceTmp(SurfNum)%Name)//', which has a between-glass shade.')
             CALL ShowContinueError('..Material='//TRIM(Material(MatGap)%Name)//  &
-                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap)%Thickness,3))//' - (')
-            CALL ShowContinueError('..Material='//TRIM(Material(MatGap1)%Name)//  &
+                            ' thickness='//TRIM(RoundSigDigits(Material(MatGap)%Thickness,3))//' -')
+            CALL ShowContinueError('...( Material='//TRIM(Material(MatGap1)%Name)//  &
                             ' thickness='//TRIM(RoundSigDigits(Material(MatGap1)%Thickness,3))//' +')
             CALL ShowContinueError('..Material='//TRIM(Material(MatGap2)%Name)//  &
                             ' thickness='//TRIM(RoundSigDigits(Material(MatGap2)%Thickness,3))//' +')
             CALL ShowContinueError('..Material='//TRIM(Material(MatSh)%Name)//    &
-                            ' thickness='//TRIM(RoundSigDigits(Material(MatSh)%Thickness,3))//') >.001')
+                            ' thickness='//TRIM(RoundSigDigits(Material(MatSh)%Thickness,3))//' )=['//  &
+                            trim(RoundSigDigits(MatGapCalc,3))//'] >.001')
             ErrorsFound=.true.
           END IF
         END IF
@@ -5324,7 +5349,7 @@ SUBROUTINE GetAttShdSurfaceData(ErrorsFound,SurfNum,TotShdSubs)
   ENDIF
 
   cCurrentModuleObject='Shading:Zone:Detailed'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Loop,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,Loop,NumAlphas,NumNumbers)
   IF (NumAlphas /= 3) THEN
     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates '// &
                          'not = 3 Alpha Objects, Number Indicated='//  &
@@ -5333,7 +5358,7 @@ SUBROUTINE GetAttShdSurfaceData(ErrorsFound,SurfNum,TotShdSubs)
   ENDIF
 
   DO Loop=1,TotShdSubs
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNumbers,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -5555,7 +5580,7 @@ SUBROUTINE GetSimpleShdSurfaceData(ErrorsFound,SurfNum,TotOverhangs,TotOverhangs
     ENDIF
 
     DO Loop=1,ItemsToGet
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       ErrorInName=.false.
@@ -5918,7 +5943,7 @@ SUBROUTINE GetIntMassSurfaceData(ErrorsFound,SurfNum,TotIntMass)
 
   cCurrentModuleObject='InternalMass'
   DO Loop=1,TotIntMass
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,SurfaceNumAlpha,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,SurfaceNumAlpha,  &
                    rNumericArgs,SurfaceNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -5999,7 +6024,8 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! Gets data for a Shading Surface Reflectance object
+          ! Gets data for a Shading Surface Reflectance object.  This is only called when the
+          ! Solar Distribution is to be calculated for reflectances.
 
           ! METHODOLOGY EMPLOYED: na
           ! REFERENCES: na
@@ -6007,13 +6033,15 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
           ! USE STATEMENTS:
   USE DataIPShortCuts
   USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, FindItemInList
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   LOGICAL, INTENT(INOUT) :: ErrorsFound ! If errors found in input
 
-          ! SUBROUTINE PARAMETER DEFINITIONS:na
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: fmtA='(A)'
           ! INTERFACE BLOCK SPECIFICATIONS:na
           ! DERIVED TYPE DEFINITIONS:na
 
@@ -6036,29 +6064,27 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B .or.   &
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Overhang .or.     &
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) CYCLE
-!      IF(SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or. SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or. &
-!          SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B) THEN
-      SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = 0.2
-      SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = 0.2
+      SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl  = 0.2d0
+      SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl  = 0.2d0
       SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac = 0.0
       SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct = 0
-!    END IF
   END DO
 
   ! Get the total number of Shading Surface Reflectance objects
   cCurrentModuleObject='ShadingProperty:Reflectance'
-  TotShadingSurfaceReflectance = GetNumObjectsFound(TRIM(cCurrentModuleObject))
-  IF(TotShadingSurfaceReflectance.EQ.0) RETURN
+  TotShadingSurfaceReflectance = GetNumObjectsFound(cCurrentModuleObject)
+!  IF(TotShadingSurfaceReflectance.EQ.0) RETURN
 
   DO Loop = 1, TotShadingSurfaceReflectance
 
-    CALL GetObjectItem(trim(cCurrentModuleObject),Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumProp,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlpha,rNumericArgs,NumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     SurfNum = FindItemInList(cAlphaArgs(1),SurfaceTmp%Name,TotSurfaces)
     IF(SurfNum == 0) THEN
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//  &
-                             '", '//TRIM(cAlphaFieldNames(1))//' not found.')
+                             '", invalid specification')
+      CALL ShowContinueError('.. not found '//TRIM(cAlphaFieldNames(1))//'="'//trim(cAlphaArgs(1))//'".')
 !      ErrorsFound =.true.
       CYCLE
     END IF
@@ -6071,8 +6097,6 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B .or.   &
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Overhang .or.     &
                  SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) WrongSurfaceType = .TRUE.
-!      IF(SurfaceTmp(SurfNum)%Class /= SurfaceClass_Shading.AND.SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_F .AND. &
-!          SurfaceTmp(SurfNum)%Class /= SurfaceClass_Detached_B) WrongSurfaceType = .TRUE.
       IF(WrongSurfaceType) THEN
         CALL ShowSevereError('GetShadingSurfReflectanceData: '//TRIM(cCurrentModuleObject)//'="'//  &
                   TRIM(SurfaceTmp(SurfNum)%Name)//  &
@@ -6111,6 +6135,33 @@ SUBROUTINE GetShadingSurfReflectanceData(ErrorsFound)
     END IF
 
   END DO  ! End of loop over Shading Surface Reflectance objects
+
+  ! Write reflectance values to .eio file.
+  Write(OutputFileInits,fmtA) '! <ShadingProperty Reflectance>,Shading Surface Name,Shading Type,Diffuse Solar Reflectance, '//  &
+     'Diffuse Visible Reflectance,Surface Glazing Fraction,Surface Glazing Contruction'
+
+  DO SurfNum = 1, TotSurfaces
+    IF (.not. (SurfaceTmp(SurfNum)%Class == SurfaceClass_Shading .or.      &
+               SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F .or.   &
+               SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_B .or.   &
+               SurfaceTmp(SurfNum)%Class == SurfaceClass_Overhang .or.     &
+               SurfaceTmp(SurfNum)%Class == SurfaceClass_Fin) ) CYCLE
+    IF (SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct /= 0) THEN
+      Write(OutputFileInits,'(A)') 'ShadingProperty Reflectance,'//trim(SurfaceTmp(SurfNum)%Name)//','//  &
+         trim(cSurfaceClass(SurfaceTmp(SurfNum)%class))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl,2))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl,2))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac,2))//','//  &
+         trim(Construct(SurfaceTmp(SurfNum)%ShadowSurfGlazingConstruct)%Name)
+    ELSE
+      Write(OutputFileInits,'(A)') 'ShadingProperty Reflectance,'//trim(SurfaceTmp(SurfNum)%Name)//','//  &
+         trim(cSurfaceClass(SurfaceTmp(SurfNum)%class))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfDiffuseSolRefl,2))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfDiffuseVisRefl,2))//','//  &
+         trim(RoundSigDigits(SurfaceTmp(SurfNum)%ShadowSurfGlazingFrac,2))//', N/A'
+    ENDIF
+  END DO
+
 
   RETURN
 
@@ -6173,7 +6224,7 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
   LOGICAL                        :: ErrorInName
 
   cCurrentModuleObject='SurfaceProperty:ExteriorNaturalVentedCavity'
-  CALL GetObjectDefMaxArgs(TRIM(cCurrentModuleObject),Dummy, MaxNumAlphas,MaxNumNumbers)
+  CALL GetObjectDefMaxArgs(cCurrentModuleObject,Dummy, MaxNumAlphas,MaxNumNumbers)
 
   IF (MaxNumNumbers /= 8) THEN
     CALL ShowSevereError(TRIM(cCurrentModuleObject)//': Object Definition indicates '// &
@@ -6182,12 +6233,12 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
     ErrorsFound=.true.
   ENDIF
 
-  TotExtVentCav = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotExtVentCav = GetNumObjectsFound(cCurrentModuleObject)
 
   ALLOCATE(ExtVentedCavity(TotExtVentCav))
 
   DO Item=1,TotExtVentCav
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ! first handle cAlphaArgs
@@ -6362,17 +6413,20 @@ SUBROUTINE GetHTSurfExtVentedCavityData(ErrorsFound )
     endif
     ExtVentedCavity(Item)%ActualArea    = ExtVentedCavity(Item)%ProjArea * ExtVentedCavity(Item)%AreaRatio
 
-    CALL SetupOutputVariable('Exterior Baffle Temperature [C]',ExtVentedCavity(Item)%Tbaffle, &
+    CALL SetupOutputVariable('Surface Exterior Cavity Baffle Surface Temperature [C]',ExtVentedCavity(Item)%Tbaffle, &
                                'System','Average',ExtVentedCavity(Item)%Name)
-    CALL SetupOutputVariable('Exterior Cavity Drybulb Temperature[C]',ExtVentedCavity(Item)%TAirCav, &
+    CALL SetupOutputVariable('Surface Exterior Cavity Air Drybulb Temperature [C]',ExtVentedCavity(Item)%TAirCav, &
                                'System','Average',ExtVentedCavity(Item)%Name)
-    CALL SetupOutputVariable('Exterior Cavity Air Changes per Hour Passive[ACH]',ExtVentedCavity(Item)%PassiveACH, &
+    CALL SetupOutputVariable('Surface Exterior Cavity Total Natural Ventilation Air Change Rate [ACH]', &
+                              ExtVentedCavity(Item)%PassiveACH, &
+                              'System','Average',ExtVentedCavity(Item)%Name)
+    CALL SetupOutputVariable('Surface Exterior Cavity Total Natural Ventilation Mass Flow Rate [kg/s]', &
+                              ExtVentedCavity(Item)%PassiveMdotVent, &
                                'System','Average',ExtVentedCavity(Item)%Name)
-    CALL SetupOutputVariable('Exterior Cavity Total Natural Vent Mass Flow[kg/s]',ExtVentedCavity(Item)%PassiveMdotVent, &
+    CALL SetupOutputVariable('Surface Exterior Cavity Natural Ventilation from Wind Mass Flow Rate [kg/s]', &
+                              ExtVentedCavity(Item)%PassiveMdotWind, &
                                'System','Average',ExtVentedCavity(Item)%Name)
-    CALL SetupOutputVariable('Exterior Cavity Total Natural Vent Mass Flow from Wind[kg/s]',ExtVentedCavity(Item)%PassiveMdotWind, &
-                               'System','Average',ExtVentedCavity(Item)%Name)
-    CALL SetupOutputVariable('Exterior Cavity Total Natural Vent Mass Flow from Bouyancy[kg/s]',  &
+    CALL SetupOutputVariable('Surface Exterior Cavity Natural Ventilation from Buoyancy Mass Flow Rate [kg/s]',  &
                                ExtVentedCavity(Item)%PassiveMdotTherm, &
                                'System','Average',ExtVentedCavity(Item)%Name)
 
@@ -6461,12 +6515,12 @@ SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
 !
 
   cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
-  CountHTAlgoObjectsSingleSurf = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  CountHTAlgoObjectsSingleSurf = GetNumObjectsFound(cCurrentModuleObject)
 
 
   cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm'
   DO Item=1, CountHTAlgoObjectsSingleSurf
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorsFoundSingleSurf = .FALSE.
@@ -6516,10 +6570,10 @@ SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
 
 
   cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:MultipleSurface'
-  CountHTAlgoObjectsMultiSurf = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  CountHTAlgoObjectsMultiSurf = GetNumObjectsFound(cCurrentModuleObject)
 
   DO Item=1, CountHTAlgoObjectsMultiSurf
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorsFoundMultiSurf = .FALSE.
@@ -6665,9 +6719,9 @@ SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
 
 
   cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:SurfaceList'
-  CountHTAlgoObjectsSurfList = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  CountHTAlgoObjectsSurfList = GetNumObjectsFound(cCurrentModuleObject)
   DO Item=1, CountHTAlgoObjectsSurfList
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorsFoundSurfList = .FALSE.
@@ -6721,9 +6775,9 @@ SUBROUTINE GetSurfaceHeatTransferAlgorithmOverrides(ErrorsFound)
   ENDDO
 
   cCurrentModuleObject = 'SurfaceProperty:HeatTransferAlgorithm:Construction'
-  CountHTAlgoObjectsSurfList = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  CountHTAlgoObjectsSurfList = GetNumObjectsFound(cCurrentModuleObject)
   DO Item=1, CountHTAlgoObjectsSurfList
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
+    CALL GetObjectItem(cCurrentModuleObject,Item,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ErrorsFoundByConstruct = .FALSE.
@@ -7068,7 +7122,7 @@ SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
         ELSE
           IF (DisplayExtraWarnings) THEN
             CALL ShowContinueError('Cannot Drop Vertex ['//trim(RoundSigDigits(SurfaceTmp(SurfNum)%Sides))//']; '//  &
-                                                 'Number of Surface Sides at minimum.')
+                 'Number of Surface Sides at minimum. This surface is now a degenerate surface.')
           ENDIF
           TotalDegenerateSurfaces=TotalDegenerateSurfaces+1
           ! mark degenerate surface?
@@ -7104,7 +7158,7 @@ SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
             ELSE
               IF (DisplayExtraWarnings) THEN
                 CALL ShowContinueError('Cannot Drop Vertex ['//trim(RoundSigDigits(SurfaceTmp(SurfNum)%Sides))//']; '//  &
-                                                     'Number of Surface Sides at minimum.')
+                     'Number of Surface Sides at minimum. This surface is now a degenerate surface.')
               ENDIF
               TotalDegenerateSurfaces=TotalDegenerateSurfaces+1
               ! mark degenerate surface?
@@ -7124,7 +7178,7 @@ SUBROUTINE GetVertices(SurfNum,NSides,Vertices)
             ELSE
               IF (DisplayExtraWarnings) THEN
                 CALL ShowContinueError('Cannot Drop Vertex ['//trim(RoundSigDigits(SurfaceTmp(SurfNum)%Sides))//']; '//  &
-                                                     'Number of Surface Sides at minimum.')
+                   'Number of Surface Sides at minimum. This surface is now a degenerate surface.')
               ENDIF
               TotalDegenerateSurfaces=TotalDegenerateSurfaces+1
               ! mark degenerate surface?
@@ -7576,7 +7630,7 @@ SUBROUTINE GetWindowShadingControlData(ErrorsFound)
           ! FLOW:
 ! Get the total number of window shading control blocks
   cCurrentModuleObject='WindowProperty:ShadingControl'
-  TotWinShadingControl = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotWinShadingControl = GetNumObjectsFound(cCurrentModuleObject)
   IF(TotWinShadingControl.EQ.0) RETURN
 
   ALLOCATE (WindowShadingControl(TotWinShadingControl))
@@ -7584,7 +7638,7 @@ SUBROUTINE GetWindowShadingControlData(ErrorsFound)
   ControlNum=0
   DO Loop = 1, TotWinShadingControl
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,ControlNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,ControlNumAlpha, &
                        rNumericArgs,ControlNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -8013,7 +8067,7 @@ SUBROUTINE GetStormWindowData(ErrorsFound)
 
   ! Get the total number of storm window input objects
   cCurrentModuleObject='WindowProperty:StormWindow'
-  TotStormWin = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotStormWin = GetNumObjectsFound(cCurrentModuleObject)
   IF(TotStormWin == 0) RETURN
 
   ALLOCATE (StormWindow(TotStormWin))
@@ -8021,7 +8075,7 @@ SUBROUTINE GetStormWindowData(ErrorsFound)
   StormWinNum = 0
   DO loop = 1,TotStormWin
 
-    CALL GetObjectItem(trim(cCurrentModuleObject),loop,cAlphaArgs,StormWinNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject,loop,cAlphaArgs,StormWinNumAlpha, &
                        rNumericArgs,StormWinNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -8214,12 +8268,12 @@ SUBROUTINE GetWindowGapAirflowControlData(ErrorsFound)
 
         ! Get the total number of window airflow control statements
   cCurrentModuleObject='WindowProperty:AirflowControl'
-  TotWinAirflowControl = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotWinAirflowControl = GetNumObjectsFound(cCurrentModuleObject)
   IF(TotWinAirflowControl.EQ.0) RETURN
 
   DO Loop = 1,TotWinAirflowControl   ! Loop through all surfaces in the input...
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,ControlNumAlpha, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,ControlNumAlpha, &
                        rNumericArgs,ControlNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -8510,12 +8564,12 @@ SUBROUTINE GetOSCData(ErrorsFound)
   CHARACTER(len=52) cOSCLimitsString
 
   cCurrentModuleObject='SurfaceProperty:OtherSideCoefficients'
-  TotOSC=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotOSC=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(OSC(TotOSC))
 
   OSCNum=0
   DO Loop=1,TotOSC
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumProps,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -8604,7 +8658,7 @@ SUBROUTINE GetOSCData(ErrorsFound)
     ENDIF
     IF (OSC(Loop)%SurfFilmCoef > 0.0) THEN
       cAlphaArgs(1)=RoundSigDigits(OSC(Loop)%SurfFilmCoef,3)
-      CALL SetupOutputVariable('Other Side Coefficients Exterior Air Dry Bulb Temperature[C]',OSC(Loop)%OSCTempCalc, &
+      CALL SetupOutputVariable('Surface Other Side Coefficients Exterior Air Drybulb Temperature [C]',OSC(Loop)%OSCTempCalc, &
                                  'System','Average',OSC(Loop)%Name)
     ELSE
       cAlphaArgs(1)='N/A'
@@ -8689,13 +8743,13 @@ SUBROUTINE GetOSCMData(ErrorsFound)
   LOGICAL IsBlank
 
   cCurrentModuleObject='SurfaceProperty:OtherSideConditionsModel'
-  TotOSCM=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  TotOSCM=GetNumObjectsFound(cCurrentModuleObject)
   ALLOCATE(OSCM(TotOSCM))
   ! OSCM is already initialized in derived type defn.
 
   OSCMNum=0
   DO Loop=1,TotOSCM
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumProps,IOSTAT)
     ErrorInName=.false.
     IsBlank=.false.
@@ -8710,13 +8764,15 @@ SUBROUTINE GetOSCMData(ErrorsFound)
     ! Note no validation of the below at this time:
     OSCM(OSCMNum)%Class           = cAlphaArgs(2)
     ! setup output vars for modeled coefficients
-    CALL SetupOutputVariable('Other Side Conditions Modeled Convection Air Temperature[C]',OSCM(OSCMNum)%TConv, &
+    CALL SetupOutputVariable('Surface Other Side Conditions Modeled Convection Air Temperature [C]',OSCM(OSCMNum)%TConv, &
                                'System','Average',OSCM(OSCMNum)%Name)
-    CALL SetupOutputVariable('Other Side Conditions Modeled Convection Coefficient[W/m2-K]',OSCM(OSCMNum)%HConv, &
+    CALL SetupOutputVariable('Surface Other Side Conditions Modeled Convection Heat Transfer Coefficient [W/m2-K]', &
+                              OSCM(OSCMNum)%HConv, &
                                'System','Average',OSCM(OSCMNum)%Name)
-    CALL SetupOutputVariable('Other Side Conditions Modeled Radiation Temperature [C]',OSCM(OSCMNum)%TRad, &
+    CALL SetupOutputVariable('Surface Other Side Conditions Modeled Radiation Temperature [C]',OSCM(OSCMNum)%TRad, &
                                'System','Average',OSCM(OSCMNum)%Name)
-    CALL SetupOutputVariable('Other Side Conditions Modeled Radiation Coefficient [W/m2-K]',OSCM(OSCMNum)%HRad, &
+    CALL SetupOutputVariable('Surface Other Side Conditions Modeled Radiation Heat Transfer Coefficient [W/m2-K]', &
+                              OSCM(OSCMNum)%HRad, &
                                'System','Average',OSCM(OSCMNum)%Name)
 
     IF (AnyEnergyManagementSystemInModel) THEN
@@ -8725,7 +8781,7 @@ SUBROUTINE GetOSCMData(ErrorsFound)
                            OSCM(OSCMNum)%EMSOverrideOnTConv, &
                            OSCM(OSCMNum)%EMSOverrideTConvValue)
       CALL SetupEMSActuator('Other Side Boundary Conditions',  OSCM(OSCMNum)%Name, &
-                           'Convection Heat Tranfer Coefficient', '[W/m2-K]', &
+                           'Convection Heat Transfer Coefficient', '[W/m2-K]', &
                            OSCM(OSCMNum)%EMSOverrideOnHConv, &
                            OSCM(OSCMNum)%EMSOverrideHConvValue)
       CALL SetupEMSActuator('Other Side Boundary Conditions',  OSCM(OSCMNum)%Name, &
@@ -8767,25 +8823,30 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
 
           ! REFERENCES:
   ! Movable Insulation Definition
-  !MovableInsulation,  ! Exterior or Interior Insulation on surfaces
-  !  A1, \field Insulation Type
-  !      \type choice
-  !      \key Exterior
-  !      \key Interior
-  !  A2, \field SurfaceName
-  !      \type object-list
-  !      \type SurfaceNames
-  !  A3, \field MaterialMovInsul- Name of the material used for movable insulation
-  !  A4; \field SchedMovInsul-Schedule for movable insulation
+  ! SurfaceControl:MovableInsulation,
+  !       \memo Exterior or Interior Insulation on opaque surfaces
+  !   A1, \field Insulation Type
+  !       \required-field
+  !       \type choice
+  !       \key Outside
+  !       \key Inside
+  !   A2, \field Surface Name
+  !       \required-field
   !       \type object-list
-  !       \object-list ScheduleNames
-  !
+  !       \object-list SurfaceNames
+  !   A3, \field Material Name
+  !       \required-field
+  !       \object-list MaterialName
+  !   A4; \field Schedule Name
+  !        \required-field
+  !        \type object-list
+  !        \object-list ScheduleNames
 
           ! USE STATEMENTS:
     USE DataIPShortCuts
     USE InputProcessor, ONLY: GetNumObjectsFound, GetObjectItem, FindItemInList, VerifyName, SameString
     USE ScheduleManager, ONLY: GetScheduleIndex
-    USE General, ONLY: TrimSigDigits
+    USE General, ONLY: TrimSigDigits,RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -8813,9 +8874,9 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
   INTEGER InslType
 
   cCurrentModuleObject='SurfaceControl:MovableInsulation'
-  NMatInsul=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NMatInsul=GetNumObjectsFound(cCurrentModuleObject)
   DO Loop=1,NMatInsul
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,cAlphaArgs,NAlphas,rNumericArgs,NNums,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,Loop,cAlphaArgs,NAlphas,rNumericArgs,NNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     SurfNum=FindItemInList(cAlphaArgs(2),SurfaceTmp%Name,TotSurfaces)
@@ -8827,41 +8888,95 @@ SUBROUTINE GetMovableInsulationData(ErrorsFound)
       InslType=2
     ELSE
       InslType=0
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Item # ['//TRIM(TrimSigDigits(Loop))//'], '//  &
-         TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'", '//TRIM(cAlphaFieldNames(1))//   &
-         'invalid, [not Inside or Outside]='//TRIM(cAlphaArgs(1)))
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+         '", invalid data.')
+      CALL ShowContinueError(' invalid '//TRIM(cAlphaFieldNames(1))//'="'//TRIM(cAlphaArgs(1))//  &
+         '", [should be Inside or Outside]')
       ErrorsFound=.false.
     ENDIF
     IF (SurfNum == 0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Item # ['//TRIM(TrimSigDigits(Loop))//'], invalid '//  &
-         TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'"')
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+         '", invalid data.')
+      CALL ShowContinueError(' invalid (not found) '//TRIM(cAlphaFieldNames(2)))
       ErrorsFound=.true.
     ELSE
       IF (MaterNum == 0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Item # ['//TRIM(TrimSigDigits(Loop))//'], '//  &
-         TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'", invalid '//   &
-         TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'"')
+        CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+           '", invalid data.')
+        CALL ShowContinueError(' invalid (not found) '//TRIM(cAlphaFieldNames(3))//'="'//TRIM(cAlphaArgs(3))//'"')
         ErrorsFound=.true.
       ELSE
         IF (SchNum == 0) THEN
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Item # ['//TRIM(TrimSigDigits(Loop))//'], '//  &
-             TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'", invalid '//   &
-             TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'"')
+          CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+           '", invalid data.')
+          CALL ShowContinueError(' invalid (not found) '//TRIM(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4))//'"')
           ErrorsFound=.true.
         ELSE
           SELECT CASE (InslType)
           CASE (1)
+            IF (SurfaceTmp(SurfNum)%MaterialMovInsulExt > 0) THEN
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+                 '", already assigned.')
+              CALL ShowContinueError('"Outside", was already assigned Material="'//  &
+                 trim(Material(SurfaceTmp(SurfNum)%MaterialMovInsulInt)%Name)//'".')
+              CALL ShowContinueError('attempting to assign Material="'//trim(Material(MaterNum)%Name)//'".')
+              ErrorsFound=.true.
+            ENDIF
             SurfaceTmp(SurfNum)%MaterialMovInsulExt=MaterNum
             SurfaceTmp(SurfNum)%SchedMovInsulExt=SchNum
+            IF (Material(MaterNum)%Resistance <= 0.0d0) THEN
+              IF (Material(MaterNum)%Conductivity <= 0.0 .or. Material(MaterNum)%Thickness <= 0.0) THEN
+                CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+                   '", invalid material.')
+                CALL ShowContinueError('"Outside", invalid material for movable insulation.')
+                CALL ShowContinueError('Material="'//trim(Material(MaterNum)%Name)//'",'//  &
+                   'Resistance=['//trim(RoundSigDigits(Material(MaterNum)%Resistance,3))//  &
+                   '], must be > 0 for use in Movable Insulation.')
+                ErrorsFound=.true.
+              ELSEIF (Material(MaterNum)%Conductivity > 0.0) THEN
+                Material(MaterNum)%Resistance=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
+              ENDIF
+            ENDIF
+            IF (Material(MaterNum)%Conductivity <= 0.0d0) THEN
+              IF (Material(MaterNum)%Resistance <= 0.0) THEN
+                CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+                   '", invalid material.')
+                CALL ShowContinueError('"Outside", invalid material for movable insulation.')
+                CALL ShowContinueError('Material="'//trim(Material(MaterNum)%Name)//'",'//  &
+                   'Conductivity=['//trim(RoundSigDigits(Material(MaterNum)%Conductivity,3))//  &
+                   '], must be > 0 for use in Movable Insulation.')
+                ErrorsFound=.true.
+              ENDIF
+            ENDIF
           CASE (2)
+            IF (SurfaceTmp(SurfNum)%MaterialMovInsulInt > 0) THEN
+              CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+                 '", already assigned.')
+              CALL ShowContinueError('"Inside", was already assigned Material="'//  &
+                 trim(Material(SurfaceTmp(SurfNum)%MaterialMovInsulInt)%Name)//'".')
+              CALL ShowContinueError('attempting to assign Material="'//trim(Material(MaterNum)%Name)//'".')
+              ErrorsFound=.true.
+            ENDIF
             SurfaceTmp(SurfNum)%MaterialMovInsulInt=MaterNum
             SurfaceTmp(SurfNum)%SchedMovInsulInt=SchNum
+            IF (Material(MaterNum)%Resistance <= 0.0d0) THEN
+              IF (Material(MaterNum)%Conductivity <= 0.0 .or. Material(MaterNum)%Thickness <= 0.0) THEN
+                CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//  &
+                   '", invalid material.')
+                CALL ShowContinueError('"Inside", invalid material for movable insulation.')
+                CALL ShowContinueError('Material="'//trim(Material(MaterNum)%Name)//'",'//  &
+                   'Resistance=['//trim(RoundSigDigits(Material(MaterNum)%Resistance,3))//  &
+                   '], must be > 0 for use in Movable Insulation.')
+                ErrorsFound=.true.
+              ELSEIF (Material(MaterNum)%Conductivity > 0.0) THEN
+                Material(MaterNum)%Resistance=Material(MaterNum)%Thickness/Material(MaterNum)%Conductivity
+              ENDIF
+            ENDIF
           CASE DEFAULT
           END SELECT
           IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Window) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//', Item # ['//TRIM(TrimSigDigits(Loop))//'], '//  &
-               TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'", invalid use on a Window. '//   &
-               'Use WindowProperty:ShadingControl instead.')
+            CALL ShowSevereError(TRIM(cCurrentModuleObject)//', '//TRIM(cAlphaFieldNames(2))//'="'//TRIM(cAlphaArgs(2))//'"')
+            CALL ShowContinueError('invalid use on a Window. Use WindowProperty:ShadingControl instead.')
             ErrorsFound=.true.
           ENDIF
         ENDIF
@@ -10897,6 +11012,12 @@ SUBROUTINE TransformVertsByAspect(SurfNum,NSides)
   endif
   If (noTransform) return
 
+  !check surface type.
+  IF (.not. SurfaceTmp(SurfNum)%HeatTransSurf) THEN
+    ! Site Shading do not get transformed.
+    IF (SurfaceTmp(SurfNum)%Class == SurfaceClass_Detached_F) return
+  ENDIF
+
 
     !testing method of transforming  x and y coordinates as follows
 
@@ -11194,13 +11315,13 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
 
   !First collect names of surfaces referenced by active solar components
   cCurrentModuleObject = 'SolarCollector:FlatPlate:Water'
-  NumOfFlatPlateUnits = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfFlatPlateUnits = GetNumObjectsFound(cCurrentModuleObject)
   cCurrentModuleObject = 'SolarCollector:FlatPlate:PhotovoltaicThermal'
-  NumPVTs              = GetNumObjectsFound( TRIM(cCurrentModuleObject) )
+  NumPVTs              = GetNumObjectsFound(cCurrentModuleObject)
   cCurrentModuleObject = 'Generator:Photovoltaic'
-  NumPVs                 = GetNumObjectsFound(TRIM(cCurrentModuleObject) )
+  NumPVs                 = GetNumObjectsFound(cCurrentModuleObject )
   cCurrentModuleObject = 'SolarCollector:IntegralCollectorStorage'
-  NumOfICSUnits = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumOfICSUnits = GetNumObjectsFound(cCurrentModuleObject)
 
   NumCandidateNames = NumOfFlatPlateUnits + NumPVTs + NumPVs + NumOfICSUnits
   NumOfCollectors = NumOfFlatPlateUnits + NumOfICSUnits
@@ -11212,7 +11333,7 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
     cCurrentModuleObject = 'SolarCollector:FlatPlate:Water'
     DO CollectorNum = 1, NumOfFlatPlateUnits
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),CollectorNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+      CALL GetObjectItem(cCurrentModuleObject,CollectorNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
 
       TmpCandidateSurfaceNames(CollectorNum) = cAlphaArgs(3)
       TmpCandidateICSBCTypeNames(CollectorNum) = ' '
@@ -11223,7 +11344,7 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
     cCurrentModuleObject = 'SolarCollector:FlatPlate:PhotovoltaicThermal'
     DO PVTNum = 1, NumPVTs
 
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),PVTNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+      CALL GetObjectItem(cCurrentModuleObject,PVTNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
 
       TmpCandidateSurfaceNames(NumOfFlatPlateUnits + PVTNum) = cAlphaArgs(2)
     ENDDO
@@ -11232,7 +11353,7 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
   IF (NumPVs > 0) THEN
     cCurrentModuleObject = 'Generator:Photovoltaic'
     DO PVNum = 1, NumPVs
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),PVNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+      CALL GetObjectItem(cCurrentModuleObject,PVNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
       TmpCandidateSurfaceNames(NumOfFlatPlateUnits + NumPVTs + PVNum) = cAlphaArgs(2)
     ENDDO
   ENDIF
@@ -11240,7 +11361,7 @@ SUBROUTINE SetupShadeSurfacesForSolarCalcs
   IF (NumOfICSUnits > 0) THEN
     cCurrentModuleObject = 'SolarCollector:IntegralCollectorStorage'
     DO CollectorNum = 1, NumOfICSUnits
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),CollectorNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
+      CALL GetObjectItem(cCurrentModuleObject,CollectorNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStatus)
       TmpCandidateSurfaceNames(NumOfFlatPlateUnits + NumPVTs + NumPVs + CollectorNum) = cAlphaArgs(3)
       TmpCandidateICSSurfaceNames(NumOfFlatPlateUnits + CollectorNum) = cAlphaArgs(3)
       TmpCandidateICSBCTypeNames(NumOfFlatPlateUnits + CollectorNum) = cAlphaArgs(4)
@@ -11517,7 +11638,8 @@ SUBROUTINE CheckConvexity(SurfNum,NSides)
       IF (DisplayExtraWarnings) THEN
         CALL ShowWarningError('CheckConvexity: Surface="'//TRIM(SurfaceTmp(SurfNum)%Name)//'" has ['//  &
              trim(RoundSigDigits(M))//'] collinear points.')
-        CALL ShowContinueError('...too many to remove all.  Will leave the surface with 3 sides.')
+        CALL ShowContinueError('...too many to remove all.  Will leave the surface with 3 sides. '//  &
+           'But this is now a degenerate surface')
       ENDIF
       TotalDegenerateSurfaces=TotalDegenerateSurfaces+1
       SurfaceTmp(SurfNum)%Sides = MAX(NSides-M,3)
@@ -11538,7 +11660,7 @@ END SUBROUTINE CheckConvexity
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

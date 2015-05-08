@@ -631,7 +631,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
                                                     IntGainTypeOf_RefrigerationSecondaryReceiver, &
                                                     IntGainTypeOf_RefrigerationSecondaryPipe, &
                                                     IntGainTypeOf_RefrigerationWalkIn/)
-                                                    
+
   INTEGER, DIMENSION(2) :: IntGainTypesMixedSubzone = (/IntGainTypeOf_DaylightingDeviceTubular , &
                                                         IntGainTypeOf_Lights/)
   REAL(r64)   :: RetAirGain
@@ -652,7 +652,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
       Zone1Floor(ZoneNum) = ZTFLOOR(ZoneNum)
       Zone1OC(ZoneNum) = ZTOC(ZoneNum)
       Zone1MX(ZoneNum) = ZTMX(ZoneNum)
-    End If      
+    End If
   End If
 
   MIXFLAG = .FALSE.
@@ -683,7 +683,7 @@ SUBROUTINE CalcUCSDDV(ZoneNum)
     ConvGainsOccupiedSubzone = ConvGainsOccupiedSubzone + RetAirGain
 
   END IF
- 
+
   CALL SumInternalConvectionGainsByTypes(ZoneNum, IntGainTypesMixedSubzone, ConvGainsMixedSubzone)
   ConvGainsMixedSubzone = ConvGainsMixedSubzone  + SumConvHTRadSys(ZoneNum) &
                            + 0.5*SysDepZoneLoadsLagged(ZoneNum)
@@ -854,7 +854,7 @@ ENDIF
         ZTM1MX(ZoneNum)    = DSXMATMX(ZoneNum)
 
       ENDIF
-  
+
       AirCap = AIRRATFloor(ZoneNum)
       TempHistTerm = AirCap*(3.0d0*ZTM1Floor(ZoneNum)-(3.0d0/2.0d0)*ZTM2Floor(ZoneNum)+(1.0d0/3.0d0)*ZTM3Floor(ZoneNum))
       TempDepCoef = HA_FLOOR + MCP_Total
@@ -866,13 +866,13 @@ ENDIF
         CASE (UseAnalyticalSolution)
           If (TempDepCoef .eq. 0.0) Then ! B=0
             ZTFLOOR(ZoneNum) = Zone1Floor(ZoneNum) + TempIndCoef/AirCap
-          Else 
+          Else
             ZTFLOOR(ZoneNum) = (Zone1Floor(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
                                TempIndCoef/TempDepCoef
           End If
         CASE (UseEulerMethod)
           ZTFLOOR(ZoneNum) = (AirCap*Zone1Floor(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
-      END SELECT 
+      END SELECT
       AirCap = AIRRATOC(ZoneNum)
       TempHistTerm = AirCap*(3.0d0*ZTM1OC(ZoneNum)-(3.0d0/2.0d0)*ZTM2OC(ZoneNum)+(1.0d0/3.0d0)*ZTM3OC(ZoneNum))
       TempDepCoef = HA_OC + MCP_Total
@@ -884,7 +884,7 @@ ENDIF
         CASE (UseAnalyticalSolution)
           If (TempDepCoef .eq. 0.0) Then ! B=0
             ZTOC(ZoneNum) = Zone1OC(ZoneNum) + TempIndCoef/AirCap
-          Else 
+          Else
             If (AirCap .eq. 0.0) Then
               ZTOC(ZoneNum) = TempIndCoef/TempDepCoef
             Else
@@ -894,7 +894,7 @@ ENDIF
           End If
         CASE (UseEulerMethod)
           ZTOC(ZoneNum) = (AirCap*Zone1OC(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
-      END SELECT 
+      END SELECT
       AirCap = AIRRATMX(ZoneNum)
       TempHistTerm = AirCap*(3.0*ZTM1MX(ZoneNum)-(3.0d0/2.0d0)*ZTM2MX(ZoneNum)+(1.0d0/3.0d0)*ZTM3MX(ZoneNum))
       TempDepCoef = HA_MX + MCP_Total
@@ -907,7 +907,7 @@ ENDIF
         CASE (UseAnalyticalSolution)
           If (TempDepCoef .eq. 0.0) Then ! B=0
             ZTMX(ZoneNum) = Zone1MX(ZoneNum) + TempIndCoef/AirCap
-          Else 
+          Else
             If (AirCap .eq. 0.0) Then
               ZTMX(ZoneNum) = TempIndCoef/TempDepCoef
             Else
@@ -917,7 +917,7 @@ ENDIF
           End If
         CASE (UseEulerMethod)
           ZTMX(ZoneNum) = (AirCap*Zone1MX(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
-      END SELECT 
+      END SELECT
     END DO
 
     ! MinFlow for interface layer at z = 1.0
@@ -951,13 +951,13 @@ ENDIF
           CASE (UseAnalyticalSolution)
             If (TempDepCoef .eq. 0.0) Then ! B=0
               ZTAveraged = ZoneT1(ZoneNum) + TempIndCoef/AirCap
-            Else 
+            Else
               ZTAveraged = (ZoneT1(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
                             TempIndCoef/TempDepCoef
             End If
           CASE (UseEulerMethod)
             ZTAveraged = (AirCap*ZoneT1(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
-        END SELECT 
+        END SELECT
         ZTOC(ZoneNum) = ZTAveraged
         ZTMX(ZoneNum) = ZTAveraged
         ZTFLOOR(ZoneNum) = ZTAveraged
@@ -971,13 +971,13 @@ ENDIF
           CASE (UseAnalyticalSolution)
             If (TempDepCoef .eq. 0.0) Then ! B=0
               ZTAveraged = ZoneT1(ZoneNum) + TempIndCoef/AirCap
-            Else 
+            Else
               ZTAveraged = (ZoneT1(ZoneNum)-TempIndCoef/TempDepCoef)*exp(MIN(700.d0,-TempDepCoef/AirCap))+ &
                            TempIndCoef/TempDepCoef
             End If
           CASE (UseEulerMethod)
             ZTAveraged = (AirCap*ZoneT1(ZoneNum)+TempIndCoef)/(AirCap+TempDepCoef)
-        END SELECT 
+        END SELECT
         ZTOC(ZoneNum) = ZTAveraged
         ZTMX(ZoneNum) = ZTAveraged
         ZTFLOOR(ZoneNum) = ZTAveraged
@@ -1101,7 +1101,7 @@ END SUBROUTINE CalcUCSDDV
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

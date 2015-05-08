@@ -106,7 +106,9 @@ TYPE WaterCoilEquipConditions
   REAL(r64)    :: TotWaterHeatingCoilEnergy      = 0.0 ! Total Heating Coil energy of the Coil [J]
   REAL(r64)    :: TotWaterCoolingCoilEnergy      = 0.0 ! Total Cooling Coil energy of the Coil [J]
   REAL(r64)    :: SenWaterCoolingCoilEnergy      = 0.0 ! Sensible Cooling Coil energy of the Coil [J]
+  REAL(r64)    :: DesWaterHeatingCoilRate        = 0.0 ! Design Heating Coil Rate used for sizing [W]
   REAL(r64)    :: TotWaterHeatingCoilRate        = 0.0 ! Total Heating Coil Rate on the Coil [W]
+  REAL(r64)    :: DesWaterCoolingCoilRate        = 0.0 ! Design Cooling Coil Rate used for sizing [W]
   REAL(r64)    :: TotWaterCoolingCoilRate        = 0.0 ! Total Cooling Coil Rate on the Coil [W]
   REAL(r64)    :: SenWaterCoolingCoilRate        = 0.0 ! Sensible Cooling Coil Rate on the Coil [W]
   REAL(r64)    :: UACoil                         = 0.0 ! WaterCoil UA Value
@@ -256,6 +258,7 @@ PUBLIC  GetCoilWaterOutletNode
 PUBLIC  UpdateWaterToAirCoilPlantConnection  !DSU3
 PRIVATE EstimateHEXSurfaceArea
 PUBLIC  GetWaterCoilIndex
+PUBLIC  CheckForSensorAndSetpointNode
 
 CONTAINS
 
@@ -403,6 +406,8 @@ SUBROUTINE GetWaterCoilInput
   USE BranchNodeConnections, ONLY: TestCompSet
   USE WaterManager, ONLY: SetupTankSupplyComponent
   USE DataIPShortCuts
+  USE GlobalNames, ONLY: VerifyUniqueCoilName
+  USE SetPointManager,            ONLY: NodeHasSPMCtrlVarType, iCtrlVarType_Temp, iCtrlVarType_HumRat
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -443,6 +448,7 @@ SUBROUTINE GetWaterCoilInput
     LOGICAL :: ErrorsFound = .false.   ! If errors detected in input
     LOGICAL :: IsNotOK                 ! Flag to verify name
     LOGICAL :: IsBlank                 ! Flag for blank name
+    LOGICAL :: errflag
 
           ! Flow
      NumSimpHeat   = GetNumObjectsFound('Coil:Heating:Water')
@@ -490,7 +496,7 @@ SUBROUTINE GetWaterCoilInput
 
         CoilNum= SimpHeatNum
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SimpHeatNum,AlphArray, &
+        CALL GetObjectItem(CurrentModuleObject,SimpHeatNum,AlphArray, &
                            NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -502,19 +508,22 @@ SUBROUTINE GetWaterCoilInput
           ErrorsFound=.true.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
+        IF (errflag) THEN
+          ErrorsFound=.true.
+        ENDIF
         WaterCoil(CoilNum)%Name     = AlphArray(1)
         WaterCoil(CoilNum)%Schedule = AlphArray(2)
-        WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
-        IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
-          IF (lAlphaBlanks(2)) THEN
-            CALL ShowSevereError(TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-                                 ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
-          ELSE
+        IF (lAlphaBlanks(2)) THEN
+          WaterCoil(CoilNum)%SchedPtr = ScheduleAlwaysOn
+        ELSE
+          WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
+          IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
             CALL ShowSevereError(TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
                                 ' entered ='//TRIM(AlphArray(2))// &
                                 ' for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
+            ErrorsFound=.TRUE.
           END IF
-          ErrorsFound=.TRUE.
         ENDIF
 
         WaterCoil(CoilNum)%WaterCoilTypeA  = 'Heating'
@@ -586,15 +595,16 @@ SUBROUTINE GetWaterCoilInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(5),AlphArray(6),'Air Nodes')
 
         !Setup the Simple Heating Coil reporting variables
-        CALL SetupOutputVariable('Total Water Heating Coil Energy [J]', WaterCoil(CoilNum)%TotWaterHeatingCoilEnergy, &
+        CALL SetupOutputVariable('Heating Coil Heating Energy [J]', WaterCoil(CoilNum)%TotWaterHeatingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Water Heating Coil Hot Water Consumption [J]', WaterCoil(CoilNum)%TotWaterHeatingCoilEnergy, &
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Energy [J]',   &
+                              WaterCoil(CoilNum)%TotWaterHeatingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Total Water Heating Coil Rate [W]', WaterCoil(CoilNum)%TotWaterHeatingCoilRate, &
+        CALL SetupOutputVariable('Heating Coil Heating Rate [W]', WaterCoil(CoilNum)%TotWaterHeatingCoilRate, &
                               'System','Average',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Water Heating Coil U-Factor Times Area Value [W/K]', WaterCoil(CoilNum)%UACoilVariable, &
+        CALL SetupOutputVariable('Heating Coil U Factor Times Area Value [W/K]', WaterCoil(CoilNum)%UACoilVariable, &
                               'System','Average',WaterCoil(CoilNum)%Name)
 
       END DO
@@ -606,7 +616,7 @@ SUBROUTINE GetWaterCoilInput
 
         CoilNum= NumSimpHeat + FlatFinNum
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),FlatFinNum,  &
+        CALL GetObjectItem(CurrentModuleObject,FlatFinNum,  &
                            AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -618,19 +628,22 @@ SUBROUTINE GetWaterCoilInput
           ErrorsFound=.true.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
+        IF (errflag) THEN
+          ErrorsFound=.true.
+        ENDIF
         WaterCoil(CoilNum)%Name     = AlphArray(1)
         WaterCoil(CoilNum)%Schedule = AlphArray(2)
-        WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
-        IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
-          IF (lAlphaBlanks(2)) THEN
-            CALL ShowSevereError(TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-                                 ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
-          ELSE
+        IF (lAlphaBlanks(2)) THEN
+          WaterCoil(CoilNum)%SchedPtr = ScheduleAlwaysOn
+        ELSE
+          WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
+          IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
             CALL ShowSevereError(TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
                                 ' entered ='//TRIM(AlphArray(2))// &
                                 ' for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
+            ErrorsFound=.TRUE.
           END IF
-          ErrorsFound=.TRUE.
         ENDIF
 
         WaterCoil(CoilNum)%WaterCoilTypeA    = 'Cooling'
@@ -706,22 +719,23 @@ SUBROUTINE GetWaterCoilInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(5),AlphArray(6),'Air Nodes')
 
         ! Setup Report variables for the Detailed Flat Fin Cooling Coils
-        CALL SetupOutputVariable('Total Water Cooling Coil Energy[J]', WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]', WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Water Cooling Coil Chilled Water Consumption[J]', WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]',   &
+                              WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Sensible Water Cooling Coil Energy[J]',WaterCoil(CoilNum)%SenWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]',WaterCoil(CoilNum)%SenWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Total Water Cooling Coil Rate[W]', WaterCoil(CoilNum)%TotWaterCoolingCoilRate, &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', WaterCoil(CoilNum)%TotWaterCoolingCoilRate, &
                               'System','Average',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Sensible Water Cooling Coil Rate[W]', WaterCoil(CoilNum)%SenWaterCoolingCoilRate, &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', WaterCoil(CoilNum)%SenWaterCoolingCoilRate, &
                               'System','Average',WaterCoil(CoilNum)%Name)
 
         IF (WaterCoil(CoilNum)%CondensateCollectMode == CondensateToTank) THEN
 
-          CALL SetupOutputVariable('Cooling Coil Condensate Volumetric Flow Rate [m3/s]',WaterCoil(CoilNum)%CondensateVdot,&
+          CALL SetupOutputVariable('Cooling Coil Condensate Volume Flow Rate [m3/s]',WaterCoil(CoilNum)%CondensateVdot,&
                            'System','Average', WaterCoil(CoilNum)%Name)
           CALL SetupOutputVariable('Cooling Coil Condensate Volume [m3]',WaterCoil(CoilNum)%CondensateVol,&
                            'System','Sum', WaterCoil(CoilNum)%Name,  &
@@ -738,7 +752,7 @@ SUBROUTINE GetWaterCoilInput
 
         CoilNum= NumSimpHeat + NumFlatFin + CoolingNum
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),CoolingNum,  &
+        CALL GetObjectItem(CurrentModuleObject,CoolingNum,  &
                            AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -750,19 +764,22 @@ SUBROUTINE GetWaterCoilInput
           ErrorsFound=.true.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
+        IF (errflag) THEN
+          ErrorsFound=.true.
+        ENDIF
         WaterCoil(CoilNum)%Name     = AlphArray(1)
         WaterCoil(CoilNum)%Schedule = AlphArray(2)
-        WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
-        IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
-          IF (lAlphaBlanks(2)) THEN
-            CALL ShowSevereError(TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-                                 ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
-          ELSE
+        IF (lAlphaBlanks(2)) THEN
+          WaterCoil(CoilNum)%SchedPtr = ScheduleAlwaysOn
+        ELSE
+          WaterCoil(CoilNum)%SchedPtr = GetScheduleIndex(AlphArray(2))
+          IF (WaterCoil(CoilNum)%SchedPtr == 0) THEN
             CALL ShowSevereError(TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
                                 ' entered ='//TRIM(AlphArray(2))// &
                                 ' for '//TRIM(cAlphaFields(1))//'='//TRIM(AlphArray(1)))
+            ErrorsFound=.TRUE.
           END IF
-          ErrorsFound=.TRUE.
         ENDIF
 
         WaterCoil(CoilNum)%WaterCoilTypeA    = 'Cooling'
@@ -839,24 +856,26 @@ SUBROUTINE GetWaterCoilInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(5),AlphArray(6),'Air Nodes')
 
         ! Setup Report variables for the Design input Cooling Coils
-        CALL SetupOutputVariable('Total Water Cooling Coil Energy[J]', WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]',   &
+                              WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Water Cooling Coil Chilled Water Consumption[J]', WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]',   &
+                               WaterCoil(CoilNum)%TotWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name, &
                                ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
-        CALL SetupOutputVariable('Sensible Water Cooling Coil Energy[J]',WaterCoil(CoilNum)%SenWaterCoolingCoilEnergy, &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]',WaterCoil(CoilNum)%SenWaterCoolingCoilEnergy, &
                               'System','Sum',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Total Water Cooling Coil Rate[W]', WaterCoil(CoilNum)%TotWaterCoolingCoilRate, &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', WaterCoil(CoilNum)%TotWaterCoolingCoilRate, &
                               'System','Average',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Sensible Water Cooling Coil Rate[W]', WaterCoil(CoilNum)%SenWaterCoolingCoilRate, &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', WaterCoil(CoilNum)%SenWaterCoolingCoilRate, &
                               'System','Average',WaterCoil(CoilNum)%Name)
-        CALL SetupOutputVariable('Cooling Coil Area Wet Fraction', WaterCoil(CoilNum)%SurfAreaWetFraction, &
+        CALL SetupOutputVariable('Cooling Coil Wetted Area Fraction []', WaterCoil(CoilNum)%SurfAreaWetFraction, &
                               'System','Average',WaterCoil(CoilNum)%Name)
 
         IF (WaterCoil(CoilNum)%CondensateCollectMode == CondensateToTank) THEN
 
-          CALL SetupOutputVariable('Cooling Coil Condensate Volumetric Flow Rate [m3/s]',WaterCoil(CoilNum)%CondensateVdot,&
+          CALL SetupOutputVariable('Cooling Coil Condensate Volume Flow Rate [m3/s]',WaterCoil(CoilNum)%CondensateVdot,&
                            'System','Average', WaterCoil(CoilNum)%Name)
           CALL SetupOutputVariable('Cooling Coil Condensate Volume [m3]',WaterCoil(CoilNum)%CondensateVol,&
                            'System','Sum', WaterCoil(CoilNum)%Name,  &
@@ -935,6 +954,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
   REAL(r64) DesOutletAirEnth              ! Leaving air enthalpy at rating(J/kg)
   REAL(r64) DesAirApparatusDewPtEnth      ! Air enthalpy at apparatus dew point at rating(J/kg)
   REAL(r64) DesSatEnthAtWaterInTemp       ! Saturated enthalpy at entering liquid temp(J/kg)
+  REAL(r64) DesHumRatAtWaterInTemp        ! Enthalpy at water inlet temp and entering air HumRat (J/kg)
   REAL(r64) CapacitanceAir                ! Air-side capacity rate(W/C)
   REAL(r64) DesAirTempApparatusDewPt      ! Temperature apparatus dew point at design capacity
   REAL(r64) DesAirHumRatApparatusDewPt    ! Humdity Ratio at apparatus dew point at design capacity
@@ -1258,13 +1278,21 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
     IF (MyCoilDesignFlag(CoilNum) .and. (WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling).and. &
                   (WaterCoil(CoilNum)%DesAirVolFlowRate .gt. 0.0).and.  &
                            (WaterCoil(CoilNum)%MaxWaterMassFlowRate .gt. 0.0))THEN
+
       DesInletAirEnth=PsyHFnTdbW(WaterCoil(CoilNum)%DesInletAirTemp,WaterCoil(CoilNum)%DesInletAirHumRat)
       DesOutletAirEnth=PsyHFnTdbW(WaterCoil(CoilNum)%DesOutletAirTemp,WaterCoil(CoilNum)%DesOutletAirHumRat)
       DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, &
                                              PsyWFnTdpPb(WaterCoil(CoilNum)%DesInletWaterTemp,StdBaroPress))
-
-      IF ( DesOutletAirEnth >= DesInletAirEnth .OR. WaterCoil(CoilNum)%DesInletWaterTemp >= WaterCoil(CoilNum)%DesInletAirTemp &
-             .OR. DesSatEnthAtWaterInTemp >= DesOutletAirEnth) THEN
+      ! check for dry coil
+      DesHumRatAtWaterInTemp = PsyWFnTdbH(WaterCoil(CoilNum)%DesInletWaterTemp,DesSatEnthAtWaterInTemp,'InitWaterCoil')
+      IF(DesHumRatAtWaterInTemp > WaterCoil(CoilNum)%DesOutletAirHumRat .AND. &
+         WaterCoil(CoilNum)%DesOutletAirTemp > WaterCoil(CoilNum)%DesInletWaterTemp)THEN
+        ! if the design outlet air humrat is lower than the saturated air humrat at the design inlet water temp
+        ! and the design outlet air temperature is higher than the design inlet water temp (i.e, cooling possible),
+        ! move the design outlet air saturated enthalpy down (i.e., to Twaterin, Wair,out) to allow the coil to size.
+        DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, WaterCoil(CoilNum)%DesOutletAirHumRat)-0.0001d0
+      END IF
+      IF ( DesOutletAirEnth >= DesInletAirEnth .OR. WaterCoil(CoilNum)%DesInletWaterTemp >= WaterCoil(CoilNum)%DesInletAirTemp) THEN
         CALL ShowWarningError('The design cooling capacity is zero for Coil:Cooling:Water '// &
                                   TRIM(WaterCoil(CoilNum)%Name))
         CALL ShowContinueError('  The maximum water flow rate for this coil will be set to zero and the coil will do no cooling.')
@@ -1321,7 +1349,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
                TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirTemp,4)))
             CALL ShowContinueError('                                   Wair,out = ' //  &
                TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
-            IF ( .not. NoExitCondReset) THEN 
+            IF ( .not. NoExitCondReset) THEN
               CALL ShowContinueError('The revised design conditions are: Tair,out = ' //  &
                  TRIM(RoundSigDigits(TOutNew,4)))
               CALL ShowContinueError('                                   Wair,out = ' //  &
@@ -1341,9 +1369,10 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
         ! Enthalpy of Air at outlet at design conditions
         DesOutletAirEnth=PsyHFnTdbW(WaterCoil(CoilNum)%DesOutletAirTemp,WaterCoil(CoilNum)%DesOutletAirHumRat)
 
-        ! Enthalpy of Water at Inlet design conditions
-        DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, &
-                                             PsyWFnTdpPb(WaterCoil(CoilNum)%DesInletWaterTemp,StdBaroPress))
+! already calculated above and possibly reset if dry coil
+!        ! Enthalpy of Water at Inlet design conditions
+!        DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, &
+!                                             PsyWFnTdpPb(WaterCoil(CoilNum)%DesInletWaterTemp,StdBaroPress))
 
         ! Total Coil Load from Inlet and Outlet Air States.
         WaterCoil(CoilNum)%DesTotWaterCoilLoad=WaterCoil(CoilNum)%DesAirMassFlowRate*(DesInletAirEnth-DesOutletAirEnth)
@@ -1363,7 +1392,9 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
         DesEnthAtWaterOutTempAirInHumRat = PsyHFnTdbW(DesOutletWaterTemp,WaterCoil(CoilNum)%DesInletAirHumRat)
         DesEnthWaterOut = MIN(DesSatEnthAtWaterOutTemp,DesEnthAtWaterOutTempAirInHumRat)
 
-        IF (WaterCoil(CoilNum)%DesOutletAirHumRat < WaterCoil(CoilNum)%DesInletAirHumRat) THEN
+        ! dry coil test
+        IF (WaterCoil(CoilNum)%DesOutletAirHumRat < WaterCoil(CoilNum)%DesInletAirHumRat .AND. &
+            DesHumRatAtWaterInTemp < WaterCoil(CoilNum)%DesInletAirHumRat) THEN ! wet coil
 
           ! Calculations for BYPASS FACTOR at design conditions
           ! Calculate "slope" of temperature vs. humidity ratio between entering and leaving states
@@ -1511,6 +1542,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
       WaterCoil(CoilNum)%UAWetExtPerUnitArea=WaterCoil(CoilNum)%UACoilExternal/WaterCoil(CoilNum)%TotCoilOutsideSurfArea
       ! approximate the dry UA as 1.0 times wet UA
       WaterCoil(CoilNum)%UADryExtPerUnitArea=WaterCoil(CoilNum)%UAWetExtPerUnitArea
+
       ! Now use SolveRegulaFalsi to "invert" the cooling coil model to obtain the UA given the specified design inlet and outlet conditions
       ! Note that the UAs we have obtained so far are rough estimates that are the starting points for the the following iterative
       !   calulation of the actual UAs.
@@ -1538,7 +1570,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
         WaterCoil(CoilNum)%UACoilTotal = 1.0d0/(1.d0/WaterCoil(CoilNum)%UACoilExternal+1.d0/WaterCoil(CoilNum)%UACoilInternal)
         WaterCoil(CoilNum)%TotCoilOutsideSurfArea=EstimateHEXSurfaceArea(CoilNum)
         WaterCoil(CoilNum)%UACoilInternalPerUnitArea=WaterCoil(CoilNum)%UACoilInternal/  &
-                                                         WaterCoil(CoilNum)%TotCoilOutsideSurfArea
+                                                       WaterCoil(CoilNum)%TotCoilOutsideSurfArea
         WaterCoil(CoilNum)%UAWetExtPerUnitArea=WaterCoil(CoilNum)%UACoilExternal/WaterCoil(CoilNum)%TotCoilOutsideSurfArea
         WaterCoil(CoilNum)%UADryExtPerUnitArea=WaterCoil(CoilNum)%UAWetExtPerUnitArea
         CALL ShowContinueError(' Coil design UA set to ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%UACoilTotal,6)) // ' [W/C]')
@@ -1551,7 +1583,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
         WaterCoil(CoilNum)%UACoilTotal = 1.0d0/(1.d0/WaterCoil(CoilNum)%UACoilExternal+1.d0/WaterCoil(CoilNum)%UACoilInternal)
         WaterCoil(CoilNum)%TotCoilOutsideSurfArea=EstimateHEXSurfaceArea(CoilNum)
         WaterCoil(CoilNum)%UACoilInternalPerUnitArea=WaterCoil(CoilNum)%UACoilInternal/  &
-                                                         WaterCoil(CoilNum)%TotCoilOutsideSurfArea
+                                                       WaterCoil(CoilNum)%TotCoilOutsideSurfArea
         WaterCoil(CoilNum)%UAWetExtPerUnitArea=WaterCoil(CoilNum)%UACoilExternal/WaterCoil(CoilNum)%TotCoilOutsideSurfArea
         WaterCoil(CoilNum)%UADryExtPerUnitArea=WaterCoil(CoilNum)%UAWetExtPerUnitArea
         CALL ShowContinueError(' Coil design UA set to ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%UACoilTotal,6)) // ' [W/C]')
@@ -1643,6 +1675,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
             RptCoilHeaderFlag(1)=.false.
           ENDIF
           CALL PreDefTableEntry(pdchHeatCoilType,WaterCoil(CoilNum)%Name,'Coil:Heating:Water')
+          CALL PreDefTableEntry(pdchHeatCoilDesCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%DesWaterHeatingCoilRate)
           CALL PreDefTableEntry(pdchHeatCoilNomCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%TotWaterHeatingCoilRate)
           CALL PreDefTableEntry(pdchHeatCoilNomEff,WaterCoil(CoilNum)%Name,'-')
           WRITE(OutputFileInits,'(A)') 'Water Heating Coil Capacity Information,Coil:Heating:Water,'//  &
@@ -1658,6 +1691,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
           RatedLatentCapacity = WaterCoil(CoilNum)%TotWaterCoolingCoilRate - WaterCoil(CoilNum)%SenWaterCoolingCoilRate
           RatedSHR = SafeDivide(WaterCoil(CoilNum)%SenWaterCoolingCoilRate , WaterCoil(CoilNum)%TotWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilType,WaterCoil(CoilNum)%Name,'Coil:Cooling:Water:DetailedGeometry')
+          CALL PreDefTableEntry(pdchCoolCoilDesCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%DesWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilTotCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%TotWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilSensCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%SenWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilLatCap,WaterCoil(CoilNum)%Name,RatedLatentCapacity)
@@ -1678,6 +1712,7 @@ SUBROUTINE InitWaterCoil(CoilNum,FirstHVACIteration)
           RatedLatentCapacity = WaterCoil(CoilNum)%TotWaterCoolingCoilRate - WaterCoil(CoilNum)%SenWaterCoolingCoilRate
           RatedSHR = SafeDivide(WaterCoil(CoilNum)%SenWaterCoolingCoilRate , WaterCoil(CoilNum)%TotWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilType,WaterCoil(CoilNum)%Name,'Coil:Cooling:Water')
+          CALL PreDefTableEntry(pdchCoolCoilDesCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%DesWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilTotCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%TotWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilSensCap,WaterCoil(CoilNum)%Name,WaterCoil(CoilNum)%SenWaterCoolingCoilRate)
           CALL PreDefTableEntry(pdchCoolCoilLatCap,WaterCoil(CoilNum)%Name,RatedLatentCapacity)
@@ -1854,6 +1889,12 @@ SUBROUTINE SizeWaterCoil(CoilNum)
   REAL(r64)           :: Cp  !
   REAL(r64)           :: rho !
   REAL(r64)           :: DesWaterVolFlow = 0.0D0
+  REAL(r64)           :: DesSatEnthAtWaterInTemp ! used in testing coil inputs
+  REAL(r64)           :: DesHumRatAtWaterInTemp  ! used in testing coil inputs
+  REAL(r64)           :: T1Out = 0.0D0
+  REAL(r64)           :: T2Out = 0.0D0
+  REAL(r64)           :: TDpIn = 0.0D0
+
 
   ErrorsFound = .FALSE.
   PltSizCoolNum = 0
@@ -1951,6 +1992,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CoilOutHumRat = FinalSysSizing(CurSysNum)%CoolSupHumRat
             CoilOutTemp = FinalSysSizing(CurSysNum)%CoolSupTemp
           END IF
+! None of these IF tests for ".and. WaterCoil(CoilNum)%WaterCoilModel==CoilModel_Cooling" are needed inside the outermost IF block
           If((CoilOutHumRat.GT.CoilInHumRat).and.(WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling)) Then
             CALL ShowWarningError('SizeWaterCoil: Coil="'//TRIM(WaterCoil(CoilNum)%Name)//  &
                                   '", Cooling Coil has leaving humidity ratio > entering humidity ratio.')
@@ -1980,6 +2022,14 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CALL ShowWarningError('The design coil load is zero for Coil:Cooling:Water ' &
                                   //TRIM(WaterCoil(CoilNum)%Name))
             CALL ShowContinueError('The autosize value for max water flow rate is zero')
+          END IF
+          WaterCoil(CoilNum)%DesWaterCoolingCoilRate = DesCoilLoad
+          If(WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Detailed) Then  ! 'DETAILED FLAT FIN'
+            CALL ReportSizingOutput('Coil:Cooling:Water:DetailedGeometry',WaterCoil(CoilNum)%Name,&
+                                    'Design Coil Load [W]',WaterCoil(CoilNum)%DesWaterCoolingCoilRate)
+          ElseIf(WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) Then  ! 'Cooling'
+            CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
+                                    'Design Coil Load [W]',WaterCoil(CoilNum)%DesWaterCoolingCoilRate)
           END IF
           If(WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Detailed) Then  ! 'DETAILED FLAT FIN'
             CALL ReportSizingOutput('Coil:Cooling:Water:DetailedGeometry',WaterCoil(CoilNum)%Name,&
@@ -2045,17 +2095,6 @@ SUBROUTINE SizeWaterCoil(CoilNum)
                                     'Design Inlet Air Temperature [C]',WaterCoil(CoilNum)%DesInletAirtemp)
         END IF
 
-        IF (WaterCoil(CoilNum)%DesOutletAirTemp == AutoSize .AND.   &
-            WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) THEN  !  'Cooling'
-          IF (CurOASysNum > 0) THEN
-            WaterCoil(CoilNum)%DesOutletAirTemp = FinalSysSizing(CurSysNum)%PrecoolTemp
-          ELSE
-            WaterCoil(CoilNum)%DesOutletAirTemp = FinalSysSizing(CurSysNum)%CoolSupTemp
-          END IF
-          CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
-                                    'Design Outlet Air Temperature [C]',WaterCoil(CoilNum)%DesOutletAirtemp)
-        END IF
-
         IF (WaterCoil(CoilNum)%DesInletWaterTemp == AutoSize .AND.   &
             WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) THEN  !  'Cooling'
 
@@ -2063,6 +2102,29 @@ SUBROUTINE SizeWaterCoil(CoilNum)
 
           CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
                                     'Design Inlet Water Temperature [C]',WaterCoil(CoilNum)%DesInletWaterTemp)
+        END IF
+
+        IF (WaterCoil(CoilNum)%DesOutletAirTemp == AutoSize .AND.   &
+            WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) THEN  !  'Cooling'
+          IF (CurOASysNum > 0) THEN
+            WaterCoil(CoilNum)%DesOutletAirTemp = FinalSysSizing(CurSysNum)%PrecoolTemp
+          ELSE
+            WaterCoil(CoilNum)%DesOutletAirTemp = FinalSysSizing(CurSysNum)%CoolSupTemp
+          END IF
+
+          If (WaterCoil(CoilNum)%DesOutletAirTemp.LT.WaterCoil(CoilNum)%DesInletWaterTemp &
+             .AND. WaterCoil(CoilNum)%MaxWaterVolFlowRate > 0.0 ) Then
+            CALL ShowWarningError('SizeWaterCoil: Coil="'//TRIM(WaterCoil(CoilNum)%Name)//  &
+                                  '", Cooling Coil has leaving air temperature > entering water temperature.')
+            CALL ShowContinueError('    Tair,out  =  ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirTemp,3)))
+            CALL ShowContinueError('    Twater,in = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesInletWaterTemp,3)))
+            WaterCoil(CoilNum)%DesOutletAirTemp = WaterCoil(CoilNum)%DesInletWaterTemp + 0.5d0
+            CALL ShowContinueError('....coil leaving air temperature will be reset to:')
+            CALL ShowContinueError('    Tair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirTemp,3)))
+          End If
+
+          CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
+                                    'Design Outlet Air Temperature [C]',WaterCoil(CoilNum)%DesOutletAirtemp)
         END IF
 
         IF (WaterCoil(CoilNum)%DesInletAirHumRat == AutoSize .AND.   &
@@ -2108,6 +2170,26 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CALL ShowContinueError('....coil leaving humidity ratio will be reset to:')
             CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
           End If
+
+          ! check for dry coil and reset outlet humrat if needed
+          DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, &
+                                             PsyWFnTdpPb(WaterCoil(CoilNum)%DesInletWaterTemp,StdBaroPress))
+          DesHumRatAtWaterInTemp = PsyWFnTdbH(WaterCoil(CoilNum)%DesInletWaterTemp,DesSatEnthAtWaterInTemp,'InitWaterCoil')
+          IF (WaterCoil(CoilNum)%DesOutletAirHumRat < WaterCoil(CoilNum)%DesInletAirHumRat .AND. &
+            DesHumRatAtWaterInTemp > WaterCoil(CoilNum)%DesInletAirHumRat .AND. &
+            WaterCoil(CoilNum)%MaxWaterVolFlowRate > 0.0 ) THEN
+            IF (WaterCoil(CoilNum)%DesInletAirHumRat > WaterCoil(CoilNum)%DesOutletAirHumRat) THEN
+              CALL ShowWarningError('SizeWaterCoil: Coil="'//TRIM(WaterCoil(CoilNum)%Name)//  &
+                                  '", Cooling Coil is dry and has air leaving humidity ratio < entering humidity ratio.')
+              CALL ShowContinueError('    Wair,in =  ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesInletAirHumRat,6)))
+              CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
+              WaterCoil(CoilNum)%DesOutletAirHumRat = WaterCoil(CoilNum)%DesInletAirHumRat
+              CALL ShowContinueError('....coil leaving humidity ratio will be reset to:')
+              CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
+            END IF
+
+          END IF
+
 
           CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
                                     'Design Outlet Air Humidity Ratio',WaterCoil(CoilNum)%DesOutletAirHumRat)
@@ -2232,8 +2314,10 @@ SUBROUTINE SizeWaterCoil(CoilNum)
 !          End If
           IF (TermUnitIU) THEN
             WaterCoil(CoilNum)%MaxWaterVolFlowRate = TermUnitSizing(CurZoneEqNum)%MaxCWVolFlow
+            DesCoilLoad = TermUnitSizing(CurZoneEqNum)%DesCoolingLoad
           ELSE IF (ZoneEqFanCoil) THEN
             WaterCoil(CoilNum)%MaxWaterVolFlowRate = ZoneEqSizing(CurZoneEqNum)%MaxCWVolFlow
+            DesCoilLoad = ZoneEqSizing(CurZoneEqNum)%DesCoolingLoad
           ELSE
             CoilInTemp = FinalZoneSizing(CurZoneEqNum)%DesCoolCoilInTemp
             CoilOutTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
@@ -2249,6 +2333,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
               WaterCoil(CoilNum)%MaxWaterVolFlowRate = 0.0
             END IF
           END IF
+          WaterCoil(CoilNum)%DesWaterHeatingCoilRate = DesCoilLoad
           IF (WaterCoil(CoilNum)%MaxWaterVolFlowRate == 0.0) THEN
             CALL ShowWarningError('The design coil load is zero for Coil:Cooling:Water ' &
                                   //TRIM(WaterCoil(CoilNum)%Name))
@@ -2304,33 +2389,6 @@ SUBROUTINE SizeWaterCoil(CoilNum)
                                     'Design Inlet Air Temperature [C]',WaterCoil(CoilNum)%DesInletAirtemp)
         END IF
 
-        IF (WaterCoil(CoilNum)%DesOutletAirTemp == AutoSize .AND.   &
-            WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) Then    ! 'Cooling'
-!          CALL CheckZoneSizing('Coil:Cooling:Water',WaterCoil(CoilNum)%Name)
-          IF (TermUnitIU) THEN
-
-            Cp =  GetSpecificHeatGlycol(PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidName,  &
-                       5.0d0,                      &
-                       PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidIndex, &
-                       'SizeWaterCoil')
-
-            rho = GetDensityGlycol(PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidName,  &
-                       InitConvTemp,                      &
-                       PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidIndex, &
-                       'SizeWaterCoil')
-            DesCoilLoad = WaterCoil(CoilNum)%MaxWaterVolFlowRate * PlantSizData(PltSizCoolNum)%DeltaT * &
-                            Cp * rho
-            WaterCoil(CoilNum)%DesOutletAirTemp = WaterCoil(CoilNum)%DesInletAirtemp - DesCoilLoad / &
-              (RhoAirStd * PsyCpAirFnWTdb(WaterCoil(CoilNum)%DesInletAirHumRat,WaterCoil(CoilNum)%DesInletAirTemp) * &
-               WaterCoil(CoilNum)%DesAirVolFlowRate)
-          ELSE
-            WaterCoil(CoilNum)%DesOutletAirTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
-          END IF
-
-          CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
-                                    'Design Outlet Air Temperature [C]',WaterCoil(CoilNum)%DesOutletAirtemp)
-        END IF
-
         IF (WaterCoil(CoilNum)%DesInletWaterTemp == AutoSize .AND.   &
             WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) Then    ! 'Cooling'
 !          CALL CheckZoneSizing('Coil:Cooling:Water',WaterCoil(CoilNum)%Name)
@@ -2339,7 +2397,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
           CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
                                     'Design Inlet Water Temperature [C]',WaterCoil(CoilNum)%DesInletWaterTemp)
         END IF
-
+        
         IF (WaterCoil(CoilNum)%DesInletAirHumRat == AutoSize .AND.   &
             WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) THEN  ! 'Cooling'
 !          CALL CheckZoneSizing('Coil:Cooling:Water',WaterCoil(CoilNum)%Name)
@@ -2361,10 +2419,60 @@ SUBROUTINE SizeWaterCoil(CoilNum)
                                     'Design Inlet Air Humidity Ratio',WaterCoil(CoilNum)%DesInletAirHumRat)
         END IF
 
+        IF (WaterCoil(CoilNum)%DesOutletAirTemp == AutoSize .AND.   &
+            WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) Then    ! 'Cooling'
+!          CALL CheckZoneSizing('Coil:Cooling:Water',WaterCoil(CoilNum)%Name)
+          IF (TermUnitIU) THEN
+
+            Cp =  GetSpecificHeatGlycol(PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidName,  &
+                       5.0d0,                      &
+                       PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidIndex, &
+                       'SizeWaterCoil')
+
+            rho = GetDensityGlycol(PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidName,  &
+                       InitConvTemp,                      &
+                       PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidIndex, &
+                       'SizeWaterCoil')
+            DesCoilLoad = WaterCoil(CoilNum)%MaxWaterVolFlowRate * PlantSizData(PltSizCoolNum)%DeltaT * &
+                            Cp * rho
+            T1Out = WaterCoil(CoilNum)%DesInletAirtemp - DesCoilLoad / &
+              (RhoAirStd * PsyCpAirFnWTdb(WaterCoil(CoilNum)%DesInletAirHumRat,WaterCoil(CoilNum)%DesInletAirTemp) * &
+               WaterCoil(CoilNum)%DesAirVolFlowRate)
+            T2Out = PlantSizData(PltSizCoolNum)%ExitTemp + 2.0d0
+            WaterCoil(CoilNum)%DesOutletAirTemp = MAX(T1Out,T2Out)
+          ELSE
+            WaterCoil(CoilNum)%DesOutletAirTemp = FinalZoneSizing(CurZoneEqNum)%CoolDesTemp
+          END IF
+
+          If (WaterCoil(CoilNum)%DesOutletAirTemp.LT.WaterCoil(CoilNum)%DesInletWaterTemp &
+             .AND. WaterCoil(CoilNum)%MaxWaterVolFlowRate > 0.0 ) Then
+            CALL ShowWarningError('SizeWaterCoil: Coil="'//TRIM(WaterCoil(CoilNum)%Name)//  &
+                                  '", Cooling Coil has leaving air temperature > entering water temperature.')
+            CALL ShowContinueError('    Tair,out  =  ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirTemp,3)))
+            CALL ShowContinueError('    Twater,in = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesInletWaterTemp,3)))
+            WaterCoil(CoilNum)%DesOutletAirTemp = WaterCoil(CoilNum)%DesInletWaterTemp + 0.5d0
+            CALL ShowContinueError('....coil leaving air temperature will be reset to:')
+            CALL ShowContinueError('    Tair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirTemp,3)))
+          End If
+
+          CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
+                                    'Design Outlet Air Temperature [C]',WaterCoil(CoilNum)%DesOutletAirtemp)
+        END IF
+
        IF (WaterCoil(CoilNum)%DesOutletAirHumRat == AutoSize .AND.   &
             WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Cooling) Then    ! 'Cooling'
-
-          WaterCoil(CoilNum)%DesOutletAirHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
+            
+          IF (TermUnitIU) THEN
+            TDpIn = PsyTdpFnWPb(WaterCoil(CoilNum)%DesInletAirHumRat,StdBaroPress)
+            IF (TDpIn .LE. WaterCoil(CoilNum)%DesInletWaterTemp) THEN
+              WaterCoil(CoilNum)%DesOutletAirHumRat = WaterCoil(CoilNum)%DesInletAirHumRat
+            ELSE
+              WaterCoil(CoilNum)%DesOutletAirHumRat = MIN(PsyWFnTdbRhPb(WaterCoil(CoilNum)%DesOutletAirTemp, &
+                                                                    0.9d0,StdBaroPress),WaterCoil(CoilNum)%DesInletAirHumRat)
+            END IF
+          ELSE
+            WaterCoil(CoilNum)%DesOutletAirHumRat = FinalZoneSizing(CurZoneEqNum)%CoolDesHumRat
+          END IF
 
           If (WaterCoil(CoilNum)%DesOutletAirHumRat.GT.WaterCoil(CoilNum)%DesInletAirHumRat &
              .AND. WaterCoil(CoilNum)%MaxWaterVolFlowRate > 0.0 ) Then
@@ -2381,6 +2489,22 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
           End If
 
+          ! check for dry coil and reset outlet humrat if needed
+          DesSatEnthAtWaterInTemp =PsyHFnTdbW(WaterCoil(CoilNum)%DesInletWaterTemp, &
+                                             PsyWFnTdpPb(WaterCoil(CoilNum)%DesInletWaterTemp,StdBaroPress))
+          DesHumRatAtWaterInTemp = PsyWFnTdbH(WaterCoil(CoilNum)%DesInletWaterTemp,DesSatEnthAtWaterInTemp,'InitWaterCoil')
+          IF (WaterCoil(CoilNum)%DesOutletAirHumRat < WaterCoil(CoilNum)%DesInletAirHumRat .AND. &
+            DesHumRatAtWaterInTemp > WaterCoil(CoilNum)%DesInletAirHumRat .AND. &
+            WaterCoil(CoilNum)%MaxWaterVolFlowRate > 0.0 ) THEN
+            CALL ShowWarningError('SizeWaterCoil: Coil="'//TRIM(WaterCoil(CoilNum)%Name)//  &
+                                  '", Cooling Coil is dry and has air leaving humidity ratio < entering humidity ratio.')
+            CALL ShowContinueError('    Wair,in =  ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesInletAirHumRat,6)))
+            CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
+            WaterCoil(CoilNum)%DesOutletAirHumRat = WaterCoil(CoilNum)%DesInletAirHumRat
+            CALL ShowContinueError('....coil leaving humidity ratio will be reset to:')
+            CALL ShowContinueError('    Wair,out = ' // TRIM(RoundSigDigits(WaterCoil(CoilNum)%DesOutletAirHumRat,6)))
+          END IF
+
           CALL ReportSizingOutput('Coil:Cooling:Water',WaterCoil(CoilNum)%Name,&
                                     'Design Outlet Air Humidity Ratio',WaterCoil(CoilNum)%DesOutletAirHumRat)
         END IF
@@ -2394,10 +2518,10 @@ SUBROUTINE SizeWaterCoil(CoilNum)
 
         IF (WaterCoil(CoilNum)%FinDiam == AutoSize .AND. WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Detailed) THEN
           IF (TermUnitIU) THEN
-            WaterCoil(CoilNum)%InletAirMassFlowRate = TermUnitSizing(CurZoneEqNum)%AirVolFlow
+            WaterCoil(CoilNum)%InletAirMassFlowRate = RhoAirStd * TermUnitSizing(CurZoneEqNum)%AirVolFlow
           ELSE
            WaterCoil(CoilNum)%InletAirMassFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, &
-                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow) / RhoAirStd
+                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow)
           END IF
           WaterCoil(CoilNum)%FinDiam = 0.335d0 * WaterCoil(CoilNum)%InletAirMassFlowRate
           CALL ReportSizingOutput('Coil:Cooling:Water:DetailedGeometry',WaterCoil(CoilNum)%Name,&
@@ -2406,10 +2530,10 @@ SUBROUTINE SizeWaterCoil(CoilNum)
 
         IF (WaterCoil(CoilNum)%MinAirFlowArea == AutoSize .AND. WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Detailed) THEN
           IF (TermUnitIU) THEN
-            WaterCoil(CoilNum)%InletAirMassFlowRate = TermUnitSizing(CurZoneEqNum)%AirVolFlow
+            WaterCoil(CoilNum)%InletAirMassFlowRate = RhoAirStd * TermUnitSizing(CurZoneEqNum)%AirVolFlow
           ELSE
            WaterCoil(CoilNum)%InletAirMassFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, &
-                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow) / RhoAirStd
+                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow)
           END IF
           WaterCoil(CoilNum)%MinAirFlowArea = 0.44d0 * WaterCoil(CoilNum)%InletAirMassFlowRate
           CALL ReportSizingOutput('Coil:Cooling:Water:DetailedGeometry',WaterCoil(CoilNum)%Name,&
@@ -2417,10 +2541,10 @@ SUBROUTINE SizeWaterCoil(CoilNum)
         END IF
         IF (WaterCoil(CoilNum)%FinSurfArea == AutoSize .AND. WaterCoil(CoilNum)%WaterCoilModel == CoilModel_Detailed) THEN
           IF (TermUnitIU) THEN
-            WaterCoil(CoilNum)%InletAirMassFlowRate = TermUnitSizing(CurZoneEqNum)%AirVolFlow
+            WaterCoil(CoilNum)%InletAirMassFlowRate = RhoAirStd * TermUnitSizing(CurZoneEqNum)%AirVolFlow
           ELSE
            WaterCoil(CoilNum)%InletAirMassFlowRate = MAX(FinalZoneSizing(CurZoneEqNum)%DesCoolMassFlow, &
-                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow) / RhoAirStd
+                                                      FinalZoneSizing(CurZoneEqNum)%DesHeatMassFlow)
           END IF
           WaterCoil(CoilNum)%FinSurfArea = 78.5d0 * WaterCoil(CoilNum)%InletAirMassFlowRate
           CALL ReportSizingOutput('Coil:Cooling:Water:DetailedGeometry',WaterCoil(CoilNum)%Name,&
@@ -2547,10 +2671,11 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CALL ShowContinueError('To change this, input a value for UA, change the heating design day, or lower')
             CALL ShowContinueError('  the system heating design supply air temperature')
           END IF
-          CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
-                                  'Maximum Water Flow Rate [m3/s]',WaterCoil(CoilNum)%MaxWaterVolFlowRate)
+          WaterCoil(CoilNum)%DesWaterHeatingCoilRate = DesCoilLoad
           CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
                                   'Design Coil Load [W]',DesCoilLoad)
+          CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
+                                  'Maximum Water Flow Rate [m3/s]',WaterCoil(CoilNum)%MaxWaterVolFlowRate)
         END IF
         ! if the coil UA needs autosizing, then do it
         IF ( (WaterCoil(CoilNum)%CoilPerfInpMeth == UAandFlow .AND. WaterCoil(CoilNum)%UACoil == AutoSize) .OR. &
@@ -2682,6 +2807,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
               CALL ShowContinueError('  the system heating design supply air temperature')
             END IF
           END IF
+          WaterCoil(CoilNum)%DesWaterHeatingCoilRate = DesCoilLoad
           CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
                                   'U-Factor Times Area Value [W/K]',WaterCoil(CoilNum)%UACoil)
         END IF
@@ -2746,8 +2872,9 @@ SUBROUTINE SizeWaterCoil(CoilNum)
                                                        ( PlantSizData(PltSizHeatNum)%DeltaT * &
                                                          Cp* rho )
             ELSE
-            WaterCoil(CoilNum)%MaxWaterVolFlowRate = 0.0
+              WaterCoil(CoilNum)%MaxWaterVolFlowRate = 0.0
             END IF
+            WaterCoil(CoilNum)%DesWaterHeatingCoilRate = DesCoilLoad
           END IF
           ! issue warning if hw coil has zero flow
           IF (WaterCoil(CoilNum)%MaxWaterVolFlowRate == 0.0) THEN
@@ -2758,9 +2885,9 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             CALL ShowContinueError('  the system heating design supply air temperature')
           END IF
           CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
-                                  'Maximum Water Flow Rate [m3/s]',WaterCoil(CoilNum)%MaxWaterVolFlowRate)
-          CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
                                   'Design Coil Load [W]',DesCoilLoad)
+          CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
+                                  'Maximum Water Flow Rate [m3/s]',WaterCoil(CoilNum)%MaxWaterVolFlowRate)
         END IF
         ! autosize the coil UA if needed
         IF ( (WaterCoil(CoilNum)%CoilPerfInpMeth == UAandFlow .AND. WaterCoil(CoilNum)%UACoil == AutoSize) .OR. &
@@ -2807,7 +2934,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
             DesCoilLoad = WaterCoil(CoilNum)%MaxWaterVolFlowRate * PlantSizData(PltSizHeatNum)%DeltaT * &
                             Cp * rho * TermUnitSizing(CurZoneEqNum)%ReheatMult
             DesWaterVolFlow =  WaterCoil(CoilNum)%MaxWaterVolFlowRate * TermUnitSizing(CurZoneEqNum)%ReheatMult
-          ELSE IF (ZoneEqFanCoil) THEN                                                    
+          ELSE IF (ZoneEqFanCoil) THEN
             DesMassFlow = RhoAirStd * FinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
             Cp =  GetSpecificHeatGlycol(PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidName,  &
                      60.0d0,                      &
@@ -2925,6 +3052,7 @@ SUBROUTINE SizeWaterCoil(CoilNum)
               CALL ShowContinueError('  the zone heating design supply air temperature')
             END IF
           END IF
+          WaterCoil(CoilNum)%DesWaterHeatingCoilRate = DesCoilLoad
           CALL ReportSizingOutput('Coil:Heating:Water',WaterCoil(CoilNum)%Name,&
                                   'U-Factor Times Area Value [W/K]',WaterCoil(CoilNum)%UACoil)
         END IF ! end UA autosize IF
@@ -5080,8 +5208,9 @@ SUBROUTINE ReportWaterCoil(CoilNum)
                        Tavg,                      &
                        PlantLoop(WaterCoil(CoilNum)%WaterLoopNum)%FluidIndex, &
                        'ReportWaterCoil')
-    SpecHumIn = WaterCoil(CoilNum)%InletAirHumRat / ( 1.0d0 + WaterCoil(CoilNum)%InletAirHumRat) !eq. 9b ASHRAE HOF 2001 page 6.8
-    SpecHumOut = WaterCoil(CoilNum)%OutletAirHumRat / ( 1.0d0 + WaterCoil(CoilNum)%OutletAirHumRat )
+!   CR9155 Remove specific humidity calculations
+    SpecHumIn = WaterCoil(CoilNum)%InletAirHumRat 
+    SpecHumOut = WaterCoil(CoilNum)%OutletAirHumRat 
     !  mdot * del HumRat / rho water
     WaterCoil(CoilNum)%CondensateVdot = MAX(0.0d0, (WaterCoil(CoilNum)%InletAirMassFlowRate * (SpecHumIn - SpecHumOut) / rhoWater) )
     WaterCoil(CoilNum)%CondensateVol = WaterCoil(CoilNum)%CondensateVdot *ReportingConstant
@@ -6452,6 +6581,136 @@ SUBROUTINE CheckActuatorNode(ActuatorNodeNum, iNodeType, NodeNotFound)
 
 END SUBROUTINE CheckActuatorNode
 
+SUBROUTINE CheckForSensorAndSetpointNode(SensorNodeNum,ControlledVar,NodeNotFound)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Bereket Nigusse
+          !       DATE WRITTEN   March 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine checks that the sensor node number matches the air outlet node number
+          ! of some water coils
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE SetPointManager,     ONLY: NodeHasSPMCtrlVarType, iCtrlVarType_Temp, iCtrlVarType_HumRat, iCtrlVarType_MaxHumRat
+  USE EMSManager,          ONLY: CheckIfNodeSetpointManagedByEMS, iTemperatureSetpoint, iHumidityRatioMaxSetpoint
+
+  !USE HVACControllers,     ONLY: iTemperature, iHumidityRatio, iTemperatureAndHumidityRatio
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: SensorNodeNum      ! controller sensor node number
+  INTEGER, INTENT(IN)  :: ControlledVar      ! controlled variable type
+  LOGICAL, INTENT(OUT) :: NodeNotFound       ! true if matching air outlet node not found
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  CHARACTER(len=*), PARAMETER :: RoutineName='CheckForSensorAndSetpointNode: '
+  INTEGER, PARAMETER :: iTemperature                 = 1
+  INTEGER, PARAMETER :: iHumidityRatio               = 2
+  INTEGER, PARAMETER :: iTemperatureAndHumidityRatio = 3
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: WhichCoil                       ! water coil index
+  INTEGER :: CoilNum                         ! counter
+  CHARACTER(len=40) :: WaterCoilType         ! water coil type
+  LOGICAL           :: EMSSetpointErrorFlag  ! flag true is EMS is used to set node setpoints
+
+  ! Obtains and Allocates DXCoils
+  IF (GetWaterCoilsInputFlag) THEN
+    CALL GetWaterCoilInput
+    GetWaterCoilsInputFlag = .FALSE.
+  END IF
+
+  WhichCoil = 0
+  NodeNotFound = .TRUE.
+
+  DO CoilNum = 1, NumWaterCoils
+     IF (SensorNodeNum /= WaterCoil(CoilNum)%AirOutletNodeNum) CYCLE
+        NodeNotFound = .FALSE.
+        WhichCoil = CoilNum
+        EXIT
+  END DO
+  ! now if the sensor node is on the water coil air outlet node then check that
+  ! a setpoint is also specified on the water coil outlet node
+  IF ( .NOT. NodeNotFound) THEN
+     IF ( WhichCoil > 0) THEN
+        If(WaterCoil(CoilNum)%WaterCoilType_Num == WaterCoil_DetFlatFinCooling) Then
+                WaterCoilType = 'Coil:Cooling:Water:DetailedGeometry'
+        ElseIf(WaterCoil(CoilNum)%WaterCoilType_Num == WaterCoil_Cooling) Then
+                WaterCoilType = 'Coil:Cooling:Water'
+        ELSEIf(WaterCoil(CoilNum)%WaterCoilType_Num == WaterCoil_SimpleHeating) Then
+                WaterCoilType = 'Coil:Heating:Water'
+        ENDIF
+        EMSSetpointErrorFlag = .FALSE.
+        SELECT CASE (ControlledVar)
+        CASE (iTemperature)
+          CALL CheckIfNodeSetpointManagedByEMS(SensorNodeNum,iTemperatureSetpoint, EMSSetpointErrorFlag)
+          IF (EMSSetpointErrorFlag) THEN
+            IF(.NOT. NodeHasSPMCtrlVarType(SensorNodeNum, iCtrlVarType_Temp)) THEN
+                CALL ShowWarningError(RoutineName//TRIM(WaterCoilType)//'="'//TRIM(WaterCoil(WhichCoil)%Name)//'". ')
+                CALL ShowContinueError(' ..Temperature setpoint not found on coil air outlet node.')
+                CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                       ' or on an airloop outlet node.')
+                CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+            END IF
+          ENDIF
+        CASE (iHumidityRatio)
+          CALL CheckIfNodeSetpointManagedByEMS(SensorNodeNum,iHumidityRatioMaxSetpoint, EMSSetpointErrorFlag)
+          IF (EMSSetpointErrorFlag) THEN
+            IF(.NOT. NodeHasSPMCtrlVarType(SensorNodeNum, iCtrlVarType_MaxHumRat)) THEN
+                CALL ShowWarningError(RoutineName//TRIM(WaterCoilType)//'="'//TRIM(WaterCoil(WhichCoil)%Name)//'". ')
+                CALL ShowContinueError(' ..Humidity ratio setpoint not found on coil air outlet node.')
+                CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                       ' or on an airloop outlet node.')
+                CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+            END IF
+          ENDIF
+        CASE (iTemperatureAndHumidityRatio)
+          CALL CheckIfNodeSetpointManagedByEMS(SensorNodeNum,iTemperatureSetpoint, EMSSetpointErrorFlag)
+          IF (EMSSetpointErrorFlag) THEN
+            IF(.NOT. NodeHasSPMCtrlVarType(SensorNodeNum, iCtrlVarType_Temp)) THEN
+                CALL ShowWarningError(RoutineName//TRIM(WaterCoilType)//'="'//TRIM(WaterCoil(WhichCoil)%Name)//'". ')
+                CALL ShowContinueError(' ..Temperature setpoint not found on coil air outlet node.')
+                CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                       ' or on an airloop outlet node.')
+                CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+            END IF
+          ENDIF
+          EMSSetpointErrorFlag = .FALSE.
+          CALL CheckIfNodeSetpointManagedByEMS(SensorNodeNum,iHumidityRatioMaxSetpoint, EMSSetpointErrorFlag)
+          IF (EMSSetpointErrorFlag) THEN
+            IF(.NOT. NodeHasSPMCtrlVarType(SensorNodeNum, iCtrlVarType_MaxHumRat)) THEN
+                CALL ShowWarningError(RoutineName//TRIM(WaterCoilType)//'="'//TRIM(WaterCoil(WhichCoil)%Name)//'". ')
+                CALL ShowContinueError(' ..Humidity ratio setpoint not found on coil air outlet node.')
+                CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                       ' or on an airloop outlet node.')
+                CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+            END IF
+          ENDIF
+        END SELECT
+
+     ENDIF
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CheckForSensorAndSetpointNode
+
 FUNCTION TdbFnHRhPb(H,RH,PB) RESULT(T)
 
           ! FUNCTION INFORMATION:
@@ -6838,14 +7097,12 @@ SUBROUTINE UpdateWaterToAirCoilPlantConnection(CoilTypeNum,        &
 
 END SUBROUTINE UpdateWaterToAirCoilPlantConnection
 
-
-
 ! End of Coil Utility subroutines
 ! *****************************************************************************
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

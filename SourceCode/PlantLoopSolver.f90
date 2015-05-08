@@ -274,7 +274,7 @@ SUBROUTINE PlantHalfLoopSolver(FirstHVACIteration, LoopSideNum, LoopNum, ReSimOt
     ! Pass the loop information via the HVAC interface manager
     CALL UpdatePlantLoopInterface(LoopNum, LoopSideNum,PlantLoop(LoopNum)%LoopSide(DemandSide)%NodeNumOut, &
                                    PlantLoop(LoopNum)%LoopSide(SupplySide)%NodeNumIn,  &
-                                   ReSimOtherSideNeeded,FirstHVACIteration,PlantLoop(LoopNum)%CommonPipeType)
+                                   ReSimOtherSideNeeded,PlantLoop(LoopNum)%CommonPipeType)
 
   ELSE !LoopSide == SupplySide
 
@@ -284,7 +284,7 @@ SUBROUTINE PlantHalfLoopSolver(FirstHVACIteration, LoopSideNum, LoopNum, ReSimOt
     ! Pass the loop information via the HVAC interface manager (only the flow)
     CALL UpdatePlantLoopInterface(LoopNum, LoopSideNum, PlantLoop(LoopNum)%LoopSide(SupplySide)%NodeNumOut, &
                                    PlantLoop(LoopNum)%LoopSide(DemandSide)%NodeNumIn, ReSimOtherSideNeeded, &
-                                   FirstHVACIteration,PlantLoop(LoopNum)%CommonPipeType)
+                                   PlantLoop(LoopNum)%CommonPipeType)
 
     ! Update the loop outlet node conditions
     CALL CheckLoopExitNode(LoopNum, FirstHVACIteration)
@@ -766,15 +766,15 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
     IF (.NOT. ANY(ThisLoopHasConstantSpeedBranchPumps)) THEN
       LoopFlow = MAXVAL(EachSideFlowRequestFinal)
     ELSE ! account for stepped loop flow rates required of branch pumps
-      
-      ! rules for setting flow when there are constant speed branch pumps. 
+
+      ! rules for setting flow when there are constant speed branch pumps.
       ! 1. Check if above routines already selected a loop flow rate based on the constant speed branches, if so then just use it
       IF ((ThisLoopHasConstantSpeedBranchPumps(ThisSide)) .AND. &
           (EachSideFlowRequestFinal(ThisSide) >= EachSideFlowRequestFinal(OtherSide))) THEN
         ! okay, just use basic logic
         LoopFlow = MAXVAL(EachSideFlowRequestFinal)
       ELSEIF ((ThisLoopHasConstantSpeedBranchPumps(OtherSide)) .AND. &
-          (EachSideFlowRequestFinal(ThisSide) <= EachSideFlowRequestFinal(OtherSide))) THEN 
+          (EachSideFlowRequestFinal(ThisSide) <= EachSideFlowRequestFinal(OtherSide))) THEN
         ! okay, just use basic logic
         LoopFlow = MAXVAL(EachSideFlowRequestFinal)
       ELSE ! not okay, we have a case that will likely need special correcting
@@ -807,12 +807,12 @@ SUBROUTINE SetupLoopFlowRequest(LoopNum, ThisSide, OtherSide, LoopFlow)
           ENDIF
         ENDDO
 
-        ! 4. allocate which branches to use, 
+        ! 4. allocate which branches to use,
         tmpLoopFlow = MAXVAL(EachSideFlowRequestFinal)
         AccumFlowSteps = 0.d0
         MaxBranchPumpLoopSideFlow = SUM(LoadedConstantSpeedBranchFlowRateSteps) + SUM(NoLoadConstantSpeedBranchFlowRateSteps)
         tmpLoopFlow = MIN(tmpLoopFlow, MaxBranchPumpLoopSideFlow)
-        !  4b. first use all the branches with non-zero MyLoad 
+        !  4b. first use all the branches with non-zero MyLoad
         IF (tmpLoopFlow <= Sum(LoadedConstantSpeedBranchFlowRateSteps)) THEN
           tmpLoopFlow = Sum(LoadedConstantSpeedBranchFlowRateSteps)
         ELSE
@@ -1204,7 +1204,7 @@ SUBROUTINE SimulateLoopSideBranchGroup(LoopNum, LoopSideNum, FirstBranchNum, Las
 
   ! If we have load based now, we should go ahead and distribute the load
   ! If not then this branch group is done, since flow path validation was previously done
-  LoadToLoopSetPoint = InitialDemandToLoopSetPoint
+  LoadToLoopSetPoint = UpdatedDemandToLoopSetPoint
   LoadDistributionWasPerformed = .FALSE.
 
   ! The way the load distribution is set up, I think I should call this for every load range based component
@@ -2075,11 +2075,11 @@ SUBROUTINE ResolveParallelFlows(LoopNum, LoopSideNum, ThisLoopSideFlow, FirstHVA
 
 
 !IF SUFFICIENT FLOW TO MEET ALL PARALLEL BRANCH FLOW REQUESTS
-    IF (FlowRemaining < MassFlowTolerance) THEN ! no flow available at all for splitter 
+    IF (FlowRemaining < MassFlowTolerance) THEN ! no flow available at all for splitter
       DO OutletNum = 1, NumSplitOutlets
         SplitterBranchOut = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Splitter(SplitNum)%BranchNumOut(OutletNum)
         DO CompCounter = 1, PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%TotalComponents
-        
+
           FirstNodeOnBranch = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%NodeNumIn
           CompInletNode  = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%Comp(CompCounter)%NodeNumIn
           CompOutletNode = PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(SplitterBranchOut)%Comp(CompCounter)%NodeNumOut
@@ -2341,7 +2341,7 @@ REAL(r64) FUNCTION DetermineBranchFlowRequest(LoopNum, LoopSideNum, BranchNum) R
   USE DataLoopNode,   ONLY: Node
   USE PlantUtilities, ONLY: BoundValueToNodeMinMaxAvail
   USE DataBranchAirLoopPlant, ONLY : ControlType_SeriesActive
-  
+
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2960,7 +2960,7 @@ END SUBROUTINE AdjustPumpFlowRequestByEMSControls
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

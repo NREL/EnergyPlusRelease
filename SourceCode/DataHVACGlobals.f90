@@ -89,7 +89,7 @@ CHARACTER(len=*), PARAMETER, PUBLIC, DIMENSION(NumAllFanTypes) :: cFanTypes=  &
          'Fan:ComponentModel      '/)   !cpw22Aug2010 (new)
 
 ! parameters describing coil types
-INTEGER, PARAMETER :: NumAllCoilTypes                = 22
+INTEGER, PARAMETER :: NumAllCoilTypes                = 24
 
 INTEGER, PARAMETER :: CoilDX_CoolingSingleSpeed       = 1
 INTEGER, PARAMETER :: CoilDX_HeatingEmpirical         = 2
@@ -101,29 +101,29 @@ INTEGER, PARAMETER :: CoilDX_MultiSpeedCooling        = 7
 INTEGER, PARAMETER :: CoilDX_MultiSpeedHeating        = 8
 
 INTEGER, PARAMETER :: Coil_HeatingGas                 = 9
-INTEGER, PARAMETER :: Coil_HeatingElectric            = 10
-INTEGER, PARAMETER :: Coil_HeatingDesuperheater       = 11
+INTEGER, PARAMETER :: Coil_HeatingGas_MultiStage      = 10
+INTEGER, PARAMETER :: Coil_HeatingElectric            = 11
+INTEGER, PARAMETER :: Coil_HeatingElectric_MultiStage = 12
+INTEGER, PARAMETER :: Coil_HeatingDesuperheater       = 13
 
-INTEGER, PARAMETER :: Coil_CoolingWater               = 12
-INTEGER, PARAMETER :: Coil_CoolingWaterDetailed       = 13
-INTEGER, PARAMETER :: Coil_HeatingWater               = 14
-INTEGER, PARAMETER :: Coil_HeatingSteam               = 15
-INTEGER, PARAMETER :: CoilWater_CoolingHXAssisted     = 16
+INTEGER, PARAMETER :: Coil_CoolingWater               = 14
+INTEGER, PARAMETER :: Coil_CoolingWaterDetailed       = 15
+INTEGER, PARAMETER :: Coil_HeatingWater               = 16
+INTEGER, PARAMETER :: Coil_HeatingSteam               = 17
+INTEGER, PARAMETER :: CoilWater_CoolingHXAssisted     = 18
 
-INTEGER, PARAMETER :: Coil_CoolingWaterToAirHP        = 17
-INTEGER, PARAMETER :: Coil_HeatingWaterToAirHP        = 18
-INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPSimple  = 19
-INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPSimple  = 20
-INTEGER, PARAMETER :: CoilVRF_Cooling                 = 21
-INTEGER, PARAMETER :: CoilVRF_Heating                 = 22
+INTEGER, PARAMETER :: Coil_CoolingWaterToAirHP        = 19
+INTEGER, PARAMETER :: Coil_HeatingWaterToAirHP        = 20
+INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPSimple  = 21
+INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPSimple  = 22
+INTEGER, PARAMETER :: CoilVRF_Cooling                 = 23
+INTEGER, PARAMETER :: CoilVRF_Heating                 = 24
 
-INTEGER, PARAMETER :: CoilPerfDX_CoolByPassEmpirical  = 23
-INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPVSEquationFit  = 24
-INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPVSEquationFit  = 25
-INTEGER, PARAMETER :: Coil_CoolingAirToAirVariableSpeed  = 26
-INTEGER, PARAMETER :: Coil_HeatingAirToAirVariableSpeed  = 27
-
-
+INTEGER, PARAMETER :: CoilPerfDX_CoolByPassEmpirical  = 25
+INTEGER, PARAMETER :: Coil_CoolingWaterToAirHPVSEquationFit  = 26
+INTEGER, PARAMETER :: Coil_HeatingWaterToAirHPVSEquationFit  = 27
+INTEGER, PARAMETER :: Coil_CoolingAirToAirVariableSpeed  = 28
+INTEGER, PARAMETER :: Coil_HeatingAirToAirVariableSpeed  = 29
 
 ! Water to air HP coil types
 INTEGER, PARAMETER :: WatertoAir_Simple               = 1
@@ -131,6 +131,10 @@ INTEGER, PARAMETER :: WatertoAir_ParEst               = 2
 INTEGER, PARAMETER :: WatertoAir_VarSpeedEquationFit  = 3
 INTEGER, PARAMETER :: WatertoAir_VarSpeedLooUpTable = 4
 
+! Water to Air HP Water Flow Mode
+INTEGER, PARAMETER :: WaterCycling = 1                  ! water flow cycles with compressor
+INTEGER, PARAMETER :: WaterConstant = 2                 ! water flow is constant
+INTEGER, PARAMETER :: WaterConstantOnDemand = 3         ! water flow is constant whenever the coil is operational - this is the only method used in EP V7.2 and earlier
 
 CHARACTER(len=*), PARAMETER, DIMENSION(NumAllCoilTypes) :: cAllCoilTypes=  &
        (/'Coil:Cooling:DX:SingleSpeed                        ',  &
@@ -142,7 +146,9 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumAllCoilTypes) :: cAllCoilTypes=  &
          'Coil:Cooling:DX:MultiSpeed                         ',  &
          'Coil:Heating:DX:MultiSpeed                         ',  &
          'Coil:Heating:Gas                                   ',  &
+         'Coil:Heating:Gas:MultiStage                        ',  &
          'Coil:Heating:Electric                              ',  &
+         'Coil:Heating:Electric:MultiStage                   ',  &
          'Coil:Heating:Desuperheater                         ',  &
          'Coil:Cooling:Water                                 ',  &
          'Coil:Cooling:Water:DetailedGeometry                ',  &
@@ -153,8 +159,8 @@ CHARACTER(len=*), PARAMETER, DIMENSION(NumAllCoilTypes) :: cAllCoilTypes=  &
          'Coil:Heating:WaterToAirHeatPump:ParameterEstimation',  &
          'Coil:Cooling:WaterToAirHeatPump:EquationFit        ',  &
          'Coil:Heating:WaterToAirHeatPump:EquationFit        ',  &
-         'COIL:Cooling:DX:VariableRefrigerantFlow            ',  &
-         'COIL:Heating:DX:VariableRefrigerantFlow            '/)
+         'Coil:Cooling:DX:VariableRefrigerantFlow            ',  &
+         'Coil:Heating:DX:VariableRefrigerantFlow            '/)
 
 ! Parameters describing Heat Exchanger types
 INTEGER, PARAMETER :: NumHXTypes            = 3
@@ -256,8 +262,9 @@ REAL(r64)     :: DXElecHeatingPower   = 0.0 ! Electric power consumed by DX heat
 REAL(r64)     :: ElecHeatingCoilPower = 0.0 ! Electric power consumed by electric heating coil
 REAL(r64)     :: AirToAirHXElecPower  = 0.0 ! Electric power consumed by Heat Exchanger:Air To Air (Generic or Flat Plate)
                                             ! from last simulation in HeatRecovery.f90
-REAL(r64)     :: UnbalExhMassFlow = 0.0     ! unbalanced zone exhaust from a zone equip component [kg/s]
-REAL(r64)     :: PlenumInducedMassFlow = 0.0 ! secondary air mass flow rate induced from a return plenum [kg/s]
+REAL(r64)     :: UnbalExhMassFlow = 0.d0     ! unbalanced zone exhaust from a zone equip component [kg/s]
+REAL(r64)     :: BalancedExhMassFlow = 0.d0    ! balanced zone exhaust (declared as so by user)  [kg/s]
+REAL(r64)     :: PlenumInducedMassFlow = 0.d0 ! secondary air mass flow rate induced from a return plenum [kg/s]
 LOGICAL  :: TurnFansOn = .FALSE.       ! If true overrides fan schedule and cycles fans on
 LOGICAL  :: TurnFansOff = .FALSE.      ! If True overides fan schedule and TurnFansOn and forces fans off
 LOGICAL  :: ZoneCompTurnFansOn = .FALSE.       ! If true overrides fan schedule and cycles fans on
@@ -302,7 +309,7 @@ LOGICAL,  PUBLIC :: SimNonZoneEquipmentFlag       ! True when non-zone equipment
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -379,7 +379,7 @@ SUBROUTINE GetFluidCoolerInput
     cCurrentModuleObject = cFluidCooler_SingleSpeed
 DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
     FluidCoolerNum = SingleSpeedFluidCoolerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),SingleSpeedFluidCoolerNumber,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,SingleSpeedFluidCoolerNumber,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -516,7 +516,7 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
   cCurrentModuleObject = cFluidCooler_TwoSpeed
   DO TwoSpeedFluidCoolerNumber = 1 , NumTwoSpeedFluidCoolers
     FluidCoolerNum = NumSingleSpeedFluidCoolers + TwoSpeedFluidCoolerNumber
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),TwoSpeedFluidCoolerNumber,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT,  &
+    CALL GetObjectItem(cCurrentModuleObject,TwoSpeedFluidCoolerNumber,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -732,34 +732,34 @@ DO SingleSpeedFluidCoolerNumber = 1 , NumSingleSpeedFluidCoolers
 
 ! Set up output variables, CurrentModuleObject='FluidCooler:SingleSpeed'
   DO FluidCoolerNum = 1, NumSingleSpeedFluidCoolers
-    CALL SetupOutputVariable('Fluid Cooler Water Inlet Temperature [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%InletWaterTemp,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Water Outlet Temperature [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%OutletWaterTemp,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%WaterMassFlowRate,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%Qactual,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%FanPower,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%FanEnergy,'System','Sum',SimpleFluidCooler(FluidCoolerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
   END DO
 
   ! CurrentModuleObject='FluidCooler:TwoSpeed'
   DO FluidCoolerNum = NumSingleSpeedFluidCoolers+1, NumSingleSpeedFluidCoolers+NumTwoSpeedFluidCoolers
-    CALL SetupOutputVariable('Fluid Cooler Water Inlet Temperature [C]', &
+    CALL SetupOutputVariable('Cooling Tower Inlet Temperature [C]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%InletWaterTemp,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Water Outlet Temperature [C]', &
+    CALL SetupOutputVariable('Cooling Tower Outlet Temperature [C]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%OutletWaterTemp,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Water Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Cooling Tower Mass Flow Rate [kg/s]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%WaterMassFlowRate,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Heat Transfer [W]', &
+    CALL SetupOutputVariable('Cooling Tower Heat Transfer Rate [W]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%Qactual,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Fan Electric Power [W]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Power [W]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%FanPower,'System','Average',SimpleFluidCooler(FluidCoolerNum)%Name)
-    CALL SetupOutputVariable('Fluid Cooler Fan Electric Consumption [J]', &
+    CALL SetupOutputVariable('Cooling Tower Fan Electric Energy [J]', &
           SimpleFluidCoolerReport(FluidCoolerNum)%FanEnergy,'System','Sum',SimpleFluidCooler(FluidCoolerNum)%Name, &
           ResourceTypeKey='Electric',EndUseKey='HeatRejection',GroupKey='Plant')
   END DO
@@ -2260,7 +2260,7 @@ END SUBROUTINE ReportFluidCooler
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

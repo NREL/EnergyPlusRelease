@@ -87,6 +87,9 @@ TYPE AirLoopControlData ! Derived type for air control information
   LOGICAL :: ReqstEconoLockoutWithCompressor=.false.  ! there is a request to lockout the economizer due to compressor operation
   LOGICAL :: EconoActive       =.false. ! if true economizer is active
   LOGICAL :: HeatRecoveryBypass=.false. ! if true heat recovery is bypassed (not active)
+  LOGICAL :: ResimAirLoopFlag            = .FALSE. ! Same as SimAir, will trigger re-sim of air loops
+  LOGICAL :: HeatRecoveryResimFlag       = .TRUE.  ! Used to trigger new air loop sim when HX is used in OA system
+  LOGICAL :: HeatRecoveryResimFlag2      = .FALSE. ! Used to trigger new air loop sim when HX is used in OA system
   LOGICAL :: CheckHeatRecoveryBypassStatus=.false. ! determines when heat recovery bypass is set
   LOGICAL :: EconomizerFlowLocked = .false. ! locks economizer flow for custon ERV operation
   LOGICAL :: HighHumCtrlActive =.false. ! if true high humidity control is active
@@ -104,21 +107,22 @@ TYPE AirLoopControlData ! Derived type for air control information
 END TYPE AirLoopControlData
 
 TYPE AirLoopFlowData ! Derived type for air loop flow information
-  REAL(r64) :: ZoneExhaust    =0.0 ! total of zone exhaust air mass flow rate for this loop [kg/s]
-  REAL(r64) :: DesSupply      =0.0 ! design supply air mass flow rate for loop [kg/s]
-  REAL(r64) :: SysToZoneDesFlowRatio =0.0 ! System design flow divided by the sum of the zone design flows
-  REAL(r64) :: TotReturn      =0.0 ! the return air mass flow rate for this loop [kg/s]
-  REAL(r64) :: ReqSupplyFrac  =1.0 ! required flow (as a fraction of DesSupply) set by a manager
-  REAL(r64) :: MinOutAir      =0.0 ! minimum outside air mass flow rate [kg/s]
-  REAL(r64) :: MaxOutAir      =0.0 ! maximum outside air mass flow rate [kg/s]
-  REAL(r64) :: OAMinFrac      =0.0 ! minimum outside air flow fraction this time step
-  REAL(r64) :: Previous       =0.0 ! Previous mass air flow rate for this loop [kg/s]
-  REAL(r64) :: SupFlow        =0.0 ! supply air flow rate [kg/s]
-  REAL(r64) :: RetFlow        =0.0 ! return air flow rate [kg/s]
-  REAL(r64) :: RetFlow0       =0.0 ! sum of zone return flows before adjusting for total loop exhaust
-  REAL(r64) :: RecircFlow     =0.0 ! sum of zone plenum recirculated flows
-  REAL(r64) :: FanPLR         =0.0 ! Operating PLR of air loop fan
-  REAL(r64) :: OAFrac         =0.0 ! fraction of outside air to mixed air mass flow rate
+  REAL(r64) :: ZoneExhaust    =0.d0 ! total of zone exhaust air mass flow rate for this loop [kg/s]
+  REAL(r64) :: ZoneExhaustBalanced = 0.d0 !zone exhaust air that is balanced by simple air flow for loop [kg/s]
+  REAL(r64) :: DesSupply      =0.d0 ! design supply air mass flow rate for loop [kg/s]
+  REAL(r64) :: SysToZoneDesFlowRatio =0.d0 ! System design flow divided by the sum of the zone design flows
+  REAL(r64) :: TotReturn      =0.d0 ! the return air mass flow rate for this loop [kg/s]
+  REAL(r64) :: ReqSupplyFrac  =1.d0 ! required flow (as a fraction of DesSupply) set by a manager
+  REAL(r64) :: MinOutAir      =0.d0 ! minimum outside air mass flow rate [kg/s]
+  REAL(r64) :: MaxOutAir      =0.d0 ! maximum outside air mass flow rate [kg/s]
+  REAL(r64) :: OAMinFrac      =0.d0 ! minimum outside air flow fraction this time step
+  REAL(r64) :: Previous       =0.d0 ! Previous mass air flow rate for this loop [kg/s]
+  REAL(r64) :: SupFlow        =0.d0 ! supply air flow rate [kg/s]
+  REAL(r64) :: RetFlow        =0.d0 ! return air flow rate [kg/s]
+  REAL(r64) :: RetFlow0       =0.d0 ! sum of zone return flows before adjusting for total loop exhaust
+  REAL(r64) :: RecircFlow     =0.d0 ! sum of zone plenum recirculated flows
+  REAL(r64) :: FanPLR         =0.d0 ! Operating PLR of air loop fan
+  REAL(r64) :: OAFrac         =0.d0 ! fraction of outside air to mixed air mass flow rate
   LOGICAL :: FlowError   =.FALSE. ! error flag for flow error message
 END TYPE AirLoopFlowData
 
@@ -150,7 +154,7 @@ END TYPE OAControllerData
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

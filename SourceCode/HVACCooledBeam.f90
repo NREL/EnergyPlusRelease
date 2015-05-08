@@ -27,7 +27,7 @@ MODULE HVACCooledBeam
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals,     ONLY: BeginEnvrnFlag, MaxNameLength, NumOfZones, &
-                           InitConvTemp, SysSizingCalc, Pi, SecInHour
+                           InitConvTemp, SysSizingCalc, Pi, SecInHour, ScheduleAlwaysOn
 USE DataInterfaces,  ONLY: ShowWarningError, ShowFatalError, ShowSevereError, ShowContinueError, &
                            SetupOutputVariable
 Use DataEnvironment, ONLY: StdBaroPress, StdRhoAir
@@ -286,13 +286,13 @@ SUBROUTINE GetCoolBeams
 
   ! find the number of cooled beam units
   CurrentModuleObject = 'AirTerminal:SingleDuct:ConstantVolume:CooledBeam'
-  NumCB = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumCB = GetNumObjectsFound(CurrentModuleObject)
   ! allocate the data structures
   ALLOCATE(CoolBeam(NumCB))
   ALLOCATE(CheckEquipName(NumCB))
   CheckEquipName=.true.
 
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),TotalArgs,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,TotalArgs,NumAlphas,NumNumbers)
   NumAlphas = 7
   NumNumbers = 16
   TotalArgs = 23
@@ -313,7 +313,7 @@ SUBROUTINE GetCoolBeams
   ! loop over cooled beam units; get and load the input data
   DO CBIndex = 1,NumCB
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),CBIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,CBIndex,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
     CBNum = CBIndex
@@ -338,30 +338,29 @@ SUBROUTINE GetCoolBeams
       ErrorsFound=.true.
     END IF
     CoolBeam(CBNum)%Sched = Alphas(2)
-    CoolBeam(CBNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-    IF (CoolBeam(CBNum)%SchedPtr .EQ. 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': '//TRIM(cAlphaFields(2))//  &
-             ' is required, missing for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      CoolBeam(CBNum)%SchedPtr = ScheduleAlwaysOn
+    ELSE
+      CoolBeam(CBNum)%SchedPtr = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (CoolBeam(CBNum)%SchedPtr .EQ. 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//': invalid '//TRIM(cAlphaFields(2))//  &
              ' entered ='//TRIM(Alphas(2))// &
              ' for '//TRIM(cAlphaFields(1))//'='//TRIM(Alphas(1)))
+        ErrorsFound=.TRUE.
       END IF
-      ErrorsFound=.TRUE.
     END IF
     CoolBeam(CBNum)%AirInNode = &
       GetOnlySingleNode(Alphas(4),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                        NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
     CoolBeam(CBNum)%AirOutNode = &
       GetOnlySingleNode(Alphas(5),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                        NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(5))
     CoolBeam(CBNum)%CWInNode = &
       GetOnlySingleNode(Alphas(6),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Water,NodeConnectionType_Inlet,2,ObjectIsNotParent)
+                        NodeType_Water,NodeConnectionType_Inlet,2,ObjectIsNotParent,cAlphaFields(6))
     CoolBeam(CBNum)%CWOutNode = &
       GetOnlySingleNode(Alphas(7),ErrorsFound,TRIM(CurrentModuleObject),Alphas(1), &
-                        NodeType_Water,NodeConnectionType_Outlet,2,ObjectIsNotParent)
+                        NodeType_Water,NodeConnectionType_Outlet,2,ObjectIsNotParent,cAlphaFields(7))
     CoolBeam(CBNum)%MaxAirVolFlow = Numbers(1)
     CoolBeam(CBNum)%MaxCoolWaterVolFlow = Numbers(2)
     CoolBeam(CBNum)%NumBeams = Numbers(3)
@@ -386,21 +385,21 @@ SUBROUTINE GetCoolBeams
                      NodeID(CoolBeam(CBNum)%CWInNode),NodeID(CoolBeam(CBNum)%CWOutNode),'Water Nodes')
 
    !Setup the Cooled Beam reporting variables
-    CALL SetupOutputVariable('Cooled Beam Cooling Energy [J]', CoolBeam(CBNum)%BeamCoolingEnergy, &
+    CALL SetupOutputVariable('Zone Air Terminal Beam Sensible Cooling Energy [J]', CoolBeam(CBNum)%BeamCoolingEnergy, &
                               'System','Sum',CoolBeam(CBNum)%Name, &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
-    CALL SetupOutputVariable('Cooled Beam Chilled Water Consumption[J]', CoolBeam(CBNum)%BeamCoolingEnergy, &
+    CALL SetupOutputVariable('Zone Air Terminal Beam Chilled Water Energy [J]', CoolBeam(CBNum)%BeamCoolingEnergy, &
                               'System','Sum',CoolBeam(CBNum)%Name, &
                                ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
-    CALL SetupOutputVariable('Cooled Beam Cooling Rate[W]', CoolBeam(CBNum)%BeamCoolingRate, &
+    CALL SetupOutputVariable('Zone Air Terminal Beam Sensible Cooling Rate [W]', CoolBeam(CBNum)%BeamCoolingRate, &
                               'System','Average',CoolBeam(CBNum)%Name)
-    CALL SetupOutputVariable('Cooled Beam Supply Air Cooling Energy [J]', CoolBeam(CBNum)%SupAirCoolingEnergy, &
+    CALL SetupOutputVariable('Zone Air Terminal Supply Air Sensible Cooling Energy [J]', CoolBeam(CBNum)%SupAirCoolingEnergy, &
                               'System','Sum',CoolBeam(CBNum)%Name)
-    CALL SetupOutputVariable('Cooled Beam Supply Air Cooling Rate [W]', CoolBeam(CBNum)%SupAirCoolingRate, &
+    CALL SetupOutputVariable('Zone Air Terminal Supply Air Sensible Cooling Rate [W]', CoolBeam(CBNum)%SupAirCoolingRate, &
                               'System','Average',CoolBeam(CBNum)%Name)
-    CALL SetupOutputVariable('Cooled Beam Supply Air Heating Energy [J]', CoolBeam(CBNum)%SupAirHeatingEnergy, &
+    CALL SetupOutputVariable('Zone Air Terminal Supply Air Sensible Heating Energy [J]', CoolBeam(CBNum)%SupAirHeatingEnergy, &
                               'System','Sum',CoolBeam(CBNum)%Name)
-    CALL SetupOutputVariable('Cooled Beam Supply Air Heating Rate [W]', CoolBeam(CBNum)%SupAirHeatingRate, &
+    CALL SetupOutputVariable('Zone Air Terminal Supply Air Sensible Heating Rate [W]', CoolBeam(CBNum)%SupAirHeatingRate, &
                               'System','Average',CoolBeam(CBNum)%Name)
 
     ! Fill the Zone Equipment data with the supply air inlet node number of this unit.
@@ -839,6 +838,9 @@ SUBROUTINE SizeCoolBeam(CBNum)
           IF (FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak > 0.0) THEN
             DT = FinalZoneSizing(CurZoneEqNum)%ZoneTempAtCoolPeak - 0.5d0*  &
                (CoolBeam(CBNum)%DesInletWaterTemp + CoolBeam(CBNum)%DesOutletWaterTemp)
+            IF (DT <= 0.0) THEN
+              DT = 7.8d0
+            END IF
           ELSE
             DT = 7.8d0
           END IF
@@ -1384,7 +1386,7 @@ END Subroutine ReportCoolBeam
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

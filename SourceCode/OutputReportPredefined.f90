@@ -75,6 +75,7 @@ INTEGER :: pdchMotEff
 ! Cooling coil subtable
 INTEGER :: pdstCoolCoil
 INTEGER :: pdchCoolCoilType
+INTEGER :: pdchCoolCoilDesCap
 INTEGER :: pdchCoolCoilTotCap
 INTEGER :: pdchCoolCoilSensCap
 INTEGER :: pdchCoolCoilLatCap
@@ -125,6 +126,7 @@ INTEGER :: pdchDXHeatCoilRegionNum   ! Region number for which HSPF is calculate
 ! Heating Coil subtable
 INTEGER :: pdstHeatCoil
 INTEGER :: pdchHeatCoilType
+INTEGER :: pdchHeatCoilDesCap
 INTEGER :: pdchHeatCoilNomCap
 INTEGER :: pdchHeatCoilNomEff
 ! SWH subtable
@@ -300,6 +302,7 @@ INTEGER :: pdchOaoNomNumOcc1
 INTEGER :: pdchOaoZoneVol1
 INTEGER :: pdchOaoAvgMechVent
 INTEGER :: pdchOaoAvgInfil
+INTEGER :: pdchOaoAvgAFNInfil
 INTEGER :: pdchOaoAvgSimpVent
 INTEGER :: pdchOaoAvgTotVent
 INTEGER :: pdstOAminOcc
@@ -308,6 +311,7 @@ INTEGER :: pdchOaoNomNumOcc2
 INTEGER :: pdchOaoZoneVol2
 INTEGER :: pdchOaoMinMechVent
 INTEGER :: pdchOaoMinInfil
+INTEGER :: pdchOaoMinAFNInfil
 INTEGER :: pdchOaoMinSimpVent
 INTEGER :: pdchOaoMinTotVent
 
@@ -537,6 +541,65 @@ INTEGER :: pdchS62shdVpzmin
 INTEGER :: pdchS62shdVozhtg
 INTEGER :: pdchS62shdEvz
 
+!  LEED Summary
+INTEGER :: pdrLeed
+INTEGER :: pdstLeedGenInfo
+INTEGER :: pdchLeedGenData
+
+INTEGER :: pdstLeedSpaceUsageType
+INTEGER :: pdchLeedSutName
+INTEGER :: pdchLeedSutSpArea
+INTEGER :: pdchLeedSutOcArea
+INTEGER :: pdchLeedSutUnArea
+INTEGER :: pdchLeedSutHrsWeek
+
+INTEGER :: pdstLeedAdvsMsg
+INTEGER :: pdchLeedAmData
+
+INTEGER :: pdstLeedEneTypSum
+INTEGER :: pdchLeedEtsType
+INTEGER :: pdchLeedEtsRtNm
+INTEGER :: pdchLeedEtsVirt
+INTEGER :: pdchLeedEtsEneUnt
+INTEGER :: pdchLeedEtsDemUnt
+
+INTEGER :: pdstLeedPerf
+INTEGER :: pdchLeedPerfRot
+INTEGER :: pdchLeedPerfElEneUse
+INTEGER :: pdchLeedPerfElDem
+INTEGER :: pdchLeedPerfGasEneUse
+INTEGER :: pdchLeedPerfGasDem
+INTEGER :: pdchLeedPerfOthEneUse
+INTEGER :: pdchLeedPerfOthDem
+
+INTEGER :: pdstLeedEneUseSum
+INTEGER :: pdchLeedEusUnt
+INTEGER :: pdchLeedEusProc
+INTEGER :: pdchLeedEusTotal
+
+INTEGER :: pdstLeedEneCostSum
+INTEGER :: pdchLeedEcUnt
+INTEGER :: pdchLeedEcsProc
+INTEGER :: pdchLeedEcsTotal
+REAL(r64) :: LEEDelecCostTotal
+REAL(r64) :: LEEDgasCostTotal
+REAL(r64) :: LEEDothrCostTotal
+
+INTEGER :: pdstLeedRenewSum
+INTEGER :: pdchLeedRenRatCap
+INTEGER :: pdchLeedRenAnGen
+
+INTEGER :: pdstLeedEneUseIntEl
+INTEGER :: pdchLeedEuiElec
+INTEGER :: pdstLeedEneUseIntNatG
+INTEGER :: pdchLeedEuiNatG
+INTEGER :: pdstLeedEneUseIntOthr
+INTEGER :: pdchLeedEuiOthr
+
+INTEGER :: pdstLeedEneUsePerc
+INTEGER :: pdchLeedEupPerc
+
+
 ! Internal data structures to store information provided by calls
 
 INTEGER, PARAMETER :: sizeIncrement = 100
@@ -615,6 +678,7 @@ INTEGER, PARAMETER                                :: recKindSubsurface = 2
 
 REAL(r64) :: TotalNotMetHeatingOccupiedForABUPS = 0.0
 REAL(r64) :: TotalNotMetCoolingOccupiedForABUPS = 0.0
+REAL(r64) :: TotalNotMetOccupiedForABUPS = 0.0
 REAL(r64) :: TotalTimeNotSimpleASH55EitherForABUPS = 0.0
 
 CONTAINS
@@ -839,6 +903,7 @@ pdchMechIPLVIP =    newPreDefColumn(pdstMech,'IPLV in IP Units [Btu/W-h]')
 pdstCoolCoil = newPreDefSubTable(pdrEquip,'Cooling Coils')
 
 pdchCoolCoilType    = newPreDefColumn(pdstCoolCoil,'Type')
+pdchCoolCoilDesCap  = newPreDefColumn(pdstCoolCoil,'Design Coil Load [W]')
 pdchCoolCoilTotCap  = newPreDefColumn(pdstCoolCoil,'Nominal Total Capacity [W]')
 pdchCoolCoilSensCap = newPreDefColumn(pdstCoolCoil,'Nominal Sensible Capacity [W]')
 pdchCoolCoilLatCap  = newPreDefColumn(pdstCoolCoil,'Nominal Latent Capacity [W]')
@@ -867,6 +932,7 @@ pdchDXHeatCoilRegionNum = newPreDefColumn(pdstDXHeatCoil,'Region Number')
 pdstHeatCoil = newPreDefSubTable(pdrEquip,'Heating Coils')
 
 pdchHeatCoilType   = newPreDefColumn(pdstHeatCoil,'Type')
+pdchHeatCoilDesCap = newPreDefColumn(pdstHeatCoil,'Design Coil Load [W]')
 pdchHeatCoilNomCap = newPreDefColumn(pdstHeatCoil,'Nominal Total Capacity [W]')
 pdchHeatCoilNomEff = newPreDefColumn(pdstHeatCoil,'Nominal Efficiency [W/W]')
 
@@ -976,6 +1042,7 @@ pdchOaoNomNumOcc1 =   newPreDefColumn(pdstOAavgOcc,'Nominal Number of Occupants'
 pdchOaoZoneVol1 =     newPreDefColumn(pdstOAavgOcc,'Zone Volume [m3]')
 pdchOaoAvgMechVent =  newPreDefColumn(pdstOAavgOcc,'Mechanical Ventilation [ach]')
 pdchOaoAvgInfil =     newPreDefColumn(pdstOAavgOcc,'Infiltration [ach]')
+pdchOaoAvgAFNInfil =  newPreDefColumn(pdstOAavgOcc,'AFN Infiltration [ach]')
 pdchOaoAvgSimpVent =  newPreDefColumn(pdstOAavgOcc,'Simple Ventilation [ach]')
 !pdchOaoAvgTotVent =   newPreDefColumn(pdstOAavgOcc,'Total Ventilation [ach]')
 
@@ -988,6 +1055,7 @@ pdchOaoNomNumOcc2 =   newPreDefColumn(pdstOAminOcc,'Nominal Number of Occupants'
 pdchOaoZoneVol2 =     newPreDefColumn(pdstOAminOcc,'Zone Volume [m3]')
 pdchOaoMinMechVent =  newPreDefColumn(pdstOAminOcc,'Mechanical Ventilation [ach]')
 pdchOaoMinInfil =     newPreDefColumn(pdstOAminOcc,'Infiltration [ach]')
+pdchOaoMinAFNInfil =  newPreDefColumn(pdstOAminOcc,'AFN Infiltration [ach]')
 pdchOaoMinSimpVent =  newPreDefColumn(pdstOAminOcc,'Simple Ventilation [ach]')
 !pdchOaoMinTotVent =   newPreDefColumn(pdstOAminOcc,'Total Ventilation [ach]')
 CALL addFootNoteSubTable(pdstOAminOcc,'Values shown for a single zone without multipliers')
@@ -1250,6 +1318,133 @@ IF (DoZoneSizing .OR. DoSystemSizing) THEN
   pdchS62shdVozhtg =      newPreDefColumn(pdstS62sysHeatDes,'Zone Outdoor Airflow Heating - Voz-htg [m3/s]')
   pdchS62shdEvz =         newPreDefColumn(pdstS62sysHeatDes,'Zone Ventilation Efficiency - Evz-min')
 END IF
+
+pdrLeed =  newPreDefReport('LEEDsummary','LEED','LEED Summary')
+
+pdstLeedGenInfo = newPreDefSubTable(pdrLeed, 'Sec1.1A-General Information')
+! single column with rows of:
+!    Principal Heating Source
+!    Weather File
+!    Climate Zone
+!    Heating Degree Days
+!    Cooling Degree Days
+!    HDD and CDD data source
+!    Total gross floor area
+pdchLeedGenData = newPreDefColumn(pdstLeedGenInfo,'Data')
+
+pdstLeedSpaceUsageType =  newPreDefSubTable(pdrLeed, 'EAp2-1. Space Usage Type')
+pdchLeedSutSpArea = newPreDefColumn(pdstLeedSpaceUsageType,'Space Area [m2]')
+pdchLeedSutOcArea = newPreDefColumn(pdstLeedSpaceUsageType,'Regularly Occupied Area [m2]')
+pdchLeedSutUnArea = newPreDefColumn(pdstLeedSpaceUsageType,'Unconditioned Area [m2]')
+pdchLeedSutHrsWeek = newPreDefColumn(pdstLeedSpaceUsageType,'Typical Hours/Week in Operation [hr/wk]')
+
+pdstLeedAdvsMsg =  newPreDefSubTable(pdrLeed, 'EAp2-2. Advisory Messages')
+! single column with rows of:
+!    Number of hours heating loads not met
+!    Number of hours cooling loads not met
+!    Total
+!    Difference
+!    Number of warning messages
+!    Number of error messages
+!    Number of defaults overridden
+pdchLeedAmData = newPreDefColumn(pdstLeedAdvsMsg,'Data')
+
+pdstLeedEneTypSum =  newPreDefSubTable(pdrLeed, 'EAp2-3. Energy Type Summary')
+! multiple columns with rows of
+!    Electricity
+!    Natural Gas
+!    <additional fuels>
+pdchLeedEtsRtNm = newPreDefColumn(pdstLeedEneTypSum,'Utility Rate')
+pdchLeedEtsVirt = newPreDefColumn(pdstLeedEneTypSum,'Virtual Rate [$/unit energy]')
+pdchLeedEtsEneUnt = newPreDefColumn(pdstLeedEneTypSum,'Units of Energy')
+pdchLeedEtsDemUnt = newPreDefColumn(pdstLeedEneTypSum,'Units of Demand')
+
+pdstLeedPerf =  newPreDefSubTable(pdrLeed, 'EAp2-4/5. Performance Rating Method Compliance')
+! Multiple colums with rows of:
+!     Interior Lighting
+!     Exterior Lighting
+!     Space Heating
+!     Space Cooling
+!     Pumps
+!     Heat Rejection
+!     Fans-Interior
+!     Fans-Parking Garage
+!     Service Water Heating
+!     Receptacle Equipment
+!     Interior Lighting (process)
+!     Refrigeration Equipment
+!     Cooking
+!     Industrial Process
+!     Elevators and Escalators
+!     Total
+pdchLeedPerfElEneUse = newPreDefColumn(pdstLeedPerf,'Electric Energy Use [GJ]')
+pdchLeedPerfElDem = newPreDefColumn(pdstLeedPerf,'Electric Demand [W]')
+pdchLeedPerfGasEneUse = newPreDefColumn(pdstLeedPerf,'Natural Gas Energy Use [GJ]')
+pdchLeedPerfGasDem = newPreDefColumn(pdstLeedPerf,'Natural Gas Demand [W]')
+pdchLeedPerfOthEneUse = newPreDefColumn(pdstLeedPerf,'Additional Energy Use [GJ]')
+pdchLeedPerfOthDem = newPreDefColumn(pdstLeedPerf,'Additional Demand [W]')
+
+pdstLeedEneUseSum =  newPreDefSubTable(pdrLeed, 'EAp2-6. Energy Use Summary')
+! Multiple columns with rows of:
+!    Electricity
+!    Natural Gas
+!    <additional fuels>
+!    Total
+pdchLeedEusProc = newPreDefColumn(pdstLeedEneUseSum,'Process Subtotal [GJ]')
+pdchLeedEusTotal = newPreDefColumn(pdstLeedEneUseSum,'Total Energy Use [GJ]')
+
+pdstLeedEneCostSum =  newPreDefSubTable(pdrLeed, 'EAp2-7. Energy Cost Summary')
+! Multiple columns with rows of:
+!    Electricity
+!    Natural Gas
+!    <additional fuels>
+!    Total
+pdchLeedEcsProc = newPreDefColumn(pdstLeedEneCostSum,'Process Subtotal [$]')
+pdchLeedEcsTotal = newPreDefColumn(pdstLeedEneCostSum,'Total Energy Cost [$]')
+
+pdstLeedRenewSum =  newPreDefSubTable(pdrLeed, 'L-1. Renewable Energy Source Summary')
+! Multiple columns with rows of each renewable source
+pdchLeedRenRatCap = newPreDefColumn(pdstLeedRenewSum,'Rated Capacity [kW]')
+pdchLeedRenAnGen = newPreDefColumn(pdstLeedRenewSum,'Annual Energy Generated [GJ]')
+
+pdstLeedEneUseIntEl =  newPreDefSubTable(pdrLeed, 'EAp2-17a. Energy Use Intensity - Electricity')
+! Single column with rows of:
+!    Interior lighting
+!    Space heating
+!    Space cooling
+!    Fans-interior
+!    Service water heating
+!    Receptacle equipment
+!    Miscellaneous
+!    Subtotal
+pdchLeedEuiElec = newPreDefColumn(pdstLeedEneUseIntEl,'Electricty [MJ/m2]')
+
+pdstLeedEneUseIntNatG =  newPreDefSubTable(pdrLeed, 'EAp2-17b. Energy Use Intensity - Natural Gas')
+! Single column with rows of:
+!    Space heating
+!    Service water heating
+!    Miscellaneous
+!    Subtotal
+pdchLeedEuiNatG = newPreDefColumn(pdstLeedEneUseIntNatG,'Natural Gas [MJ/m2]')
+
+pdstLeedEneUseIntOthr =  newPreDefSubTable(pdrLeed, 'EAp2-17c. Energy Use Intensity - Additional')
+! Single column with rows of:
+!    Miscellaneous
+!    Subtotal
+pdchLeedEuiOthr = newPreDefColumn(pdstLeedEneUseIntOthr,'Additional [MJ/m2]')
+
+pdstLeedEneUsePerc =  newPreDefSubTable(pdrLeed, 'EAp2-18. End Use Percentage')
+! single column with rows of:
+!    Interior Lighting
+!    Space heating
+!    Space cooling
+!    Fans-Interior
+!    Service Water Heating
+!    Receptacle Equipment
+!    Miscellaneous
+pdchLeedEupPerc = newPreDefColumn(pdstLeedEneUsePerc,'Percent [%]')
+
+
 END SUBROUTINE SetPredefinedTables
 
 SUBROUTINE RealPreDefTableEntry(columnIndex,objName,tableEntryReal,numSigDigits)
@@ -1809,7 +2004,7 @@ END FUNCTION newPreDefColumn
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

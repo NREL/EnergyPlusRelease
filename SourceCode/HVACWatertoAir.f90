@@ -31,7 +31,7 @@ MODULE WatertoAirHeatPump
 USE DataPrecisionGlobals
 USE DataLoopNode
 USE DataGlobals
-USE DataHVACGlobals, ONLY: CycFanCycCoil, ContFanCycCoil
+USE DataHVACGlobals, ONLY: CycFanCycCoil, ContFanCycCoil, TimeStepSys
 USE DataInterfaces
 USE DataPlant, ONLY: TypeOf_CoilWAHPCoolingParamEst,  TypeOf_CoilWAHPHeatingParamEst, PlantLoop
 
@@ -313,7 +313,7 @@ SUBROUTINE GetWatertoAirHPInput
   USE NodeInputManager
   USE BranchNodeConnections, ONLY: TestCompSet
   USE FluidProperties,    ONLY : CheckFluidPropertyName, FindGlycol
-  USE GlobalNames, ONLY: VerifyUniqueWaterToAirHPName
+  USE GlobalNames, ONLY: VerifyUniqueCoilName
   USE PlantUtilities, ONLY: RegisterPlantCompDesignFlow
   USE OutputReportPredefined
 
@@ -401,7 +401,7 @@ SUBROUTINE GetWatertoAirHPInput
 
         HPNum= HPNum + 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HPNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,HPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT,&
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -414,8 +414,7 @@ SUBROUTINE GetWatertoAirHPInput
           ErrorsFound=.true.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -498,21 +497,21 @@ SUBROUTINE GetWatertoAirHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Water Nodes')
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(6),AlphArray(7),'Air Nodes')
 
-        CALL SetupOutputVariable('WatertoAirHP Cooling Electric Consumption [J]', &
+        CALL SetupOutputVariable('Cooling Coil Electric Energy [J]', &
              WatertoAirHP(HPNum)%Energy,'System','Summed',WatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Total Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]', &
              WatertoAirHP(HPNum)%EnergyLoadTotal,'System','Summed',WatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Sensible Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]', &
              WatertoAirHP(HPNum)%EnergySensible,'System','Summed',WatertoAirHP(HPNum)%Name)
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Latent Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Latent Cooling Energy [J]', &
              WatertoAirHP(HPNum)%EnergyLatent,'System','Summed',WatertoAirHP(HPNum)%Name)
 
-        CALL SetupOutputVariable('WatertoAirHP Source Side Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]', &
              WatertoAirHP(HPNum)%EnergySource,'System','Summed',WatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
@@ -536,7 +535,7 @@ SUBROUTINE GetWatertoAirHPInput
 
         HPNum= HPNum + 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),WatertoAirHPNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,WatertoAirHPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT,&
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -549,8 +548,7 @@ SUBROUTINE GetWatertoAirHPInput
           ErrorsFound=.true.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -625,15 +623,15 @@ SUBROUTINE GetWatertoAirHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Water Nodes')
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(6),AlphArray(7),'Air Nodes')
 
-        CALL SetupOutputVariable('WatertoAirHP Heating Electric Consumption [J]', &
+        CALL SetupOutputVariable('Heating Coil Electric Energy [J]', &
              WatertoAirHP(HPNum)%Energy,'System','Summed',WatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Total Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Heating Energy [J]', &
              WatertoAirHP(HPNum)%EnergyLoadTotal,'System','Summed',WatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Source Side Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Energy [J]', &
              WatertoAirHP(HPNum)%EnergySource,'System','Summed',WatertoAirHP(HPNum)%Name, &
              ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
@@ -661,45 +659,88 @@ SUBROUTINE GetWatertoAirHPInput
 
   DO HPNum=1,NumWatertoAirHPs
 
-        ! Setup Report variables for the Heat Pump
-   CALL SetupOutputVariable('WatertoAirHP Power [W]', &
-        WatertoAirHP(HPNum)%Power,'System','Average',WatertoAirHP(HPNum)%Name)
+    IF ( WatertoAirHP(HPNum)%WAHPPlantTypeOfNum == TypeOf_CoilWAHPCoolingParamEst) THEN
+        ! COOLING COIL: Setup Report variables for the Heat Pump
+      CALL SetupOutputVariable('Cooling Coil Electric Power [W]', &
+           WatertoAirHP(HPNum)%Power,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Load Side Total Heat Transfer Rate [W]', &
-        WatertoAirHP(HPNum)%QLoadTotal,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', &
+           WatertoAirHP(HPNum)%QLoadTotal,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Load Side Sensible Heat Transfer Rate [W]', &
-        WatertoAirHP(HPNum)%QSensible,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', &
+           WatertoAirHP(HPNum)%QSensible,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Load Side Latent Heat Transfer Rate [W]', &
-        WatertoAirHP(HPNum)%QLatent,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Latent Cooling Rate [W]', &
+           WatertoAirHP(HPNum)%QLatent,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Source Side Heat Transfer Rate [W]', &
-        WatertoAirHP(HPNum)%QSource,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Rate [W]', &
+           WatertoAirHP(HPNum)%QSource,'System','Average',WatertoAirHP(HPNum)%Name)
 
 
-   CALL SetupOutputVariable('WatertoAirHP Part Load Ratio', &
-        WatertoAirHP(HPNum)%PartLoadRatio,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Duty Factor', &
-        WatertoAirHP(HPNum)%RunFrac,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Part Load Ratio []', &
+           WatertoAirHP(HPNum)%PartLoadRatio,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Runtime Fraction []', &
+           WatertoAirHP(HPNum)%RunFrac,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Load Side Mass Flow Rate[kg/s]', &
-        WatertoAirHP(HPNum)%OutletAirMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
-        WatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
-        WatertoAirHP(HPNum)%InletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
-        WatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
-        WatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Mass Flow Rate [kg/s]', &
+           WatertoAirHP(HPNum)%OutletAirMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Inlet Temperature [C]', &
+           WatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+           WatertoAirHP(HPNum)%InletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Outlet Temperature [C]', &
+           WatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+           WatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
 
-   CALL SetupOutputVariable('WatertoAirHP Source Side Mass Flow Rate[kg/s]', &
-        WatertoAirHP(HPNum)%OutletWaterMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Source Side Inlet Temperature [C]', &
-        WatertoAirHP(HPNum)%InletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Source Side Outlet Temperature [C]', &
-        WatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Mass Flow Rate [kg/s]', &
+           WatertoAirHP(HPNum)%OutletWaterMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Inlet Temperature [C]', &
+           WatertoAirHP(HPNum)%InletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Outlet Temperature [C]', &
+           WatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+    ELSEIF (WatertoAirHP(HPNum)%WAHPPlantTypeOfNum == TypeOf_CoilWAHPHeatingParamEst) THEN
+        ! HEATING COIL Setup Report variables for the Heat Pump
+      CALL SetupOutputVariable('Heating Coil Electric Power [W]', &
+           WatertoAirHP(HPNum)%Power,'System','Average',WatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Heating Rate [W]', &
+           WatertoAirHP(HPNum)%QLoadTotal,'System','Average',WatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Sensible Heating Rate [W]', &
+           WatertoAirHP(HPNum)%QSensible,'System','Average',WatertoAirHP(HPNum)%Name)
+
+
+      CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Rate [W]', &
+           WatertoAirHP(HPNum)%QSource,'System','Average',WatertoAirHP(HPNum)%Name)
+
+
+      CALL SetupOutputVariable('Heating Coil Part Load Ratio []', &
+           WatertoAirHP(HPNum)%PartLoadRatio,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Runtime Fraction []', &
+           WatertoAirHP(HPNum)%RunFrac,'System','Average',WatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Air Mass Flow Rate [kg/s]', &
+           WatertoAirHP(HPNum)%OutletAirMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Inlet Temperature [C]', &
+           WatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+           WatertoAirHP(HPNum)%InletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Outlet Temperature [C]', &
+           WatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+           WatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',WatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Source Side Mass Flow Rate [kg/s]', &
+           WatertoAirHP(HPNum)%OutletWaterMassFlowRate,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Source Side Inlet Temperature [C]', &
+           WatertoAirHP(HPNum)%InletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Source Side Outlet Temperature [C]', &
+           WatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',WatertoAirHP(HPNum)%Name)
+
+    ENDIF
+
+
 
   END DO
 
@@ -876,13 +917,13 @@ SUBROUTINE InitWatertoAirHP(HPNum,InitFlag,MaxONOFFCyclesperHour,HPTimeConstant,
                                  WatertoAirHP(HPNum)%BranchNum, &
                                  WatertoAirHP(HPNum)%CompNum )
 
-    Node(WaterInletNode)%Temp          = 5.0
+    Node(WaterInletNode)%Temp          = 5.0d0
     Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
     Node(WaterInletNode)%Quality       = 0.0
     Node(WaterInletNode)%Press         = 0.0
     Node(WaterInletNode)%HumRat        = 0.0
 
-    Node(PlantOutletNode)%Temp          = 5.0
+    Node(PlantOutletNode)%Temp          = 5.0d0
     Node(PlantOutletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
     Node(PlantOutletNode)%Quality       = 0.0
     Node(PlantOutletNode)%Press         = 0.0
@@ -2788,7 +2829,8 @@ USE DataLoopNode
 USE DataGlobals
 USE DataSizing
 USE DataEnvironment, ONLY: StdBaroPress, OutBaroPress
-USE DataHVACGlobals, ONLY: CycFanCycCoil, ContFanCycCoil
+USE DataHVACGlobals, ONLY: CycFanCycCoil, ContFanCycCoil, WaterCycling, WaterConstant, WaterConstantOnDemand, Heating, Cooling,  &
+                           TimestepSys
 USE DataInterfaces
 USE DataPlant,       ONLY: TypeOf_CoilWAHPHeatingEquationFit, TypeOf_CoilWAHPCoolingEquationFit
 
@@ -2877,6 +2919,17 @@ TYPE SimpleWatertoAirHPConditions
   INTEGER      :: LoopSide                     =0    ! plant loop side index
   INTEGER      :: BranchNum                    =0    ! plant branch index
   INTEGER      :: CompNum                      =0    ! plant component index
+
+  INTEGER   :: WaterCyclingMode                = 0     ! Heat Pump Coil water flow mode; See definitions in DataHVACGlobals,
+                                                       ! 1=water cycling, 2=water constant, 3=water constant on demand (old mode)
+  INTEGER   :: LastOperatingMode               = WaterCycling  ! type of coil calling for water flow, either heating or cooling,
+                                                               ! start it at 1 so there will be water flow from the start,
+                                                               ! even if there is no load.
+                                                               ! Gets updated only during the first iteration of each timestep
+  LOGICAL   :: WaterFlowMode                   = .FALSE.       ! whether the water flow through the coil is called
+                                                               ! because there is a load on the coil, or not.
+                                                               ! Gets updated each iteration
+
 ! set by parent object and "pushed" to this structure in SetSimpleWSHPData subroutine
   INTEGER      :: CompanionCoolingCoilNum      =0    ! Heating coil companion cooling coil index
   INTEGER      :: CompanionHeatingCoilNum      =0    ! Cooling coil companion heating coil index
@@ -2888,6 +2941,8 @@ TYPE SimpleWatertoAirHPConditions
   REAL(r64) :: HPTimeConstant                  =0.0  ! Heat pump time constant [s]
   REAL(r64) :: FanDelayTime                    =0.0  ! Fan delay time, time delay for the HP's fan to
  END TYPE SimpleWatertoAirHPConditions
+
+  ! MODULE VARIABLE DECLARATIONS:
 TYPE (SimpleWatertoAirHPConditions), ALLOCATABLE, DIMENSION(:) :: SimpleWatertoAirHP
 
 INTEGER        :: NumWatertoAirHPs  = 0        ! The Number of Water to Air Heat Pumps found in the Input
@@ -2895,6 +2950,7 @@ INTEGER        :: NumWatertoAirHPs  = 0        ! The Number of Water to Air Heat
 !INTEGER        :: Count = 0
 LOGICAL        :: GetCoilsInputFlag = .TRUE.       ! Flag set to make sure you get input once
 LOGICAL, ALLOCATABLE, DIMENSION(:) :: MySizeFlag
+LOGICAL, ALLOCATABLE, DIMENSION(:) :: SimpleHPTimeStepFlag  ! determines whether the previous operating mode for the coil and it's partner has been initialized
 
 REAL(r64) :: SourceSideMassFlowRate =0.0 ! Source Side Mass flow rate [Kg/s]
 REAL(r64) :: SourceSideInletTemp    =0.0 ! Source Side Inlet Temperature [C]
@@ -2950,7 +3006,7 @@ CONTAINS
 !*************************************************************************
 SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
            CyclingScheme,RuntimeFrac,MaxONOFFCyclesperHour, &
-           HPTimeConstant,FanDelayTime,CompOp, PartLoadRatio, OnOffAirFlowRat)
+           HPTimeConstant,FanDelayTime,CompOp, PartLoadRatio, FirstHVACIteration, OnOffAirFlowRat)
 
           !       AUTHOR         Arun Shenoy
           !       DATE WRITTEN   Nov 2003
@@ -2976,7 +3032,6 @@ SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
 
           ! USE STATEMENTS:
   USE InputProcessor,       ONLY: FindItemInList
-  USE DataHVACGlobals,      ONLY: TimestepSys
   USE FluidProperties,      ONLY: FindGlycol
   USE General,              ONLY: TrimSigDigits
 
@@ -2984,20 +3039,21 @@ SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
 
-  CHARACTER(len=*), INTENT(IN) :: CompName                    ! Coil Name
-  INTEGER, INTENT(INOUT)       :: CompIndex                   ! Index for Component name
-  REAL(r64), INTENT(IN)             :: SensLoad                    ! Sensible demand load [W]
-  REAL(r64), INTENT(IN)             :: LatentLoad                  ! Latent demand load [W]
-  INTEGER, INTENT(IN)          :: CyclingScheme               ! Continuous fan OR cycling compressor
-  REAL(r64), INTENT (IN)            :: RuntimeFrac                 ! Compressor run time fraction  or
-                                                              ! percent on-time (on-time/cycle time)
-  REAL(r64), INTENT (INOUT)         :: MaxONOFFCyclesperHour       ! Maximum cycling rate of heat pump [cycles/hr]
-  REAL(r64), INTENT (INOUT)         :: HPTimeConstant              ! Heat pump time constant [s]
-  REAL(r64), INTENT (INOUT)         :: FanDelayTime                ! Fan delay time, time delay for the HP's fan to
-                                                              ! shut off after compressor cycle off  [s]
-  INTEGER, INTENT(IN) :: CompOp
-  REAL(r64), INTENT(IN) :: PartLoadRatio
-  REAL(r64), OPTIONAL, INTENT(IN) :: OnOffAirFlowRat          ! ratio of comp on to comp off air flow rate
+  CHARACTER(len=*), INTENT(IN) :: CompName                ! Coil Name
+  INTEGER, INTENT(INOUT)       :: CompIndex               ! Index for Component name
+  REAL(r64), INTENT(IN)        :: SensLoad                ! Sensible demand load [W]
+  REAL(r64), INTENT(IN)        :: LatentLoad              ! Latent demand load [W]
+  INTEGER, INTENT(IN)          :: CyclingScheme           ! Continuous fan OR cycling compressor
+  REAL(r64), INTENT (IN)       :: RuntimeFrac             ! Compressor run time fraction  or
+                                                          ! percent on-time (on-time/cycle time)
+  REAL(r64), INTENT (INOUT)    :: MaxONOFFCyclesperHour   ! Maximum cycling rate of heat pump [cycles/hr]
+  REAL(r64), INTENT (INOUT)   :: HPTimeConstant           ! Heat pump time constant [s]
+  REAL(r64), INTENT (INOUT)   :: FanDelayTime             ! Fan delay time, time delay for the HP's fan to
+                                                          ! shut off after compressor cycle off  [s]
+  INTEGER, INTENT(IN)         :: CompOp
+  REAL(r64), INTENT(IN)       :: PartLoadRatio
+  LOGICAL, INTENT (IN)        :: FirstHVACIteration
+  REAL(r64), OPTIONAL, INTENT(IN) :: OnOffAirFlowRat      ! ratio of comp on to comp off air flow rate
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: Blank = ' '
@@ -3009,8 +3065,10 @@ SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-  INTEGER                      :: HPNum                       ! The WatertoAirHP that you are currently loading input into
-  REAL(r64)                    :: OnOffAirFlowRatio           ! ratio of comp on to comp off air flow rate
+  INTEGER   :: HPNum                       ! The WatertoAirHP that you are currently loading input into
+  REAL(r64) :: OnOffAirFlowRatio           ! ratio of comp on to comp off air flow rate
+  REAL(r64) :: WaterPartLoad               ! The part load ratio of water
+
            ! FLOW:
 
   ! Obtains and Allocates WatertoAirHP related parameters from input file
@@ -3049,17 +3107,27 @@ SUBROUTINE SimWatertoAirHPSimple(CompName,CompIndex,SensLoad,LatentLoad, &
   END IF
 
   ! Calculate the Correct Water to Air HP Model with the current HPNum
-   IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
+  IF((SimpleWatertoAirHP(HPNum)%WaterCyclingMode)==WaterCycling)THEN
+   WaterPartLoad = RuntimeFrac
+        !IF (WaterPartLoad < 0.1)THEN
+	!	WaterPartLoad = 0.1
+	!ENDIF
+  ELSE
+    WaterPartLoad = 1.0d0
+  ENDIF
+
+  IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
     ! Cooling mode
     CALL InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
-                                OnOffAirFlowRatio)
-    CALL CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensLoad,LatentLoad,CompOp, PartLoadRatio, OnOffAirFlowRatio)
+                                OnOffAirFlowRatio,WaterPartLoad,FirstHVACIteration)
+    CALL CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensLoad,LatentLoad,CompOp, PartLoadRatio,   &
+                                OnOffAirFlowRatio,WaterPartLoad)
     CALL UpdateSimpleWatertoAirHP(HPNum)
   ELSEIF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPHeatingEquationFit)THEN
     ! Heating mode
     CALL InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,constant_zero,CyclingScheme, &
-                                OnOffAirFlowRatio)
-    CALL CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensLoad,CompOp,PartLoadRatio, OnOffAirFlowRatio)
+                                OnOffAirFlowRatio,WaterPartLoad,FirstHVACIteration)
+    CALL CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensLoad,CompOp,PartLoadRatio, OnOffAirFlowRatio,WaterPartLoad)
     CALL UpdateSimpleWatertoAirHP(HPNum)
   ELSE
     CALL ShowFatalError ('SimWatertoAirHPSimple: WatertoAir heatpump not in either HEATING or COOLING mode')
@@ -3100,7 +3168,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
     USE InputProcessor
     USE NodeInputManager
     USE BranchNodeConnections, ONLY: TestCompSet
-    USE GlobalNames,     ONLY: VerifyUniqueWaterToAirHPName
+    USE GlobalNames, ONLY: VerifyUniqueCoilName
     USE OutputReportPredefined
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -3153,6 +3221,8 @@ SUBROUTINE GetSimpleWatertoAirHPInput
    ! Allocate Arrays
     IF (NumWatertoAirHPs.GT.0) THEN
       ALLOCATE(SimpleWatertoAirHP(NumWatertoAirHPs))
+      ALLOCATE(SimpleHPTimeStepFlag(NumWatertoAirHPs))
+      SimpleHPTimeStepFlag = .TRUE.
     ENDIF
 
     CALL GetObjectDefMaxArgs('Coil:Cooling:WaterToAirHeatPump:EquationFit',NumParams,NumAlphas,NumNums)
@@ -3182,7 +3252,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
 
         HPNum= HPNum + 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),HPNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,HPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -3195,8 +3265,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -3244,21 +3313,21 @@ SUBROUTINE GetSimpleWatertoAirHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),'Water Nodes')
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
-        CALL SetupOutputVariable('WatertoAirHP Cooling Electric Consumption [J]', &
+        CALL SetupOutputVariable('Cooling Coil Electric Energy [J]', &
              SimpleWatertoAirHP(HPNum)%Energy,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Cooling',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Total Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Total Cooling Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergyLoadTotal,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='COOLINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Sensible Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Sensible Cooling Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergySensible,'System','Summed',SimpleWatertoAirHP(HPNum)%Name)
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Latent Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Latent Cooling Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergyLatent,'System','Summed',SimpleWatertoAirHP(HPNum)%Name)
 
-        CALL SetupOutputVariable('WatertoAirHP Source Side Cooling Energy [J]', &
+        CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergySource,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,   &
              ResourceTypeKey='PLANTLOOPCOOLINGDEMAND',EndUseKey='COOLINGCOILS',GroupKey='System')
 
@@ -3282,7 +3351,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
 
         HPNum= HPNum + 1
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),WatertoAirHPNum,AlphArray,NumAlphas, &
+        CALL GetObjectItem(CurrentModuleObject,WatertoAirHPNum,AlphArray,NumAlphas, &
                            NumArray,NumNums,IOSTAT, &
                            NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                            AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
@@ -3295,8 +3364,7 @@ SUBROUTINE GetSimpleWatertoAirHPInput
           ErrorsFound=.TRUE.
           IF (IsBlank) AlphArray(1)='xxxxx'
         ENDIF
-        CALL VerifyUniqueWaterToAirHPName(TRIM(CurrentModuleObject),AlphArray(1),errflag,  &
-                                          TRIM(CurrentModuleObject)//' Name')
+        CALL VerifyUniqueCoilName(CurrentModuleObject,AlphArray(1),errflag,TRIM(CurrentModuleObject)//' Name')
         IF (errflag) THEN
           ErrorsFound=.true.
         ENDIF
@@ -3335,15 +3403,15 @@ SUBROUTINE GetSimpleWatertoAirHPInput
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(2),AlphArray(3),'Water Nodes')
         CALL TestCompSet(TRIM(CurrentModuleObject),AlphArray(1),AlphArray(4),AlphArray(5),'Air Nodes')
 
-        CALL SetupOutputVariable('WatertoAirHP Heating Electric Consumption [J]', &
+        CALL SetupOutputVariable('Heating Coil Electric Energy [J]', &
              SimpleWatertoAirHP(HPNum)%Energy,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='Electric',EndUseKey='Heating',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Load Side Total Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Heating Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergyLoadTotal,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATINGCOILS',GroupKey='System')
 
-        CALL SetupOutputVariable('WatertoAirHP Source Side Heating Energy [J]', &
+        CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Energy [J]', &
              SimpleWatertoAirHP(HPNum)%EnergySource,'System','Summed',SimpleWatertoAirHP(HPNum)%Name,  &
              ResourceTypeKey='PLANTLOOPHEATINGDEMAND',EndUseKey='HEATINGCOILS',GroupKey='System')
 
@@ -3355,50 +3423,89 @@ SUBROUTINE GetSimpleWatertoAirHPInput
 
    END DO
 
-   DEALLOCATE(AlphArray)
-   DEALLOCATE(cAlphaFields)
-   DEALLOCATE(lAlphaBlanks)
-   DEALLOCATE(cNumericFields)
-   DEALLOCATE(lNumericBlanks)
-   DEALLOCATE(NumArray)
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(cAlphaFields)
+  DEALLOCATE(lAlphaBlanks)
+  DEALLOCATE(cNumericFields)
+  DEALLOCATE(lNumericBlanks)
+  DEALLOCATE(NumArray)
 
-   IF (ErrorsFound) THEN
-     CALL ShowFatalError(RoutineName//'Errors found getting input. Program terminates.')
-   ENDIF
+  IF (ErrorsFound) THEN
+    CALL ShowFatalError(RoutineName//'Errors found getting input. Program terminates.')
+  ENDIF
 
-   DO HPNum=1,NumWatertoAirHPs
-        ! Setup Report variables for the Heat Pump
-   CALL SetupOutputVariable('WatertoAirHP Power [W]', &
-        SimpleWatertoAirHP(HPNum)%Power,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Total Heat Transfer Rate [W]', &
-        SimpleWatertoAirHP(HPNum)%QLoadTotal,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Sensible Heat Transfer Rate [W]', &
-        SimpleWatertoAirHP(HPNum)%QSensible,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Latent Heat Transfer Rate [W]', &
-        SimpleWatertoAirHP(HPNum)%QLatent,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Source Side Heat Transfer Rate [W]', &
-        SimpleWatertoAirHP(HPNum)%QSource,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Part Load Ratio', &
-        SimpleWatertoAirHP(HPNum)%PartLoadRatio,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Run Time Fraction', &
-        SimpleWatertoAirHP(HPNum)%RunFrac,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+  DO HPNum=1,NumWatertoAirHPs
 
-   CALL SetupOutputVariable('WatertoAirHP Air Mass Flow Rate [kg/s]', &
-        SimpleWatertoAirHP(HPNum)%AirMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Dry Bulb Temperature [C]', &
-        SimpleWatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Inlet Humidity Ratio [kgWater/kgDryAir]', &
-        SimpleWatertoAirHP(HPNum)%InletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Dry Bulb Temperature [C]', &
-        SimpleWatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Load Side Outlet Humidity Ratio [kgWater/kgDryAir]', &
-        SimpleWatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Water Mass Flow Rate [kg/s]', &
-        SimpleWatertoAirHP(HPNum)%WaterMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Source Side Inlet Temperature [C]', &
-        SimpleWatertoAirHP(HPNum)%InletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
-   CALL SetupOutputVariable('WatertoAirHP Source Side Outlet Temperature [C]', &
-        SimpleWatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+    IF (    SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum== TypeOf_CoilWAHPCoolingEquationFit ) THEN
+          ! COOLING COIL  Setup Report variables for the Heat Pump
+      CALL SetupOutputVariable('Cooling Coil Electric Power [W]', &
+           SimpleWatertoAirHP(HPNum)%Power,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Total Cooling Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QLoadTotal,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Sensible Cooling Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QSensible,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Latent Cooling Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QLatent,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Heat Transfer Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QSource,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Part Load Ratio []', &
+           SimpleWatertoAirHP(HPNum)%PartLoadRatio,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Runtime Fraction []', &
+           SimpleWatertoAirHP(HPNum)%RunFrac,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Cooling Coil Air Mass Flow Rate [kg/s]', &
+           SimpleWatertoAirHP(HPNum)%AirMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Inlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+           SimpleWatertoAirHP(HPNum)%InletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Outlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+           SimpleWatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Mass Flow Rate [kg/s]', &
+           SimpleWatertoAirHP(HPNum)%WaterMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Inlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%InletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Cooling Coil Source Side Outlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+
+    ELSEIF ( SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum== TypeOf_CoilWAHPHeatingEquationFit) THEN
+          ! HEATING COIL Setup Report variables for the Heat Pump
+      CALL SetupOutputVariable('Heating Coil Electric Power [W]', &
+           SimpleWatertoAirHP(HPNum)%Power,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Heating Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QLoadTotal,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Sensible Heating Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QSensible,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Source Side Heat Transfer Rate [W]', &
+           SimpleWatertoAirHP(HPNum)%QSource,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Part Load Ratio []', &
+           SimpleWatertoAirHP(HPNum)%PartLoadRatio,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Runtime Fraction []', &
+           SimpleWatertoAirHP(HPNum)%RunFrac,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+
+      CALL SetupOutputVariable('Heating Coil Air Mass Flow Rate [kg/s]', &
+           SimpleWatertoAirHP(HPNum)%AirMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Inlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%InletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Inlet Humidity Ratio [kgWater/kgDryAir]', &
+           SimpleWatertoAirHP(HPNum)%InletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Outlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%OutletAirDBTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Air Outlet Humidity Ratio [kgWater/kgDryAir]', &
+           SimpleWatertoAirHP(HPNum)%OutletAirHumRat,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Source Side Mass Flow Rate [kg/s]', &
+           SimpleWatertoAirHP(HPNum)%WaterMassFlowRate,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Source Side Inlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%InletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+      CALL SetupOutputVariable('Heating Coil Source Side Outlet Temperature [C]', &
+           SimpleWatertoAirHP(HPNum)%OutletWaterTemp,'System','Average',SimpleWatertoAirHP(HPNum)%Name)
+
+    ENDIF
+
+
 
    END DO
 
@@ -3410,7 +3517,7 @@ END SUBROUTINE GetSimpleWatertoAirHPInput
 !******************************************************************************
 
 SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,FanDelayTime,SensLoad,LatentLoad,CyclingScheme, &
-                                  OnOffAirFlowRatio)
+                                  OnOffAirFlowRatio,WaterPartLoad,FirstHVACIteration)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Arun Shenoy
@@ -3446,6 +3553,8 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
   REAL(r64), INTENT(IN) :: LatentLoad            ! Control zone latent load[W]
   INTEGER,   INTENT(IN) :: CyclingScheme         ! fan operating mode
   REAL(r64), INTENT(IN) :: OnOffAirFlowRatio     ! ratio of compressor on flow to average flow over time step
+  REAL(r64), INTENT(IN) :: WaterPartLoad
+  LOGICAL,   INTENT(IN) :: FirstHVACIteration  ! Iteration flag
 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -3505,6 +3614,40 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
 
   END IF
 
+  IF(FirstHVACIteration)THEN
+    IF(SimpleHPTimeStepFlag(HPNum))THEN
+      IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
+        IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
+          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Cooling
+        ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%WaterFlowMode)THEN
+          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
+          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%LastOperatingMode = Heating
+        END IF
+        SimpleHPTimeStepFlag(HPNum) = .FALSE.
+        SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum) = .FALSE.
+      ELSE
+        ! it is a heating coil
+        IF(SimpleWatertoAirHP(HPNum)%WaterFlowMode)THEN
+          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Heating
+          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Heating
+        ELSEIF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%WaterFlowMode)THEN
+          SimpleWatertoAirHP(HPNum)%LastOperatingMode = Cooling
+          SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%LastOperatingMode = Cooling
+        END IF
+        SimpleHPTimeStepFlag(HPNum) = .FALSE.
+        SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum) = .FALSE.
+      END IF
+    END IF
+    ELSE
+    SimpleHPTimeStepFlag(HPNum) = .TRUE.
+    IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
+      SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum) = .TRUE.
+    ELSE
+      SimpleHPTimeStepFlag(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum) = .TRUE.
+    END IF
+  END IF
+
   ! Do the Begin Environment initializations
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(HPNum) .AND. .NOT. MyPlantScanFlag(HPNum)) THEN
       ! Do the initializations to start simulation
@@ -3561,13 +3704,13 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
                                   SimpleWatertoAirHP(HPNum)%BranchNum, &
                                   SimpleWatertoAirHP(HPNum)%CompNum )
 
-    Node(WaterInletNode)%Temp          = 5.0
+    Node(WaterInletNode)%Temp          = 5.0d0
     Node(WaterInletNode)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
     Node(WaterInletNode)%Quality       = 0.0
     Node(WaterInletNode)%Press         = 0.0
     Node(WaterInletNode)%HumRat        = 0.0
 
-    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Temp          = 5.0
+    Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Temp          = 5.0d0
     Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Enthalpy      = Cp* Node(WaterInletNode)%Temp
     Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Quality       = 0.0
     Node(SimpleWatertoAirHP(HPNum)%WaterOutletNodeNum)%Press         = 0.0
@@ -3587,14 +3730,18 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
   ! the previous components outlets or the node data in this section.
   ! First set the conditions for the air into the heat pump model
 
-    ! Set water and air inlet nodes
+  ! Set water and air inlet nodes
 
-    AirInletNode = SimpleWatertoAirHP(HPNum)%AirInletNodeNum
-    WaterInletNode = SimpleWatertoAirHP(HPNum)%WaterInletNodeNum
+  AirInletNode = SimpleWatertoAirHP(HPNum)%AirInletNodeNum
+  WaterInletNode = SimpleWatertoAirHP(HPNum)%WaterInletNodeNum
 
   IF ((SensLoad .NE. 0.0 .OR. LatentLoad .NE. 0.0).AND.(Node(AirInletNode)%MassFlowRate > 0.0)) THEN
 
-    SimpleWatertoAirHP(HPNum)%WaterMassFlowRate =    SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+   ! changed the water mass flow rate to be equal to the design times run time fraction in order to account for
+   ! cycling of equipment
+    SimpleWatertoAirHP(HPNum)%WaterMassFlowRate =    SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate*WaterPartLoad
+
+!    SimpleWatertoAirHP(HPNum)%WaterMassFlowRate =    SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
 
 ! Model requires the values to be calculated at full design flow rate for air and then scaled to part load ratio.
 ! So always start the calculations by setting the air flow rate to design flow rate.
@@ -3610,10 +3757,29 @@ SUBROUTINE InitSimpleWatertoAirHP(HPNum,MaxONOFFCyclesperHour,HPTimeConstant,Fan
           0.25d0*SimpleWatertoAirHP(HPNum)%RatedAirVolFlowRate* &
               PsyRhoAirFnPbTdbW(StdBaroPress,Node(AirInletNode)%Temp,Node(AirInletNode)%HumRat)
     END IF
-
+    SimpleWatertoAirHP(HPNum)%WaterFlowMode = .TRUE.
   ELSE !heat pump is off
+    SimpleWatertoAirHP(HPNum)%WaterFlowMode = .FALSE.
     SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = 0.d0
     SimpleWatertoAirHP(HPNum)%AirMassFlowRate   = 0.d0
+    IF((SimpleWatertoAirHP(HPNum)%WaterCyclingMode)==WaterConstant)THEN
+      IF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPCoolingEquationFit)THEN
+        IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionHeatingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
+          ! do nothing, there will be flow through this coil
+        ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Cooling)THEN
+          ! set the flow rate to full design flow
+          SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+        END IF
+      ELSEIF(SimpleWatertoAirHP(HPNum)%WAHPPlantTypeOfNum==TypeOf_CoilWAHPHeatingEquationFit)THEN
+        ! It's a heating coil
+        IF(SimpleWatertoAirHP(SimpleWatertoAirHP(HPNum)%CompanionCoolingCoilNum)%QLoadTotal .GT. 0.0d0)THEN
+          ! do nothing, there will be flow through this coil
+        ELSEIF(SimpleWatertoAirHP(HPNum)%LastOperatingMode==Heating)THEN
+          ! set the flow rate to full design flow
+          SimpleWatertoAirHP(HPNum)%WaterMassFlowRate = SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate
+        END IF
+      END IF
+    ENDIF
   ENDIF
 
   CALL SetComponentFlowRate(SimpleWatertoAirHP(HPNum)%WaterMassFlowRate, &
@@ -4172,7 +4338,7 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
 
     CALL ReportSizingOutput('COIL:'//TRIM(SimpleWatertoAirHP(HPNum)%WaterToAirHPType)//':WATERTOAIRHEATPUMP:EQUATIONFIT', &
                              SimpleWatertoAirHP(HPNum)%Name, &
-                            'Nominal Heating Capacity [W]', &
+                            'Rated Heating Capacity [W]', &
                              SimpleWatertoAirHP(HPNum)%RatedCapHeat)
     CALL PreDefTableEntry(pdchHeatCoilNomCap,SimpleWatertoAirHP(HPNum)%Name,SimpleWatertoAirHP(HPNum)%RatedCapHeat)
     IF (SimpleWatertoAirHP(HPNum)%RatedCapHeat /= 0.0d0) THEN
@@ -4306,7 +4472,8 @@ SUBROUTINE SizeHVACWaterToAir(HPNum)
 END SUBROUTINE SizeHVACWaterToAir
 
 
-SUBROUTINE  CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,LatentDemand,CompOp,PartLoadRatio,OnOffAirFlowRatio)
+SUBROUTINE CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,LatentDemand,CompOp,PartLoadRatio,  &
+                               OnOffAirFlowRatio,WaterPartLoad)
 
 
           !       AUTHOR         Arun Shenoy
@@ -4363,6 +4530,7 @@ SUBROUTINE  CalcHPCoolingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,Laten
   INTEGER,   INTENT(IN) :: CompOp             ! compressor operation flag
   REAL(r64), INTENT(IN) :: PartLoadRatio      ! compressor part load ratio
   REAL(r64), INTENT(IN) :: OnOffAirFlowRatio  ! ratio of compressor on flow to average flow over time step
+  REAL(r64), INTENT(IN) :: WaterPartLoad      ! water part load ratio
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER  :: Tref=283.15d0      ! Reference Temperature for performance curves,10C [K]
@@ -4534,7 +4702,11 @@ LOOP: DO
     ratioTS = ((SourceSideInletTemp+CelsiustoKelvin)/Tref)
     ratioVL = (LoadSideMassFlowRate/(AirVolFlowRateRated*PsyRhoAirFnPbTdbW(StdBaroPress,LoadSideInletDBTemp,LoadSideInletHumRat)))
 
-    ratioVS = (SourceSideMassFlowRate/(SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate))
+    IF (WaterPartLoad > 0.0d0 .and. SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate > 0.0d0) THEN
+      ratioVS = (SourceSideMassFlowRate)/(SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate*WaterPartLoad)
+    ELSE
+      ratioVS = 0.0d0
+    ENDIF
 
     QLoadTotal = TotalCapRated*(TotalCapCoeff1 + (ratioTWB * TotalCapCoeff2) + (ratioTS * TotalCapCoeff3) +   &
                                 (ratioVL * TotalCapCoeff4) + (ratioVS * TotalCapCoeff5))
@@ -4629,7 +4801,7 @@ LOOP: DO
 
 END SUBROUTINE CalcHPCoolingSimple
 
-SUBROUTINE  CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompOp,PartLoadRatio,OnOffAirFlowRatio)
+SUBROUTINE CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompOp,PartLoadRatio,OnOffAirFlowRatio,WaterPartLoad)
 
 
           !       AUTHOR         Arun Shenoy
@@ -4674,6 +4846,7 @@ SUBROUTINE  CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompO
   INTEGER,   INTENT(IN) :: CompOp             ! compressor operation flag
   REAL(r64), INTENT(IN) :: PartLoadRatio      ! compressor part load ratio
   REAL(r64), INTENT(IN) :: OnOffAirFlowRatio  ! ratio of compressor on flow to average flow over time step
+  REAL(r64), INTENT(IN) :: WaterPartLoad      ! water part load ratio
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   REAL(r64), PARAMETER  :: Tref=283.15d0      ! Reference Temperature for performance curves,10C [K]
@@ -4762,7 +4935,11 @@ SUBROUTINE  CalcHPHeatingSimple(HPNum,CyclingScheme,RuntimeFrac,SensDemand,CompO
   ratioTS = ((SourceSideInletTemp+CelsiustoKelvin)/Tref)
   ratioVL = (LoadSideMassFlowRate/  &
      (AirVolFlowRateRated*PsyRhoAirFnPbTdbW(StdBaroPress,LoadSideInletDBTemp,LoadSideInletHumRat,RoutineName)))
-  ratioVS = (SourceSideMassFlowRate/(SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate))
+  IF (WaterPartLoad > 0.0d0 .and. SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate > 0.0d0) THEN
+    ratioVS = (SourceSideMassFlowRate)/(SimpleWatertoAirHP(HPNum)%DesignWaterMassFlowRate*WaterPartLoad)
+  ELSE
+    ratioVS = 0.0d0
+  ENDIF
 
   QLoadTotal = HeatCapRated*(HeatCapCoeff1 + (ratioTDB * HeatCapCoeff2) + (ratioTS * HeatCapCoeff3) +   &
                                   (ratioVL * HeatCapCoeff4) + (ratioVS * HeatCapCoeff5))
@@ -5425,7 +5602,7 @@ FUNCTION GetCoilOutletNode(CoilType,CoilName,ErrorsFound) RESULT(NodeNumber)
 
 END FUNCTION GetCoilOutletNode
 
- SUBROUTINE SetSimpleWSHPData(SimpleWSHPNum,ErrorsFound,CompanionCoolingCoilNum,CompanionHeatingCoilNum)
+ SUBROUTINE SetSimpleWSHPData(SimpleWSHPNum,ErrorsFound,WaterCyclingMode,CompanionCoolingCoilNum,CompanionHeatingCoilNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Raustad
@@ -5453,6 +5630,7 @@ END FUNCTION GetCoilOutletNode
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN)    :: SimpleWSHPNum  ! Number of OA Controller
   LOGICAL, INTENT(INOUT) :: ErrorsFound    ! Set to true if certain errors found
+  INTEGER, INTENT(IN)    :: WaterCyclingMode  ! the coil water flow mode (cycling, constant or constantondemand)
   INTEGER, OPTIONAL      :: CompanionCoolingCoilNum  ! Index to cooling coil for heating coil = SimpleWSHPNum
   INTEGER, OPTIONAL      :: CompanionHeatingCoilNum  ! Index to heating coil for cooling coil = SimpleWSHPNum
 
@@ -5482,14 +5660,17 @@ END FUNCTION GetCoilOutletNode
     RETURN
   ENDIF
 
+  SimpleWatertoAirHP(SimpleWSHPNum)%WaterCyclingMode = WaterCyclingMode
   IF (PRESENT(CompanionCoolingCoilNum)) THEN
     SimpleWatertoAirHP(SimpleWSHPNum)%CompanionCoolingCoilNum=CompanionCoolingCoilNum
     SimpleWatertoAirHP(CompanionCoolingCoilNum)%CompanionHeatingCoilNum=SimpleWSHPNum
+    SimpleWatertoAirHP(CompanionCoolingCoilNum)%WaterCyclingMode = WaterCyclingMode
   ENDIF
 
   IF (PRESENT(CompanionHeatingCoilNum)) THEN
     SimpleWatertoAirHP(SimpleWSHPNum)%CompanionHeatingCoilNum=CompanionHeatingCoilNum
     SimpleWatertoAirHP(CompanionHeatingCoilNum)%CompanionCoolingCoilNum=SimpleWSHPNum
+    SimpleWatertoAirHP(CompanionHeatingCoilNum)%WaterCyclingMode = WaterCyclingMode
   ENDIF
 
   RETURN
@@ -5500,7 +5681,7 @@ END MODULE WatertoAirHeatPumpSimple
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

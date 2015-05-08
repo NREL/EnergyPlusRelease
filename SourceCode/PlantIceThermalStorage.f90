@@ -27,7 +27,7 @@ MODULE IceThermalStorage  ! Ice Storage Module
   USE CurveManager
   USE DataLoopNode
   USE DataGlobals,     ONLY: WarmupFlag, BeginDayFlag, EndDayFlag, TimeStepZone, SecInHour, &
-                             HourOfDay,TimeStep
+                             HourOfDay,TimeStep,ScheduleAlwaysOn
   USE DataInterfaces,  ONLY: ShowWarningError, ShowContinueError, ShowSevereError, ShowFatalError, &
                              ShowContinueErrorTimeStamp, ShowRecurringWarningErrorAtEnd
   USE DataEnvironment, ONLY : OutWetBulbTemp,OutDryBulbTemp  ! This value is used to model Cooling Tower.  Twb + 2[degF]
@@ -44,10 +44,10 @@ MODULE IceThermalStorage  ! Ice Storage Module
 
   INTEGER, PARAMETER :: IceStorageType_Simple   = 1
   INTEGER, PARAMETER :: IceStorageType_Detailed = 2
-  
+
   INTEGER, PARAMETER :: DetIceInsideMelt  = 1    ! Inside melt system--charge starting with bare coil
   INTEGER, PARAMETER :: DetIceOutsideMelt = 2    ! Outside melt system--charge from existing ice layer on coil
-  
+
        ! ITS parameter
   REAL(r64), PARAMETER :: FreezTemp   = 0.0d0      ! Water freezing Temperature, 0[C]
   REAL(r64), PARAMETER :: FreezTempIP  = 32.0d0    ! Water freezing Temperature, 32[F]
@@ -353,9 +353,9 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
       ! READING INPUT when first calling SimIceStorage
       !------------------------------------------------------------------------
       IceNum=IceStorageTypeMap(IceStorageNum)%LocalEqNum
-      
+
       CALL InitSimpleIceStorage
-      
+
       IF (InitLoopEquip) THEN
 
              ! Find IceStorage Number
@@ -394,12 +394,12 @@ SUBROUTINE SimIceStorage(IceStorageType,IceStorageName,CompIndex,RunFlag,FirstIt
         TempSetPt  = Node(OutletNodeNum)%TempSetPointHi
       END SELECT
       DemandMdot = IceStorage(IceNum)%DesignMassFlowRate
-      
+
       Cp = GetSpecificHeatGlycol(PlantLoop(IceStorage(IceNum)%LoopNum)%FluidName, &
                                  TempIn, &
                                  PlantLoop(IceStorage(IceNum)%LoopNum)%FluidIndex, &
                                  'SimIceStorage')
-      
+
       MyLoad2    = (DemandMdot* Cp *(TempIn - TempSetPt))
       MyLoad     = MyLoad2
 
@@ -497,7 +497,7 @@ SUBROUTINE SimDetailedIceStorage
   USE DataPlant,       ONLY : PlantLoop, CommonPipe_TwoWay,  SingleSetpoint, DualSetpointDeadband
   USE PlantUtilities,  ONLY : SetComponentFlowRate
   USE DataBranchAirLoopPlant, ONLY : MassFlowTolerance
-  
+
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -563,7 +563,7 @@ SUBROUTINE SimDetailedIceStorage
                              TempIn, &
                              PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%FluidIndex, &
                              'SimDetailedIceStorage')
-          
+
   LocalLoad = DetIceStor(IceNum)%MassFlowRate * Cp * (TempIn - TempSetPt)
 
           ! Determine what the status is regarding the ice storage unit and the loop level flow
@@ -580,7 +580,7 @@ SUBROUTINE SimDetailedIceStorage
                             DetIceStor(IceNum)%PlantLoopSideNum, &
                             DetIceStor(IceNum)%PlantBranchNum, &
                             DetIceStor(IceNum)%PlantCompNum)
-                                  
+
     DetIceStor(IceNum)%BypassMassFlowRate = mdot
     DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
     DetIceStor(IceNum)%MassFlowRate       = mdot
@@ -606,7 +606,7 @@ SUBROUTINE SimDetailedIceStorage
                               DetIceStor(IceNum)%PlantLoopSideNum, &
                               DetIceStor(IceNum)%PlantBranchNum, &
                               DetIceStor(IceNum)%PlantCompNum)
-                                    
+
       DetIceStor(IceNum)%BypassMassFlowRate = mdot
       DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
       DetIceStor(IceNum)%MassFlowRate       = mdot
@@ -621,7 +621,7 @@ SUBROUTINE SimDetailedIceStorage
                               DetIceStor(IceNum)%PlantLoopSideNum, &
                               DetIceStor(IceNum)%PlantBranchNum, &
                               DetIceStor(IceNum)%PlantCompNum)
-      
+
           ! We are in charging mode, the temperatures are low enough to charge
           ! the tank, and we have some charging left to do.
           ! Make first guess at Qstar based on the current ice fraction remaining
@@ -751,13 +751,13 @@ SUBROUTINE SimDetailedIceStorage
                               DetIceStor(IceNum)%PlantLoopSideNum, &
                               DetIceStor(IceNum)%PlantBranchNum, &
                               DetIceStor(IceNum)%PlantCompNum)
-                                    
+
       DetIceStor(IceNum)%BypassMassFlowRate = mdot
       DetIceStor(IceNum)%TankMassFlowRate   = 0.0d0
       DetIceStor(IceNum)%MassFlowRate       = mdot
 
     ELSE
-    
+
           !make flow request so tank will get flow
       mdot = DetIceStor(IceNum)%DesignMassFlowRate
       CALL SetComponentFlowRate(mdot, &
@@ -948,7 +948,7 @@ SUBROUTINE GetIceStorageInput
   cCurrentModuleObject = cIceStorageSimple
   DO IceNum = 1 , NumIceStorages
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),IceNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,IceNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                     NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
     IsBlank=.false.
@@ -1025,27 +1025,27 @@ SUBROUTINE GetIceStorageInput
   !********************************************
   DO IceNum = 1, NumIceStorages
 
-     CALL SetupOutputVariable('Ice Thermal Storage Load Requested [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Requested Load [W]', &
           IceStorageReport(IceNum)%MyLoad,'System','Average',IceStorage(IceNum)%Name)
 
           ! Ice fraction
-     CALL SetupOutputVariable('Ice Thermal Storage End Fraction [Frac]', &
+     CALL SetupOutputVariable('Ice Thermal Storage End Fraction []', &
           IceStorageReport(IceNum)%IceFracRemain,'Zone','Average',IceStorage(IceNum)%Name)
 
           ! Discharge: ITS Information
-     CALL SetupOutputVariable('Ice Thermal Storage Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Mass Flow Rate [kg/s]', &
           IceStorageReport(IceNum)%ITSmdot,'System','Average',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Inlet Temperature [C]', &
           IceStorageReport(IceNum)%ITSInletTemp,'System','Average',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Outlet Temperature [C]', &
           IceStorageReport(IceNum)%ITSOutletTemp,'System','Average',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Cooling Rate [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Discharge Rate [W]', &
           IceStorageReport(IceNum)%ITSCoolingRate,'System','Average',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Cooling Energy [J]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Discharge Energy [J]', &
           IceStorageReport(IceNum)%ITSCoolingEnergy,'System','Sum',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Charging Rate [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Charge Rate [W]', &
           IceStorageReport(IceNum)%ITSChargingRate,'System','Average',IceStorage(IceNum)%Name)
-     CALL SetupOutputVariable('Ice Thermal Storage Charging Energy [J]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Charge Energy [J]', &
           IceStorageReport(IceNum)%ITSChargingEnergy,'System','Sum',IceStorage(IceNum)%Name)
 
   END DO  ! IceNum
@@ -1059,7 +1059,7 @@ SUBROUTINE GetIceStorageInput
 
   DO IceNum = 1, NumDetIceStorages
 
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),IceNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+    CALL GetObjectItem(cCurrentModuleObject,IceNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     IsNotOK=.false.
@@ -1081,16 +1081,15 @@ SUBROUTINE GetIceStorageInput
 
           ! Get and verify availability schedule
     DetIceStor(IceNum)%ScheduleName  = cAlphaArgs(2)  ! Detailed ice storage availability schedule name
-    DetIceStor(IceNum)%ScheduleIndex = GetScheduleIndex(DetIceStor(IceNum)%ScheduleName)
-    IF (DetIceStor(IceNum)%ScheduleIndex == 0) THEN
-      IF (lAlphaFieldBlanks(2) ) THEN
-        CALL ShowSevereError('Detailed ice storage availability schedule must be input, is missing for '// &
-                        TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
-      ELSE
+    IF (lAlphaFieldBlanks(2)) THEN
+      DetIceStor(IceNum)%ScheduleIndex = ScheduleAlwaysOn
+    ELSE
+      DetIceStor(IceNum)%ScheduleIndex = GetScheduleIndex(DetIceStor(IceNum)%ScheduleName)
+      IF (DetIceStor(IceNum)%ScheduleIndex == 0) THEN
         CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(2))//'='//TRIM(cAlphaArgs(2)))
         CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+        ErrorsFound = .TRUE.
       END IF
-      ErrorsFound = .TRUE.
     END IF
 
           ! Get and Verify ITS nominal Capacity (user input is in GJ, internal value is in W-hr)
@@ -1172,7 +1171,7 @@ SUBROUTINE GetIceStorageInput
       DetIceStor(IceNum)%ThawProcessIndex = DetIceInsideMelt ! Severe error will end simulation, but just in case...
       ErrorsFound = .TRUE.
     END IF
-    
+
           ! Get the other ice storage parameters (electric, heat loss, freezing temperature) and stupidity check each one
     DetIceStor(IceNum)%DischargeParaElecLoad = rNumericArgs(3)
     DetIceStor(IceNum)%ChargeParaElecLoad    = rNumericArgs(4)
@@ -1242,41 +1241,41 @@ SUBROUTINE GetIceStorageInput
   !********************************************
   DO IceNum = 1, NumDetIceStorages
 
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Load Requested [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Rate [W]', &
                                DetIceStor(IceNum)%CompLoad,'System','Average',DetIceStor(IceNum)%Name)
 
           ! Ice fraction
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Fraction Change [Frac]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Change Fraction []', &
                                DetIceStor(IceNum)%IceFracChange,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage End Fraction [Frac]', &
+     CALL SetupOutputVariable('Ice Thermal Storage End Fraction []', &
                                DetIceStor(IceNum)%IceFracRemaining,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Fraction on Coil [Frac]', &
+     CALL SetupOutputVariable('Ice Thermal Storage On Coil Fraction []', &
                                DetIceStor(IceNum)%IceFracOnCoil,'System','Average',DetIceStor(IceNum)%Name)
 
           ! Discharge: ITS Information
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Mass Flow Rate [kg/s]', &
                                DetIceStor(IceNum)%MassFlowRate,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Bypass Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Bypass Mass Flow Rate [kg/s]', &
                                DetIceStor(IceNum)%BypassMassFlowRate,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Tank Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Tank Mass Flow Rate [kg/s]', &
                                DetIceStor(IceNum)%TankMassFlowRate,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Fluid Inlet Temp [C]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Fluid Inlet Temperature [C]', &
                                DetIceStor(IceNum)%InletTemp,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Blended Outlet Temp [C]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Blended Outlet Temperature [C]', &
                                DetIceStor(IceNum)%OutletTemp,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Tank Outlet Temp [C]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Tank Outlet Temperature [C]', &
                                DetIceStor(IceNum)%TankOutletTemp,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Cooling/Discharge Rate [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Discharge Rate [W]', &
                                DetIceStor(IceNum)%DischargingRate,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Cooling/Discharge Energy [J]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Discharge Energy [J]', &
                                DetIceStor(IceNum)%DischargingEnergy,'System','Sum',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Charging Rate [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Charge Rate [W]', &
                                DetIceStor(IceNum)%ChargingRate,'System','Average',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Charging Energy [J]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Cooling Charge Energy [J]', &
                                DetIceStor(IceNum)%ChargingEnergy,'System','Sum',DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Parasitic Electric Power [W]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Ancillary Electric Power [W]', &
                                DetIceStor(IceNum)%ParasiticElecRate,'System','Average', DetIceStor(IceNum)%Name)
-     CALL SetupOutputVariable('Detailed Ice Thermal Storage Parasitic Electric Consumption [J]', &
+     CALL SetupOutputVariable('Ice Thermal Storage Ancillary Electric Energy [J]', &
                                DetIceStor(IceNum)%ParasiticElecEnergy,'System','Sum',DetIceStor(IceNum)%Name, &
                                ResourceTypeKey='ELECTRICITY',GroupKey='System')
 
@@ -1336,9 +1335,9 @@ SUBROUTINE InitDetailedIceStorage
     ALLOCATE(MyEnvrnFlag(NumDetIceStorages))
     MyPlantScanFlag = .TRUE.
     MyEnvrnFlag     = .TRUE.
-    MyOneTimeFlag   = .FALSE. 
+    MyOneTimeFlag   = .FALSE.
   ENDIF
-  
+
   IF (MyPlantScanFlag(IceNum)) THEN
     CALL ScanPlantLoopsForObject( DetIceStor(IceNum)%Name, &
                                   TypeOf_TS_IceDetailed, &
@@ -1346,7 +1345,7 @@ SUBROUTINE InitDetailedIceStorage
                                   DetIceStor(IceNum)%PlantLoopSideNum, &
                                   DetIceStor(IceNum)%PlantBranchNum, &
                                   DetIceStor(IceNum)%PlantCompNum)
-                                  
+
 
     MyPlantScanFlag(IceNum) = .FALSE.
   ENDIF
@@ -1372,7 +1371,7 @@ SUBROUTINE InitDetailedIceStorage
                                   DetIceStor(IceNum)%PlantLoopSideNum, &
                                   DetIceStor(IceNum)%PlantBranchNum, &
                                   DetIceStor(IceNum)%PlantCompNum)
-                                  
+
     IF ((PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%CommonPipeType == CommonPipe_TwoWay) .AND. &
         (DetIceStor(IceNum)%PlantLoopSideNum == SupplySide)) THEN
       ! up flow priority of other components on the same branch as the Ice tank
@@ -1381,13 +1380,13 @@ SUBROUTINE InitDetailedIceStorage
         PlantLoop(DetIceStor(IceNum)%PlantLoopNum)%LoopSide(SupplySide)% &
            Branch(DetIceStor(IceNum)%PlantBranchNum)%Comp(CompNum)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
       ENDDO
-    
+
     ENDIF
-                                  
+
     MyEnvrnFlag(IceNum) = .FALSE.
   END IF
   IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(IceNum) = .TRUE.
-  
+
           ! Initializations that are done every iteration
           ! Make sure all of the reporting variables are always reset at the start of any iteration
   DetIceStor(IceNum)%CompLoad            = 0.0
@@ -1450,7 +1449,7 @@ SUBROUTINE InitSimpleIceStorage
   LOGICAL, ALLOCATABLE, SAVE, DIMENSION(:) :: MyEnvrnFlag
   LOGICAL :: errFlag
   INTEGER :: CompNum ! local do loop counter
-  
+
   IF (MyOneTimeFlag) THEN
     ALLOCATE(MyPlantScanFlag(NumIceStorages))
     ALLOCATE(MyEnvrnFlag(NumIceStorages))
@@ -1458,8 +1457,8 @@ SUBROUTINE InitSimpleIceStorage
     MyPlantScanFlag = .TRUE.
     MyEnvrnFlag     = .TRUE.
   END IF
-  
-  
+
+
   IF (MyPlantScanFlag(IceNum)) THEN
     ! Locate the storage on the plant loops for later usage
     errFlag=.false.
@@ -1475,7 +1474,7 @@ SUBROUTINE InitSimpleIceStorage
     ENDIF
     MyPlantScanFlag(IceNum)=.FALSE.
   ENDIF
-  
+
   IF (BeginEnvrnFlag .and. MyEnvrnFlag(IceNum)) THEN
     IceStorage(IceNum)%DesignMassFlowRate = PlantLoop(IceStorage(IceNum)%LoopNum)%MaxMassFlowRate
     !no design flow rates for model, assume min is zero and max is plant loop's max
@@ -1494,7 +1493,7 @@ SUBROUTINE InitSimpleIceStorage
         PlantLoop(IceStorage(IceNum)%LoopNum)%LoopSide(SupplySide)% &
            Branch(IceStorage(IceNum)%BranchNum)%Comp(CompNum)%FlowPriority = LoopFlowStatus_NeedyAndTurnsLoopOn
       ENDDO
-    
+
     ENDIF
     IceStorageReport(IceNum)%MyLoad = 0.0
     IceStorageReport(IceNum)%U = 0.0
@@ -1507,16 +1506,16 @@ SUBROUTINE InitSimpleIceStorage
     IceStorageReport(IceNum)%ITSmdot          = 0.0
     IceStorageReport(IceNum)%ITSInletTemp     = 0.0
     IceStorageReport(IceNum)%ITSOutletTemp    = 0.0
-  
+
     MyEnvrnFlag(IceNum) = .FALSE.
-  ENDIF  
-  
-  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(IceNum) = .TRUE. 
-  
+  ENDIF
+
+  IF (.NOT. BeginEnvrnFlag) MyEnvrnFlag(IceNum) = .TRUE.
+
   ITSNomCap            = IceStorage(IceNum)%ITSNomCap
   InletNodeNum         = IceStorage(IceNum)%PltInletNodeNum
   OutletNodeNum        = IceStorage(IceNum)%PltOutletNodeNum
-  
+
   RETURN
 
 END SUBROUTINE InitSimpleIceStorage
@@ -1668,7 +1667,7 @@ CASE(IceStorageType_Simple)   !by ZG
 
        ! Provide output results for ITS.
   ITSMassFlowRate  = 0.d0                        ![kg/s]
-  
+
   CALL SetComponentFlowRate(ITSMassFlowRate, &
                             IceStorage(IceNum)%PltInletNodeNum, &
                             IceStorage(IceNum)%PltOutletNodeNum, &
@@ -1676,7 +1675,7 @@ CASE(IceStorageType_Simple)   !by ZG
                             IceStorage(IceNum)%LoopSideNum, &
                             IceStorage(IceNum)%BranchNum, &
                             IceStorage(IceNum)%CompNum )
-  
+
   ITSInletTemp     = Node(InletNodeNum)%Temp  ![C]
   ITSOutletTemp    = ITSInletTemp             ![C]
   SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
@@ -1715,7 +1714,7 @@ SUBROUTINE CalcIceStorageCharge(IceStorageType,IceNum)
   USE Psychrometrics, ONLY:CPCW
   USE PlantUtilities, ONLY: SetComponentFlowRate
   USE DataPlant,      ONLY: PlantLoop, SingleSetpoint, DualSetpointDeadband
-  
+
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -1759,7 +1758,7 @@ CASE(IceStorageType_Simple)
                             IceStorage(IceNum)%LoopSideNum, &
                             IceStorage(IceNum)%BranchNum, &
                             IceStorage(IceNum)%CompNum )
-  
+
   ITSInletTemp     = Node(InletNodeNum)%Temp  ![C]
   ITSOutletTemp    = ITSInletTemp             ![C]
   SELECT CASE (PlantLoop(IceStorage(IceNum)%LoopNum)%LoopDemandCalcScheme)
@@ -1988,7 +1987,7 @@ SUBROUTINE CalcIceStorageDischarge(IceStorageType,IceNum,MyLoad,Runflag,FirstIte
   USE DataPlant, ONLY:  PlantLoop, SingleSetpoint, DualSetpointDeadband
   USE FluidProperties, ONLY: GetDensityGlycol
   USE PlantUtilities, ONLY: SetComponentFlowRate
-  
+
   IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -2068,7 +2067,7 @@ CASE(IceStorageType_Simple)
   !----------------------------
   LoopNum = IceStorage(IceNum)%LoopNum
   LoopSideNum = IceStorage(IceNum)%LoopSideNum
-  
+
   CpFluid = GetDensityGlycol(PlantLoop(LoopNum)%FluidName, &
                              Node(InletNodeNum)%Temp, &
                              PlantLoop(LoopNum)%FluidIndex, &
@@ -2542,7 +2541,7 @@ SUBROUTINE UpdateIceFractions
             DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracRemaining
       END IF
     ELSE ! Outside melt system so IceFracOnCoil is always the same as IceFracRemaining (needs to be done for reporting only)
-      DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracRemaining      
+      DetIceStor(IceNum2)%IceFracOnCoil = DetIceStor(IceNum2)%IceFracRemaining
     END IF
   END DO
 
@@ -2597,7 +2596,7 @@ SUBROUTINE UpdateDetailedIceStorage
   OutNodeNum = DetIceStor(IceNum)%PlantOutNodeNum
 
   CALL SafeCopyPlantNode(InNodeNum, OutNodeNum)
-  
+
   Node(OutNodeNum)%Temp                 = DetIceStor(IceNum)%OutletTemp
 
 
@@ -2689,7 +2688,7 @@ END SUBROUTINE ReportDetailedIceStorage
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

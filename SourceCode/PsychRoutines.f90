@@ -1,7 +1,9 @@
 #ifdef EP_nocache_Psychrometrics
 #undef EP_cache_PsyTwbFnTdbWPb
+#undef EP_cache_PsyPsatFnTemp
 #else
 #define EP_cache_PsyTwbFnTdbWPb
+#define EP_cache_PsyPsatFnTemp
 #endif
 #define EP_psych_errors
 ! the following defines would only be used in special instances and not for release.
@@ -48,9 +50,7 @@ IMPLICIT NONE         ! Enforce explicit typing of all variables
 PRIVATE ! Everything private unless explicitly made public
 
           ! MODULE PARAMETER DEFINITIONS:
-      INTEGER, PARAMETER :: NumPsychMonitors=17 ! Parameterization of Number of psychrometric routines that
                                     ! call for recurring errors
-      INTEGER, PARAMETER :: NumToReport=13
       INTEGER, PARAMETER :: iPsyTdpFnTdbTwbPb     =1
       INTEGER, PARAMETER :: iPsyRhFnTdbWPb        =2
       INTEGER, PARAMETER :: iPsyTwbFnTdbWPb       =3
@@ -68,10 +68,14 @@ PRIVATE ! Everything private unless explicitly made public
       INTEGER, PARAMETER :: iPsyTsatFnPb2         =17 ! iterations
       INTEGER, PARAMETER :: iPsyRhFnTdbRhov       =12
       INTEGER, PARAMETER :: iPsyRhFnTdbRhovLBnd0C =13
-      CHARACTER(len=*), PARAMETER, DIMENSION(NumPsychMonitors) :: PsyRoutineNames=                         &
+      INTEGER, PARAMETER :: iPsyTwbFnTdbWPb_cache =18
+      INTEGER, PARAMETER :: iPsyPsatFnTemp_cache  =19
+      INTEGER, PARAMETER :: NumPsychMonitors=19 ! Parameterization of Number of psychrometric routines that
+#ifdef EP_psych_stats
+      CHARACTER(len=*), PARAMETER, DIMENSION(NumPsychMonitors) :: PsyRoutineNames=      &
               (/'PsyTdpFnTdbTwbPb      ',  &  ! 1
                 'PsyRhFnTdbWPb         ',  &  ! 2
-                'PsyTwbFnTdbWPb_raw    ',  &  ! 3
+                'PsyTwbFnTdbWPb        ',  &  ! 3
                 'PsyVFnTdbWPb          ',  &  ! 4
                 'PsyWFnTdpPb           ',  &  ! 5
                 'PsyWFnTdbH            ',  &  ! 6
@@ -85,22 +89,56 @@ PRIVATE ! Everything private unless explicitly made public
                 'PsyTwbFnTdbWPb        ',  &  ! 14 - HR
                 'PsyTwbFnTdbWPb        ',  &  ! 15 - max iter
                 'PsyWFnTdbTwbPb        ',  &  ! 16 - HR
-                'PsyTsatFnPb           '/)    ! 17 - max iter
+                'PsyTsatFnPb           ',  &  ! 17 - max iter
+                'PsyTwbFnTdbWPb_cache  ',  &  ! 18 - PsyTwbFnTdbWPb_raw (raw calc)
+                'PsyPsatFnTemp_cache   '/)    ! 19 - PsyPsatFnTemp_raw (raw calc)
+
+      LOGICAL, PARAMETER, DIMENSION(NumPsychMonitors) :: PsyReportIt=   &
+      (/.true.,  & ! PsyTdpFnTdbTwbPb     1
+        .true.,  & ! PsyRhFnTdbWPb        2
+        .true.,  & ! PsyTwbFnTdbWPb       3
+        .true.,  & ! PsyVFnTdbWPb         4
+        .true.,  & ! PsyWFnTdpPb          5
+        .true.,  & ! PsyWFnTdbH           6
+        .true.,  & ! PsyWFnTdbTwbPb       7
+        .true.,  & ! PsyWFnTdbRhPb        8
+        .true.,  & ! PsyPsatFnTemp        9
+        .true.,  & ! PsyTsatFnHPb         10
+        .true.,  & ! PsyTsatFnPb          11
+        .true.,  & ! PsyRhFnTdbRhov       12
+        .true.,  & ! PsyRhFnTdbRhovLBnd0C 13
+        .false., & ! PsyTwbFnTdbWPb       14 - HR
+        .false., & ! PsyTwbFnTdbWPb       15 - max iter
+        .false., & ! PsyWFnTdbTwbPb       16 - HR
+        .false., & ! PsyTsatFnPb          17 - max iter
+        .true.,  & ! PsyTwbFnTdbWPb_cache 18 - PsyTwbFnTdbWPb_raw (raw calc)
+        .true./)   ! PsyPsatFnTemp_cache  19 - PsyPsatFnTemp_raw (raw calc)
+#endif
 
 #ifndef EP_psych_errors
       REAL(r64), PARAMETER :: KelvinConv=273.15d0
 #endif
 
 #ifdef EP_cache_PsyTwbFnTdbWPb
-  integer, parameter :: cache_size=1024*1024
-  integer, parameter :: precision_bits=20
+  integer, parameter :: twbcache_size=1024*1024
+  integer, parameter :: twbprecision_bits=20
 
           ! DERIVED TYPE DEFINITIONS:
   TYPE :: cached_twb_t
-    REAL(r64) :: Tdb  = 0.0d0
-    REAL(r64) :: W    = 0.0d0
-    REAL(r64) :: Pb   = 0.0d0
+    INTEGER(i64) :: iTdb  = 0
+    INTEGER(i64) :: iW    = 0
+    INTEGER(i64) :: iPb   = 0
     REAL(r64) :: Twb  = 0.0d0
+  END TYPE
+#endif
+#ifdef EP_cache_PsyPsatFnTemp
+  integer, parameter :: psatcache_size=1024*1024
+  integer, parameter :: psatprecision_bits=24 !28  !24  !32
+
+          ! DERIVED TYPE DEFINITIONS:
+  TYPE :: cached_psat_t
+    INTEGER(i64) :: iTdb  = -1000
+    REAL(r64) :: Psat = 0.0d0
   END TYPE
 #endif
 
@@ -109,13 +147,18 @@ PRIVATE ! Everything private unless explicitly made public
 
 
           ! MODULE VARIABLE DEFINITIONS:
-      INTEGER, DIMENSION(NumPsychMonitors) ::  iPsyErrIndex = NumPsychMonitors*0 ! Number of times error occurred
       CHARACTER(len=150) String
       LOGICAL :: ReportErrors=.true.
-      INTEGER(i64), DIMENSION(NumToReport) :: NumTimesCalled=NumToReport*0
-      INTEGER, DIMENSION(NumToReport) :: NumIterations =NumToReport*0
+      INTEGER, DIMENSION(NumPsychMonitors) ::  iPsyErrIndex = NumPsychMonitors*0 ! Number of times error occurred
+#ifdef EP_psych_stats
+      INTEGER(i64), DIMENSION(NumPsychMonitors) :: NumTimesCalled=NumPsychMonitors*0
+      INTEGER, DIMENSION(NumPsychMonitors) :: NumIterations =NumPsychMonitors*0
+#endif
 #ifdef EP_cache_PsyTwbFnTdbWPb
-      TYPE(cached_TWB_T), DIMENSION(0:cache_size) :: cached_Twb
+      TYPE(cached_twb_t), ALLOCATABLE, DIMENSION(:)  :: cached_Twb !DIMENSION(0:twbcache_size)
+#endif
+#ifdef EP_cache_PsyPsatFnTemp
+      TYPE(cached_psat_t), ALLOCATABLE, DIMENSION(:) :: cached_Psat  !DIMENSION(0:psatcache_size)
 #endif
 
 
@@ -148,8 +191,57 @@ PUBLIC  CPCW
 PUBLIC  CPHW
 PUBLIC  RhoH2O
 PUBLIC  ShowPsychrometricSummary
+PUBLIC  InitializePsychRoutines
 
 CONTAINS
+
+SUBROUTINE InitializePsychRoutines
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! Initializes some variables for PsychRoutines
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+          ! na
+
+#ifdef EP_cache_PsyTwbFnTdbWPb
+  ALLOCATE(cached_Twb(0:twbcache_size))
+#endif
+#ifdef EP_cache_PsyPsatFnTemp
+  ALLOCATE(cached_Psat(0:psatcache_size))
+#endif
+
+  RETURN
+
+END SUBROUTINE InitializePsychRoutines
 
 SUBROUTINE ShowPsychrometricSummary
 
@@ -198,7 +290,8 @@ SUBROUTINE ShowPsychrometricSummary
   IF (EchoInputFile == 0) RETURN
   IF (ANY(NumTimesCalled>0)) THEN
     WRITE(EchoInputFile,fmta) 'RoutineName,#times Called,Avg Iterations'
-    DO Loop=1,NumToReport
+    DO Loop=1,NumPsychMonitors
+      IF (.not. PsyReportIt(Loop)) CYCLE
       write(istring,*) NumTimesCalled(Loop)
       istring=adjustl(istring)
       IF (NumIterations(Loop) > 0) THEN
@@ -325,12 +418,29 @@ function PsyCpAirFnWTdb(dw,T,calledfrom) result(cpa)
       REAL(r64) h2  ! PsyHFnTdbW result of input humidity ratio and tt
       REAL(r64) w  ! humidity ratio
 
+      REAL(r64), SAVE :: dwSave = -100
+      REAL(r64), SAVE :: Tsave = -100
+      REAL(r64), SAVE :: cpaSave = -100
+
+      !check if last call had the same input and if it did just use the
+      !saved output.
+      IF (Tsave .EQ. T) THEN
+        IF (dwSave .EQ. dw)  THEN
+          cpa = cpaSave
+          RETURN
+        END IF
+      END IF
+
       w=MAX(dw,1.0d-5)
       h1 = PsyHFnTdbW(T,w,calledfrom)
       tt = T + 0.1d0
       h2 = PsyHFnTdbW(tt,w,calledfrom)
       cpa = (h2-h1)/0.1d0
 
+      !save values for next call
+      dwSave = dw
+      Tsave = T
+      cpaSave = cpa
   return
 end function PsyCpAirFnWTdb
 
@@ -1256,9 +1366,7 @@ FUNCTION PsyTwbFnTdbWPb(Tdb,W,Pb,calledfrom)  RESULT (Twb_result)
   REAL(r64)        :: Twb_result    ! result=> Temperature Wet-Bulb {C}
 
           ! FUNCTION PARAMETER DEFINITIONS:
-  integer(i64), parameter :: Grid_Shift=(64 - 12 - Precision_bits)
-!  integer(i64), parameter :: Grid_Mask=NOT(ISHFT(z'0000000000000001', Grid_Shift)-1)
-  integer(i64), parameter :: Grid_Mask=NOT(ISHFT(1_i64, Grid_Shift)-1)
+  integer(i64), parameter :: Grid_Shift=(64 - 12 - twbPrecision_bits)
 
           ! INTERFACE BLOCK SPECIFICATIONS:
           ! na
@@ -1267,34 +1375,43 @@ FUNCTION PsyTwbFnTdbWPb(Tdb,W,Pb,calledfrom)  RESULT (Twb_result)
           ! na
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-  REAL(r64) :: Tdbx,Wx,Pbx
-  integer(i64) :: Tdb_grid, W_grid, Pb_grid
-  equivalence(Tdbx,Tdb_grid)
-  equivalence(Wx,W_grid)
-  equivalence(Pbx,Pb_grid)
+  integer(i64) :: Tdb_tag, W_tag, Pb_tag
   integer(i64) :: hash
+  real(r64) :: Tdb_tag_r, w_tag_r, Pb_tag_r
 
-  Tdbx = Tdb
-  Wx = W
-  Pbx = Pb
+#ifdef EP_psych_stats
+      NumTimesCalled(iPsyTwbFnTdbWPb_cache)=NumTimesCalled(iPsyTwbFnTdbWPb_cache)+1
+#endif
+
+
+  Tdb_tag = Transfer(Tdb,Tdb_tag)
+  W_tag = Transfer(W,W_tag)
+  Pb_tag = Transfer(Pb,Pb_tag)
 
   !Both Intel & GNU are happy to use .iand.
-  Tdb_grid = IAND(Tdb_grid, Grid_Mask)
-  W_grid = IAND(W_grid, Grid_Mask)
-  Pb_grid = IAND(Pb_grid, Grid_Mask)
-  hash = IAND(IEOR(ISHFT(Tdb_grid, -Grid_Shift), IEOR(ISHFT(W_grid, -Grid_Shift), ISHFT(Pb_grid, -Grid_Shift))), (cache_size - 1))
+  Tdb_tag = ISHFT(Tdb_tag, -Grid_shift)
+  W_tag = ISHFT(W_tag, -Grid_shift)
+  Pb_tag = ISHFT(Pb_tag, -Grid_shift)
+  hash = IAND(IEOR(Tdb_tag,IEOR(W_tag,Pb_tag)), (twbcache_size - 1))
 
-  IF (cached_Twb(hash)%Tdb /= Tdbx .OR. cached_Twb(hash)%W /= Wx .OR. cached_Twb(hash)%Pb /= Pbx) THEN
-    cached_Twb(hash)%Tdb = Tdbx
-    cached_Twb(hash)%W = Wx
-    cached_Twb(hash)%Pb = Pbx
+  IF (cached_Twb(hash)%iTdb /= Tdb_tag .OR. cached_Twb(hash)%iW /= W_tag .OR. cached_Twb(hash)%iPb /= Pb_tag) THEN
+    cached_Twb(hash)%iTdb = Tdb_tag
+    cached_Twb(hash)%iW = W_tag
+    cached_Twb(hash)%iPb = Pb_tag
+
+    Tdb_tag_r = Transfer(ISHFT(Tdb_tag, Grid_shift), Tdb_tag_r)
+    W_tag_r = Transfer(ISHFT(W_tag, Grid_shift), W_tag_r)
+    Pb_tag_r = Transfer(ISHFT(Pb_tag, Grid_shift), Pb_tag_r)
+
     IF (PRESENT(calledfrom)) THEN
-      cached_Twb(hash)%Twb = PsyTwbFnTdbWPb_raw(Tdbx, Wx, Pbx,calledfrom)
+      cached_Twb(hash)%Twb = PsyTwbFnTdbWPb_raw(Tdb_tag_r, W_tag_r, Pb_tag_r,calledfrom)
     ELSE
-      cached_Twb(hash)%Twb = PsyTwbFnTdbWPb_raw(Tdbx, Wx, Pbx)
+      cached_Twb(hash)%Twb = PsyTwbFnTdbWPb_raw(Tdb_tag_r, W_tag_r, Pb_tag_r)
     ENDIF
   END IF
 
+!  Twbresult_last = cached_Twb(hash)%Twb
+!  Twb_result = Twbresult_last
   Twb_result = cached_Twb(hash)%Twb
 
   RETURN
@@ -1981,8 +2098,82 @@ FUNCTION PsyWFnTdbRhPb(TDB,RH,PB,calledfrom) RESULT(W)
 END FUNCTION PsyWFnTdbRhPb
 
 
+#ifdef EP_cache_PsyPsatFnTemp
 FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
+          ! FUNCTION INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   March 2013
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS FUNCTION:
+          ! Provide a "cache" of results for the given argument (T) and pressure (Pascal) output result.
+
+          ! METHODOLOGY EMPLOYED:
+          ! Use grid shifting and masking to provide hash into the cache. Use Equivalence to
+          ! make Fortran ignore "types".
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! FUNCTION ARGUMENT DEFINITIONS:
+  REAL(r64), intent(in) :: T      ! dry-bulb temperature {C}
+  character(len=*), intent(in), optional :: calledfrom  ! routine this function was called from (error messages)
+  REAL(r64)             :: Pascal ! result=> saturation pressure {Pascals}
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+  integer(i64), parameter :: Grid_Shift=(64 - 12 - psatPrecision_bits)
+!  integer(i64), parameter :: Grid_Mask=NOT(ISHFT(1_i64, Grid_Shift)-1)
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! FUNCTION LOCAL VARIABLE DECLARATIONS:
+  integer(i64) :: Tdb_tag
+  integer(i64) :: hash
+  real(r64) :: Tdb_tag_r
+
+#ifdef EP_psych_stats
+      NumTimesCalled(iPsyPsatFnTemp_cache)=NumTimesCalled(iPsyPsatFnTemp_cache)+1
+#endif
+
+  Tdb_tag=Transfer(T,Tdb_tag)
+
+  !Both Intel & GNU are happy to use .iand.
+  Tdb_tag = ISHFT(Tdb_tag, -Grid_Shift)
+  hash = IAND(Tdb_tag, (psatcache_size - 1))
+
+  IF (cached_psat(hash)%iTdb /= Tdb_tag) THEN
+    cached_Psat(hash)%iTdb = Tdb_tag
+    Tdb_tag_r = Transfer(ISHFT(Tdb_tag, Grid_shift), Tdb_tag_r)
+
+    IF (PRESENT(calledfrom)) THEN
+      cached_Psat(hash)%Psat = PsyPsatFnTemp_raw(Tdb_tag_r,calledfrom)
+    ELSE
+      cached_Psat(hash)%Psat = PsyPsatFnTemp_raw(Tdb_tag_r)
+    ENDIF
+  END IF
+
+  Pascal = cached_Psat(hash)%Psat
+
+  RETURN
+
+END FUNCTION PsyPsatFnTemp
+
+
+FUNCTION PsyPsatFnTemp_raw(T,calledfrom) RESULT(Pascal)
+#else
+FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
+#endif
           ! FUNCTION INFORMATION:
           !       AUTHOR         George Shih
           !       DATE WRITTEN   May 1976
@@ -2024,8 +2215,20 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
       REAL(r64), PARAMETER   :: C11 =   0.41764768d-4  ! Coefficient for TKel >= KelvinConvK
       REAL(r64), PARAMETER   :: C12 =  -0.14452093d-7  ! Coefficient for TKel >= KelvinConvK
       REAL(r64), PARAMETER   :: C13 =   6.5459673d0    ! Coefficient for TKel >= KelvinConvK
+#ifdef EP_IF97
+      !Table 34 in IF97
+      REAL(r64), PARAMETER   :: N1  =  0.11670521452767d04
+      REAL(r64), PARAMETER   :: N2  = -0.72421316703206d06
+      REAL(r64), PARAMETER   :: N3  = -0.17073846940092d02
+      REAL(r64), PARAMETER   :: N4  =  0.12020824702470d05
+      REAL(r64), PARAMETER   :: N5  = -0.32325550322333d07
+      REAL(r64), PARAMETER   :: N6  =  0.14915108613530d02
+      REAL(r64), PARAMETER   :: N7  = -0.48232657361591d04
+      REAL(r64), PARAMETER   :: N8  =  0.40511340542057d06
+      REAL(r64), PARAMETER   :: N9  = -0.23855557567849d0
+      REAL(r64), PARAMETER   :: N10 =  0.65017534844798d03
+#endif
 
-      REAL(r64), PARAMETER               :: KelvinConv = 273.15d0
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
 
@@ -2034,6 +2237,13 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
       REAL(r64)   :: Tkel  ! Dry-bulb in REAL(r64) for function passing
+#ifdef EP_IF97
+      REAL(r64)   :: phi   ! IF97 equation 29b
+      REAL(r64)   :: phi2  ! phi squared
+      REAL(r64)   :: A     ! IF97 equation 30
+      REAL(r64)   :: B     ! IF97 equation 30
+      REAL(r64)   :: C     ! IF97 equation 30
+#endif
 
 
 #ifdef EP_psych_stats
@@ -2064,7 +2274,7 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
        ! If below freezing, calculate saturation pressure over ice.
       IF ((TKel .LT. KelvinConv) .AND. (TKel .GE. 173.15d0)) THEN
-         Pascal = EXP(C1/TKel+C2+TKel*(C3+TKel*(C4+TKel*(C5+C6*TKel)))+C7*LOG(TKel))
+       Pascal = EXP(C1/TKel+C2+TKel*(C3+TKel*(C4+TKel*(C5+C6*TKel)))+C7*LOG(TKel))
 
        ! If below -100C,set value of Pressure corresponding to Saturation Temperature of -100C.
       ELSE IF ((TKel .Lt. 173.15d0)) THEN
@@ -2072,8 +2282,17 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
        ! If above freezing, calculate saturation pressure over liquid water.
       ELSE IF ((TKel .GE. KelvinConv) .AND. (TKel .LE. 473.15d0)) THEN
+#ifndef EP_IF97
          Pascal = EXP(C8/TKel+C9+TKel*(C10+TKel*(C11+TKel*C12))+C13*LOG(TKel))
-
+#else
+!         !IF97 equations
+         phi =  TKel + n9 /(TKel - n10)
+         phi2 = phi * phi
+         A =      phi2 + n1 * phi + n2
+         B = n3 * phi2 + n4 * phi + n5
+         C = n6 * phi2 + n7 * phi + n8
+         Pascal = 1000000.d0 * ((2.d0 * C) / (-B + SQRT(B**2 - 4.d0 * A * C)))**4
+#endif
        ! If above 200C, set value of Pressure corresponding to Saturation Temperature of 200C.
       ELSE IF ((TKel .GT. 473.15d0)) THEN
          Pascal = 1555000.0d0
@@ -2096,8 +2315,11 @@ FUNCTION PsyPsatFnTemp(T,calledfrom) RESULT(Pascal)
 
   RETURN
 
+#ifdef EP_cache_PsyPsatFnTemp
+END FUNCTION PsyPsatFnTemp_raw
+#else
 END FUNCTION PsyPsatFnTemp
-
+#endif
 
 FUNCTION PsyTsatFnHPb(H,PB,calledfrom) RESULT(T)
 
@@ -2615,7 +2837,7 @@ END FUNCTION RhoH2O
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

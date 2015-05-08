@@ -83,6 +83,8 @@ PUBLIC  GetCurrentHVACTime
 PUBLIC  GetPreviousHVACTime
 PRIVATE ParseTime
 PUBLIC  ScanForReports
+PUBLIC  ReallocateRealArray
+PUBLIC  CheckCreatedZoneItemName
 !PUBLIC  ErfFunction
 
 CONTAINS
@@ -2668,6 +2670,7 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
   USE DataInterfaces, ONLY: ShowWarningError, ShowContinueError
   USE DataRuntimeLanguage, ONLY: OutputFullEMSTrace, OutputEMSErrors, OutputEMSActuatorAvailFull, &
                                  OutputEMSActuatorAvailSmall, OutputEMSInternalVarsFull, OutputEMSInternalVarsSmall
+  USE DataGlobals, ONLY: ShowDecayCurvesInEIO
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -2724,9 +2727,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 
     cCurrentModuleObject='Output:Surfaces:List'
 
-    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReports=GetNumObjectsFound(cCurrentModuleObject)
     DO RepNum=1,NumReports
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2753,6 +2756,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
           ViewFactorInfo=.true.
           ViewRptOption1=cAlphaArgs(2)
 
+        CASE ('DECAYCURVESFROMZONECOMPONENTLOADS') !Should the Radiant to Convective Decay Curves from the load component report appear in the EIO file
+          ShowDecayCurvesInEIO = .TRUE.
+
         CASE (' ')
           CALL ShowWarningError(trim(cCurrentModuleObject)//': No '//trim(cAlphaFieldNames(1))//' supplied.')
           CALL ShowContinueError(' Legal values are: "Lines", "Vertices", "Details", "DetailsWithVertices", '//  &
@@ -2769,9 +2775,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 
     cCurrentModuleObject='Output:Surfaces:Drawing'
 
-    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReports=GetNumObjectsFound(cCurrentModuleObject)
     DO RepNum=1,NumReports
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2813,9 +2819,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 
     cCurrentModuleObject='Output:VariableDictionary'
 
-    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReports=GetNumObjectsFound(cCurrentModuleObject)
     DO RepNum=1,NumReports
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
      VarDict=.true.
@@ -2825,9 +2831,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
     ENDDO
 
     cCurrentModuleObject='Output:Constructions'
-    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReports=GetNumObjectsFound(cCurrentModuleObject)
     DO RepNum=1,NumReports
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
       IF (cAlphaArgs(1)(1:9) == 'CONSTRUCT') THEN
@@ -2845,9 +2851,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
     ENDDO
 
     cCurrentModuleObject  = 'Output:EnergyManagementSystem'
-    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumReports=GetNumObjectsFound(cCurrentModuleObject)
     DO RepNum=1,NumReports
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
                      AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                      AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2929,9 +2935,9 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
     ENDDO
 
 !    cCurrentModuleObject='Output:Schedules'
-!    NumReports=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+!    NumReports=GetNumObjectsFound(cCurrentModuleObject)
 !    DO RepNum=1,NumReports
-!      CALL GetObjectItem(TRIM(cCurrentModuleObject),RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
+!      CALL GetObjectItem(cCurrentModuleObject,RepNum,cAlphaArgs,NumNames,rNumericArgs,NumNumbers,IOStat,  &
 !                     AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
 !                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 !      SchRpt=.true.
@@ -2998,9 +3004,152 @@ SUBROUTINE ScanForReports(ReportName,DoReport,ReportKey,Option1,Option2)
 END SUBROUTINE ScanForReports
 
 
+SUBROUTINE ReallocateRealArray(Array,ArrayMax,ArrayInc)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda K. Lawrie
+          !       DATE WRITTEN   October 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine reallocates (preserving data) a REAL(r64) array.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+          ! na
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  REAL(r64), ALLOCATABLE, DIMENSION(:), INTENT(INOUT) :: Array
+  INTEGER, INTENT(INOUT)                            :: ArrayMax  ! Current and resultant dimension for Array
+  INTEGER, INTENT(IN)                               :: ArrayInc  ! increment for redimension
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64), DIMENSION(:), ALLOCATABLE    :: NewArray
+
+  ALLOCATE(NewArray(ArrayMax+ArrayInc))
+  NewArray=0.0d0
+
+  IF (ArrayMax > 0) THEN
+    NewArray(1:ArrayMax)=Array(1:ArrayMax)
+  ENDIF
+  DEALLOCATE(Array)
+  ArrayMax=ArrayMax+ArrayInc
+  ALLOCATE(Array(ArrayMax))
+  Array=NewArray
+  DEALLOCATE(NewArray)
+
+  RETURN
+
+END SUBROUTINE ReallocateRealArray
+
+SUBROUTINE CheckCreatedZoneItemName(calledFrom,CurrentObject,ZoneName,MaxZoneNameLength,ItemName,  &
+                                     ItemNames,NumItems,ResultName,ErrFlag)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Linda Lawrie
+          !       DATE WRITTEN   December 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This routine checks "global" objects (that is, ones with ZoneList used in the name
+          ! specification) along with a specific name for the current object for length and duplication
+          ! with previous objects of that class.
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,    ONLY: MaxNameLength
+  USE DataInterfaces, ONLY: ShowWarningError,ShowSevereError,ShowContinueError
+  USE InputProcessor, ONLY: FindItemInList
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  CHARACTER(len=*), INTENT(IN) :: calledFrom        ! routine called from
+  CHARACTER(len=*), INTENT(IN) :: CurrentObject     ! object being parsed
+  CHARACTER(len=*), INTENT(IN) :: ZoneName          ! Zone Name associated
+  INTEGER, INTENT(IN)          :: MaxZoneNameLength ! maximum length of zonelist zone names
+  CHARACTER(len=*), INTENT(IN) :: ItemName          ! Item name (People, Lights, etc object)
+  CHARACTER(len=*), DIMENSION(:), INTENT(IN) :: ItemNames  ! Item Names to check for duplication
+  INTEGER, INTENT(IN) :: NumItems                   ! Number of items in ItemNames array
+  CHARACTER(len=*), INTENT(INOUT) :: ResultName     ! Resultant name
+  LOGICAL, INTENT(INOUT) :: ErrFlag                 ! Error flag set to true if error found here.
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  INTEGER :: ItemLength
+  LOGICAL :: DuplicateNameError
+  INTEGER :: FoundItem
+  INTEGER :: ItemNameLength
+  LOGICAL :: TooLong
+
+  ErrFlag=.false.
+  DuplicateNameError=.false.
+  ItemNameLength=len_trim(ItemName)
+  ItemLength=len_trim(ZoneName) +  ItemNameLength
+  ResultName=trim(ZoneName)//' '//ItemName
+  TooLong=.false.
+  IF (ItemLength > MaxNameLength) THEN
+    CALL ShowWarningError(calledFrom//trim(CurrentObject)//' Combination of ZoneList and Object Name generate a name too long.')
+    CALL ShowContinueError('Object Name="'//trim(ItemName)//'".')
+    CALL ShowContinueError('ZoneList/Zone Name="'//trim(ZoneName)//'".')
+    CALL ShowContinueError('Item length=['//trim(RoundSigDigits(ItemLength))//'] > Maximum Length=['//  &
+       trim(RoundSigDigits(MaxNameLength))//']. You may need to shorten the names.')
+    CALL ShowContinueError('Shortening the Object Name by ['//  &
+       trim(RoundSigDigits((MaxZoneNameLength+1+ItemNameLength)-MaxNameLength))//  &
+       '] characters will assure uniqueness for this ZoneList.')
+    CALL ShowContinueError('name that will be used (may be needed in reporting)="'//trim(ResultName)//'".')
+    TooLong=.true.
+  ENDIF
+
+  FoundItem=FindItemInList(ResultName,ItemNames,NumItems)
+
+  IF (FoundItem /= 0) THEN
+    CALL ShowSevereError(calledFrom//trim(CurrentObject)//'="'//trim(ItemName)//'", Duplicate Generated name encountered.')
+    CALL ShowContinueError('name="'//trim(ResultName)//'" has already been generated or entered as '//  &
+       trim(CurrentObject)//' item=['//trim(RoundSigDigits(FoundItem))//'].')
+    IF (TooLong) CALL ShowContinueError('Duplicate name likely caused by the previous "too long" warning.')
+    ResultName='xxxxxxx'
+    ErrFlag=.true.
+  ENDIF
+
+  RETURN
+
+END SUBROUTINE CheckCreatedZoneItemName
+
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

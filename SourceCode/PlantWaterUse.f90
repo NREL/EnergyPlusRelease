@@ -66,7 +66,7 @@ TYPE WaterEquipmentType
   INTEGER                      :: LatentFracSchedule = 0   ! Pointer to schedule object
   REAL(r64)                    :: LatentRate = 0.0
   REAL(r64)                    :: LatentEnergy = 0.0
-  REAL(r64)                    :: LatentRateNoMultiplier = 0.d0 
+  REAL(r64)                    :: LatentRateNoMultiplier = 0.d0
   REAL(r64)                    :: MoistureRate = 0.0
   REAL(r64)                    :: MoistureMass = 0.0
 
@@ -257,7 +257,7 @@ SUBROUTINE SimulateWaterUse(FirstHVACIteration)
 
     IF (.NOT. WaterConnections(WaterConnNum)%StandAlone ) CYCLE ! only model non plant connections here
 
-    CALL InitConnections(WaterConnNum, FirstHVACIteration)
+    CALL InitConnections(WaterConnNum)
 
     NumIteration = 0
 
@@ -391,7 +391,7 @@ SUBROUTINE SimulateWaterUseConnection(EquipTypeNum, CompName, CompIndex, InitLoo
 
   IF ( .NOT. BeginEnvrnFlag) MyEnvrnFlag = .true.
 
-  CALL InitConnections(WaterConnNum, FirstHVACIteration)
+  CALL InitConnections(WaterConnNum)
 
   NumIteration = 0
 
@@ -476,13 +476,13 @@ SUBROUTINE GetWaterUseInput
           ! FLOW:
 
   cCurrentModuleObject = 'WaterUse:Equipment'
-  NumWaterEquipment = GetNumObjectsFound( TRIM(cCurrentModuleObject) )
+  NumWaterEquipment = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumWaterEquipment > 0) THEN
     ALLOCATE(WaterEquipment(NumWaterEquipment))
 
     DO WaterEquipNum = 1, NumWaterEquipment
-      CALL GetObjectItem( TRIM(cCurrentModuleObject), WaterEquipNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
+      CALL GetObjectItem( cCurrentModuleObject, WaterEquipNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
       IsNotOK = .FALSE.
@@ -579,13 +579,13 @@ SUBROUTINE GetWaterUseInput
   END IF
 
   cCurrentModuleObject = 'WaterUse:Connections'
-  NumWaterConnections = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumWaterConnections = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumWaterConnections > 0) THEN
     ALLOCATE(WaterConnections(NumWaterConnections))
 
     DO WaterConnNum = 1, NumWaterConnections
-      CALL GetObjectItem(TRIM(cCurrentModuleObject), WaterConnNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
+      CALL GetObjectItem(cCurrentModuleObject, WaterConnNum, cAlphaArgs, NumAlphas, rNumericArgs, NumNumbers, IOStatus, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
       IsNotOK = .FALSE.
@@ -723,16 +723,16 @@ SUBROUTINE GetWaterUseInput
         thisWaterEquipNum = WaterConnections(WaterConnNum)%WaterEquipment(WaterEquipNum)
         IF (WaterEquipment(thisWaterEquipNum)%zone > 0) then
           WaterConnections(WaterConnNum)%PeakMassFlowRate = WaterConnections(WaterConnNum)%PeakMassFlowRate &
-           + WaterEquipment(thisWaterEquipNum)%PeakVolFlowRate * RhoH2O(60.0D0)                               &
+           + WaterEquipment(thisWaterEquipNum)%PeakVolFlowRate * RhoH2O(InitConvTemp)                               &
             * Zone(WaterEquipment(thisWaterEquipNum)%zone)%Multiplier                                         &
             * Zone(WaterEquipment(thisWaterEquipNum)%zone)%ListMultiplier
         ELSE ! can't have multipliers
           WaterConnections(WaterConnNum)%PeakMassFlowRate = WaterConnections(WaterConnNum)%PeakMassFlowRate &
-           + WaterEquipment(thisWaterEquipNum)%PeakVolFlowRate * RhoH2O(60.0D0)
+           + WaterEquipment(thisWaterEquipNum)%PeakVolFlowRate * RhoH2O(InitConvTemp)
         ENDIF
       ENDDO
       CALL RegisterPlantCompDesignFlow(WaterConnections(WaterConnNum)%InletNode, &
-                                WaterConnections(WaterConnNum)%PeakMassFlowRate/RhoH2O(60.0D0) )
+                                WaterConnections(WaterConnNum)%PeakMassFlowRate/RhoH2O(InitConvTemp) )
     ENDDO
   ENDIF
 
@@ -750,27 +750,27 @@ SUBROUTINE GetWaterUseInput
       WaterEquipment(WaterEquipNum)%TotalMassFlowRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
 
 
-    CALL SetupOutputVariable('Water Use Equipment Hot Water Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Equipment Hot Water Volume Flow Rate [m3/s]', &
       WaterEquipment(WaterEquipNum)%HotVolFlowRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Equipment Cold Water Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Equipment Cold Water Volume Flow Rate [m3/s]', &
       WaterEquipment(WaterEquipNum)%ColdVolFlowRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Equipment Total Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Equipment Total Volume Flow Rate [m3/s]', &
       WaterEquipment(WaterEquipNum)%TotalVolFlowRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
 
 
-    CALL SetupOutputVariable('Water Use Equipment Hot Water Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Equipment Hot Water Volume [m3]', &
       WaterEquipment(WaterEquipNum)%HotVolume, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Equipment Cold Water Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Equipment Cold Water Volume [m3]', &
       WaterEquipment(WaterEquipNum)%ColdVolume, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Equipment Total Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Equipment Total Volume [m3]', &
       WaterEquipment(WaterEquipNum)%TotalVolume, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name, &
       ResourceTypeKey='Water', EndUseKey='WATERSYSTEMS', EndUseSubKey=WaterEquipment(WaterEquipNum)%EndUseSubcatName, &
       GroupKey='Plant')
-    CALL SetupOutputVariable('Mains Water Supply for Equipment [m3]', &
+    CALL SetupOutputVariable('Water Use Equipment Mains Water Volume [m3]', &
       WaterEquipment(WaterEquipNum)%TotalVolume, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name, &
       ResourceTypeKey='MainsWater', EndUseKey='WATERSYSTEMS', EndUseSubKey=WaterEquipment(WaterEquipNum)%EndUseSubcatName, &
       GroupKey='Plant')
@@ -815,19 +815,19 @@ SUBROUTINE GetWaterUseInput
     END IF
 
     IF (WaterEquipment(WaterEquipNum)%Zone > 0) THEN
-      CALL SetupOutputVariable('Water Use Equipment Sensible Heat Rate To Zone [W]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Sensible Heat Gain Rate [W]', &
         WaterEquipment(WaterEquipNum)%SensibleRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
-      CALL SetupOutputVariable('Water Use Equipment Sensible Heat Gain To Zone [J]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Sensible Heat Gain Energy [J]', &
         WaterEquipment(WaterEquipNum)%SensibleEnergy, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
 
-      CALL SetupOutputVariable('Water Use Equipment Latent Heat Rate To Zone [W]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Latent Gain Rate [W]', &
         WaterEquipment(WaterEquipNum)%LatentRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
-      CALL SetupOutputVariable('Water Use Equipment Latent Heat Gain To Zone [J]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Latent Gain Energy [J]', &
         WaterEquipment(WaterEquipNum)%LatentEnergy, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
 
-      CALL SetupOutputVariable('Water Use Equipment Moisture Rate To Zone [kg/s]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Moisture Gain Mass Flow Rate [kg/s]', &
         WaterEquipment(WaterEquipNum)%MoistureRate, 'System', 'Average', WaterEquipment(WaterEquipNum)%Name)
-      CALL SetupOutputVariable('Water Use Equipment Moisture Gain To Zone [kg]', &
+      CALL SetupOutputVariable('Water Use Equipment Zone Moisture Gain Mass [kg]', &
         WaterEquipment(WaterEquipNum)%MoistureMass, 'System', 'Sum', WaterEquipment(WaterEquipNum)%Name)
 
       CALL SetupZoneInternalGain(WaterEquipment(WaterEquipNum)%Zone, &
@@ -855,30 +855,30 @@ SUBROUTINE GetWaterUseInput
     CALL SetupOutputVariable('Water Use Connections Total Mass Flow Rate [kg/s]', &
       WaterConnections(WaterConnNum)%TotalMassFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Connections Drain Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Water Use Connections Drain Water Mass Flow Rate [kg/s]', &
       WaterConnections(WaterConnNum)%DrainMassFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
     CALL SetupOutputVariable('Water Use Connections Heat Recovery Mass Flow Rate [kg/s]', &
       WaterConnections(WaterConnNum)%RecoveryMassFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
 
-    CALL SetupOutputVariable('Water Use Connections Hot Water Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Connections Hot Water Volume Flow Rate [m3/s]', &
       WaterConnections(WaterConnNum)%HotVolFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Connections Cold Water Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Connections Cold Water Volume Flow Rate [m3/s]', &
       WaterConnections(WaterConnNum)%ColdVolFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Connections Total Consumption Rate [m3/s]', &
+    CALL SetupOutputVariable('Water Use Connections Total Volume Flow Rate [m3/s]', &
       WaterConnections(WaterConnNum)%TotalVolFlowRate, 'System', 'Average', WaterConnections(WaterConnNum)%Name)
 
 
-    CALL SetupOutputVariable('Water Use Connections Hot Water Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Connections Hot Water Volume [m3]', &
       WaterConnections(WaterConnNum)%HotVolume, 'System', 'Sum', WaterConnections(WaterConnNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Connections Cold Water Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Connections Cold Water Volume [m3]', &
       WaterConnections(WaterConnNum)%ColdVolume, 'System', 'Sum', WaterConnections(WaterConnNum)%Name)
 
-    CALL SetupOutputVariable('Water Use Connections Total Consumption [m3]', &
+    CALL SetupOutputVariable('Water Use Connections Total Volume [m3]', &
       WaterConnections(WaterConnNum)%TotalVolume, 'System', 'Sum', WaterConnections(WaterConnNum)%Name) !, &
      ! ResourceTypeKey='Water', EndUseKey='DHW', EndUseSubKey=EndUseSubcategoryName, GroupKey='Plant')
 ! tHIS WAS double counting
@@ -914,7 +914,7 @@ SUBROUTINE GetWaterUseInput
     ! To do:  Add report variable for starved flow when tank can't deliver?
 
     IF (.NOT. WaterConnections(WaterConnNum)%StandAlone) THEN
-      CALL SetupOutputVariable('Water Use Connections Plant Hot Water Consumption [J]', &
+      CALL SetupOutputVariable('Water Use Connections Plant Hot Water Energy [J]', &
         WaterConnections(WaterConnNum)%Energy, 'System', 'Sum', WaterConnections(WaterConnNum)%Name, &
         ResourceTypeKey='PLANTLOOPHEATINGDEMAND', EndUseKey='WATERSYSTEMS', GroupKey='Plant')
     END IF
@@ -1066,7 +1066,7 @@ SUBROUTINE CalcEquipmentDrainTemp(WaterEquipNum)
 
           ! USE STATEMENTS:
   USE ScheduleManager, ONLY: GetCurrentScheduleValue
-  USE Psychrometrics, ONLY: CPHW, PsyWFnTdbRhPb, PsyRhoAirFnPbTdbW, PsyHgAirFnWTdb
+  USE Psychrometrics, ONLY: CPHW, PsyWFnTdbRhPb, PsyRhoAirFnPbTdbW, PsyHfgAirFnWTdb
   USE DataHeatBalFanSys, ONLY: MAT, ZoneAirHumRat
   USE DataHeatBalance, ONLY: ZONE
   USE DataEnvironment, ONLY: OutBaroPress
@@ -1129,7 +1129,7 @@ SUBROUTINE CalcEquipmentDrainTemp(WaterEquipNum)
         * MoistureMassMax
       WaterEquipment(WaterEquipNum)%MoistureRate = WaterEquipment(WaterEquipNum)%MoistureMass / (TimeStepSys * SecInHour)
 
-      WaterEquipment(WaterEquipNum)%LatentRate = WaterEquipment(WaterEquipNum)%MoistureRate * PsyHgAirFnWTdb(ZoneHumRat, ZoneMAT)
+      WaterEquipment(WaterEquipNum)%LatentRate = WaterEquipment(WaterEquipNum)%MoistureRate * PsyHfgAirFnWTdb(ZoneHumRat, ZoneMAT)
       WaterEquipment(WaterEquipNum)%LatentEnergy = WaterEquipment(WaterEquipNum)%LatentRate * TimeStepSys * SecInHour
     END IF
 
@@ -1150,7 +1150,7 @@ SUBROUTINE CalcEquipmentDrainTemp(WaterEquipNum)
 END SUBROUTINE CalcEquipmentDrainTemp
 
 
-SUBROUTINE InitConnections(WaterConnNum, FirstHVACIteration)
+SUBROUTINE InitConnections(WaterConnNum)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Peter Graham Ellis
@@ -1178,7 +1178,6 @@ SUBROUTINE InitConnections(WaterConnNum, FirstHVACIteration)
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER, INTENT(IN) :: WaterConnNum
-  LOGICAL, INTENT(IN) :: FirstHVACIteration
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER :: InletNode
@@ -1780,7 +1779,7 @@ SUBROUTINE CalcWaterUseZoneGains
   IF (BeginEnvrnFlag .and. MyEnvrnFlag) THEN
     WaterEquipment%SensibleRate = 0.0
     WaterEquipment%SensibleEnergy = 0.0
-    WaterEquipment%SensibleRateNoMultiplier = 0.d0 
+    WaterEquipment%SensibleRateNoMultiplier = 0.d0
     WaterEquipment%LatentRate = 0.0
     WaterEquipment%LatentEnergy = 0.0
     WaterEquipment%LatentRateNoMultiplier = 0.d0
@@ -1807,12 +1806,12 @@ SUBROUTINE CalcWaterUseZoneGains
           / ( Zone(ZoneNum)%Multiplier                             & ! CR7401, back out multipliers
               * Zone(ZoneNum)%ListMultiplier)
   END DO
-  
+
 !  ! this routine needs to model approx zone gains for use during sizing
 !  IF(DoingSizing)THEN
 !    DO WaterEquipNum = 1, NumWaterEquipment
-!      WaterEquipment(WaterEquipNum)%SensibleRateNoMultiplier = 
-!      WaterEquipment(WaterEquipNum)%LatentRateNoMultiplier   = 
+!      WaterEquipment(WaterEquipNum)%SensibleRateNoMultiplier =
+!      WaterEquipment(WaterEquipNum)%LatentRateNoMultiplier   =
 !    END DO
 !  ENDIF
 
@@ -1822,7 +1821,7 @@ END SUBROUTINE CalcWaterUseZoneGains
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

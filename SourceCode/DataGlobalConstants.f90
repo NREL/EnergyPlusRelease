@@ -197,7 +197,13 @@ INTEGER, PARAMETER          :: iRT_WellWater=1043
 CHARACTER(len=istrLeng), PARAMETER :: cRT_Condensate='Condensate'
 CHARACTER(len=istrLeng), PARAMETER :: cRT_CondensateUC='CONDENSATE'
 INTEGER, PARAMETER          :: iRT_Condensate=1044
-INTEGER, PARAMETER          :: NumOfResourceTypes=44
+CHARACTER(len=istrLeng), PARAMETER :: cRT_OtherFuel1='OtherFuel1'
+CHARACTER(len=istrLeng), PARAMETER :: cRT_OtherFuel1UC='OTHERFUEL1'
+INTEGER, PARAMETER          :: iRT_OtherFuel1=1045
+CHARACTER(len=istrLeng), PARAMETER :: cRT_OtherFuel2='OtherFuel2'
+CHARACTER(len=istrLeng), PARAMETER :: cRT_OtherFuel2UC='OTHERFUEL2'
+INTEGER, PARAMETER          :: iRT_OtherFuel2=1046
+INTEGER, PARAMETER          :: NumOfResourceTypes=46
 INTEGER, PARAMETER          :: ResourceTypeInitialOffset=1000   ! to reach "ValidTypes"
 CHARACTER(len=istrLeng), PARAMETER, DIMENSION(0:NumOfResourceTypes) :: cRT_ValidTypes = (/  &
                cRT_None,  &
@@ -244,7 +250,9 @@ CHARACTER(len=istrLeng), PARAMETER, DIMENSION(0:NumOfResourceTypes) :: cRT_Valid
                cRT_MainsWater, &
                cRT_RainWater, &
                cRT_WellWater, &
-               cRT_Condensate/)
+               cRT_Condensate,  &
+               cRT_OtherFuel1,  &
+               cRT_OtherFuel2/)
 
  INTEGER, PARAMETER :: iGeneratorICEngine     =1
  INTEGER, PARAMETER :: iGeneratorCombTurbine  =2
@@ -338,6 +346,12 @@ FUNCTION AssignResourceTypeNum(ResourceTypeChar) RESULT(ResourceTypeNum)
 
   CASE ('PROPANE','LPG')
     ResourceTypeNum=iRT_Propane
+
+  CASE ('OTHERFUEL1')
+    ResourceTypeNum=iRT_OtherFuel1
+
+  CASE ('OTHERFUEL2')
+    ResourceTypeNum=iRT_OtherFuel2
 
   CASE ('WATER','H2O')
     ResourceTypeNum=iRT_Water  ! use record keeping
@@ -521,6 +535,12 @@ FUNCTION GetResourceTypeChar(ResourceTypeNum) RESULT(ResourceTypeChar)
   CASE (iRT_Propane)
     ResourceTypeChar='Propane'
 
+  CASE (iRT_OtherFuel1)
+    ResourceTypeChar='OtherFuel1'
+
+  CASE (iRT_OtherFuel2)
+    ResourceTypeChar='OtherFuel2'
+
   CASE (iRT_Water)
     ResourceTypeChar='Water'
 
@@ -640,7 +660,7 @@ END FUNCTION GetResourceTypeChar
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

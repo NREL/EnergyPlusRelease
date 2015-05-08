@@ -136,8 +136,8 @@ REAL(r64), ALLOCATABLE, DIMENSION(:) :: SigmaC      !  Total Capacitance of cons
 !REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QMassOutFlux    !MassFlux on Surface for reporting
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QHeatInFlux     !HeatFlux on Surface for reporting
 REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QHeatOutFlux    !HeatFlux on Surface for reporting
-!REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QFluxZoneToInSurf !sum of Heat flows at the surface to air interface, zone-side boundary conditions W/m2
-!                                                           ! before CR 8280 was not reported, but was calculated.
+!REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QFluxZoneToInSurf !sum of Heat flows at the surface to air interface,
+!                                 ! zone-side boundary conditions W/m2 before CR 8280 was not reported, but was calculated.
 !REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QFluxOutsideToOutSurf !sum of Heat flows at the surface to air interface, Out-side boundary conditions W/m2
 !                                                           ! before CR 8280 was
 !REAL(r64), ALLOCATABLE, DIMENSION(:)   :: QFluxInArrivSurfCond !conduction between surface node and first node into the surface (sensible)
@@ -306,8 +306,8 @@ SUBROUTINE GetCondFDInput
   ! user settings for numerical parameters
   cCurrentModuleObject = 'HeatBalanceSettings:ConductionFiniteDifference'
 
-  IF (GetNumObjectsFound(TRIM(cCurrentModuleObject)) > 0) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas, &
+  IF (GetNumObjectsFound(cCurrentModuleObject) > 0) THEN
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNumbers,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -354,7 +354,7 @@ SUBROUTINE GetCondFDInput
     DO Loop=1,pcMat
 
     !Call Input Get routine to retrieve material data
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha, &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha, &
                        MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -443,7 +443,7 @@ SUBROUTINE GetCondFDInput
     DO Loop=1,vcMat
 
       !Call Input Get routine to retrieve material data
-      CALL GetObjectItem(TRIM(cCurrentModuleObject),Loop,MaterialNames,MaterialNumAlpha, &
+      CALL GetObjectItem(cCurrentModuleObject,Loop,MaterialNames,MaterialNumAlpha, &
                        MaterialProps,MaterialNumProp,IOSTAT,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -661,7 +661,9 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
           ! na
 
           ! USE STATEMENTS:
+  USE General,      ONLY : TrimSigDigits, RoundSigDigits
   USE DataSurfaces, ONLY : HeatTransferModel_CondFD
+  USE DataHeatBalance, Only: HighDiffusivityThreshold, ThinMaterialLayerThreshold
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -710,6 +712,8 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
   REAL(r64) :: Cp
   REAL(r64) :: Dv
   LOGICAL :: errorsFound
+  REAL(r64) :: DeltaTimestep      ! zone timestep in seconds, for local check of properties
+  REAL(r64) :: ThicknessThreshold ! min thickness consistent with other thermal properties, for local check
 
   ALLOCATE(ConstructFD(TotConstructs))
   ALLOCATE(SigmaR(TotConstructs))
@@ -875,6 +879,27 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
         !   Alpha = kt*(Por+At*RhoS)/(RhoS*(Bv*Por*Lambda+Cp*(Por+At*RhoS)))
         MAlpha = 0.d0
 
+        !check for Material layers that are too thin and highly conductivity (not appropriate for surface models)
+        IF (Alpha > HighDiffusivityThreshold .AND. .NOT. Material(CurrentLayer)%WarnedForHighDiffusivity) THEN
+          DeltaTimestep      = TimeStepZone * SecInHour
+          ThicknessThreshold = SQRT(Alpha * DeltaTimestep * 3.d0)
+          IF (Material(CurrentLayer)%Thickness < ThicknessThreshold) THEN
+            CALL ShowSevereError('InitialInitHeatBalFiniteDiff: Found Material that is too thin and/or too highly conductive,' &
+                                    //' material name = '  // TRIM(Material(CurrentLayer)%Name))
+            CALL ShowContinueError('High conductivity Material layers are not well supported by Conduction Finite Difference, ' &
+                                    //' material conductivity = ' //TRIM(RoundSigDigits(Material(CurrentLayer)%Conductivity, 3)) &
+                                    //' [W/m-K]')
+            CALL ShowContinueError('Material thermal diffusivity = ' //TRIM(RoundSigDigits(Alpha, 3)) //' [m2/s]')
+            IF (Material(CurrentLayer)%Thickness < ThinMaterialLayerThreshold) THEN
+              CALL ShowContinueError('Material may be too thin to be modeled well, thickness = ' &
+                                      // TRIM(RoundSigDigits(Material(currentLayer)%Thickness, 5 ))//' [m]')
+              CALL ShowContinueError('Material with this thermal diffusivity should have thickness > ' &
+                                      //  TRIM(RoundSigDigits(ThicknessThreshold , 5)) // ' [m]')
+            ENDIF
+            Material(CurrentLayer)%WarnedForHighDiffusivity = .TRUE.
+          ENDIF
+        ENDIF
+
       END IF  !  R, Air  or regular material properties and parameters
 
      ! Proceed with setting node sizes in layers
@@ -1007,16 +1032,16 @@ SUBROUTINE InitialInitHeatBalFiniteDiff
 !    CALL SetupOutputVariable('CondFD Inside Heat Flux to Surface [W/m2]', QFluxZoneToInSurf(SurfNum), &
 !                             'Zone','State',TRIM(Surface(SurfNum)%Name))
 
-    CALL SetupOutputVariable('CondFD Inner Solver Loop Iterations [ ]', SurfaceFD(SurfNum)%GSloopCounter, &
-                             'Zone','Sum',TRIM(Surface(SurfNum)%Name))
+    CALL SetupOutputVariable('CondFD Inner Solver Loop Iteration Count [ ]', SurfaceFD(SurfNum)%GSloopCounter, &
+                             'Zone','Sum',Surface(SurfNum)%Name)
 
-!       CALL SetupOutputVariable('Source Location Temperature[C]',TempSource(SurfNum),'Zone','State',Trim(Surface(SurfNum)%Name))
+
 
     TotNodes = ConstructFD(Surface(SurfNum)%Construction)%TotNodes  ! Full size nodes, start with outside face.
     DO Lay = 1,TotNodes +1  ! include inside face node
-      WRITE(LayChar,*)Lay
-      CALL SetupOutputVariable('CondFD Nodal Temperature[C]',SurfaceFD(SurfNum)%TDreport(Lay),  &
-          'Zone','State', TRIM(Surface(SurfNum)%Name)//" Node #"//TRIM(ADJUSTL(LayChar)))
+      CALL SetupOutputVariable('CondFD Surface Temperature Node '//TRIM(TrimSigDigits(Lay))//' [C]',&
+           SurfaceFD(SurfNum)%TDreport(Lay),  &
+          'Zone','State', Surface(SurfNum)%Name)
     END DO
 
   ENDDO  ! End of the Surface Loop for Report Variable Setup
@@ -1174,7 +1199,8 @@ SUBROUTINE CalcHeatBalFiniteDiff(Surf,TempSurfInTmp,TempSurfOutTmp)
                                    SurfaceFD(Surf)%TD, &
                                    SurfaceFD(Surf)%TDT, &
                                    SurfaceFD(Surf)%EnthOld, &
-                                   SurfaceFD(Surf)%EnthNew)
+                                   SurfaceFD(Surf)%EnthNew, &
+                                   SurfaceFD(Surf)%TDReport)
         END IF
 
       END DO    !The end of the layer loop
@@ -1635,7 +1661,8 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
                                           SurfaceFD(Surf)%TD, &
                                           SurfaceFD(Surf)%TDT, &
                                           SurfaceFD(Surf)%EnthOld, &
-                                          SurfaceFD(Surf)%EnthNew)
+                                          SurfaceFD(Surf)%EnthNew, &
+                                          SurfaceFD(Surf)%TDReport)
       TDT(I)  = SurfaceFD(Surf)%TDT(TotNodes + 1)
       TT(I)   = SurfaceFD(Surf)%TT(TotNodes + 1)
       RhoT(I) = SurfaceFD(Surf)%RhoT(TotNodes + 1)
@@ -1651,7 +1678,8 @@ SUBROUTINE ExteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
                                             SurfaceFD(Surface(Surf)%ExtBoundCond)%TD, &
                                             SurfaceFD(Surface(Surf)%ExtBoundCond)%TDT, &
                                             SurfaceFD(Surface(Surf)%ExtBoundCond)%EnthOld, &
-                                            SurfaceFD(Surface(Surf)%ExtBoundCond)%EnthNew)
+                                            SurfaceFD(Surface(Surf)%ExtBoundCond)%EnthNew, &
+                                            SurfaceFD(Surface(Surf)%ExtBoundCond)%TDReport)
 
       TDT(I)  = SurfaceFD(Surface(Surf)%ExtBoundCond)%TDT(TotNodes + 1)
       TT(I)   = SurfaceFD(Surface(Surf)%ExtBoundCond)%TT(TotNodes + 1)
@@ -2321,7 +2349,7 @@ RETURN
 END SUBROUTINE IntInterfaceNodeEqns
 
 
-SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthNew)
+SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthNew,TDReport)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Richard Liesen
           !       DATE WRITTEN   November, 2003
@@ -2358,6 +2386,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
   REAL(r64),DIMENSION(:), INTENT(InOut) :: RH    !INSIDE SURFACE TEMPERATURE OF EACH HEAT TRANSFER SURF.
   REAL(r64),DIMENSION(:), INTENT(InOut) :: EnthOld    ! Old Nodal enthalpy
   REAL(r64),DIMENSION(:), INTENT(InOut) :: EnthNew    ! New Nodal enthalpy
+  REAL(r64),DIMENSION(:), INTENT(InOut) :: TDreport    ! Temperature value from previous HeatSurfaceHeatManager titeration's value 
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -2377,6 +2406,7 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
   Real(r64) :: QElecBaseboardSurfFD  ! Current radiant heat flux at a surface due to the presence of electric baseboard heaters
   REAL(r64) :: QRadThermInFD !Thermal radiation absorbed on inside surfaces
   REAL(r64) :: Delx
+  REAL(r64), PARAMETER :: IterDampConst = 5.0d0  ! Damping constant for inside surface temperature iterations. Only used for massless (R-value only) Walls
 
   INTEGER    :: ConstrNum
   INTEGER    :: MatLay
@@ -2456,13 +2486,13 @@ SUBROUTINE InteriorBCEqns(Delt,I,Lay,Surf,T,TT,Rhov,RhoT,RH,TD,TDT,EnthOld,EnthN
 
         TDT(I)=(NetLWRadToSurfFD*Rlayer+QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
                     QElecBaseboardSurfFD*Rlayer +  QRadSWInFD*Rlayer + QRadThermInFD*Rlayer +   &
-                       TDT(I+1) + hconvi*Rlayer*Tia)/(1.0d0 + hconvi*Rlayer)
+                       TDT(I+1) + hconvi*Rlayer*Tia+TDreport(I)*IterDampConst*Rlayer)/(1.0d0 + hconvi*Rlayer+IterDampConst*Rlayer)
 
 
       ELSE ! regular wall
         TDT(I)=(NetLWRadToSurfFD*Rlayer+QHtRadSysSurfFD*Rlayer + QHWBaseboardSurfFD*Rlayer + QSteamBaseboardSurfFD*Rlayer + &
                     QElecBaseboardSurfFD*Rlayer + QRadSWInFD*Rlayer + QRadThermInFD*Rlayer +   &
-                       TDT(I-1) + hconvi*Rlayer*Tia)/(1.0d0 + hconvi*Rlayer)
+                       TDT(I-1) + hconvi*Rlayer*Tia+TDreport(I)*IterDampConst*Rlayer)/(1.0d0 + hconvi*Rlayer+IterDampConst*Rlayer)
       ENDIF
 
       IF ((TDT(I) > MaxSurfaceTempLimit) .OR. &
@@ -2698,7 +2728,7 @@ END SUBROUTINE CheckFDSurfaceTempLimits
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

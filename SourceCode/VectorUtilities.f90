@@ -1327,6 +1327,7 @@ Integer Function Triangulate(nsides,polygon,outtriangles,surfazimuth,surftilt,su
   USE DataInterfaces, ONLY: ShowWarningError,ShowMessage,ShowContinueError
   USE DataGlobals, ONLY: DisplayExtraWarnings
   USE DataSurfaces, ONLY: cSurfaceClass,SurfaceClass_Floor,SurfaceClass_Roof,SurfaceClass_Overhang
+  USE General, ONLY: RoundSigDigits
 
   implicit none ! Enforce explicit typing of all variables in this routine
 
@@ -1441,13 +1442,17 @@ Integer Function Triangulate(nsides,polygon,outtriangles,surfazimuth,surftilt,su
         write(line,*) 'surface=',trim(surfname),' class=',trim(cSurfaceClass(surfclass))
         call showmessage(trim(line))
         do j=1,nsides
-          write(line,"(' side=',i2,' (',2(f6.1,','),f6.1,')')") j,polygon(j)
+!          write(line,"(' side=',i2,' (',2(f6.1,','),f6.1,')')") j,polygon(j)
+          line=' side='//trim(roundsigdigits(j))//' ('//trim(roundsigdigits(polygon(j)%x,1))//','//  &
+            trim(roundsigdigits(polygon(j)%y,1))//','//trim(roundsigdigits(polygon(j)%z,1))//')'
           call showmessage(trim(line))
         enddo
         write(line,*) 'number of triangles found=',ncount
         call showmessage(trim(line))
         do j=1,nrangles
-          write(line,"(' r angle=',i2,' vert=',i2,' deg=',f6.1)") j,r_angles(j),rangles(j)*radtodeg
+!          write(line,"(' r angle=',i2,' vert=',i2,' deg=',f6.1)") j,r_angles(j),rangles(j)*radtodeg
+          line=' r angle='//trim(roundsigdigits(j))//' vert='//trim(roundsigdigits(r_angles(j)))//' deg='//  &
+            trim(roundsigdigits(rangles(j)*radtodeg,1))
           call showmessage(trim(line))
         enddo
       endif
@@ -1933,7 +1938,7 @@ End Module DXFEarClipping
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

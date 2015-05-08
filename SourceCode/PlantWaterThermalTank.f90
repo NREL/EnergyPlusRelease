@@ -1201,7 +1201,7 @@ SUBROUTINE GetWaterThermalTankInput
           ! Standard EnergyPlus methodology.
 
           ! USE STATEMENTS:
-  USE DataGlobals,        ONLY: MaxNameLength, NumOfZones, AutoCalculate, outputfiledebug
+  USE DataGlobals,        ONLY: MaxNameLength, NumOfZones, AutoCalculate, ScheduleAlwaysOn, outputfiledebug
   USE DataInterfaces,     ONLY: ShowSevereError, ShowWarningError, ShowFatalError,  &
                                 SetupOutputVariable, ShowContinueError
   USE InputProcessor,     ONLY: GetNumObjectsFound, GetObjectItem, VerifyName, FindItemInList, SameString, GetObjectDefMaxArgs
@@ -1230,6 +1230,7 @@ SUBROUTINE GetWaterThermalTankInput
   USE OutAirNodeManager,  ONLY: CheckOutAirNodeNumber,CheckAndAddAirNodeNumber
   USE DataSizing,         ONLY: PlantSizData, NumPltSizInput
   USE RefrigeratedCase,   ONLY: CheckRefrigerationInput
+  USE GlobalNames, ONLY: VerifyUniqueCoilName
 
   IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -1238,6 +1239,7 @@ SUBROUTINE GetWaterThermalTankInput
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: Blank = ' '
+  CHARACTER(len=*), PARAMETER :: RoutineName = 'GetWaterThermalTankInput: '
 
 
           ! INTERFACE BLOCK SPECIFICATIONS:
@@ -1363,7 +1365,7 @@ SUBROUTINE GetWaterThermalTankInput
       cCurrentModuleObject = 'Coil:WaterHeating:Desuperheater'
       DO DesuperheaterNum = 1, NumWaterHeaterDesuperheater
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),DesuperheaterNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
+        CALL GetObjectItem(cCurrentModuleObject,DesuperheaterNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1375,6 +1377,10 @@ SUBROUTINE GetWaterThermalTankInput
           ErrorsFound = .TRUE.
           IF (IsBlank) cAlphaArgs(1) = 'xxxxx'
         END IF
+        CALL VerifyUniqueCoilName(cCurrentModuleObject,cAlphaArgs(1),errflag,TRIM(cCurrentModuleObject)//' Name')
+        IF (errflag) THEN
+          ErrorsFound=.true.
+        ENDIF
         WaterHeaterDesuperheater(DesuperheaterNum)%Name = cAlphaArgs(1)
         WaterHeaterDesuperheater(DesuperheaterNum)%Type = cCurrentModuleObject
 
@@ -1382,10 +1388,12 @@ SUBROUTINE GetWaterThermalTankInput
         IF(.NOT. lAlphaFieldBlanks(2) )THEN
           WaterHeaterDesuperheater(DesuperheaterNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
           IF (WaterHeaterDesuperheater(DesuperheaterNum)%AvailSchedPtr .EQ. 0) THEN
-           CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)))
-           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(2))//' = '//TRIM(cAlphaArgs(2)))
+            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
             ErrorsFound=.TRUE.
           END IF
+        ELSE
+          WaterHeaterDesuperheater(DesuperheaterNum)%AvailSchedPtr = ScheduleAlwaysOn
         END IF
 
 !       convert schedule name to pointer
@@ -1460,8 +1468,8 @@ SUBROUTINE GetWaterThermalTankInput
 
         WaterHeaterDesuperheater(DesuperheaterNum)%TankType = cAlphaArgs(7)
 
-        IF (.NOT. SameString(TRIM(WaterHeaterDesuperheater(DesuperheaterNum)%TankType),cMixedWHModuleObj)  &
-          .AND. .NOT. SameString(TRIM(WaterHeaterDesuperheater(DesuperheaterNum)%TankType),cStratifiedWHModuleObj)) THEN
+        IF (.NOT. SameString(WaterHeaterDesuperheater(DesuperheaterNum)%TankType,cMixedWHModuleObj)  &
+          .AND. .NOT. SameString(WaterHeaterDesuperheater(DesuperheaterNum)%TankType,cStratifiedWHModuleObj)) THEN
 
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(HPWaterHeater(DesuperheaterNum)%Name)//':')
           CALL ShowContinueError('Desuperheater can only be used with '//cMixedWHModuleObj//' or '//cStratifiedWHModuleObj//'.')
@@ -1471,9 +1479,9 @@ SUBROUTINE GetWaterThermalTankInput
         WaterHeaterDesuperheater(DesuperheaterNum)%TankName = cAlphaArgs(8)
 
 !       get heat reclaim object
-        IF(SameString(TRIM(cAlphaArgs(9)),'Coil:Cooling:DX:SingleSpeed') .OR. &
-           SameString(TRIM(cAlphaArgs(9)),'Coil:Cooling:DX:TwoSpeed') .OR. &
-           SameString(TRIM(cAlphaArgs(9)),'Coil:Cooling:DX:TwoStageWithHumidityControlMode'))THEN
+        IF(SameString(cAlphaArgs(9),'Coil:Cooling:DX:SingleSpeed') .OR. &
+           SameString(cAlphaArgs(9),'Coil:Cooling:DX:TwoSpeed') .OR. &
+           SameString(cAlphaArgs(9),'Coil:Cooling:DX:TwoStageWithHumidityControlMode'))THEN
           WaterHeaterDesuperheater(DesuperheaterNum)%HeatingSourceType  = cAlphaArgs(9)
           WaterHeaterDesuperheater(DesuperheaterNum)%HeatingSourceName  = cAlphaArgs(10)
 !         load DX coil structure for connection to desuperheater heating coil (refrigerated rack have been loaded)
@@ -1485,10 +1493,10 @@ SUBROUTINE GetWaterThermalTankInput
                                    TRIM(WaterHeaterDesuperheater(DesuperheaterNum)%Name))
             ErrorsFound=.true.
           ENDIF
-        ELSE IF((SameString(TRIM(cAlphaArgs(9)),'Refrigeration:CompressorRack')) .OR. &
-                (SameString(TRIM(cAlphaArgs(9)),'Refrigeration:Condenser:AirCooled')).OR.&
-                (SameString(TRIM(cAlphaArgs(9)),'Refrigeration:Condenser:EvaporativeCooled')).OR.&
-                (SameString(TRIM(cAlphaArgs(9)),'Refrigeration:Condenser:WaterCooled')))&
+        ELSE IF((SameString(cAlphaArgs(9),'Refrigeration:CompressorRack')) .OR. &
+                (SameString(cAlphaArgs(9),'Refrigeration:Condenser:AirCooled')).OR.&
+                (SameString(cAlphaArgs(9),'Refrigeration:Condenser:EvaporativeCooled')).OR.&
+                (SameString(cAlphaArgs(9),'Refrigeration:Condenser:WaterCooled')))&
         THEN
           WaterHeaterDesuperheater(DesuperheaterNum)%HeatingSourceType  = cAlphaArgs(9)
           WaterHeaterDesuperheater(DesuperheaterNum)%HeatingSourceName  = cAlphaArgs(10)
@@ -1521,9 +1529,9 @@ SUBROUTINE GetWaterThermalTankInput
                         '" desuperheater heat source object not found: '//TRIM(cAlphaArgs(9))//' "'//TRIM(cAlphaArgs(10))//'"')
             ErrorsFound = .TRUE.
           END IF
-        ELSEIF((SameString(Trim(cAlphaArgs(9)),'Refrigeration:Condenser:AirCooled')).OR.&
-                (SameString(Trim(cAlphaArgs(9)),'Refrigeration:Condenser:EvaporativeCooled')).OR.&
-                (SameString(Trim(cAlphaArgs(9)),'Refrigeration:Condenser:WaterCooled')))&
+        ELSEIF((SameString(cAlphaArgs(9),'Refrigeration:Condenser:AirCooled')).OR.&
+                (SameString(cAlphaArgs(9),'Refrigeration:Condenser:EvaporativeCooled')).OR.&
+                (SameString(cAlphaArgs(9),'Refrigeration:Condenser:WaterCooled')))&
         THEN
           WaterHeaterDesuperheater(DesuperheaterNum)%ReclaimHeatingSource = CONDENSER_REFRIGERATION
           DO CondNum = 1,NumRefrigCondensers
@@ -1680,7 +1688,7 @@ SUBROUTINE GetWaterThermalTankInput
       cCurrentModuleObject = 'WaterHeater:HeatPump'
       DO HPWaterHeaterNum = 1, NumHeatPumpWaterHeater
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),HPWaterHeaterNum, &
+        CALL GetObjectItem(cCurrentModuleObject,HPWaterHeaterNum, &
           cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
           NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
           AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -1707,9 +1715,7 @@ SUBROUTINE GetWaterThermalTankInput
             ErrorsFound=.TRUE.
           END IF
         ELSE
-          CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(HPWaterHeater(HPWaterHeaterNum)%Name)//'", ')
-          CALL ShowContinueError('required '//trim(cAlphaFieldNames(2))//' is blank.')
-          ErrorsFound=.TRUE.
+          HPWaterHeater(HPWaterHeaterNum)%AvailSchedPtr = ScheduleAlwaysOn
         ENDIF
 
 !       convert schedule name to pointer
@@ -1837,8 +1843,8 @@ SUBROUTINE GetWaterThermalTankInput
 
         HPWaterHeater(HPWaterHeaterNum)%TankType = cAlphaArgs(14)
 
-        IF (.NOT. SameString(TRIM(HPWaterHeater(HPWaterHeaterNum)%TankType),cMixedWHModuleObj)  &
-          .AND. .NOT. SameString(TRIM(HPWaterHeater(HPWaterHeaterNum)%TankType),cStratifiedWHModuleObj)) THEN
+        IF (.NOT. SameString(HPWaterHeater(HPWaterHeaterNum)%TankType,cMixedWHModuleObj)  &
+          .AND. .NOT. SameString(HPWaterHeater(HPWaterHeaterNum)%TankType,cStratifiedWHModuleObj)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(HPWaterHeater(HPWaterHeaterNum)%Name)//'":')
           CALL ShowContinueError('Heat pump water heater can only be used with '//  &
                                   cMixedWHModuleObj//' or '//cStratifiedWHModuleObj//'.')
@@ -1867,7 +1873,7 @@ SUBROUTINE GetWaterThermalTankInput
         HPWaterHeater(HPWaterHeaterNum)%DXCoilName = cAlphaArgs(19)
 
 !       check that the DX Coil exists
-        IF(.NOT. SameString(TRIM(HPWaterHeater(HPWaterHeaterNum)%DXCoilType),'Coil:WaterHeating:AirToWaterHeatPump'))THEN
+        IF(.NOT. SameString(HPWaterHeater(HPWaterHeaterNum)%DXCoilType,'Coil:WaterHeating:AirToWaterHeatPump'))THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(HPWaterHeater(HPWaterHeaterNum)%Name)//'":')
           CALL ShowContinueError('Heat pump water heater can only be used with Coil:WaterHeating:AirToWaterHeatPump.')
           ErrorsFound = .TRUE.
@@ -2350,7 +2356,7 @@ SUBROUTINE GetWaterThermalTankInput
             CALL ShowContinueError(trim(cAlphaFieldNames(29))//'="'//TRIM(cAlphaArgs(29))//'".')
             ErrorsFound=.TRUE.
           END SELECT
-        
+
         ENDIF
 
       END DO ! DO HPWaterHeaterNum = 1, NumHeatPumpWaterHeater
@@ -2368,7 +2374,7 @@ SUBROUTINE GetWaterThermalTankInput
       cCurrentModuleObject = cMixedWHModuleObj
       DO WaterThermalTankNum = 1, NumWaterHeaterMixed
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),WaterThermalTankNum, &
+        CALL GetObjectItem(cCurrentModuleObject,WaterThermalTankNum, &
           cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2386,6 +2392,10 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%Type = cCurrentModuleObject
         WaterThermalTank(WaterThermalTankNum)%TypeNum = MixedWaterHeater
 
+        ! default to always on
+        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
+
           ! A user field will be added in a later release
         WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName = 'Water Heater'
 
@@ -2396,9 +2406,13 @@ SUBROUTINE GetWaterThermalTankInput
         END IF
 
         WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule = GetScheduleIndex(cAlphaArgs(2))
-        IF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule .EQ. 0) THEN
+        IF (lAlphaFieldBlanks(2)) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", missing data.')
+          CALL ShowContinueError('blank field, missing '//TRIM(cAlphaFieldNames(2))//' is required')
+          ErrorsFound = .TRUE.
+        ELSEIF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule .EQ. 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
-            ':  Setpoint Temperature Schedule not found = '//TRIM(cAlphaArgs(2)))
+            ':  '//trim(cAlphaFieldNames(2))//' not found = '//TRIM(cAlphaArgs(2)))
           ErrorsFound = .TRUE.
         END IF
 
@@ -2478,6 +2492,12 @@ SUBROUTINE GetWaterThermalTankInput
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%FuelType = 'Propane'
 
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%FuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%FuelType = 'OtherFuel2'
+
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%FuelType = 'Steam'
 
@@ -2549,6 +2569,12 @@ SUBROUTINE GetWaterThermalTankInput
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'Propane'
 
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'OtherFuel2'
+
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'Steam'
 
@@ -2596,6 +2622,12 @@ SUBROUTINE GetWaterThermalTankInput
 
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'Propane'
+
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'OtherFuel2'
 
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'Steam'
@@ -2782,7 +2814,7 @@ SUBROUTINE GetWaterThermalTankInput
 
       DO WaterThermalTankNum = NumWaterHeaterMixed + 1, NumWaterHeaterMixed + NumWaterHeaterStratified
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),WaterThermalTankNum-NumWaterHeaterMixed,  &
+        CALL GetObjectItem(cCurrentModuleObject,WaterThermalTankNum-NumWaterHeaterMixed,  &
           cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -2798,6 +2830,10 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%Name = cAlphaArgs(1)
         WaterThermalTank(WaterThermalTankNum)%Type = cCurrentModuleObject
         WaterThermalTank(WaterThermalTankNum)%TypeNum = StratifiedWaterHeater
+
+        ! default to always on
+        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
 
         WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName = cAlphaArgs(2)
 
@@ -2852,7 +2888,11 @@ SUBROUTINE GetWaterThermalTankInput
         END SELECT
 
         WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule = GetScheduleIndex(cAlphaArgs(5))
-        IF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule .EQ. 0) THEN
+        IF (lAlphaFieldBlanks(5)) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", missing data.')
+          CALL ShowContinueError('blank field, missing '//TRIM(cAlphaFieldNames(5))//' is required')
+          ErrorsFound = .TRUE.
+        ELSEIF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule .EQ. 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': '//trim(cAlphaFieldNames(5))//' not found = '//TRIM(cAlphaArgs(5)))
           ErrorsFound = .TRUE.
@@ -2869,8 +2909,9 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%HeaterHeight1 = rNumericArgs(7)
 
         !Test if Heater height is within range
-        IF(WaterThermalTank(WaterThermalTankNum)%HeaterHeight1 &
-            >  WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. &
+            (WaterThermalTank(WaterThermalTankNum)%HeaterHeight1 &
+                >  WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Heater 1 is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -2879,7 +2920,11 @@ SUBROUTINE GetWaterThermalTankInput
         ENDIF
 
         WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule2 = GetScheduleIndex(cAlphaArgs(6))
-        IF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule2 .EQ. 0) THEN
+        IF (lAlphaFieldBlanks(6)) THEN
+          CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'", missing data.')
+          CALL ShowContinueError('blank field, missing '//TRIM(cAlphaFieldNames(6))//' is required')
+          ErrorsFound = .TRUE.
+        ELSEIF (WaterThermalTank(WaterThermalTankNum)%SetpointTempSchedule2 .EQ. 0) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ':  '//trim(cAlphaFieldNames(6))//' not found = '//TRIM(cAlphaArgs(6)))
           ErrorsFound = .TRUE.
@@ -2896,8 +2941,9 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%HeaterHeight2 = rNumericArgs(10)
 
         !Test if Heater height is within range
-        IF(WaterThermalTank(WaterThermalTankNum)%HeaterHeight2 &
-            >  WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. &
+            (WaterThermalTank(WaterThermalTankNum)%HeaterHeight2 &
+                 >  WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Heater 2 is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -2930,6 +2976,12 @@ SUBROUTINE GetWaterThermalTankInput
 
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%FuelType = 'Propane'
+
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%FuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%FuelType = 'OtherFuel2'
 
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%FuelType = 'Steam'
@@ -2984,6 +3036,12 @@ SUBROUTINE GetWaterThermalTankInput
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'Propane'
 
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'OtherFuel2'
+
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType = 'Steam'
 
@@ -3031,6 +3089,12 @@ SUBROUTINE GetWaterThermalTankInput
 
           CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
             WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'Propane'
+
+          CASE ('OTHERFUEL1')
+            WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'OtherFuel1'
+
+          CASE ('OTHERFUEL2')
+            WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'OtherFuel2'
 
           CASE ('STEAM')
             WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType = 'Steam'
@@ -3135,8 +3199,9 @@ SUBROUTINE GetWaterThermalTankInput
          ! Defaults to bottom of tank
           WaterThermalTank(WaterThermalTankNum)%UseInletHeight = 0.0
         END IF
-        IF (WaterThermalTank(WaterThermalTankNum)%UseInletHeight &
-             > WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. & 
+            (WaterThermalTank(WaterThermalTankNum)%UseInletHeight &
+                   > WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Use inlet is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -3150,8 +3215,9 @@ SUBROUTINE GetWaterThermalTankInput
           ! Defaults to top of tank
           WaterThermalTank(WaterThermalTankNum)%UseOutletHeight = WaterThermalTank(WaterThermalTankNum)%Height
         END IF
-        IF (WaterThermalTank(WaterThermalTankNum)%UseOutletHeight &
-             > WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. &
+            (WaterThermalTank(WaterThermalTankNum)%UseOutletHeight &
+              > WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Use outlet is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -3171,8 +3237,9 @@ SUBROUTINE GetWaterThermalTankInput
           ! Defaults to top of tank
           WaterThermalTank(WaterThermalTankNum)%SourceInletHeight = WaterThermalTank(WaterThermalTankNum)%Height
         END IF
-        IF (WaterThermalTank(WaterThermalTankNum)%SourceInletHeight &
-             > WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. &
+            (WaterThermalTank(WaterThermalTankNum)%SourceInletHeight &
+              > WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Source inlet is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -3186,8 +3253,9 @@ SUBROUTINE GetWaterThermalTankInput
           ! Defaults to bottom of tank
           WaterThermalTank(WaterThermalTankNum)%SourceOutletHeight = 0.0D0
         END IF
-        IF (WaterThermalTank(WaterThermalTankNum)%SourceOutletHeight &
-             > WaterThermalTank(WaterThermalTankNum)%Height) THEN
+        IF ((WaterThermalTank(WaterThermalTankNum)%Height /= Autosize) .AND. &
+            (WaterThermalTank(WaterThermalTankNum)%SourceOutletHeight &
+              > WaterThermalTank(WaterThermalTankNum)%Height)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
             ': Source outlet is located higher than overall tank height.' )
           CALL ShowContinueError( TRIM(cNumericFieldNames(2))//' = '//TRIM(RoundSigDigits(rNumericArgs(2), 4)) )
@@ -3303,7 +3371,7 @@ SUBROUTINE GetWaterThermalTankInput
       DO WaterThermalTankNum = NumWaterHeaterMixed + NumWaterHeaterStratified + 1, &
                                    NumWaterHeaterMixed + NumWaterHeaterStratified + NumChilledWaterMixed
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),WaterThermalTankNum - (NumWaterHeaterMixed + NumWaterHeaterStratified), &
+        CALL GetObjectItem(cCurrentModuleObject,WaterThermalTankNum - (NumWaterHeaterMixed + NumWaterHeaterStratified), &
                            cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -3422,6 +3490,9 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%FlowRateSchedule = 0
         WaterThermalTank(WaterThermalTankNum)%UseInletTempSchedule = 0
 
+        ! default to always on
+        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
 
         IF ((rNumericArgs(6) > 1) .OR. (rNumericArgs(6) < 0)) THEN
           CALL ShowSevereError(TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1))// &
@@ -3446,12 +3517,16 @@ SUBROUTINE GetWaterThermalTankInput
 
         WaterThermalTank(WaterThermalTankNum)%UseSidePlantLoopSide = DemandSupply_No
 
-        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(9))
-        IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum == 0) Then
-          CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(cAlphaArgs(9)))
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
-          CALL ShowContinueError('Schedule was not found.')
-          ErrorsFound = .TRUE.
+        IF (lAlphaFieldBlanks(9)) THEN
+          WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
+        ELSE
+          WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(9))
+          IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum == 0) Then
+            CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(9))//' = '//TRIM(cAlphaArgs(9)))
+            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+            CALL ShowContinueError('Schedule was not found.')
+            ErrorsFound = .TRUE.
+          ENDIF
         ENDIF
 
         WaterThermalTank(WaterThermalTankNum)%SourceSidePlantLoopSide = DemandSupply_No
@@ -3462,12 +3537,16 @@ SUBROUTINE GetWaterThermalTankInput
           WaterThermalTank(WaterThermalTankNum)%SourceDesignVolFlowRate = rNumericArgs(9)
         ENDIF
 
-        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(12))
-        IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum == 0) Then
-          CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(12))//' = '//TRIM(cAlphaArgs(12)))
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
-          CALL ShowContinueError('Schedule was not found.')
-          ErrorsFound = .TRUE.
+        IF (lAlphaFieldBlanks(12)) THEN
+          WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        ELSE
+          WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(12))
+          IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum == 0) Then
+            CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(12))//' = '//TRIM(cAlphaArgs(12)))
+            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+            CALL ShowContinueError('Schedule was not found.')
+            ErrorsFound = .TRUE.
+          ENDIF
         ENDIF
         IF (lNumericFieldBlanks(10)) THEN
           WaterThermalTank(WaterThermalTankNum)%SizingRecoveryTime   = 4.0D0
@@ -3523,7 +3602,7 @@ SUBROUTINE GetWaterThermalTankInput
       DO WaterThermalTankNum = NumWaterHeaterMixed + NumWaterHeaterStratified + NumChilledWaterMixed + 1 &
                               , NumWaterHeaterMixed + NumWaterHeaterStratified + NumChilledWaterMixed + NumChilledWaterStratified
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),WaterThermalTankNum  &
+        CALL GetObjectItem(cCurrentModuleObject,WaterThermalTankNum  &
                             -  (NumWaterHeaterMixed + NumWaterHeaterStratified + NumChilledWaterMixed),  &
                               cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
@@ -3669,6 +3748,11 @@ SUBROUTINE GetWaterThermalTankInput
         WaterThermalTank(WaterThermalTankNum)%UseInletTempSchedule = 0
         WaterThermalTank(WaterThermalTankNum)%UseEffectiveness = rNumericArgs(9)
         WaterThermalTank(WaterThermalTankNum)%UseInletHeight = rNumericArgs(10)
+
+        ! default to always on
+        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
+
         IF (rNumericArgs(10) == Autocalculate) THEN
           WaterThermalTank(WaterThermalTankNum)%UseInletHeight = WaterThermalTank(WaterThermalTankNum)%Height  ! top of tank
         ENDIF
@@ -3760,12 +3844,16 @@ SUBROUTINE GetWaterThermalTankInput
 
         END IF
 
-        WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(10))
-        IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum == 0) Then
-          CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(10))//' = '//TRIM(cAlphaArgs(10)))
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
-          CALL ShowContinueError('Schedule was not found.')
-          ErrorsFound = .TRUE.
+        IF (lAlphaFieldBlanks(10)) THEN
+          WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = ScheduleAlwaysOn
+        ELSE
+          WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(10))
+          IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum == 0) Then
+            CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(10))//' = '//TRIM(cAlphaArgs(10)))
+            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+            CALL ShowContinueError('Schedule was not found.')
+            ErrorsFound = .TRUE.
+          ENDIF
         ENDIF
 
         IF (WaterThermalTank(WaterThermalTankNum)%UseSidePlantLoopSide == DemandSide   &
@@ -3774,12 +3862,16 @@ SUBROUTINE GetWaterThermalTankInput
                                     WaterThermalTank(WaterThermalTankNum)%SourceDesignVolFlowRate)
         ENDIF
 
-        WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(13))
-        IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum == 0) Then
-          CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(13))//' = '//TRIM(cAlphaArgs(13)))
-          CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
-          CALL ShowContinueError('Schedule was not found.')
-          ErrorsFound = .TRUE.
+        IF (lAlphaFieldBlanks(13)) THEN
+          WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = ScheduleAlwaysOn
+        ELSE
+          WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum = GetScheduleIndex(cAlphaArgs(13))
+          IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum == 0) Then
+            CALL ShowSevereError('Invalid, '//TRIM(cAlphaFieldNames(13))//' = '//TRIM(cAlphaArgs(13)))
+            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//' = '//TRIM(cAlphaArgs(1)))
+            CALL ShowContinueError('Schedule was not found.')
+            ErrorsFound = .TRUE.
+          ENDIF
         ENDIF
 
         ! Validate inlet mode
@@ -4034,7 +4126,7 @@ SUBROUTINE GetWaterThermalTankInput
                       END IF
 !                     check that tank has lower priority than all other non-HPWH objects in Zone Equipment List
                       DO EquipmentTypeNum = 1, ZoneEquipList(ZoneEquipListNum)%NumOfEquipTypes
-                        IF(SameString(ZoneEquipList(ZoneEquipListNum)%EquipType(EquipmentTypeNum),TRIM(cCurrentModuleObject)))CYCLE
+                        IF(SameString(ZoneEquipList(ZoneEquipListNum)%EquipType(EquipmentTypeNum),cCurrentModuleObject))CYCLE
                           IF(TankCoolingPriority .GT. ZoneEquipList(ZoneEquipListNum)%CoolingPriority(EquipmentTypeNum) .OR. &
                              TankHeatingPriority .GT. ZoneEquipList(ZoneEquipListNum)%HeatingPriority(EquipmentTypeNum))THEN
                             TankNotLowestPriority = .TRUE.
@@ -4080,12 +4172,12 @@ SUBROUTINE GetWaterThermalTankInput
 
    !Get water heater sizing input.
     cCurrentModuleObject='WaterHeater:Sizing'
-    NumWaterHeaterSizing  = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumWaterHeaterSizing  = GetNumObjectsFound(cCurrentModuleObject)
 
     If (NumWaterHeaterSizing > 0) then
 
       DO WHsizingNum = 1, NumWaterHeaterSizing
-        CALL GetObjectItem(TRIM(cCurrentModuleObject), WHsizingNum, cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT)
+        CALL GetObjectItem(cCurrentModuleObject, WHsizingNum, cAlphaArgs,NumAlphas,rNumericArgs,NumNums,IOSTAT)
 
         ! find which water heater this object is for
         WaterThermalTankNum = FindItemInList(cAlphaArgs(1),WaterThermalTank%Name, NumWaterThermalTank)
@@ -4321,58 +4413,55 @@ SUBROUTINE GetWaterThermalTankInput
           CALL SetupOutputVariable('Water Heater Final Tank Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%TankTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Loss Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Heat Loss Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%LossRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Loss Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Heat Loss Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%LossEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Use Flow Rate [kg/s]', &
+          CALL SetupOutputVariable('Water Heater Use Side Mass Flow Rate [kg/s]', &
             WaterThermalTank(WaterThermalTankNum)%UseMassFlowRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Use Inlet Temperature [C]', &
+          CALL SetupOutputVariable('Water Heater Use Side Inlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%UseInletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Use Outlet Temperature [C]', &
+          CALL SetupOutputVariable('Water Heater Use Side Outlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%UseOutletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Use Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Use Side Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%UseRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Use Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Use Side Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%UseEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Source Flow Rate [kg/s]', &
+          CALL SetupOutputVariable('Water Heater Source Side Mass Flow Rate [kg/s]', &
             WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Source Inlet Temperature [C]', &
+          CALL SetupOutputVariable('Water Heater Source Side Inlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%SourceInletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Source Outlet Temperature [C]', &
+          CALL SetupOutputVariable('Water Heater Source Side Outlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Source Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Source Side Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%SourceRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Source Energy [J]', &
-            WaterThermalTank(WaterThermalTankNum)%SourceEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
-
-          CALL SetupOutputVariable('Water Heater Plant Hot Water Consumption [J]', &
+          CALL SetupOutputVariable('Water Heater Source Side Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%SourceEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name, &
             ResourceTypeKey='PLANTLOOPHEATINGDEMAND',GroupKey='Plant', &
             EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
 
-          CALL SetupOutputVariable('Water Heater Off-Cycle Parasitic Heat Rate To Tank [W]', &
+          CALL SetupOutputVariable('Water Heater Off Cycle Parasitic Tank Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%OffCycParaRateToTank,'System','Average',  &
                WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Off-Cycle Parasitic Heat Energy To Tank [J]', &
+          CALL SetupOutputVariable('Water Heater Off Cycle Parasitic Tank Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%OffCycParaEnergyToTank,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater On-Cycle Parasitic Heat Rate To Tank [W]', &
+          CALL SetupOutputVariable('Water Heater On Cycle Parasitic Tank Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%OnCycParaRateToTank,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater On-Cycle Parasitic Heat Energy To Tank [J]', &
+          CALL SetupOutputVariable('Water Heater On Cycle Parasitic Tank Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%OnCycParaEnergyToTank,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Total Demand Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Total Demand Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%TotalDemandRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Total Demand Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Total Demand Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%TotalDemandEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
           CALL SetupOutputVariable('Water Heater Heating Rate [W]', &
@@ -4380,19 +4469,19 @@ SUBROUTINE GetWaterThermalTankInput
           CALL SetupOutputVariable('Water Heater Heating Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%HeaterEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Unmet Demand Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Unmet Demand Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%UnmetRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Unmet Demand Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Unmet Demand Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%UnmetEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Venting Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Venting Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%VentRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Venting Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Venting Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%VentEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater Net Heat Tranfer Rate [W]', &
+          CALL SetupOutputVariable('Water Heater Net Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%NetHeatTransferRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Net Heat Tranfer Energy [J]', &
+          CALL SetupOutputVariable('Water Heater Net Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%NetHeatTransferEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
           CALL SetupOutputVariable('Water Heater Cycle On Count []', &
@@ -4402,61 +4491,80 @@ SUBROUTINE GetWaterThermalTankInput
           CALL SetupOutputVariable('Water Heater Part Load Ratio []', &
             WaterThermalTank(WaterThermalTankNum)%PartLoadRatio,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Water Heater '//TRIM(WaterThermalTank(WaterThermalTankNum)%FuelType)//' Consumption Rate [W]', &
-            WaterThermalTank(WaterThermalTankNum)%FuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater '//TRIM(WaterThermalTank(WaterThermalTankNum)%FuelType)//' Consumption [J]', &
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType, 'Electric') ) THEN
+            CALL SetupOutputVariable('Water Heater Electric Power [W]', &
+              WaterThermalTank(WaterThermalTankNum)%FuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ELSE
+            CALL SetupOutputVariable('Water Heater '//TRIM(WaterThermalTank(WaterThermalTankNum)%FuelType)//' Rate [W]', &
+              WaterThermalTank(WaterThermalTankNum)%FuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ENDIF
+          CALL SetupOutputVariable('Water Heater '//TRIM(WaterThermalTank(WaterThermalTankNum)%FuelType)//' Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%FuelEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name,  &
             ResourceTypeKey=WaterThermalTank(WaterThermalTankNum)%FuelType,GroupKey='Plant', &
             EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType, 'Electric') ) THEN
+            CALL SetupOutputVariable( &
+              'Water Heater Off Cycle Parasitic Electric Power [W]', &
+              WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelRate, &
+             'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ELSE
+            CALL SetupOutputVariable( &
+              'Water Heater Off Cycle Parasitic '//  &
+                 TRIM(WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType)//' Rate [W]', &
+              WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelRate,&
+              'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ENDIF
+          CALL SetupOutputVariable( &
+              'Water Heater Off Cycle Parasitic '//  &
+                 TRIM(WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType)//' Energy [J]', &
+              WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelEnergy,'System','Sum', &
+              WaterThermalTank(WaterThermalTankNum)%Name, &
+              ResourceTypeKey=WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType,GroupKey='Plant', &
+              EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
+          IF (SameString(WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType, 'Electric') ) THEN
+            CALL SetupOutputVariable( &
+              'Water Heater On Cycle Parasitic Electric Power [W]', &
+              WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ELSE
+            CALL SetupOutputVariable( &
+              'Water Heater On Cycle Parasitic '//TRIM(WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType)//  &
+                 ' Rate [W]', &
+              WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
+          ENDIF
 
           CALL SetupOutputVariable( &
-            'Water Heater Off-Cycle Parasitic '//  &
-               TRIM(WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType)//' Consumption Rate [W]', &
-            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable( &
-            'Water Heater Off-Cycle Parasitic '//  &
-               TRIM(WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType)//' Consumption [J]', &
-            WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name, &
-            ResourceTypeKey=WaterThermalTank(WaterThermalTankNum)%OffCycParaFuelType,GroupKey='Plant', &
-            EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
-
-          CALL SetupOutputVariable( &
-            'Water Heater On-Cycle Parasitic '//TRIM(WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType)//  &
-               ' Consumption Rate [W]', &
-            WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable( &
-            'Water Heater On-Cycle Parasitic '//TRIM(WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType)//  &
-               ' Consumption [J]', &
+            'Water Heater On Cycle Parasitic '//TRIM(WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType)//  &
+               ' Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name, &
             ResourceTypeKey=WaterThermalTank(WaterThermalTankNum)%OnCycParaFuelType,GroupKey='Plant', &
             EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
 
-          CALL SetupOutputVariable('Water Heater Water Consumption Rate [m3/s]', &
+          CALL SetupOutputVariable('Water Heater Water Volume Flow Rate [m3/s]', &
             WaterThermalTank(WaterThermalTankNum)%VolFlowRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Water Heater Water Consumption [m3]',WaterThermalTank(WaterThermalTankNum)%VolumeConsumed, &
+          CALL SetupOutputVariable('Water Heater Water Volume [m3]',WaterThermalTank(WaterThermalTankNum)%VolumeConsumed, &
             'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name,ResourceTypeKey='Water',GroupKey='Plant', &
             EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
-          CALL SetupOutputVariable('Mains Water Supply for Water Heater [m3]',  &
+          CALL SetupOutputVariable('Water Heater Mains Water Volume [m3]',  &
              WaterThermalTank(WaterThermalTankNum)%VolumeConsumed, &
             'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name,ResourceTypeKey='MainsWater',GroupKey='Plant', &
             EndUseKey='DHW',EndUseSubKey=WaterThermalTank(WaterThermalTankNum)%EndUseSubcategoryName)
 
           IF(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum .GT. 0) THEN
             !CurrentModuleObject='WaterHeater:HeatPump'
-            CALL SetupOutputVariable('Heat Pump Water Heater Compressor Part-Load Ratio', &
+            CALL SetupOutputVariable('Water Heater Compressor Part Load Ratio []', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%HeatingPLR,'System','Average', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Name)
-            CALL SetupOutputVariable('Heat Pump Water Heater Off-Cycle Parasitic Electric Power [W]', &
+            CALL SetupOutputVariable('Water Heater Off Cycle Ancillary Electric Power [W]', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%OffCycParaFuelRate,'System','Average', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Name)
-            CALL SetupOutputVariable('Heat Pump Water Heater Off-Cycle Parasitic Elec Consumption [J]', &
+            CALL SetupOutputVariable('Water Heater Off Cycle Ancillary Electric Energy [J]', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%OffCycParaFuelEnergy,'System','Sum', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Name, &
               ResourceTypeKey='Electric',EndUseKey='DHW',EndUseSubKey='Water Heater Parasitic', GroupKey='Plant')
-            CALL SetupOutputVariable('Heat Pump Water Heater On-Cycle Parasitic Electric Power [W]', &
+            CALL SetupOutputVariable('Water Heater On Cycle Ancillary Electric Power [W]', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%OnCycParaFuelRate,'System','Average', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Name)
-            CALL SetupOutputVariable('Heat Pump Water Heater On-Cycle Parasitic Elec Consumption [J]', &
+            CALL SetupOutputVariable('Water Heater On Cycle Ancillary Electric Energy [J]', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%OnCycParaFuelEnergy,'System','Sum', &
               HPWaterHeater(WaterThermalTank(WaterThermalTankNum)%HeatPumpNum)%Name, &
               ResourceTypeKey='Electric',EndUseKey='DHW',EndUseSubKey='Water Heater Parasitic',GroupKey='Plant')
@@ -4464,43 +4572,43 @@ SUBROUTINE GetWaterThermalTankInput
 
          IF(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum .GT. 0) THEN
             !CurrentModuleObject='Coil:WaterHeating:Desuperheater'
-            CALL SetupOutputVariable('Desuperheater PLR', &
+            CALL SetupOutputVariable('Water Heater Part Load Ratio []', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%DesuperheaterPLR,  &
                  'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater On-Cycle Parasitic Electric Power [W]', &
+            CALL SetupOutputVariable('Water Heater On Cycle Parasitic Electric Power [W]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%OnCycParaFuelRate,  &
                  'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater On-Cycle Parasitic Electric Consumption [J]', &
+            CALL SetupOutputVariable('Water Heater On Cycle Parasitic Electric Energy [J]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%OnCycParaFuelEnergy,  &
                  'System','Sum', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name, &
               ResourceTypeKey='Electric',EndUseKey='DHW',EndUseSubKey='Water Heater Parasitic',GroupKey='Plant')
-            CALL SetupOutputVariable('Desuperheater Off-Cycle Parasitic Electric Power [W]', &
+            CALL SetupOutputVariable('Water Heater Off Cycle Parasitic Electric Power [W]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%OffCycParaFuelRate,  &
                  'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater Off-Cycle Parasitic Electric Consumption [J]', &
+            CALL SetupOutputVariable('Water Heater Off Cycle Parasitic Electric Energy [J]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%OffCycParaFuelEnergy,  &
                  'System','Sum', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name, &
               ResourceTypeKey='Electric',EndUseKey='DHW',EndUseSubKey='Water Heater Parasitic', GroupKey='Plant')
-            CALL SetupOutputVariable('Desuperheater Heat Reclaim Efficiency Modifier Curve Output', &
+            CALL SetupOutputVariable('Water Heater Heat Reclaim Efficiency Modifier Multiplier []', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%HEffFTempOutput,  &
                  'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater Pump Electric Power [W]', &
+            CALL SetupOutputVariable('Water Heater Pump Electric Power [W]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%PumpPower,'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater Pump Electric Consumption [J]', &
+            CALL SetupOutputVariable('Water Heater Pump Electric Energy [J]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%PumpEnergy,'System','Sum', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name, &
               ResourceTypeKey='Electric',EndUseKey='DHW',EndUseSubKey='Desuperheater Pump', GroupKey='Plant')
-            CALL SetupOutputVariable('Desuperheater Water Heating Rate [W]', &
+            CALL SetupOutputVariable('Water Heater Heating Rate [W]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%HeaterRate,'System','Average', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name)
-            CALL SetupOutputVariable('Desuperheater Water Heating Energy [J]', &
+            CALL SetupOutputVariable('Water Heater Heating Energy [J]', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%HeaterEnergy,'System','Sum', &
               WaterHeaterDesuperheater(WaterThermalTank(WaterThermalTankNum)%DesuperheaterNum)%Name, &
               ResourceTypeKey='EnergyTransfer',EndUseKey='DHW',EndUseSubKey='Water Heater', GroupKey='Plant')
@@ -4510,34 +4618,34 @@ SUBROUTINE GetWaterThermalTankInput
           ! CurrentModuleObject='WaterHeater:Stratified'
           IF (WaterThermalTank(WaterThermalTankNum)%TypeNum == StratifiedWaterHeater) THEN
 
-            CALL SetupOutputVariable('Water Heater Heating Rate 1 [W]', &
+            CALL SetupOutputVariable('Water Heater Heater 1 Heating Rate [W]', &
               WaterThermalTank(WaterThermalTankNum)%HeaterRate1,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-            CALL SetupOutputVariable('Water Heater Heating Rate 2 [W]', &
+            CALL SetupOutputVariable('Water Heater Heater 2 Heating Rate [W]', &
               WaterThermalTank(WaterThermalTankNum)%HeaterRate2,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-            CALL SetupOutputVariable('Water Heater Heating Energy 1 [J]', &
+            CALL SetupOutputVariable('Water Heater Heater 1 Heating Energy [J]', &
               WaterThermalTank(WaterThermalTankNum)%HeaterEnergy1,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
-            CALL SetupOutputVariable('Water Heater Heating Energy 2 [J]', &
+            CALL SetupOutputVariable('Water Heater Heater 2 Heating Energy [J]', &
               WaterThermalTank(WaterThermalTankNum)%HeaterEnergy2,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-            CALL SetupOutputVariable('Water Heater Cycle On Count 1 []', &
+            CALL SetupOutputVariable('Water Heater Heater 1 Cycle On Count []', &
               WaterThermalTank(WaterThermalTankNum)%CycleOnCount1,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
-            CALL SetupOutputVariable('Water Heater Cycle On Count 2 []', &
+            CALL SetupOutputVariable('Water Heater Heater 2 Cycle On Count  []', &
               WaterThermalTank(WaterThermalTankNum)%CycleOnCount2,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-            CALL SetupOutputVariable('Water Heater Runtime Fraction 1 []', &
+            CALL SetupOutputVariable('Water Heater Heater 1 Runtime Fraction []', &
               WaterThermalTank(WaterThermalTankNum)%RuntimeFraction1,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-            CALL SetupOutputVariable('Water Heater Runtime Fraction 2 []', &
+            CALL SetupOutputVariable('Water Heater Heater 2 Runtime Fraction []', &
               WaterThermalTank(WaterThermalTankNum)%RuntimeFraction2,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
             DO NodeNum = 1, WaterThermalTank(WaterThermalTankNum)%Nodes
-              CALL SetupOutputVariable('Water Heater Node '//TRIM(TrimSigDigits(NodeNum))//' Temperature [C]', &
+              CALL SetupOutputVariable('Water Heater Temperature Node '//TRIM(TrimSigDigits(NodeNum))//' [C]', &
                 WaterThermalTank(WaterThermalTankNum)%Node(NodeNum)%TempAvg,'System','Average',  &
                    WaterThermalTank(WaterThermalTankNum)%Name)
             END DO
 
             DO NodeNum = 1, WaterThermalTank(WaterThermalTankNum)%Nodes
-              CALL SetupOutputVariable('Water Heater Final Node '//TRIM(TrimSigDigits(NodeNum))//' Temperature [C]', &
+              CALL SetupOutputVariable('Water Heater Final Temperature Node '//TRIM(TrimSigDigits(NodeNum))//'  [C]', &
                 WaterThermalTank(WaterThermalTankNum)%Node(NodeNum)%Temp,'System','Average',  &
                    WaterThermalTank(WaterThermalTankNum)%Name)
             END DO
@@ -4568,55 +4676,56 @@ SUBROUTINE GetWaterThermalTankInput
         ELSEIF ((WaterThermalTank(WaterThermalTankNum)%TypeNum == MixedChilledWaterStorage)        &
                 .OR. (WaterThermalTank(WaterThermalTankNum)%TypeNum == StratifiedChilledWaterStorage) ) THEN
           ! CurrentModuleObject='ThermalStorage:ChilledWater:Mixed/ThermalStorage:ChilledWater:Stratified'
-          CALL SetupOutputVariable('Chilled Water Tank Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Tank Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%TankTempAvg,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Final Tank Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Final Tank Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%TankTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Gain Rate [W]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Tank Heat Gain Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%LossRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Chilled Water Tank Gain Energy [J]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Tank Heat Gain Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%LossEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Use Flow Rate [kg/s]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Use Side Mass Flow Rate [kg/s]', &
             WaterThermalTank(WaterThermalTankNum)%UseMassFlowRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Use Inlet Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Use Side Inlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%UseInletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Use Outlet Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Use Side Outlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%UseOutletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Use Rate [W]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Use Side Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%UseRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Chilled Water Tank Use Energy [J]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Use Side Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%UseEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Source Flow Rate [kg/s]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Source Side Mass Flow Rate [kg/s]', &
             WaterThermalTank(WaterThermalTankNum)%SourceMassFlowRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Source Inlet Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Source Side Inlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%SourceInletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Source Outlet Temperature [C]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Source Side Outlet Temperature [C]', &
             WaterThermalTank(WaterThermalTankNum)%SourceOutletTemp,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
 
-          CALL SetupOutputVariable('Chilled Water Tank Source Rate [W]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Source Side Heat Transfer Rate [W]', &
             WaterThermalTank(WaterThermalTankNum)%SourceRate,'System','Average',WaterThermalTank(WaterThermalTankNum)%Name)
-          CALL SetupOutputVariable('Chilled Water Tank Source Energy [J]', &
+          CALL SetupOutputVariable('Chilled Water Thermal Storage Source Side Heat Transfer Energy [J]', &
             WaterThermalTank(WaterThermalTankNum)%SourceEnergy,'System','Sum',WaterThermalTank(WaterThermalTankNum)%Name)
 
           IF (WaterThermalTank(WaterThermalTankNum)%TypeNum == StratifiedChilledWaterStorage) THEN
 
             DO NodeNum = 1, WaterThermalTank(WaterThermalTankNum)%Nodes
-              CALL SetupOutputVariable('Chilled Water Tank Node '//TRIM(TrimSigDigits(NodeNum))//' Temperature [C]', &
+              CALL SetupOutputVariable('Chilled Water Thermal Storage Temperature Node '//TRIM(TrimSigDigits(NodeNum))//' [C]', &
                 WaterThermalTank(WaterThermalTankNum)%Node(NodeNum)%TempAvg,'System','Average',  &
                    WaterThermalTank(WaterThermalTankNum)%Name)
             END DO
 
             DO NodeNum = 1, WaterThermalTank(WaterThermalTankNum)%Nodes
-              CALL SetupOutputVariable('Chilled Water Tank Final Node '//TRIM(TrimSigDigits(NodeNum))//' Temperature [C]', &
+              CALL SetupOutputVariable('Chilled Water Thermal Storage Final Temperature Node ' &
+                                      //TRIM(TrimSigDigits(NodeNum))//' [C]', &
                 WaterThermalTank(WaterThermalTankNum)%Node(NodeNum)%Temp,'System','Average',  &
                    WaterThermalTank(WaterThermalTankNum)%Name)
             END DO
@@ -4646,7 +4755,7 @@ SUBROUTINE GetWaterThermalTankInput
         ! set up internal gains if tank is in a thermal zone
         IF (WaterThermalTank(WaterThermalTankNum)%AmbientTempZone > 0) THEN
           SELECT CASE (WaterThermalTank(WaterThermalTankNum)%TypeNum)
-          
+
           CASE (MixedWaterHeater)
             CALL SetupZoneInternalGain(WaterThermalTank(WaterThermalTankNum)%AmbientTempZone, &
                                    'WaterHeater:Mixed', &
@@ -4672,7 +4781,7 @@ SUBROUTINE GetWaterThermalTankInput
                                    IntGainTypeOf_ThermalStorageChilledWaterStratified, &
                                    ConvectionGainRate = WaterThermalTank(WaterThermalTankNum)%AmbientZoneGain )
           END SELECT
-       
+
         ENDIF
 
       END DO ! WaterThermalTankNum
@@ -5050,7 +5159,7 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
   USE DataHVACGlobals,   ONLY: HPWHInletDBTemp, HPWHInletWBTemp, HPWHCrankcaseDBTemp, NumPlantLoops
   USE DataSizing,        ONLY: AutoSize
   USE InputProcessor,    ONLY: SameString
-  USE General,           ONLY: TrimSigDigits
+  USE General,           ONLY: TrimSigDigits, RoundSigDigits
   USE DataZoneEquipment, ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList
   USE DataPlant
   USE PlantUtilities,    ONLY: InitComponentNodes, SetComponentFlowRate, InterConnectTwoPlantLoopSides
@@ -5099,6 +5208,8 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
   REAL(r64)           :: rho ! local fluid density
   INTEGER             :: DummyWaterIndex = 1
   INTEGER             :: found = 0
+  REAL(r64)           :: TankChangeRateScale = 0.d0 ! local temporary for nominal tank change rate
+  REAL(r64)           :: MaxSideVolFlow = 0.d0 ! local temporary for largest connection design flow
 
           ! FLOW:
 
@@ -5316,6 +5427,35 @@ SUBROUTINE InitWaterThermalTank(WaterThermalTankNum, FirstHVACIteration, LoopNum
           RETURN
         ENDIF
       ENDIF
+
+      ! check for sizing issues that model can not suppport
+
+      ! if stratified tank model, ensure that nominal change over rate is greater than one minute, avoid numerical problems. 
+
+      IF (    (WaterThermalTank(WaterThermalTankNum)%TypeNum == StratifiedWaterHeater)  &
+         .OR. (WaterThermalTank(WaterThermalTankNum)%TypeNum == StratifiedChilledWaterStorage)) THEN
+        MaxSideVolFlow  = MAX( WaterThermalTank(WaterThermalTankNum)%UseDesignVolFlowRate, &
+                               WaterThermalTank(WaterThermalTankNum)%SourceDesignVolFlowRate)
+
+        IF (MaxSideVolFlow > 0.d0) THEN ! protect div by zero
+          TankChangeRateScale = WaterThermalTank(WaterThermalTankNum)%Volume / MaxSideVolFlow 
+          IF (TankChangeRateScale < 60.d0) THEN  ! nominal change over in less than one minute
+            CALL ShowSevereError('InitWaterThermalTank: Detected problem for stratified tank model.  Model cannot be applied.')
+            CALL ShowContinueError('Occurs for stratified tank name = ' //TRIM(WaterThermalTank(WaterThermalTankNum)%Name) )
+            CALL ShowContinueError('Tank volume = '//TRIM(RoundSigDigits(WaterThermalTank(WaterThermalTankNum)%Volume, 4))//' [m3]')
+            CALL ShowContinueError('Tank use side volume flow rate = ' &
+                              //TRIM(RoundSigDigits(WaterThermalTank(WaterThermalTankNum)%UseDesignVolFlowRate, 4))//' [m3/s]' )
+            CALL ShowContinueError('Tank source side volume flow rate = ' &
+                              //TRIM(RoundSigDigits(WaterThermalTank(WaterThermalTankNum)%SourceDesignVolFlowRate, 4))//' [m3/s]' ) 
+            CALL ShowContinueError('Nominal tank change over rate = '//TRIM(RoundSigDigits(TankChangeRateScale, 2))//' [s]')
+            CALL ShowContinueError('Change over rate is too fast, increase tank volume, decrease connection flow rates' &
+                              //' or use mixed tank model')
+          
+            CALL ShowFatalError('InitWaterThermalTank: Simulation halted because of sizing problem in stratified tank model.')
+          ENDIF
+        ENDIF
+      ENDIF
+    
     ENDIF
 
 
@@ -8510,17 +8650,17 @@ REAL(r64) FUNCTION PlantMassFlowRatesFunc(WaterThermalTankNum, InNodeNum, FirstH
   ! evaluate Availability schedule,
   ScheduledAvail = .TRUE.
   IF (WaterThermalTankSide == UseSide) THEN
-    IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum > 0) Then
+!    IF (WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum > 0) Then
       IF (GetCurrentScheduleValue(WaterThermalTank(WaterThermalTankNum)%UseSideAvailSchedNum) == 0.0D0) Then
         ScheduledAvail = .FALSE.
       ENDIF
-    ENDIF
+!    ENDIF
   ELSE IF (WaterThermalTankSide == SourceSide) THEN
-    IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum > 0) Then
+!    IF (WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum > 0) Then
       IF (GetCurrentScheduleValue(WaterThermalTank(WaterThermalTankNum)%SourceSideAvailSchedNum) == 0.0D0) Then
         ScheduledAvail = .FALSE.
       ENDIF
-    ENDIF
+!    ENDIF
   END IF
 
   ! now act based on current mode
@@ -9111,6 +9251,10 @@ SUBROUTINE SizeTankForDemandSide(WaterThermalTankNum)
       FuelTypeIsLikeGas = .TRUE.
     ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'Steam')) THEN
       FuelTypeIsLikeGas = .TRUE.
+    ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'OtherFuel1')) THEN
+      FuelTypeIsLikeGas = .TRUE.
+    ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'OtherFuel2')) THEN
+      FuelTypeIsLikeGas = .TRUE.
     ELSEIF (SameString(WaterThermalTank(WaterThermalTankNum)%FuelType , 'DistrictHeating')) THEN
       FuelTypeIsLikeGas = .TRUE.
     ENDIF
@@ -9363,6 +9507,13 @@ SUBROUTINE SizeTankForDemandSide(WaterThermalTankNum)
                                             / Pi)** 0.33333333333333D0
       CALL ReportSizingOutput(WaterThermalTank(WaterThermalTankNum)%Type, WaterThermalTank(WaterThermalTankNum)%Name, &
                            'Tank Height [m]', WaterThermalTank(WaterThermalTankNum)%Height )
+      ! check if autocalculate Use outlet and source inlet are still set to autosize by earlier 
+      IF (WaterThermalTank(WaterThermalTankNum)%UseOutletHeight == Autosize) THEN
+        WaterThermalTank(WaterThermalTankNum)%UseOutletHeight = WaterThermalTank(WaterThermalTankNum)%Height
+      ENDIF
+      IF (WaterThermalTank(WaterThermalTankNum)%SourceInletHeight == Autosize) THEN
+        WaterThermalTank(WaterThermalTankNum)%SourceInletHeight = WaterThermalTank(WaterThermalTankNum)%Height
+      ENDIF
     ENDIF
   ENDIF
 
@@ -10327,9 +10478,9 @@ FUNCTION FindStratifiedTankSensedTemp(WaterThermalTankNum,ControlLocationType)  
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
   INTEGER  :: StratNodeToUse = 0
-  
+
   SELECT CASE (ControlLocationType)
-  
+
   CASE (Heater1HPWHControl)
      StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%HeaterNode1
   CASE (Heater2HPWHControl)
@@ -10343,7 +10494,7 @@ FUNCTION FindStratifiedTankSensedTemp(WaterThermalTankNum,ControlLocationType)  
   CASE (UseOutletHPWHControl)
      StratNodeToUse = WaterThermalTank(WaterThermalTankNum)%UseOutletStratNode
   END SELECT
-  
+
   SensedTemp = WaterThermalTank(WaterThermalTankNum)%Node(StratNodeToUse)%Temp
 
   RETURN
@@ -10352,7 +10503,7 @@ END FUNCTION FindStratifiedTankSensedTemp
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

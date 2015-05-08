@@ -47,7 +47,7 @@ INTEGER, PARAMETER :: MaxCTFTerms = 19 ! Maximum number of CTF terms allowed to 
 INTEGER, PARAMETER :: MaxSolidWinLayers = 5 ! Maximum number of solid layers in a window construction
 INTEGER, PARAMETER :: MaxSpectralDataElements=800 ! Maximum number in Spectral Data arrays.
 
-          ! Parameters to indicate material type for use with the Material
+          ! Parameters to indicate material group type for use with the Material
           ! derived type (see below):
 
 INTEGER, PARAMETER :: RegularMaterial         = 0
@@ -63,6 +63,22 @@ INTEGER, PARAMETER :: IRTMaterial             = 9
 INTEGER, PARAMETER :: WindowSimpleGlazing     = 10
 INTEGER, PARAMETER :: ComplexWindowShade      = 11
 INTEGER, PARAMETER :: ComplexWindowGap        = 12
+
+CHARACTER(len=*), PARAMETER, DIMENSION(-1:12) :: cMaterialGroupType=  &
+  (/'invalid                           ',  &
+    'Material/Material:NoMass          ',  &
+    'Material:AirGap                   ',  &
+    'WindowMaterial:Shade              ',  &
+    'WindowMaterial:Glazing*           ',  &
+    'WindowMaterial:Gas                ',  &
+    'WindowMaterial:Blind              ',  &
+    'WindowMaterial:GasMixture         ',  &
+    'WindowMaterial:Screen             ',  &
+    'Material:RoofVegetation           ',  &
+    'Material:InfraredTransparent      ',  &
+    'WindowMaterial:SimpleGlazingSystem',  &
+    'WindowMaterial:ComplexShade       ',  &
+    'WindowMaterial:Gap                '/)
 
           ! Parameters to indicate surface roughness for use with the Material
           ! derived type (see below):
@@ -154,6 +170,7 @@ INTEGER, PARAMETER :: RefrigSystemTypeRack        = 2
 INTEGER, PARAMETER :: RefrigCondenserTypeAir     = 1
 INTEGER, PARAMETER :: RefrigCondenserTypeEvap    = 2
 INTEGER, PARAMETER :: RefrigCondenserTypeWater   = 3
+INTEGER, PARAMETER :: RefrigCondenserTypeCascade = 4
 
            ! Parameters for type of infiltration model
 INTEGER, PARAMETER :: InfiltrationDesignFlowRate  = 1
@@ -307,13 +324,16 @@ INTEGER, PARAMETER ::  IntGainTypeOf_CoilUserDefined                           =
 INTEGER, PARAMETER ::  IntGainTypeOf_ZoneHVACForcedAirUserDefined              = 43
 INTEGER, PARAMETER ::  IntGainTypeOf_AirTerminalUserDefined                    = 44
 
+!Parameters for checking surface heat transfer models
+REAL(r64), PARAMETER :: HighDiffusivityThreshold = 1.d-5 ! used to check if Material properties are out of line.
+REAL(r64), PARAMETER :: ThinMaterialLayerThreshold = 0.003d0 ! 3 mm lower limit to expected material layers 
 
           ! DERIVED TYPE DEFINITIONS:
 
 TYPE MaterialProperties
 
   CHARACTER(len=MaxNameLength) :: Name = ' ' ! Name of material layer
-  INTEGER :: Group       = -1  ! Material type (see Material Parameters above.  Currently
+  INTEGER :: Group       = -1  ! Material group type (see Material Parameters above.  Currently
                                ! active: RegularMaterial, Shade, Air, WindowGlass,
                                ! WindowGas, WindowBlind, WindowGasMixture, Screen, EcoRoof,
                                ! IRTMaterial, WindowSimpleGlazing, ComplexWindowShade, ComplexWindowGap)
@@ -465,6 +485,7 @@ TYPE MaterialProperties
      REAL(r64) :: SimpleWindowVisTran = 0.0D0  ! (optional) user input for simple window Visual Transmittance (non-dimensional)
      LOGICAL   :: SimpleWindowVTinputByUser = .FALSE. ! false means not input, true means user provide VT input
 
+     LOGICAL   :: WarnedForHighDiffusivity  = .FALSE. ! used to limit error messaging to just the first instance
 END TYPE MaterialProperties
 
 ! thermochromic windows
@@ -731,6 +752,7 @@ END TYPE ZoneData
 TYPE ZoneListData
   CHARACTER(len=MaxNameLength)   :: Name = ''      ! Zone List name
   INTEGER                        :: NumOfZones = 0 ! Number of zones in the list
+  INTEGER                        :: MaxZoneNameLength = 0  ! Max Name length of zones in the list
   INTEGER, ALLOCATABLE, DIMENSION(:) :: Zone           ! Pointers to zones in the list
 END TYPE ZoneListData
 
@@ -763,6 +785,9 @@ TYPE PeopleData
                                                             ! that is radiant
     REAL(r64) :: FractionConvected                          =0.0 ! Percentage (fraction 0.0-1.0) of sensible heat gain from people
                                                             ! that is convective
+    REAL(r64) :: NomMinNumberPeople           =0.d0 ! Nominal Minimum Number of People (min sch X number of people)
+    REAL(r64) :: NomMaxNumberPeople           =0.d0 ! Nominal Maximum Number of People (min sch X number of people)
+
     INTEGER :: WorkEffPtr                              =-1  ! Pointer to schedule for work efficiency
     INTEGER :: ClothingPtr                             =-1  ! Pointer to schedule for clothing insulation
     INTEGER :: AirVelocityPtr                          =-1  ! Pointer to schedule for air velocity in zone
@@ -800,8 +825,6 @@ TYPE PeopleData
     REAL(r64) :: TotGainEnergy                              =0.0 ! Total heat gain [J]
     ! Air velocity check during run time for thermal comfort control
     INTEGER :: AirVelErrIndex                               = 0  ! Air velocity error index
-!
-
 
 ! For AdaptiveComfort tabular report
     REAL(r64) :: TimeNotMetASH5580 = 0
@@ -828,6 +851,9 @@ TYPE LightsData
     LOGICAL   :: FractionReturnAirIsCalculated= .false.
     REAL(r64) :: FractionReturnAirPlenTempCoeff1   =0.0
     REAL(r64) :: FractionReturnAirPlenTempCoeff2   =0.0
+
+    REAL(r64) :: NomMinDesignLevel            =0.d0 ! Nominal Minimum Design Level (min sch X design level)
+    REAL(r64) :: NomMaxDesignLevel            =0.d0 ! Nominal Maximum Design Level (max sch X design level)
 
     LOGICAL :: ManageDemand               =.FALSE. ! Flag to indicate whether to use demand limiting
     REAL(r64) :: DemandLimit                       =0.0 ! Demand limit set by demand manager [W]
@@ -864,6 +890,9 @@ TYPE ZoneEquipData  ! Electric, Gas, Other Equipment, CO2
     REAL(r64) :: FractionConvected            =0.0 ! Percentage (fraction 0.0-1.0) of sensible heat gain that is convective
     REAL(r64) :: CO2DesignRate                =0.d0 ! CO2 design Rate [m3/s]
     REAL(r64) :: CO2RateFactor                =0.d0 ! CO2 rate factor [m3/s/W]
+
+    REAL(r64) :: NomMinDesignLevel            =0.d0 ! Nominal Minimum Design Level (min sch X design level)
+    REAL(r64) :: NomMaxDesignLevel            =0.d0 ! Nominal Maximum Design Level (max sch X design level)
 
     LOGICAL :: ManageDemand               =.FALSE. ! Flag to indicate whether to use demand limiting
     REAL(r64) :: DemandLimit                  =0.0 ! Demand limit set by demand manager [W]
@@ -1393,6 +1422,8 @@ TYPE ZonePreDefRepType
   REAL(r64) :: MechVentVolMin              = 9.9d9   ! a large number since finding minimum volume
   REAL(r64) :: InfilVolTotal               = 0.0     !volume for infiltration of outside air for entire simulation
   REAL(r64) :: InfilVolMin                 = 9.9d9   ! a large number since finding minimum volume
+  REAL(r64) :: AFNInfilVolTotal            = 0.0     !volume for infiltration of outside air for entire simulation
+  REAL(r64) :: AFNInfilVolMin              = 9.9d9   ! a large number since finding minimum volume
   REAL(r64) :: SimpVentVolTotal            = 0.0     !volume for simple 'ZoneVentilation' of outside air for entire simulation
   REAL(r64) :: SimpVentVolMin              = 9.9d9   ! a large number since finding minimum volume
   ! for Sensible Heat Gas Component Report
@@ -2053,12 +2084,12 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
 
       IF(WrongMaterialsMix) THEN  !Illegal material for a window construction
         CALL ShowSevereError('Error: Window construction='//TRIM(Construct(ConstrNum)%Name)//  &
-                         ' has materials other than glass, gas, shade, screen, blind, complex shading, complex gap, or simple system.')
+             ' has materials other than glass, gas, shade, screen, blind, complex shading, complex gap, or simple system.')
         ErrorsFound = .true.
       ! Do not check number of layers for BSDF type of window since that can be handled
       ELSE IF((TotLayers > 8).and.(.not.Construct(ConstrNum)%WindowTypeBSDF)) THEN  !Too many layers for a window construction
         CALL ShowSevereError('CheckAndSetConstructionProperties: Window construction='//TRIM(Construct(ConstrNum)%Name)//  &
-                         ' has too many layers (max of 8 allowed -- 4 glass + 3 gap + 1 shading device).')
+             ' has too many layers (max of 8 allowed -- 4 glass + 3 gap + 1 shading device).')
         ErrorsFound = .true.
 
       ELSE IF (TotLayers == 1) THEN
@@ -2072,7 +2103,8 @@ SUBROUTINE CheckAndSetConstructionProperties(ConstrNum,ErrorsFound)
            .OR. Material(Construct(ConstrNum)%LayerPoint(1))%Group == ComplexWindowGap) THEN
           CALL ShowSevereError('CheckAndSetConstructionProperties: The single-layer window construction='//  &
                    TRIM(Construct(ConstrNum)%Name)// &
-                   ' has a gas, complex gap, shade, complex shade, screen or blind material; it should be glass of simple glazing system.')
+                   ' has a gas, complex gap, shade, complex shade, screen or blind material; '//  &
+                   'it should be glass of simple glazing system.')
           ErrorsFound = .true.
         END IF
       END IF
@@ -3023,7 +3055,7 @@ END FUNCTION DisplayMaterialRoughness
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

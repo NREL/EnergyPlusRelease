@@ -10,6 +10,7 @@ MODULE SolarShading
           !       MODIFIED       May 2004, LKL, Polygons > 4 sides (not subsurfaces)
           !       MODIFIED       January 2007, LKL, Taking parameters back to original integer (HC)
           !       MODIFIED       August 2011, JHK, Including Complex Fenestration optical calculations
+          !       MODIFIED       November 2012, BG, Timestep solar and daylighting calculations
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS MODULE:
@@ -45,6 +46,7 @@ USE DataReportingFlags
 USE DataInterfaces
 USE DataBSDFWindow    , ONLY: SUNCOSTS , MaxBkSurf , ComplexWind
 USE DataVectorTypes
+USE DataTimings
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables
 
@@ -91,6 +93,9 @@ END TYPE
 INTEGER   :: MAXHCV = 12      ! Maximum number of HC vertices
                                       ! (needs to be based on maxnumvertices)
 INTEGER   :: MAXHCS = 15000 ! 200      ! Maximum number of HC surfaces (was 56)
+! Following are initially set in AllocateModuleArrays
+INTEGER,PUBLIC   :: MAXHCArrayBounds = 0      ! Bounds based on Max Number of Vertices in surfaces
+INTEGER   :: MAXHCArrayIncrement = 0   ! Increment based on Max Number of Vertices in surfaces
           ! The following variable should be re-engineered to lower in module hierarchy but need more analysis
 INTEGER   :: NVS    ! Number of vertices of the shadow/clipped surface
 INTEGER   :: NumVertInShadowOrClippedSurface
@@ -201,6 +206,7 @@ PUBLIC  WindowShadingManager
 PUBLIC  WindowGapAirflowControl
 PUBLIC  ReportSurfaceShading
 PUBLIC  ReportSurfaceErrors
+PRIVATE FigureSunCosines
 
 CONTAINS
 
@@ -246,7 +252,9 @@ SUBROUTINE InitSolarCalculations
   INTEGER :: write_stat
 
           ! FLOW:
-
+#ifdef EP_Count_Calls
+  NumInitSolar_Calls=NumInitSolar_Calls+1
+#endif
   IF (BeginSimFlag) THEN
 
     OutputFileShading=GetNewUnitNumber()
@@ -406,7 +414,7 @@ SUBROUTINE GetShadowingInput
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Linda K. Lawrie
           !       DATE WRITTEN   July 1999
-          !       MODIFIED       na
+          !       MODIFIED       B. Griffith, Nov 2012, add calculaton method
           !       RE-ENGINEERED  na
 
           ! PURPOSE OF THIS SUBROUTINE:
@@ -422,7 +430,9 @@ SUBROUTINE GetShadowingInput
   USE InputProcessor, ONLY: GetNumObjectsFound,GetObjectItem,SameString
   USE General, ONLY: RoundSigDigits
   USE DataIPShortCuts
-  USE DataSystemVariables, ONLY: SutherlandHodgman,DetailedSkyDiffuseAlgorithm
+  USE DataSystemVariables, ONLY: SutherlandHodgman,DetailedSkyDiffuseAlgorithm, &
+                                 DetailedSolarTimestepIntegration
+
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -448,7 +458,7 @@ SUBROUTINE GetShadowingInput
   cAlphaArgs(1)=' '
   cAlphaArgs(2)=' '
   cCurrentModuleObject='ShadowCalculation'
-  NumItems=GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumItems=GetNumObjectsFound(cCurrentModuleObject)
   NumAlphas=0
   NumNumbers=0
   IF (NumItems > 1) THEN
@@ -456,7 +466,7 @@ SUBROUTINE GetShadowingInput
   ENDIF
 
   IF (NumItems /= 0) THEN
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStat,  &
+    CALL GetObjectItem(cCurrentModuleObject,1,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
                    AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ShadowingCalcFrequency=rNumericArgs(1)
@@ -479,50 +489,68 @@ SUBROUTINE GetShadowingInput
   ENDIF
 
   IF (NumAlphas >= 1) THEN
-    IF (SameString(cAlphaArgs(1),'SutherlandHodgman')) THEN
-      SutherlandHodgman=.true.
-      cAlphaArgs(1)='SutherlandHodgman'
-    ELSEIF (SameString(cAlphaArgs(1),'ConvexWeilerAtherton')) THEN
-      SutherlandHodgman=.false.
-      cAlphaArgs(1)='ConvexWeilerAtherton'
-    ELSEIF (lAlphaFieldBlanks(1)) THEN
-      IF (.not. SutherlandHodgman) THEN  ! if already set.
-        cAlphaArgs(1)='ConvexWeilerAtherton'
-      ELSE
-        cAlphaArgs(1)='SutherlandHodgman'
-      ENDIF
+    IF (SameString(cAlphaArgs(1), 'AverageOverDaysInFrequency')) THEN
+      DetailedSolarTimestepIntegration = .FALSE.
+      cAlphaArgs(1) = 'AverageOverDaysInFrequency'
+    ELSEIF (SameString(cAlphaArgs(1), 'TimestepFrequency')) THEN
+      DetailedSolarTimestepIntegration = .TRUE.
+      cAlphaArgs(1) = 'TimestepFrequency'
     ELSE
       CALL ShowWarningError(TRIM(cCurrentModuleObject)//': invalid '//trim(cAlphaFieldNames(1)))
-      IF (.not. SutherlandHodgman) THEN
-        CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(1))//'", ConvexWeilerAtherton will be used.')
+      CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(1))//'", AverageOverDaysInFrequency will be used.')
+      DetailedSolarTimestepIntegration = .FALSE.
+      cAlphaArgs(1) = 'AverageOverDaysInFrequency'
+    ENDIF
+  ELSE
+    DetailedSolarTimestepIntegration = .FALSE.
+    cAlphaArgs(1) = 'AverageOverDaysInFrequency'
+  ENDIF
+
+  IF (NumAlphas >= 2) THEN
+    IF (SameString(cAlphaArgs(2),'SutherlandHodgman')) THEN
+      SutherlandHodgman=.true.
+      cAlphaArgs(2)='SutherlandHodgman'
+    ELSEIF (SameString(cAlphaArgs(2),'ConvexWeilerAtherton')) THEN
+      SutherlandHodgman=.false.
+      cAlphaArgs(2)='ConvexWeilerAtherton'
+    ELSEIF (lAlphaFieldBlanks(2)) THEN
+      IF (.not. SutherlandHodgman) THEN  ! if already set.
+        cAlphaArgs(2)='ConvexWeilerAtherton'
       ELSE
-        CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(1))//'", SutherlandHodgman will be used.')
+        cAlphaArgs(2)='SutherlandHodgman'
+      ENDIF
+    ELSE
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': invalid '//trim(cAlphaFieldNames(2)))
+      IF (.not. SutherlandHodgman) THEN
+        CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(2))//'", ConvexWeilerAtherton will be used.')
+      ELSE
+        CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(2))//'", SutherlandHodgman will be used.')
       ENDIF
     ENDIF
   ELSE
     IF (.not. SutherlandHodgman) THEN
-      cAlphaArgs(1)='ConvexWeilerAtherton'
+      cAlphaArgs(2)='ConvexWeilerAtherton'
     ELSE
-      cAlphaArgs(1)='SutherlandHodgman'
+      cAlphaArgs(2)='SutherlandHodgman'
     ENDIF
   ENDIF
 
-  IF (NumAlphas >= 2) THEN
-    IF (SameString(cAlphaArgs(2),'SimpleSkyDiffuseModeling')) THEN
+  IF (NumAlphas >= 3) THEN
+    IF (SameString(cAlphaArgs(3),'SimpleSkyDiffuseModeling')) THEN
       DetailedSkyDiffuseAlgorithm=.false.
-      cAlphaArgs(2)='SimpleSkyDiffuseModeling'
-    ELSEIF (SameString(cAlphaArgs(2),'DetailedSkyDiffuseModeling')) THEN
+      cAlphaArgs(3)='SimpleSkyDiffuseModeling'
+    ELSEIF (SameString(cAlphaArgs(3),'DetailedSkyDiffuseModeling')) THEN
       DetailedSkyDiffuseAlgorithm=.true.
-      cAlphaArgs(2)='DetailedSkyDiffuseModeling'
-    ELSEIF (lAlphaFieldBlanks(2)) THEN
+      cAlphaArgs(3)='DetailedSkyDiffuseModeling'
+    ELSEIF (lAlphaFieldBlanks(3)) THEN
       DetailedSkyDiffuseAlgorithm=.false.
-      cAlphaArgs(2)='SimpleSkyDiffuseModeling'
+      cAlphaArgs(3)='SimpleSkyDiffuseModeling'
     ELSE
-      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': invalid '//trim(cAlphaFieldNames(2)))
-      CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(2))//'", SimpleSkyDiffuseModeling will be used.')
+      CALL ShowWarningError(TRIM(cCurrentModuleObject)//': invalid '//trim(cAlphaFieldNames(3)))
+      CALL ShowContinueError('Value entered="'//trim(cAlphaArgs(3))//'", SimpleSkyDiffuseModeling will be used.')
     ENDIF
   ELSE
-    cAlphaArgs(2)='SimpleSkyDiffuseModeling'
+    cAlphaArgs(3)='SimpleSkyDiffuseModeling'
     DetailedSkyDiffuseAlgorithm=.false.
   ENDIF
 
@@ -549,13 +577,14 @@ SUBROUTINE GetShadowingInput
   ENDIF
 
 
-  Write(OutputFileInits,fmta) '! <Shadowing/Sun Position Calculations> [Annual Simulations], '//  &
+  Write(OutputFileInits,fmta) '! <Shadowing/Sun Position Calculations> [Annual Simulations], Calculation Method,'//  &
      'Value {days}, Allowable Number Figures in Shadow Overlap {}, Polygon Clipping Algorithm, '//  &
      'Sky Diffuse Modeling Algorithm'
   Write(OutputFileInits,fmta) 'Shadowing/Sun Position Calculations,'//  &
+                                TRIM(cAlphaArgs(1))//','// &
                                 TRIM(RoundSigDigits(ShadowingCalcFrequency))//','//  &
                                 TRIM(RoundSigDigits(MAXHCS))//','//  &
-                                trim(cAlphaArgs(1))//','//trim(cAlphaArgs(2))
+                                trim(cAlphaArgs(2))//','//trim(cAlphaArgs(3))
 
 
   RETURN
@@ -777,6 +806,8 @@ SUBROUTINE AllocateModuleArrays
   WindowRevealStatus=0
 
   ! Weiler-Atherton
+  MAXHCArrayBounds=2*(MaxVerticesPerSurface+1)
+  MAXHCArrayIncrement=MaxVerticesPerSurface+1
   ALLOCATE(XTEMP((MaxVerticesPerSurface+1)*2))
   XTEMP=0.0D0
   ALLOCATE(YTEMP((MaxVerticesPerSurface+1)*2))
@@ -878,82 +909,109 @@ SUBROUTINE AllocateModuleArrays
   CALL DisplayString('Initializing Zone Report Variables')
   ! CurrentModuleObject='Zone'
   DO ZoneLoop=1,NumOfZones
-    CALL SetupOutputVariable('Zone Transmitted Solar[W]',ZoneTransSolar(ZoneLoop),'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Beam Solar from Exterior Windows[W]',ZoneBmSolFrExtWinsRep(ZoneLoop),  &
-           'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Beam Solar from Interior Windows[W]',ZoneBmSolFrIntWinsRep(ZoneLoop),  &
-           'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Diff Solar from Exterior Windows[W]',ZoneDifSolFrExtWinsRep(ZoneLoop),  &
-           'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Diff Solar from Interior Windows[W]',ZoneDifSolFrIntWinsRep(ZoneLoop),  &
-           'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Window Heat Gain[W]',ZoneWinHeatGainRep(ZoneLoop),'Zone','Average',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Window Heat Loss[W]',ZoneWinHeatLossRep(ZoneLoop),'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Windows Total Transmitted Solar Radiation Rate [W]', &
+                              ZoneTransSolar(ZoneLoop),'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Exterior Windows Total Transmitted Beam Solar Radiation Rate [W]', &
+                              ZoneBmSolFrExtWinsRep(ZoneLoop),  &
+                             'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Interior Windows Total Transmitted Beam Solar Radiation Rate [W]', &
+                              ZoneBmSolFrIntWinsRep(ZoneLoop),  &
+                             'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Exterior Windows Total Transmitted Diffuse Solar Radiation Rate [W]', &
+                              ZoneDifSolFrExtWinsRep(ZoneLoop),  &
+                             'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Interior Windows Total Transmitted Diffuse Solar Radiation Rate [W]', &
+                              ZoneDifSolFrIntWinsRep(ZoneLoop),  &
+                             'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Windows Total Heat Gain Rate [W]', &
+                              ZoneWinHeatGainRep(ZoneLoop),'Zone','Average',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Windows Total Heat Loss Rate [W]',ZoneWinHeatLossRep(ZoneLoop), &
+                             'Zone','Average',Zone(ZoneLoop)%Name)
     ! Energy variables
-    CALL SetupOutputVariable('Zone Transmitted Solar Energy[J]',ZoneTransSolarEnergy(ZoneLoop), &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Beam Solar from Exterior Windows Energy[J]',ZoneBmSolFrExtWinsRepEnergy(ZoneLoop),  &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Beam Solar from Interior Windows Energy[J]',ZoneBmSolFrIntWinsRepEnergy(ZoneLoop),  &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Diff Solar from Exterior Windows Energy[J]',ZoneDifSolFrExtWinsRepEnergy(ZoneLoop),  &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Diff Solar from Interior Windows Energy[J]',ZoneDifSolFrIntWinsRepEnergy(ZoneLoop),  &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Window Heat Gain Energy[J]',ZoneWinHeatGainRepEnergy(ZoneLoop), &
-           'Zone','Sum',Zone(ZoneLoop)%Name)
-    CALL SetupOutputVariable('Zone Window Heat Loss Energy[J]',ZoneWinHeatLossRepEnergy(ZoneLoop), &
+    CALL SetupOutputVariable('Zone Windows Total Transmitted Solar Radiation Energy [J]',ZoneTransSolarEnergy(ZoneLoop), &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Exterior Windows Total Transmitted Beam Solar Radiation Energy [J]', &
+                              ZoneBmSolFrExtWinsRepEnergy(ZoneLoop),  &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Interior Windows Total Transmitted Beam Solar Radiation Energy [J]', &
+                              ZoneBmSolFrIntWinsRepEnergy(ZoneLoop),  &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Exterior Windows Total Transmitted Diffuse Solar Radiation Energy [J]', &
+                              ZoneDifSolFrExtWinsRepEnergy(ZoneLoop),  &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Interior Windows Total Transmitted Diffuse Solar Radiation Energy [J]', &
+                              ZoneDifSolFrIntWinsRepEnergy(ZoneLoop),  &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Windows Total Heat Gain Energy [J]', &
+                              ZoneWinHeatGainRepEnergy(ZoneLoop), &
+                             'Zone','Sum',Zone(ZoneLoop)%Name)
+    CALL SetupOutputVariable('Zone Windows Total Heat Loss Energy [J]',ZoneWinHeatLossRepEnergy(ZoneLoop), &
            'Zone','Sum',Zone(ZoneLoop)%Name)
 
     IF (DisplayAdvancedReportVariables) THEN
       ! CurrentModuleObject='Zone(Advanced)'
-      CALL SetupOutputVariable('Zone Opaque Surface Inside Face Conduction Gain[W]',ZoneOpaqSurfInsFaceCondGainRep(ZoneLoop), &
-             'Zone','Average',Zone(ZoneLoop)%Name)
-      CALL SetupOutputVariable('Zone Opaque Surface Inside Face Conduction Loss[W]',ZoneOpaqSurfInsFaceCondLossRep(ZoneLoop), &
-             'Zone','Average',Zone(ZoneLoop)%Name)
+      CALL SetupOutputVariable('Zone Opaque Surface Inside Faces Total Conduction Heat Gain Rate [W]', &
+                                ZoneOpaqSurfInsFaceCondGainRep(ZoneLoop), &
+                               'Zone','Average',Zone(ZoneLoop)%Name)
+      CALL SetupOutputVariable('Zone Opaque Surface Inside Faces Total Conduction Heat Loss Rate [W]', &
+                                ZoneOpaqSurfInsFaceCondLossRep(ZoneLoop), &
+                               'Zone','Average',Zone(ZoneLoop)%Name)
       ! Energy variables
-      CALL SetupOutputVariable('Zone Opaque Surface Inside Face Conduction Gain Energy[J]', &
-             ZnOpqSurfInsFaceCondGnRepEnrg(ZoneLoop), &
-             'Zone','Sum',Zone(ZoneLoop)%Name)
-      CALL SetupOutputVariable('Zone Opaque Surface Inside Face Conduction Loss Energy[J]', &
-             ZnOpqSurfInsFaceCondLsRepEnrg(ZoneLoop), &
-             'Zone','Sum',Zone(ZoneLoop)%Name)
+      CALL SetupOutputVariable('Zone Opaque Surface Inside Faces Total Conduction Heat Gain Energy [J]', &
+                                ZnOpqSurfInsFaceCondGnRepEnrg(ZoneLoop), &
+                               'Zone','Sum',Zone(ZoneLoop)%Name)
+      CALL SetupOutputVariable('Zone Opaque Surface Inside Faces Total Conduction Heat Loss Energy [J]', &
+                                ZnOpqSurfInsFaceCondLsRepEnrg(ZoneLoop), &
+                               'Zone','Sum',Zone(ZoneLoop)%Name)
     ENDIF
   END DO
 
-  CALL DisplayString('Initializing Surface Report Variables')
+  CALL DisplayString('Initializing Surface (Shading) Report Variables')
   ! CurrentModuleObject='Surfaces'
   DO SurfLoop=1,TotSurfaces
     IF (Surface(SurfLoop)%ExtSolar) THEN
-      CALL SetupOutputVariable('Surface Ext Sunlit Area [m2]',SurfSunlitArea(SurfLoop),'Zone','State',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Sunlit Fraction []',SurfSunlitFrac(SurfLoop),'Zone','State',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar Incident[W/m2]',QRadSWOutIncident(SurfLoop),'Zone','Average', &
+      CALL SetupOutputVariable('Surface Outside Face Sunlit Area [m2]', &
+                                SurfSunlitArea(SurfLoop),'Zone','State',Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Sunlit Fraction []', &
+                                SurfSunlitFrac(SurfLoop),'Zone','State',Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Outside Face Incident Solar Radiation Rate per Area [W/m2]', &
+                                QRadSWOutIncident(SurfLoop), &
+                               'Zone','Average', &
                                 Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar Beam Incident[W/m2]',QRadSWOutIncidentBeam(SurfLoop),'Zone', &
+      CALL SetupOutputVariable('Surface Outside Face Incident Beam Solar Radiation Rate per Area [W/m2]', &
+                                QRadSWOutIncidentBeam(SurfLoop),'Zone', &
                                'Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar Sky Diffuse Incident[W/m2]',QRadSWOutIncidentSkyDiffuse(SurfLoop),'Zone', &
+      CALL SetupOutputVariable('Surface Outside Face Incident Sky Diffuse Solar Radiation Rate per Area [W/m2]', &
+                               QRadSWOutIncidentSkyDiffuse(SurfLoop),'Zone', &
                                'Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar Ground Diffuse Incident[W/m2]',QRadSWOutIncidentGndDiffuse(SurfLoop),'Zone', &
+      CALL SetupOutputVariable('Surface Outside Face Incident Ground Diffuse Solar Radiation Rate per Area [W/m2]', &
+                                QRadSWOutIncidentGndDiffuse(SurfLoop),'Zone', &
                                'Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar Beam Cosine Of Incidence Angle[]',CosIncidenceAngle(SurfLoop),'Zone', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Beam Solar Incident Angle Cosine Value []',CosIncidenceAngle(SurfLoop),'Zone', &
                                'Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar From Sky Diffuse Refl From Ground[W/m2]', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Incident Sky Diffuse Ground Reflected Solar Radiation Rate per Area [W/m2]', &
                                QRadSWOutIncSkyDiffReflGnd(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar From Sky Diffuse Refl From Obstructions[W/m2]', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Incident Sky Diffuse Surface Reflected Solar Radiation Rate per Area [W/m2]', &
                                QRadSWOutIncSkyDiffReflObs(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Beam Sol From Bm-To-Bm Refl From Obstructions[W/m2]', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Incident Beam To Beam Surface Reflected Solar Radiation Rate per Area [W/m2]', &
                                QRadSWOutIncBmToBmReflObs(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Diff Sol From Bm-To-Diff Refl From Obstructions[W/m2]', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Incident Beam To Diffuse Surface Reflected Solar Radiation Rate per Area [W/m2]', &
                                QRadSWOutIncBmToDiffReflObs(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Surface Ext Solar From Bm-To-Diff Refl From Ground[W/m2]', &
+      CALL SetupOutputVariable( &
+                  'Surface Outside Face Incident Beam To Diffuse Ground Reflected Solar Radiation Rate per Area [W/m2]', &
                                QRadSWOutIncBmToDiffReflGnd(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
       CALL SetupOutputVariable('Surface Anisotropic Sky Multiplier []', &
                                AnisoSkyMult(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('BSDF Beam Direction Number []',BSDFBeamDirectionRep(SurfLoop),'Zone','Average', &
+      CALL SetupOutputVariable('Surface Window BSDF Beam Direction Number []',BSDFBeamDirectionRep(SurfLoop),'Zone','Average', &
                                 Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('BSDF Beam Theta Angle [rad]',BSDFBeamThetaRep(SurfLoop),'Zone','Average', &
+      CALL SetupOutputVariable('Surface Window BSDF Beam Theta Angle [rad]',BSDFBeamThetaRep(SurfLoop),'Zone','Average', &
                                 Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('BSDF Beam Phi Angle [rad]',BSDFBeamPhiRep(SurfLoop),'Zone','Average', &
+      CALL SetupOutputVariable('Surface Window BSDF Beam Phi Angle [rad]',BSDFBeamPhiRep(SurfLoop),'Zone','Average', &
                                 Surface(SurfLoop)%Name)
     END IF
     IF (.NOT. Surface(SurfLoop)%HeatTransSurf) CYCLE
@@ -961,43 +1019,51 @@ SUBROUTINE AllocateModuleArrays
     IF (Surface(SurfLoop)%Class == SurfaceClass_Window) THEN
       ! CurrentModuleObject='Windows/GlassDoors'
       IF (Surface(SurfLoop)%ExtSolar) THEN
-        CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers [W]',QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
-                                Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Total Shortwave Absorbed:All Glass Layers [W]',SWwinAbsTotalReport(SurfLoop), &
-                                'Zone','Average', Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Solar [W]',WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Beam Solar [W]',WinBmSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Rate [W]', &
+                                  QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
+                                  Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Shortwave Radiation Rate [W]',&
+                                  SWwinAbsTotalReport(SurfLoop), &
+                                 'Zone','Average', Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Rate [W]', &
+                                  WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Rate [W]', &
+                                  WinBmSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
 
         !added TH 12/9/2009
-        CALL SetupOutputVariable('Window Transmitted Beam-to-Beam Solar [W]',WinBmBmSolar(SurfLoop),  &
+        CALL SetupOutputVariable('Surface Window Transmitted Beam To Beam Solar Radiation Rate [W]',WinBmBmSolar(SurfLoop),  &
            'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Beam-to-Diffuse Solar [W]',WinBmDifSolar(SurfLoop),  &
+        CALL SetupOutputVariable('Surface Window Transmitted Beam To Diffuse Solar Radiation Rate [W]',WinBmDifSolar(SurfLoop),  &
            'Zone','Average',Surface(SurfLoop)%Name)
 
-        CALL SetupOutputVariable('Window Transmitted Diffuse Solar [W]',WinDifSolar(SurfLoop),'Zone', &
+        CALL SetupOutputVariable('Surface Window Transmitted Diffuse Solar Radiation Rate [W]',WinDifSolar(SurfLoop),'Zone', &
                                'Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Heat Gain [W]',WinHeatGainRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Heat Loss [W]',WinHeatLossRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Gap Convective Heat Flow [W]',WinGapConvHtFlowRep(SurfLoop),'Zone','Average',  &
-                                Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Solar Absorbed:Shading Device [W]',WinShadingAbsorbedSolar(SurfLoop), &
-                                'Zone','Average',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Heat Gain Rate [W]',WinHeatGainRep(SurfLoop), &
+                                 'Zone','Average',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Heat Loss Rate [W]',WinHeatLossRep(SurfLoop), &
+                                 'Zone','Average',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Gap Convective Heat Transfer Rate [W]',&
+                                  WinGapConvHtFlowRep(SurfLoop),'Zone','Average',  &
+                                  Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Shading Device Absorbed Solar Radiation Rate [W]', &
+                                  WinShadingAbsorbedSolar(SurfLoop), &
+                                 'Zone','Average',Surface(SurfLoop)%Name)
 
         IF (DisplayAdvancedReportVariables) THEN
           ! CurrentModuleObject='Windows/GlassDoors(Advanced)'
-          CALL SetupOutputVariable('Window Convection Heat Gain from Glazing to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Glazing Zone Convection Heat Gain Rate [W]', &
                                    WinGainConvGlazToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Net Infrared Heat Gain from Glazing to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Glazing Net Infrared Heat Transfer Rate [W]', &
                                    WinGainIRGlazToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Shortwave Heat Loss from Zone Back Out Window [W]', &
+          CALL SetupOutputVariable('Surface Window Shortwave from Zone Back Out Window Heat Transfer Rate [W]', &
                                    WinLossSWZoneToOutWinRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Heat Gain from Frame and Divider to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Frame and Divider Zone Heat Gain Rate [W]', &
                                    WinGainFrameDividerToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Convection Heat Gain from Gap between Shade and Glazing to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Gap between Shade and Glazing Zone Convection Heat Gain Rate [W]', &
                                    WinGainConvGlazShadGapToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Convection Heat Gain from Shade to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Shade Zone Convection Heat Gain Rate [W]', &
                                    WinGainConvShadeToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Net Infrared Heat Gain from Shade to Zone [W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Shade Net Infrared Heat Transfer Rate [W]', &
                                    WinGainIRShadeToZoneRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
         ENDIF
 
@@ -1005,9 +1071,9 @@ SUBROUTINE AllocateModuleArrays
         ! Added TH 12/23/2008 for thermochromic windows
         ! CurrentModuleObject='Thermochromic Windows'
         IF (Construct(Surface(SurfLoop)%Construction)%TCFlag == 1) THEN
-          CALL SetupOutputVariable('Window Thermochromic Layer Temperature[C]',SurfaceWindow(SurfLoop)%TCLayerTemp, &
+          CALL SetupOutputVariable('Surface Window Thermochromic Layer Temperature [C]',SurfaceWindow(SurfLoop)%TCLayerTemp, &
                                   'Zone','Average', Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Thermochromic Layer Specification Temperature[C]', &
+          CALL SetupOutputVariable('Surface Window Thermochromic Layer Property Specification Temperature [C]', &
                                   SurfaceWindow(SurfLoop)%SpecTemp,'Zone', 'Average', Surface(SurfLoop)%Name)
         ENDIF
 
@@ -1016,10 +1082,10 @@ SUBROUTINE AllocateModuleArrays
         IF(Surface(SurfLoop)%WindowShadingControlPtr >0) THEN
           IF(WindowShadingControl(Surface(SurfLoop)%WindowShadingControlPtr)%ShadingType == WSC_ST_SwitchableGlazing)  THEN
           !IF (SurfaceWindow(SurfLoop)%ShadingFlag == SwitchableGlazing) THEN  !ShadingFlag is not set to SwitchableGlazing yet!
-            CALL SetupOutputVariable('Switchable Window System Switching Factor[]', &
+            CALL SetupOutputVariable('Surface Window Switchable Glazing Switching Factor []', &
                                  SurfaceWindow(SurfLoop)%SwitchingFactor, &
                                 'Zone', 'Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Switchable Window System Visible Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Switchable Glazing Visible Transmittance []', &
                                  SurfaceWindow(SurfLoop)%VisTransSelected, &
                                 'Zone', 'Average',Surface(SurfLoop)%Name)
           ENDIF
@@ -1027,99 +1093,105 @@ SUBROUTINE AllocateModuleArrays
 
         IF (SurfaceWindow(SurfLoop)%FrameArea > 0.0) THEN
           ! CurrentModuleObject='Window Frames'
-          CALL SetupOutputVariable('Window Frame Heat Gain[W]',SurfaceWindow(SurfLoop)%FrameHeatGain, &
+          CALL SetupOutputVariable('Surface Window Frame Heat Gain Rate [W]',SurfaceWindow(SurfLoop)%FrameHeatGain, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Frame Heat Loss[W]',SurfaceWindow(SurfLoop)%FrameHeatLoss, &
+          CALL SetupOutputVariable('Surface Window Frame Heat Loss Rate [W]',SurfaceWindow(SurfLoop)%FrameHeatLoss, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Frame Inside Temperature[C]',SurfaceWindow(SurfLoop)%FrameTempSurfIn, &
+          CALL SetupOutputVariable('Surface Window Frame Inside Temperature [C]',SurfaceWindow(SurfLoop)%FrameTempSurfIn, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Frame Outside Temperature[C]',SurfaceWindow(SurfLoop)%FrameTempSurfOut, &
+          CALL SetupOutputVariable('Surface Window Frame Outside Temperature [C]',SurfaceWindow(SurfLoop)%FrameTempSurfOut, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
         ENDIF
         IF (SurfaceWindow(SurfLoop)%DividerArea > 0.0) THEN
           ! CurrentModuleObject='Window Dividers'
-          CALL SetupOutputVariable('Window Divider Heat Gain[W]',SurfaceWindow(SurfLoop)%DividerHeatGain, &
+          CALL SetupOutputVariable('Surface Window Divider Heat Gain Rate [W]',SurfaceWindow(SurfLoop)%DividerHeatGain, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Divider Heat Loss[W]',SurfaceWindow(SurfLoop)%DividerHeatLoss, &
+          CALL SetupOutputVariable('Surface Window Divider Heat Loss Rate [W]',SurfaceWindow(SurfLoop)%DividerHeatLoss, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Divider Inside Temperature[C]',SurfaceWindow(SurfLoop)%DividerTempSurfIn, &
+          CALL SetupOutputVariable('Surface Window Divider Inside Temperature [C]',SurfaceWindow(SurfLoop)%DividerTempSurfIn, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Divider Outside Temperature[C]',SurfaceWindow(SurfLoop)%DividerTempSurfOut, &
+          CALL SetupOutputVariable('Surface Window Divider Outside Temperature [C]',SurfaceWindow(SurfLoop)%DividerTempSurfOut, &
                                 'Zone','Average',Surface(SurfLoop)%Name)
         ENDIF
 
         ! CurrentModuleObject='Windows'
         ! Energy
-        CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers Energy[J]',QRadSWwinAbsTotEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Energy [J]', &
+                                  QRadSWwinAbsTotEnergy(SurfLoop), &
                                 'Zone','Sum', Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Solar Energy[J]',WinTransSolarEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Energy [J]',WinTransSolarEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Beam Solar Energy[J]',WinBmSolarEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Energy [J]',WinBmSolarEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
 
         !added TH 12/9/2009
-        CALL SetupOutputVariable('Window Transmitted Beam-to-Beam Solar Energy[J]',WinBmBmSolarEnergy(SurfLoop), &
-                                'Zone','Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Transmitted Beam-to-Diffuse Solar Energy[J]',WinBmDifSolarEnergy(SurfLoop), &
-                                'Zone','Sum',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Transmitted Beam To Beam Solar Radiation Energy [J]', &
+                                  WinBmBmSolarEnergy(SurfLoop), &
+                                 'Zone','Sum',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Transmitted Beam To Diffuse Solar Radiation Energy [J]', &
+                                  WinBmDifSolarEnergy(SurfLoop), &
+                                 'Zone','Sum',Surface(SurfLoop)%Name)
 
-        CALL SetupOutputVariable('Window Transmitted Diffuse Solar Energy[J]',WinDifSolarEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Transmitted Diffuse Solar Radiation Energy [J]',WinDifSolarEnergy(SurfLoop), &
                                 'Zone', 'Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Heat Gain Energy[J]',WinHeatGainRepEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Heat Gain Energy [J]',WinHeatGainRepEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Heat Loss Energy[J]',WinHeatLossRepEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Heat Loss Energy [J]',WinHeatLossRepEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Gap Convective Heat Flow Energy[J]',WinGapConvHtFlowRepEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Gap Convective Heat Transfer Energy [J]',WinGapConvHtFlowRepEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Solar Absorbed:Shading Device Energy[J]',WinShadingAbsorbedSolarEnergy(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window Shading Device Absorbed Solar Radiation Energy [J]',  &
+                                WinShadingAbsorbedSolarEnergy(SurfLoop), &
                                 'Zone','Sum',Surface(SurfLoop)%Name)
 
-        CALL SetupOutputVariable('Window System Solar Transmittance[]',WinSysSolTransmittance(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window System Solar Transmittance []',WinSysSolTransmittance(SurfLoop), &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window System Solar Reflectance[]',WinSysSolReflectance(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window System Solar Reflectance []',WinSysSolReflectance(SurfLoop), &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window System Solar Absorptance[]',WinSysSolAbsorptance(SurfLoop), &
+        CALL SetupOutputVariable('Surface Window System Solar Absorptance []',WinSysSolAbsorptance(SurfLoop), &
                                 'Zone','Average',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Inside Glass Condensation Flag[]',InsideGlassCondensationFlag(SurfLoop), &
-                                'Zone','State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Inside Frame Condensation Flag[]',InsideFrameCondensationFlag(SurfLoop), &
-                                'Zone','State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Inside Divider Condensation Flag[]',InsideDividerCondensationFlag(SurfLoop), &
-                                'Zone','State',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Inside Face Glazing Condensation Status []', &
+                                  InsideGlassCondensationFlag(SurfLoop), &
+                                 'Zone','State',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Inside Face Frame Condensation Status []',InsideFrameCondensationFlag(SurfLoop), &
+                                 'Zone','State',Surface(SurfLoop)%Name)
+        CALL SetupOutputVariable('Surface Window Inside Face Divider Condensation Status []', &
+                                  InsideDividerCondensationFlag(SurfLoop), &
+                                 'Zone','State',Surface(SurfLoop)%Name)
 
       ! Outside reveal report variables
       !IF (Surface(SurfLoop)%Reveal > 0.0) THEN
-        CALL SetupOutputVariable('Beam Solar Reflected by Outside Reveal Surfaces[W]', &
+        CALL SetupOutputVariable('Surface Window Outside Reveal Reflected Beam Solar Radiation Rate [W]', &
                                  SurfaceWindow(SurfLoop)%BmSolRefldOutsRevealReport, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
         ! Energy
-        CALL SetupOutputVariable('Beam Solar Reflected by Outside Reveal Surfaces Energy[J]', &
+        CALL SetupOutputVariable('Surface Window Outside Reveal Reflected Beam Solar Radiation Energy [J]', &
                                  SurfaceWindow(SurfLoop)%BmSolRefldOutsRevealRepEnergy, &
                                 'Zone', 'Sum',Surface(SurfLoop)%Name)
       !ENDIF
 
       ! Inside reveal report variables
         IF (SurfaceWindow(SurfLoop)%InsideReveal > 0.0 .OR. SurfaceWindow(SurfLoop)%InsideSillDepth > 0.0) THEN
-          CALL SetupOutputVariable('Beam Solar Reflected by Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Beam Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldInsRevealReport, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
           ! Energy
-          CALL SetupOutputVariable('Beam Solar Reflected by Inside Reveal Surfaces Energy[J]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Beam Solar Radiation Energy [J]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldInsRevealRepEnergy, &
                                   'Zone', 'Sum',Surface(SurfLoop)%Name)
 
           ! Added report variables for inside reveal to debug CR 7596. TH 5/26/2009
           ! All reflected solar by the inside reveal is turned into diffuse
-          CALL SetupOutputVariable('Beam Solar Absorbed by Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Absorbed Beam Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%BmSolAbsdInsRevealReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Diffuse Solar into Zone from Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Diffuse Zone Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%InsRevealDiffIntoZoneReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Diffuse Solar on Window Frame from Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Diffuse Frame Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%InsRevealDiffOntoFrameReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Diffuse Solar on Window Glass from Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Diffuse Glazing Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%InsRevealDiffOntoGlazingReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
         ENDIF
@@ -1127,19 +1199,19 @@ SUBROUTINE AllocateModuleArrays
     !     Output blind report variables only when blinds are used
         IF(SurfaceWindow(SurfLoop)%BlindNumber .GT. 0)THEN
           ! CurrentModuleObject='Window Blinds'
-          CALL SetupOutputVariable('Blind Beam-Beam Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Blind Beam to Beam Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%BlTsolBmBm, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Blind Beam-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Blind Beam to Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%BlTsolBmDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Blind Diffuse-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Blind Diffuse to Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%BlTsolDifDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Blind/Glass System Beam-Beam Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Blind and Glazing System Beam Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%BlGlSysTsolBmBm, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Blind/Glass System Diffuse-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Blind and Glazing System Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%BlGlSysTsolDifDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
         END IF
@@ -1147,195 +1219,211 @@ SUBROUTINE AllocateModuleArrays
   !     Output screen report variables only when screens are used
         IF(SurfaceWindow(SurfLoop)%ScreenNumber .GT. 0)THEN
           ! CurrentModuleObject='Window Screens'
-          CALL SetupOutputVariable('Screen Beam-Beam Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Screen Beam to Beam Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%ScTsolBmBm, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Screen Beam-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Screen Beam to Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%ScTsolBmDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Screen Diffuse-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Screen Diffuse to Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%ScTsolDifDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Screen/Glass System Beam-Beam Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Screen and Glazing System Beam Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%ScGlSysTsolBmBm, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Screen/Glass System Diffuse-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Screen and Glazing System Diffuse Solar Transmittance []', &
                                     SurfaceWindow(SurfLoop)%ScGlSysTsolDifDif, &
                                    'Zone', 'State',Surface(SurfLoop)%Name)
         END IF
 
         ! CurrentModuleObject='Windows'
-        CALL SetupOutputVariable('Solar Horizontal Profile Angle[deg]', &
+        CALL SetupOutputVariable('Surface Window Solar Horizontal Profile Angle [deg]', &
                                  SurfaceWindow(SurfLoop)%ProfileAngHor, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Solar Vertical Profile Angle[deg]', &
+        CALL SetupOutputVariable('Surface Window Solar Vertical Profile Angle [deg]', &
                                  SurfaceWindow(SurfLoop)%ProfileAngVert, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Glass Beam-Beam Solar Transmittance[]', &
+        CALL SetupOutputVariable('Surface Window Glazing Beam to Beam Solar Transmittance []', &
                                  SurfaceWindow(SurfLoop)%GlTsolBmBm, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Glass Beam-Diffuse Solar Transmittance[]', &
+        CALL SetupOutputVariable('Surface Window Glazing Beam to Diffuse Solar Transmittance []', &
                                  SurfaceWindow(SurfLoop)%GlTsolBmDif, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Glass Diffuse-Diffuse Solar Transmittance[]', &
+        CALL SetupOutputVariable('Surface Window Glazing Diffuse to Diffuse Solar Transmittance []', &
                                  SurfaceWindow(SurfLoop)%GlTsolDifDif, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
-        CALL SetupOutputVariable('Window Calculation Iterations[]', &
+        CALL SetupOutputVariable('Surface Window Model Solver Iteration Count []', &
                                  SurfaceWindow(SurfLoop)%WindowCalcIterationsRep, &
                                 'Zone', 'State',Surface(SurfLoop)%Name)
       ELSEIF (.not. Surface(SurfLoop)%ExtSolar) THEN ! Not ExtSolar
         IF (DisplayAdvancedReportVariables) THEN
           ! CurrentModuleObject='InteriorWindows(Advanced)'
           IF(SurfaceWindow(SurfLoop)%OriginalClass /= SurfaceClass_TDD_Diffuser) &
-            CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers[W]',QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
-                                  Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Total Shortwave Absorbed:All Glass Layers[W]',SWwinAbsTotalReport(SurfLoop), &
-                                  'Zone','Average', Surface(SurfLoop)%Name)
+            CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Rate [W]', &
+                                      QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
+                                      Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Shortwave Radiation Rate [W]', &
+                                    SWwinAbsTotalReport(SurfLoop), &
+                                   'Zone','Average', Surface(SurfLoop)%Name)
           IF(SurfaceWindow(SurfLoop)%OriginalClass /= SurfaceClass_TDD_Diffuser) &
-             CALL SetupOutputVariable('Window Transmitted Solar[W]',WinTransSolar(SurfLoop),'Zone','Average',  &
-                Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Transmitted Beam Solar[W]',WinBmSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+             CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Rate [W]', &
+                                       WinTransSolar(SurfLoop),'Zone','Average',  &
+                                       Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Rate [W]',WinBmSolar(SurfLoop), &
+                                   'Zone','Average',Surface(SurfLoop)%Name)
 
           !added TH 12/9/2009
-          CALL SetupOutputVariable('Window Transmitted Beam-to-Beam Solar[W]',WinBmBmSolar(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Transmitted Beam To Beam Solar Radiation Rate [W]',WinBmBmSolar(SurfLoop), &
                                    'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Transmitted Beam-to-Diffuse Solar[W]',WinBmDifSolar(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Transmitted Beam To Diffuse Solar Radiation Rate [W]', &
+                                    WinBmDifSolar(SurfLoop), &
                                    'Zone','Average',Surface(SurfLoop)%Name)
 
-          CALL SetupOutputVariable('Window Transmitted Diffuse Solar[W]',WinDifSolar(SurfLoop),'Zone', &
+          CALL SetupOutputVariable('Surface Window Transmitted Diffuse Solar Radiation Rate [W]',WinDifSolar(SurfLoop),'Zone', &
                                  'Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Heat Gain[W]',WinHeatGainRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Heat Loss[W]',WinHeatLossRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Gap Convective Heat Flow[W]',WinGapConvHtFlowRep(SurfLoop),'Zone','Average',  &
+          CALL SetupOutputVariable('Surface Window Heat Gain Rate [W]', &
+                                    WinHeatGainRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Heat Loss Rate [W]', &
+                                    WinHeatLossRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Gap Convective Heat Transfer Rate [W]', &
+                                  WinGapConvHtFlowRep(SurfLoop),'Zone','Average',  &
                                   Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Solar Absorbed:Shading Device[W]',WinShadingAbsorbedSolar(SurfLoop), &
-                                  'Zone','Average',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Shading Device Absorbed Solar Radiation Rate [W]', &
+                                    WinShadingAbsorbedSolar(SurfLoop), &
+                                   'Zone','Average',Surface(SurfLoop)%Name)
           IF (SurfaceWindow(SurfLoop)%FrameArea > 0.0) THEN
-            CALL SetupOutputVariable('Window Frame Heat Gain[W]',SurfaceWindow(SurfLoop)%FrameHeatGain, &
+            CALL SetupOutputVariable('Surface Window Frame Heat Gain Rate [W]',SurfaceWindow(SurfLoop)%FrameHeatGain, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Frame Heat Loss[W]',SurfaceWindow(SurfLoop)%FrameHeatLoss, &
+            CALL SetupOutputVariable('Surface Window Frame Heat Loss Rate [W]',SurfaceWindow(SurfLoop)%FrameHeatLoss, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Frame Inside Temperature[C]',SurfaceWindow(SurfLoop)%FrameTempSurfIn, &
+            CALL SetupOutputVariable('Surface Window Frame Inside Temperature [C]',SurfaceWindow(SurfLoop)%FrameTempSurfIn, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Frame Outside Temperature[C]',SurfaceWindow(SurfLoop)%FrameTempSurfOut, &
+            CALL SetupOutputVariable('Surface Window Frame Outside Temperature [C]',SurfaceWindow(SurfLoop)%FrameTempSurfOut, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
           ENDIF
           IF (SurfaceWindow(SurfLoop)%DividerArea > 0.0) THEN
-            CALL SetupOutputVariable('Window Divider Heat Gain[W]',SurfaceWindow(SurfLoop)%DividerHeatGain, &
+            CALL SetupOutputVariable('Surface Window Divider Heat Gain Rate [W]',SurfaceWindow(SurfLoop)%DividerHeatGain, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Divider Heat Loss[W]',SurfaceWindow(SurfLoop)%DividerHeatLoss, &
+            CALL SetupOutputVariable('Surface Window Divider Heat Loss Rate [W]',SurfaceWindow(SurfLoop)%DividerHeatLoss, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Divider Inside Temperature[C]',SurfaceWindow(SurfLoop)%DividerTempSurfIn, &
+            CALL SetupOutputVariable('Surface Window Divider Inside Temperature [C]',SurfaceWindow(SurfLoop)%DividerTempSurfIn, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Window Divider Outside Temperature[C]',SurfaceWindow(SurfLoop)%DividerTempSurfOut, &
+            CALL SetupOutputVariable('Surface Window Divider Outside Temperature [C]',SurfaceWindow(SurfLoop)%DividerTempSurfOut, &
                                   'Zone','Average',Surface(SurfLoop)%Name)
           ENDIF
           ! Energy
           IF(SurfaceWindow(SurfLoop)%OriginalClass /= SurfaceClass_TDD_Diffuser) &
-            CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers Energy[J]',QRadSWwinAbsTotEnergy(SurfLoop), &
-                                  'Zone','Sum', Surface(SurfLoop)%Name)
+            CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Energy [J]', &
+                                      QRadSWwinAbsTotEnergy(SurfLoop), &
+                                     'Zone','Sum', Surface(SurfLoop)%Name)
           IF(SurfaceWindow(SurfLoop)%OriginalClass /= SurfaceClass_TDD_Diffuser) &
-            CALL SetupOutputVariable('Window Transmitted Solar Energy[J]',WinTransSolarEnergy(SurfLoop), &
+            CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Energy [J]',WinTransSolarEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Transmitted Beam Solar Energy[J]',WinBmSolarEnergy(SurfLoop), &
-                                  'Zone','Sum',Surface(SurfLoop)%Name)
-
-          CALL SetupOutputVariable('Window Transmitted Beam-to-Beam Solar Energy[J]',WinBmBmSolarEnergy(SurfLoop), &
-                                  'Zone','Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Transmitted Beam-to-Diffuse Solar Energy[J]',WinBmDifSolarEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Energy [J]',WinBmSolarEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
 
-          CALL SetupOutputVariable('Window Transmitted Diffuse Solar Energy[J]',WinDifSolarEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Transmitted Beam To Beam Solar Radiation Energy [J]', &
+                                    WinBmBmSolarEnergy(SurfLoop), &
+                                   'Zone','Sum',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Transmitted Beam To Diffuse Solar Radiation Energy [J]', &
+                                    WinBmDifSolarEnergy(SurfLoop), &
+                                   'Zone','Sum',Surface(SurfLoop)%Name)
+
+          CALL SetupOutputVariable('Surface Window Transmitted Diffuse Solar Radiation Energy [J]',WinDifSolarEnergy(SurfLoop), &
                                   'Zone', 'Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Heat Gain Energy[J]',WinHeatGainRepEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Heat Gain Energy [J]',WinHeatGainRepEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Heat Loss Energy[J]',WinHeatLossRepEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Heat Loss Energy [J]',WinHeatLossRepEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Gap Convective Heat Flow Energy[J]',WinGapConvHtFlowRepEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Gap Convective Heat Transfer Energy [J]',WinGapConvHtFlowRepEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Solar Absorbed:Shading Device Energy[J]',WinShadingAbsorbedSolarEnergy(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window Shading Device Absorbed Solar Radiation Energy [J]',  &
+                                   WinShadingAbsorbedSolarEnergy(SurfLoop), &
                                   'Zone','Sum',Surface(SurfLoop)%Name)
 
-          CALL SetupOutputVariable('Window System Solar Transmittance[]',WinSysSolTransmittance(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window System Solar Transmittance []',WinSysSolTransmittance(SurfLoop), &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window System Solar Reflectance[]',WinSysSolReflectance(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window System Solar Reflectance []',WinSysSolReflectance(SurfLoop), &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window System Solar Absorptance[]',WinSysSolAbsorptance(SurfLoop), &
+          CALL SetupOutputVariable('Surface Window System Solar Absorptance []',WinSysSolAbsorptance(SurfLoop), &
                                   'Zone','Average',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Inside Glass Condensation Flag[]',InsideGlassCondensationFlag(SurfLoop), &
-                                  'Zone','State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Inside Frame Condensation Flag[]',InsideFrameCondensationFlag(SurfLoop), &
-                                  'Zone','State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Inside Divider Condensation Flag[]',InsideDividerCondensationFlag(SurfLoop), &
-                                  'Zone','State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Beam Solar Reflected by Outside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Face Glazing Condensation Status []', &
+                                    InsideGlassCondensationFlag(SurfLoop), &
+                                   'Zone','State',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Inside Face Frame Condensation Status []', &
+                                    InsideFrameCondensationFlag(SurfLoop), &
+                                   'Zone','State',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Inside Face Divider Condensation Status []', &
+                                    InsideDividerCondensationFlag(SurfLoop), &
+                                   'Zone','State',Surface(SurfLoop)%Name)
+          CALL SetupOutputVariable('Surface Window Outside Reveal Reflected Beam Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldOutsRevealReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Beam Solar Reflected by Inside Reveal Surfaces[W]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Beam Solar Radiation Rate [W]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldInsRevealReport, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
           ! Energy
-          CALL SetupOutputVariable('Beam Solar Reflected by Outside Reveal Surfaces Energy[J]', &
+          CALL SetupOutputVariable('Surface Window Outside Reveal Reflected Beam Solar Radiation Energy [J]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldOutsRevealRepEnergy, &
                                   'Zone', 'Sum',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Beam Solar Reflected by Inside Reveal Surfaces Energy[J]', &
+          CALL SetupOutputVariable('Surface Window Inside Reveal Reflected Beam Solar Radiation Energy [J]', &
                                    SurfaceWindow(SurfLoop)%BmSolRefldInsRevealRepEnergy, &
                                   'Zone', 'Sum',Surface(SurfLoop)%Name)
 
     !     Output blind report variables only when blinds are used
           IF(SurfaceWindow(SurfLoop)%BlindNumber .GT. 0)THEN
-            CALL SetupOutputVariable('Blind Beam-Beam Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Blind Beam to Beam Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%BlTsolBmBm, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Blind Beam-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Blind Beam to Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%BlTsolBmDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Blind Diffuse-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Blind Diffuse to Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%BlTsolDifDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Blind/Glass System Beam-Beam Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Blind and Glazing System Beam Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%BlGlSysTsolBmBm, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Blind/Glass System Diffuse-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Blind and Glazing System Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%BlGlSysTsolDifDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
           END IF
 
     !     Output screen report variables only when screens are used
           IF(SurfaceWindow(SurfLoop)%ScreenNumber .GT. 0)THEN
-            CALL SetupOutputVariable('Screen Beam-Beam Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Screen Beam to Beam Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%ScTsolBmBm, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Screen Beam-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Screen Beam to Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%ScTsolBmDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Screen Diffuse-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Screen Diffuse to Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%ScTsolDifDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Screen/Glass System Beam-Beam Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Screen and Glazing System Beam Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%ScGlSysTsolBmBm, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
-            CALL SetupOutputVariable('Screen/Glass System Diffuse-Diffuse Solar Transmittance[]', &
+            CALL SetupOutputVariable('Surface Window Screen and Glazing System Diffuse Solar Transmittance []', &
                                       SurfaceWindow(SurfLoop)%ScGlSysTsolDifDif, &
                                      'Zone', 'State',Surface(SurfLoop)%Name)
           END IF
 
-          CALL SetupOutputVariable('Solar Horizontal Profile Angle[deg]', &
+          CALL SetupOutputVariable('Surface Window Solar Horizontal Profile Angle [deg]', &
                                    SurfaceWindow(SurfLoop)%ProfileAngHor, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Solar Vertical Profile Angle[deg]', &
+          CALL SetupOutputVariable('Surface Window Solar Vertical Profile Angle [deg]', &
                                    SurfaceWindow(SurfLoop)%ProfileAngVert, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Glass Beam-Beam Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Glazing Beam to Beam Solar Transmittance []', &
                                    SurfaceWindow(SurfLoop)%GlTsolBmBm, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Glass Beam-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Glazing Beam to Diffuse Solar Transmittance []', &
                                    SurfaceWindow(SurfLoop)%GlTsolBmDif, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Glass Diffuse-Diffuse Solar Transmittance[]', &
+          CALL SetupOutputVariable('Surface Window Glazing Diffuse to Diffuse Solar Transmittance []', &
                                    SurfaceWindow(SurfLoop)%GlTsolDifDif, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
-          CALL SetupOutputVariable('Window Calculation Iterations[]', &
+          CALL SetupOutputVariable('Surface Window Model Solver Iteration Count []', &
                                    SurfaceWindow(SurfLoop)%WindowCalcIterationsRep, &
                                   'Zone', 'State',Surface(SurfLoop)%Name)
         END IF
@@ -1344,36 +1432,43 @@ SUBROUTINE AllocateModuleArrays
     IF (Surface(SurfLoop)%Class == SurfaceClass_Window .AND. Surface(SurfLoop)%ExtBoundCond > 0   &
          .and. Surface(SurfLoop)%ExtBoundCond /= SurfLoop) THEN  !Interzone window
       ! CurrentModuleObject='InterzoneWindows'
-      CALL SetupOutputVariable('Beam Solar Transmitted through Interior Window[W]', &
+      CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Rate [W]', &
                                SurfaceWindow(SurfLoop)%BmSolTransThruIntWinRep, &
                               'Zone', 'State',Surface(SurfLoop)%Name)
       !energy
-      CALL SetupOutputVariable('Beam Solar Transmitted through Interior Window Energy[J]', &
+      CALL SetupOutputVariable('Surface Window Transmitted Beam Solar Radiation Energy [J]', &
                                SurfaceWindow(SurfLoop)%BmSolTransThruIntWinRepEnergy, &
                               'Zone', 'Sum',Surface(SurfLoop)%Name)
     END IF
     IF(Surface(SurfLoop)%Class == SurfaceClass_TDD_Dome .AND. Surface(SurfLoop)%ExtSolar) THEN
       ! CurrentModuleObject='TDD Domes'
-      CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers[W]',QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
-                              Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Window Transmitted Solar[W]',WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Rate [W]',&
+                                QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
+                                Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Rate [W]', &
+                                WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
       !energy
-      CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers Energy[J]',QRadSWwinAbsTotEnergy(SurfLoop), &
-                              'Zone','Sum', Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Window Transmitted Solar Energy[J]',WinTransSolarEnergy(SurfLoop), &
+      CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Energy [J]', &
+                                QRadSWwinAbsTotEnergy(SurfLoop), &
+                               'Zone','Sum', Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Energy [J]',WinTransSolarEnergy(SurfLoop), &
                               'Zone','Sum',Surface(SurfLoop)%Name)
     END IF
     IF(SurfaceWindow(SurfLoop)%OriginalClass == SurfaceClass_TDD_Diffuser) THEN
       ! CurrentModuleObject='TDD Diffusers'
-      CALL SetupOutputVariable('Surface Ext Solar Incident[W/m2]',QRadSWOutIncident(SurfLoop),'Zone','Average', &
+      CALL SetupOutputVariable('Surface Outside Face Incident Solar Radiation Rate per Area [W/m2]', &
+                                QRadSWOutIncident(SurfLoop),'Zone','Average', &
                                 Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers[W]',QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
-                              Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Window Transmitted Solar[W]',WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Rate [W]', &
+                                QRadSWwinAbsTot(SurfLoop),'Zone','Average', &
+                                Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Rate [W]', &
+                                WinTransSolar(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
       !energy
-      CALL SetupOutputVariable('Window Solar Absorbed:All Glass Layers Energy[J]',QRadSWwinAbsTotEnergy(SurfLoop), &
-                              'Zone','Sum', Surface(SurfLoop)%Name)
-      CALL SetupOutputVariable('Window Transmitted Solar Energy[J]',WinTransSolarEnergy(SurfLoop),&
+      CALL SetupOutputVariable('Surface Window Total Glazing Layers Absorbed Solar Radiation Energy [J]', &
+                                QRadSWwinAbsTotEnergy(SurfLoop), &
+                               'Zone','Sum', Surface(SurfLoop)%Name)
+      CALL SetupOutputVariable('Surface Window Transmitted Solar Radiation Energy [J]',WinTransSolarEnergy(SurfLoop),&
                               'Zone','Sum',Surface(SurfLoop)%Name)
     END IF
   ENDDO
@@ -1381,24 +1476,24 @@ SUBROUTINE AllocateModuleArrays
   DO SurfLoop=1,TotSurfaces
     IF (.NOT. Surface(SurfLoop)%HeatTransSurf) CYCLE
     ! CurrentModuleObject='Surfaces'
-    CALL SetupOutputVariable('Beam Sol Intensity from Ext Windows on Inside of Surface[W/m2]',  &
+    CALL SetupOutputVariable('Surface Inside Face Exterior Windows Incident Beam Solar Radiation Rate per Area [W/m2]',  &
                               BmIncInsSurfIntensRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Beam Sol Amount from Ext Windows on Inside of Surface[W]',  &
+    CALL SetupOutputVariable('Surface Inside Face Exterior Windows Incident Beam Solar Radiation Rate [W]',  &
                               BmIncInsSurfAmountRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Beam Sol Intensity from Int Windows on Inside of Surface[W/m2]',  &
+    CALL SetupOutputVariable('Surface Inside Face Interior Windows Incident Beam Solar Radiation Rate per Area [W/m2]',  &
                               IntBmIncInsSurfIntensRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Beam Sol Amount from Int Windows on Inside of Surface[W]',  &
+    CALL SetupOutputVariable('Surface Inside Face Interior Windows Incident Beam Solar Radiation Rate [W]',  &
                               IntBmIncInsSurfAmountRep(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Initial Transmitted Diffuse Solar Absorbed on Inside of Surface[W]',  &
+    CALL SetupOutputVariable('Surface Inside Face Initial Transmitted Diffuse Absorbed Solar Radiation Rate [W]',  &
                               InitialDifSolInAbsReport(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Initial Transmitted Diffuse Solar Transmitted Out Through Inside of Window Surface[W]',  &
+    CALL SetupOutputVariable('Surface Inside Face Initial Transmitted Diffuse Transmitted Out Window Solar Radiation Rate [W]',  &
                               InitialDifSolInTransReport(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Total Shortwave Radiation Absorbed on Inside of Surface[W]',  &
+    CALL SetupOutputVariable('Surface Inside Face Absorbed Shortwave Radiation Rate [W]',  &
                               SWInAbsTotalReport(SurfLoop),'Zone','Average',Surface(SurfLoop)%Name)
     !energy
-    CALL SetupOutputVariable('Beam Sol Amount from Ext Windows on Inside of Surface Energy[J]',  &
+    CALL SetupOutputVariable('Surface Inside Face Exterior Windows Incident Beam Solar Radiation Energy [J]',  &
                               BmIncInsSurfAmountRepEnergy(SurfLoop),'Zone','Sum',Surface(SurfLoop)%Name)
-    CALL SetupOutputVariable('Beam Sol Amount from Int Windows on Inside of Surface Energy[J]',  &
+    CALL SetupOutputVariable('Surface Inside Face Interior Windows Incident Beam Solar Radiation Energy [J]',  &
                               IntBmIncInsSurfAmountRepEnergy(SurfLoop),'Zone','Sum',Surface(SurfLoop)%Name)
   END DO
 
@@ -1505,6 +1600,9 @@ REAL(r64)   :: ViewFactorSkyGeom       ! Geometrical sky view factor
 
 
         ! FLOW:
+#ifdef EP_Count_Calls
+      NumAnisoSky_Calls=NumAnisoSky_Calls+1
+#endif
 
       CosZenithAng = SOLCOS(3)
       ZenithAng = ACOS(CosZenithAng)
@@ -1631,7 +1729,7 @@ SUBROUTINE CHKBKS(NBS,NRS)
   DO N = 1, NVBS
     DVec=Surface(NBS)%Vertex(N)-Surface(NRS)%Vertex(2)
     DOTP=CVec.dot.DVec
-    IF (DOTP > .0009) THEN
+    IF (DOTP > .0009d0) THEN
       CALL ShowSevereError('Problem in interior solar distribution calculation (CHKBKS)')
       CALL ShowContinueError( &
        '   Solar Distribution = FullInteriorExterior will not work in Zone='//TRIM(Surface(NRS)%ZoneName))
@@ -2899,7 +2997,7 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
           !
 
           ! USE STATEMENTS:
-          ! na
+  USE General, ONLY: ReallocateRealArray
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2928,6 +3026,7 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
   INTEGER KK         ! Duplicate test index
   INTEGER NVOUT      ! Current output length for loops
   INTEGER NVTEMP
+  INTEGER SaveArrayBounds
 
   REAL(r64) W        ! Normalization factor
   REAL(r64) HFunct
@@ -2937,6 +3036,9 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
 !  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: XTEMP1   ! Temporary 'X' values for HC vertices of the overlap
 !  REAL(r64), DIMENSION(2*(MaxVerticesPerSurface + 1))  :: YTEMP1   ! Temporary 'Y' values for HC vertices of the overlap
 
+#ifdef EP_Count_Calls
+  NumClipPoly_Calls=NumClipPoly_Calls+1
+#endif
   ! Populate the arrays with the original polygon
   DO P=1, NV1
      XTEMP(P) = HCX(P,NS1)
@@ -2986,6 +3088,24 @@ SUBROUTINE CLIPPOLY(NS1,NS2,NV1,NV2,NV3)
 
         KK            = NVTEMP
         NVTEMP        = NVTEMP + 1
+        IF (NVTEMP > MAXHCArrayBounds) THEN
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(XTEMP,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(YTEMP,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(XTEMP1,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(YTEMP1,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(ATEMP,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(BTEMP,SaveArrayBounds,MAXHCArrayIncrement)
+          SaveArrayBounds=MAXHCArrayBounds
+          CALL ReallocateRealArray(CTEMP,SaveArrayBounds,MAXHCArrayIncrement)
+          MAXHCArrayBounds=SaveArrayBounds
+        ENDIF
+
         XTEMP(NVTEMP) = XTEMP1(P)
         YTEMP(NVTEMP) = YTEMP1(P)
 
@@ -3330,6 +3450,9 @@ SUBROUTINE DeterminePolygonOverlap(NS1,NS2,NS3)
   LOGICAL, SAVE :: TooManyVerticesMessage=.false.
 
           ! Check for exceeding array limits.
+#ifdef EP_Count_Calls
+NumDetPolyOverlap_Calls=NumDetPolyOverlap_Calls+1
+#endif
 
   IF (NS3 > MAXHCS) THEN
 
@@ -3492,11 +3615,11 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Legacy Code
           !       DATE WRITTEN
-          !       MODIFIED       na
+          !       MODIFIED       BG, Nov 2012 - Timestep solar.  DetailedSolarTimestepIntegration
           !       RE-ENGINEERED  Lawrie, Oct 2000
 
           ! PURPOSE OF THIS SUBROUTINE:
-          ! This subroutine computes solar gain multipliers for beam radiation.  These
+          ! This subroutine manages computation of solar gain multipliers for beam radiation.  These
           ! are calculated for a period of days depending on the input "Shadowing Calculations".
 
           ! METHODOLOGY EMPLOYED:
@@ -3506,8 +3629,9 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
           ! BLAST/IBLAST code, original author George Walton
 
           ! USE STATEMENTS:
-  USE WindowComplexManager, ONLY: UpdateComplexWindows
-  USE DataSystemVariables, ONLY: DetailedSkyDiffuseAlgorithm
+  USE WindowComplexManager,ONLY: InitComplexWindows, UpdateComplexWindows
+  USE DataSystemVariables, ONLY: DetailedSkyDiffuseAlgorithm, DetailedSolarTimestepIntegration
+  USE DataGlobals,         ONLY: TimeStepZone, HourOfDay, TimeStep
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -3517,13 +3641,7 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
   REAL(r64), INTENT(IN) :: AvgEqOfTime       ! Average value of Equation of Time for period
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-  INTEGER,PARAMETER  :: NPhi = 6          ! Number of altitude angle steps for sky integration
-  INTEGER,PARAMETER  :: NTheta = 24       ! Number of azimuth angle steps for sky integration
-  REAL(r64),PARAMETER     :: Eps = 1.d-10       ! Small number
-  REAL(r64),PARAMETER :: DPhi = PiOvr2/NPhi         ! Altitude step size, 15 deg for NPhi = 6
-  REAL(r64),PARAMETER :: DTheta = 2.d0*Pi/NTheta    ! Azimuth step size, 15 deg for NTheta = 24
-  REAL(r64),PARAMETER :: DThetaDPhi = DTheta*DPhi   ! Product of DTheta and DPhi
-  REAL(r64),PARAMETER :: PhiMin = 0.5d0*DPhi        ! Minimum altitude
+
 
 
           ! INTERFACE BLOCK SPECIFICATIONS
@@ -3534,172 +3652,299 @@ SUBROUTINE CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
   INTEGER IHOUR   ! Hour index number
-  INTEGER NS      ! Shadowing surface number
-  INTEGER SurfNum ! Surface Loop Control
-  REAL(r64) CurrentTime ! Current Time for passing to Solar Position Routine
-  REAL(r64) SurfArea  ! Surface area. For walls, includes all window frame areas.
-                 ! For windows, includes divider area
-  REAL(r64), SAVE :: TimeStepFraction=0.0
   INTEGER TS     ! TimeStep Loop Counter
-  !REAL(r64)  :: Phi               ! Altitude angle
-  !REAL(r64)  :: Theta             ! Azimuth angle
-  REAL(r64)  :: CosPhi            ! Cosine of Phi
-  REAL(r64)  :: Fac1WoShdg        ! Intermediate calculation factor, without shading
-  !REAL(r64)  :: FracIlluminated   ! Fraction of surface area illuminated by a sky patch
-  REAL(r64)  :: Fac1WithShdg      ! Intermediate calculation factor, with shading
+  LOGICAL, SAVE :: Once=.true.
 
-  ! Intialize some values for the period
-  IF (TimeStepFraction == 0.0d0) TimeStepFraction=1.0d0/REAL(NumOfTimeStepInHour,r64)
-  SunLitFracHR=0.0d0
-  SunLitFrac=0.0d0
-  SunLitFracWithoutReveal=0.0d0
-  CTHETA=0.0d0
-  CosIncAngHR=0.0d0
-  CosIncAng=0.0d0
-  AOSurf=0.0d0
-  BackSurfaces=0
-  OverlapAreas=0.0d0
-  DO IHOUR = 1,24
-    SurfaceWindow%OutProjSLFracMult(IHOUR)=1.0d0
-    SurfaceWindow%InOutProjSLFracMult(IHOUR)=1.0d0
-  END DO
+  IF (Once) CALL InitComplexWindows
+  Once=.false.
 
-  DO IHOUR = 1, 24  ! Do for all hours.
+  IF (KickOffSizing .or. KickOffSimulation) RETURN  ! Skip solar calcs for these Initialization steps.
 
-    DO TS=1,NumOfTimeStepInHour
+#ifdef EP_Count_Calls
+  NumCalcPerSolBeam_Calls=NumCalcPerSolBeam_Calls+1
+#endif
 
-            ! Determine solar position.  Default for sun below horizon.
-            ! Run through all hours/ time steps to determine sun directions for WindowComplexManager
-
-      CurrentTime=REAL(IHOUR-1,r64)+REAL(TS,r64)*(TimeStepFraction)
-      CALL SUN4(CurrentTime,AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
-
-      ! Save hourly values for use in DaylightingManager
-      IF (TS == NumOfTimeStepInHour) SUNCOSHR(1:3,IHOUR) = SUNCOS
-      ! Save timestep values for use in WindowComplexManager
-      SUNCOSTS(1:3,IHOUR,TS) = SUNCOS
-
+  ! Intialize some values for the appropriate period
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    SunLitFracHR=0.0d0
+    SunLitFrac=0.0d0
+    SunLitFracWithoutReveal=0.0d0
+    CTHETA=0.0d0
+    CosIncAngHR=0.0d0
+    CosIncAng=0.0d0
+    AOSurf=0.0d0
+    BackSurfaces=0
+    OverlapAreas=0.0d0
+    DO IHOUR = 1,24
+      SurfaceWindow%OutProjSLFracMult(IHOUR)   = 1.d0
+      SurfaceWindow%InOutProjSLFracMult(IHOUR) = 1.d0
     END DO
-  END DO
+
+  ELSE
+    SunLitFracHR(1:TotSurfaces,HourOfDay)                      = 0.d0
+    SunLitFrac(1:TotSurfaces,HourOfDay,TimeStep)               = 0.d0
+    SunLitFracWithoutReveal(1:TotSurfaces,HourOfDay,TimeStep)  = 0.d0
+    CTHETA(1:TotSurfaces)                                      = 0.d0
+    CosIncAngHR(1:TotSurfaces,HourOfDay)                       = 0.d0
+    CosIncAng(1:TotSurfaces,HourOfDay,TimeStep)                = 0.d0
+    AOSurf(1:TotSurfaces)                                      = 0.d0
+    BackSurfaces(1:TotSurfaces,1:MaxBkSurf,HourOfDay,TimeStep) = 0
+    OverlapAreas(1:TotSurfaces,1:MaxBkSurf,HourOfDay,TimeStep) = 0.d0
+    SurfaceWindow%OutProjSLFracMult(HourOfDay)                =1.0d0
+    SurfaceWindow%InOutProjSLFracMult(HourOfDay)              =1.0d0
+  ENDIF
+
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    DO IHOUR = 1, 24  ! Do for all hours.
+      DO TS=1,NumOfTimeStepInHour
+        CALL FigureSunCosines(IHOUR, TS, AvgEqOfTime, AvgSinSolarDeclin, AvgCosSolarDeclin)
+      END DO
+    END DO
+  ELSE
+    CALL FigureSunCosines(HourOfDay, TimeStep, AvgEqOfTime, AvgSinSolarDeclin, AvgCosSolarDeclin)
+  ENDIF
   !
   !Initialize/update the Complex Fenestration geometry and optical properties
   CALL UpdateComplexWindows
   !
-
- DO IHOUR = 1, 24  ! Do for all hours.
-
-    DO TS=1,NumOfTimeStepInHour
-      !Recover the sun direction from the array stored in previous loop
-      SUNCOS = SUNCOSTS(1:3,IHOUR,TS)
-
-      CTHETA=0.0d0
-
-      IF (SUNCOS(3) < SunIsUpValue) CYCLE
-
-      DO NS = 1, TotSurfaces
-        CTHETA(NS) = SUNCOS(1)*Surface(NS)%OutNormVec(1)  &
-                   + SUNCOS(2)*Surface(NS)%OutNormVec(2)  &
-                   + SUNCOS(3)*Surface(NS)%OutNormVec(3)
-        IF (TS == NumOfTimeStepInHour) CosIncAngHR(NS,IHOUR) = CTHETA(NS)
-        CosIncAng(NS,IHOUR,TS) = CTHETA(NS)
-      END DO
-
-      CALL SHADOW(IHOUR,TS)  ! Determine sunlit areas and solar multipliers for all surfaces.
-
-            ! Transfer current hour
-      DO SurfNum = 1, TotSurfaces
-        IF (Surface(SurfNum)%Area >= 1.d-10) THEN
-          SurfArea = Surface(SurfNum)%NetAreaShadowCalc
-          IF (TS == NumOfTimeStepInHour) SunLitFracHR(SurfNum,IHOUR) = SAREA(SurfNum)/SurfArea
-          SunLitFrac(SurfNum,IHOUR,TS) = SAREA(SurfNum)/SurfArea
-          IF (SunLitFrac(SurfNum,IHOUR,TS) < 1.d-5) SunLitFrac(SurfNum,IHOUR,TS)=0.0d0
-        ENDIF
-
-        !Added check
-        IF (SunLitFrac(SurfNum,IHOUR,TS) > 1.0) THEN
-          SunLitFrac(SurfNum,IHOUR,TS) = 1.0d0
-        ENDIF
-      END DO
-
-!   Note -- if not the below, values are set in SkyDifSolarShading routine (constant for simulation)
-      IF (DetailedSkyDiffuseAlgorithm .and. ShadingTransmittanceVaries .and.  &
-          SolarDistribution /= MinimalShadowing) THEN
-        CosPhi=1.0d0-SUNCOS(3)
-
-        DO SurfNum = 1,TotSurfaces
-
-          IF (.NOT. Surface(SurfNum)%ShadowingSurf .AND.  &
-             (.NOT. Surface(SurfNum)%HeatTransSurf .OR. .NOT. Surface(SurfNum)%ExtSolar .OR. &
-             (Surface(SurfNum)%ExtBoundCond /= ExternalEnvironment .AND. &
-              Surface(SurfNum)%ExtBoundCond /= OtherSideCondModeledExt) ) ) CYCLE
-
-          IF(CTHETA(SurfNum) < 0.0) CYCLE
-
-          Fac1WoShdg = CosPhi * DThetaDPhi * CTHETA(SurfNum)
-          Fac1WithShdg = Fac1WoShdg * SunLitFrac(SurfNum,IHOUR,TS)
-          WithShdgIsoSky(SurfNum) = Fac1WithShdg
-          WoShdgIsoSky(SurfNum) = Fac1WoShdg
-
-          ! Horizon region
-          IF (SUNCOS(3) <= PhiMin) THEN
-            WithShdgHoriz(SurfNum) = Fac1WithShdg
-            WoShdgHoriz(SurfNum) = Fac1WoShdg
-          END IF
-        END DO  ! End of surface loop
-
-        DO SurfNum = 1,TotSurfaces
-
-          IF (.NOT. Surface(SurfNum)%ShadowingSurf .AND.                                                     &
-             (.NOT.Surface(SurfNum)%HeatTransSurf .OR. .NOT.Surface(SurfNum)%ExtSolar .OR. &
-             (Surface(SurfNum)%ExtBoundCond /= ExternalEnvironment .AND. &
-              Surface(SurfNum)%ExtBoundCond /= OtherSideCondModeledExt) )) CYCLE
-
-          IF (ABS(WoShdgIsoSky(SurfNum)) > Eps) THEN
-            DifShdgRatioIsoSkyHRTS(SurfNum,IHOUR,TS) = (WithShdgIsoSky(SurfNum))/(WoShdgIsoSky(SurfNum))
-          ELSE
-            DifShdgRatioIsoSkyHRTS(SurfNum,IHOUR,TS) = (WithShdgIsoSky(SurfNum))/(WoShdgIsoSky(SurfNum)+Eps)
-          ENDIF
-          IF (ABS(WoShdgHoriz(SurfNum)) > Eps) THEN
-            DifShdgRatioHorizHRTS(SurfNum,IHOUR,TS) =  (WithShdgHoriz(SurfNum))/(WoShdgHoriz(SurfNum))
-          ELSE
-            DifShdgRatioHorizHRTS(SurfNum,IHOUR,TS) =  (WithShdgHoriz(SurfNum))/(WoShdgHoriz(SurfNum)+Eps)
-          ENDIF
-        END DO
-
-      !  ! Get IR view factors. An exterior surface can receive IR radiation from
-      !  ! sky, ground or shadowing surfaces. Assume shadowing surfaces have same
-      !  ! temperature as outside air (and therefore same temperature as ground),
-      !  ! so that the view factor to these shadowing surfaces can be included in
-      !  ! the ground view factor. Sky IR is assumed to be isotropic and shadowing
-      !  ! surfaces are assumed to be opaque to IR so they totally "shade" IR from
-      !  ! sky or ground.
-
-      !  DO SurfNum = 1,TotSurfaces
-      !    Surface(SurfNum)%ViewFactorSkyIR = Surface(SurfNum)%ViewFactorSkyIR * DifShdgRatioIsoSky(SurfNum,IHOUR,TS)
-      !    Surface(SurfNum)%ViewFactorGroundIR = 1.0 - Surface(SurfNum)%ViewFactorSkyIR
-      !  END DO
-
-      ENDIF  ! test for shading surfaces
-
-      DO SurfNum = 1, TotSurfaces
-      ! For exterior windows with frame/divider that are partially or fully sunlit,
-      ! correct SunLitFrac due to shadowing of frame and divider projections onto window glass.
-      ! Note: if SunLitFrac = 0.0 the window is either completely shaded or the sun is in back
-      ! of the window; in either case, frame/divider shadowing doesn't have to be done.
-
-        IF(Surface(SurfNum)%Class == SurfaceClass_Window .AND.   &
-           Surface(SurfNum)%ExtBoundCond == ExternalEnvironment .AND. &
-           SunLitFrac(SurfNum,IHOUR,TS) > 0.0d0 .AND. Surface(SurfNum)%FrameDivider > 0) &
-              CALL CalcFrameDividerShadow(SurfNum,Surface(SurfNum)%FrameDivider,IHOUR)
-      END DO
-
-    END DO  ! TimeStep Loop
-
-  END DO  ! Hour Loop
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    DO IHOUR = 1, 24  ! Do for all hours.
+      DO TS=1,NumOfTimeStepInHour
+        CALL FigureSolarBeamAtTimestep(IHOUR, TS)
+      END DO  ! TimeStep Loop
+    END DO  ! Hour Loop
+  ELSE
+    CALL FigureSolarBeamAtTimestep(HourOfDay, TimeStep)
+  ENDIF
 
   RETURN
 
 END SUBROUTINE CalcPerSolarBeam
+
+SUBROUTINE FigureSunCosines(iHour, iTimeStep, EqOfTime, SinSolarDeclin, CosSolarDeclin)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B. Griffith
+          !       DATE WRITTEN   October 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+            ! Determine solar position.  Default for sun below horizon.
+
+          ! METHODOLOGY EMPLOYED:
+            ! Given hour, timestep, equation of time, solar declination sine, and solar declination cosine,
+            ! determine sun directions for use elsewhere
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataGlobals,         ONLY: TimeStepZone
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)   :: iHour
+  INTEGER, INTENT(IN)   :: iTimeStep
+  REAL(r64), INTENT(IN) :: EqOfTime    !  value of Equation of Time for period
+  REAL(r64), INTENT(IN) :: SinSolarDeclin !  value of Sine of Solar Declination for period
+  REAL(r64), INTENT(IN) :: CosSolarDeclin  !  value of Cosine of Solar Declination for period
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+          ! na
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+  REAL(r64) CurrentTime ! Current Time for passing to Solar Position Routine
+
+  IF (NumOfTimeStepInHour /= 1) THEN
+    CurrentTime=REAL(iHour-1,r64) + REAL(iTimeStep,r64)*(TimeStepZone)
+  ELSE
+    CurrentTime=REAL(iHour,r64)+TS1TimeOffset
+  ENDIF
+  CALL SUN4(CurrentTime,EqOfTime,SinSolarDeclin,CosSolarDeclin)
+
+  ! Save hourly values for use in DaylightingManager
+  IF (.NOT. DetailedSolarTimestepIntegration) THEN
+    IF (iTimeStep == NumOfTimeStepInHour) SUNCOSHR(1:3,iHour) = SUNCOS
+  ELSE
+    SUNCOSHR(1:3,iHour) = SUNCOS
+  ENDIF
+  ! Save timestep values for use in WindowComplexManager
+  SUNCOSTS(1:3,iHour,iTimeStep) = SUNCOS
+
+  RETURN
+
+END SUBROUTINE FigureSunCosines
+
+SUBROUTINE FigureSolarBeamAtTimestep(iHour, iTimeStep)
+
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         B.Griffith, derived from CalcPerSolarBeam, Legacy and Lawrie.
+          !       DATE WRITTEN   October 2012
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          ! This subroutine computes solar gain multipliers for beam solar
+
+          ! METHODOLOGY EMPLOYED:
+          ! na
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+  USE DataSystemVariables,    ONLY: DetailedSkyDiffuseAlgorithm, DetailedSolarTimestepIntegration
+
+  IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+  INTEGER, INTENT(IN)  :: iHour
+  INTEGER, INTENT(IN)  :: iTimeStep
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+  INTEGER,PARAMETER  :: NPhi = 6          ! Number of altitude angle steps for sky integration
+  INTEGER,PARAMETER  :: NTheta = 24       ! Number of azimuth angle steps for sky integration
+  REAL(r64),PARAMETER :: Eps = 1.d-10       ! Small number
+  REAL(r64),PARAMETER :: DPhi = PiOvr2/NPhi         ! Altitude step size, 15 deg for NPhi = 6
+  REAL(r64),PARAMETER :: DTheta = 2.d0*Pi/NTheta    ! Azimuth step size, 15 deg for NTheta = 24
+  REAL(r64),PARAMETER :: DThetaDPhi = DTheta*DPhi   ! Product of DTheta and DPhi
+  REAL(r64),PARAMETER :: PhiMin = 0.5d0*DPhi        ! Minimum altitude
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS
+  REAL(r64)  :: SurfArea          ! Surface area. For walls, includes all window frame areas.
+  REAL(r64)  :: CosPhi            ! Cosine of Phi
+  INTEGER    :: SurfNum           ! Surface Loop index
+  REAL(r64)  :: Fac1WoShdg        ! Intermediate calculation factor, without shading
+  REAL(r64)  :: Fac1WithShdg      ! Intermediate calculation factor, with shading
+
+  !Recover the sun direction from the array stored in previous loop
+  SUNCOS = SUNCOSTS(1:3,iHour,iTimeStep)
+
+  CTHETA=0.0d0
+
+  IF (SUNCOS(3) < SunIsUpValue) RETURN
+
+  DO SurfNum = 1, TotSurfaces
+    CTHETA(SurfNum) = SUNCOS(1)*Surface(SurfNum)%OutNormVec(1)  &
+                    + SUNCOS(2)*Surface(SurfNum)%OutNormVec(2)  &
+                    + SUNCOS(3)*Surface(SurfNum)%OutNormVec(3)
+    IF (.NOT. DetailedSolarTimestepIntegration) THEN
+      IF (iTimeStep == NumOfTimeStepInHour) CosIncAngHR(SurfNum,iHour) = CTHETA(SurfNum)
+    ELSE
+      CosIncAngHR(SurfNum,iHour) = CTHETA(SurfNum)
+    ENDIF
+    CosIncAng(SurfNum,iHour,iTimeStep) = CTHETA(SurfNum)
+  END DO
+
+  CALL SHADOW(iHour,iTimeStep)  ! Determine sunlit areas and solar multipliers for all surfaces.
+
+  DO SurfNum = 1, TotSurfaces
+    IF (Surface(SurfNum)%Area >= 1.d-10) THEN
+      SurfArea = Surface(SurfNum)%NetAreaShadowCalc
+      IF (.NOT. DetailedSolarTimestepIntegration) THEN
+        IF (iTimeStep == NumOfTimeStepInHour) SunLitFracHR(SurfNum,iHour) = SAREA(SurfNum)/SurfArea
+      ELSE
+        SunLitFracHR(SurfNum,iHour) = SAREA(SurfNum)/SurfArea
+      ENDIF
+      SunLitFrac(SurfNum,iHour,iTimeStep) = SAREA(SurfNum)/SurfArea
+      IF (SunLitFrac(SurfNum,iHour,iTimeStep) < 1.d-5) SunLitFrac(SurfNum,iHour,iTimeStep)=0.0d0
+    ENDIF
+
+    !Added check
+    IF (SunLitFrac(SurfNum,iHour,iTimeStep) > 1.d0) THEN
+      SunLitFrac(SurfNum,iHour,iTimeStep) = 1.d0
+    ENDIF
+  END DO
+
+!   Note -- if not the below, values are set in SkyDifSolarShading routine (constant for simulation)
+  IF (DetailedSkyDiffuseAlgorithm .AND. ShadingTransmittanceVaries .AND.  &
+      SolarDistribution /= MinimalShadowing) THEN
+    CosPhi=1.0d0-SUNCOS(3)
+
+    DO SurfNum = 1,TotSurfaces
+
+      IF (.NOT. Surface(SurfNum)%ShadowingSurf .AND.  &
+         (.NOT. Surface(SurfNum)%HeatTransSurf .OR. .NOT. Surface(SurfNum)%ExtSolar .OR. &
+         (Surface(SurfNum)%ExtBoundCond /= ExternalEnvironment .AND. &
+          Surface(SurfNum)%ExtBoundCond /= OtherSideCondModeledExt) ) ) CYCLE
+
+      IF(CTHETA(SurfNum) < 0.0) CYCLE
+
+      Fac1WoShdg = CosPhi * DThetaDPhi * CTHETA(SurfNum)
+      Fac1WithShdg = Fac1WoShdg * SunLitFrac(SurfNum,iHour,iTimeStep)
+      WithShdgIsoSky(SurfNum) = Fac1WithShdg
+      WoShdgIsoSky(SurfNum) = Fac1WoShdg
+
+      ! Horizon region
+      IF (SUNCOS(3) <= PhiMin) THEN
+        WithShdgHoriz(SurfNum) = Fac1WithShdg
+        WoShdgHoriz(SurfNum) = Fac1WoShdg
+      END IF
+    END DO  ! End of surface loop
+
+    DO SurfNum = 1,TotSurfaces
+
+      IF (.NOT. Surface(SurfNum)%ShadowingSurf .AND.                                                     &
+         (.NOT.Surface(SurfNum)%HeatTransSurf .OR. .NOT.Surface(SurfNum)%ExtSolar .OR. &
+         (Surface(SurfNum)%ExtBoundCond /= ExternalEnvironment .AND. &
+          Surface(SurfNum)%ExtBoundCond /= OtherSideCondModeledExt) )) CYCLE
+
+      IF (ABS(WoShdgIsoSky(SurfNum)) > Eps) THEN
+        DifShdgRatioIsoSkyHRTS(SurfNum,iHour,iTimeStep) = (WithShdgIsoSky(SurfNum))/(WoShdgIsoSky(SurfNum))
+      ELSE
+        DifShdgRatioIsoSkyHRTS(SurfNum,iHour,iTimeStep) = (WithShdgIsoSky(SurfNum))/(WoShdgIsoSky(SurfNum)+Eps)
+      ENDIF
+      IF (ABS(WoShdgHoriz(SurfNum)) > Eps) THEN
+        DifShdgRatioHorizHRTS(SurfNum,iHour,iTimeStep) =  (WithShdgHoriz(SurfNum))/(WoShdgHoriz(SurfNum))
+      ELSE
+        DifShdgRatioHorizHRTS(SurfNum,iHour,iTimeStep) =  (WithShdgHoriz(SurfNum))/(WoShdgHoriz(SurfNum)+Eps)
+      ENDIF
+    END DO
+
+  !  ! Get IR view factors. An exterior surface can receive IR radiation from
+  !  ! sky, ground or shadowing surfaces. Assume shadowing surfaces have same
+  !  ! temperature as outside air (and therefore same temperature as ground),
+  !  ! so that the view factor to these shadowing surfaces can be included in
+  !  ! the ground view factor. Sky IR is assumed to be isotropic and shadowing
+  !  ! surfaces are assumed to be opaque to IR so they totally "shade" IR from
+  !  ! sky or ground.
+
+  !  DO SurfNum = 1,TotSurfaces
+  !    Surface(SurfNum)%ViewFactorSkyIR = Surface(SurfNum)%ViewFactorSkyIR * DifShdgRatioIsoSky(SurfNum,IHOUR,TS)
+  !    Surface(SurfNum)%ViewFactorGroundIR = 1.0 - Surface(SurfNum)%ViewFactorSkyIR
+  !  END DO
+
+  ENDIF  ! test for shading surfaces
+
+  DO SurfNum = 1, TotSurfaces
+  ! For exterior windows with frame/divider that are partially or fully sunlit,
+  ! correct SunLitFrac due to shadowing of frame and divider projections onto window glass.
+  ! Note: if SunLitFrac = 0.0 the window is either completely shaded or the sun is in back
+  ! of the window; in either case, frame/divider shadowing doesn't have to be done.
+
+    IF(Surface(SurfNum)%Class == SurfaceClass_Window .AND.   &
+       Surface(SurfNum)%ExtBoundCond == ExternalEnvironment .AND. &
+       SunLitFrac(SurfNum,iHour,iTimeStep) > 0.0d0 .AND. Surface(SurfNum)%FrameDivider > 0) &
+          CALL CalcFrameDividerShadow(SurfNum,Surface(SurfNum)%FrameDivider,iHour)
+  END DO
+  RETURN
+
+END SUBROUTINE FigureSolarBeamAtTimestep
 
 SUBROUTINE DetermineShadowingCombinations
 
@@ -3766,6 +4011,10 @@ SUBROUTINE DetermineShadowingCombinations
   LOGICAL, ALLOCATABLE, DIMENSION(:) :: CastingSurface ! tracking during setup of ShadowComb
 
   INTEGER :: MaxDim=0
+
+#ifdef EP_Count_Calls
+  NumDetShadowCombs_Calls=NumDetShadowCombs_Calls+1
+#endif
 
   ALLOCATE(ShadowComb(TotSurfaces))
   ShadowComb%UseThisSurf=.false.
@@ -4165,6 +4414,14 @@ SUBROUTINE SHADOW(IHOUR,TS)
     ZVT=0.0
     OneTimeFlag=.false.
   ENDIF
+
+#ifdef EP_Count_Calls
+  IF (IHOUR == 0) THEN
+    NumShadow_Calls=NumShadow_Calls+1
+  ELSE
+    NumShadowAtTS_Calls=NumShadowAtTS_Calls+1
+  ENDIF
+#endif
 
   SAREA=0.0d0
 
@@ -5099,6 +5356,10 @@ IF (MustAlloc) THEN
   ALLOCATE (WinTransDifSolarSky(TotSurfaces))
   MustAlloc=.false.
 ENDIF
+
+#ifdef EP_Count_Calls
+NumIntSolarDist_Calls=NumIntSolarDist_Calls+1
+#endif
 
 DSZone = 0.0
 DGZone = 0.0
@@ -6427,11 +6688,11 @@ DO ZoneNum = 1, NumOfZones
          IF (.not.ALLOCATED(CFDirBoverlap)) THEN
            ALLOCATE(CFDirBoverlap(ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%NBasis, NBkSurf))
          END IF
-         
+
          CFBoverlap = 0.0d0
          ! delete values from previous timestep
          AWinCFOverlap = 0.0d0
-         
+
          ! Calculate effects on all back surfaces for each of basis directions.  Each of basis directions from the back of the
          ! window has to be considered as beam and therefore calcualte CFBoverlap for each of them
          DO CurTrnDir = 1, ComplexWind(SurfNum)%Geom(CurCplxFenState)%Trn%NBasis
@@ -6463,7 +6724,7 @@ DO ZoneNum = 1, NumOfZones
                   tempVec2(1) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%X
                   tempVec2(2) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%Y
                   tempVec2(3) = ComplexWind(BackSurfaceNumber)%Geom(CurBackState)%sTrn(CurBackDir)%Z
-                  curDot = DOT_PRODUCT(tempVec1, tempVec2) 
+                  curDot = DOT_PRODUCT(tempVec1, tempVec2)
                   IF (CurBackDir == 1) THEN
                     bestDot = curDot
                     bestTrn = CurTrnDir
@@ -6481,7 +6742,7 @@ DO ZoneNum = 1, NumOfZones
                ! this needs to be done for each outgoing direction
                BABSZone = BABSZone + CFDirBoverlap(CurTrnDir, IBack) * &
                   &     (1 - SurfaceWindow(BackSurfaceNumber)%ComplexFen%State(CurBackState)%IntegratedBkRefl(bestBackTrn))
-               
+
                ! Absorptance from current back direction
                TotSolidLay = Construct(ConstrNumBack)%TotSolidLayers
                DO Lay = 1, TotSolidLay
@@ -6490,11 +6751,11 @@ DO ZoneNum = 1, NumOfZones
                   ! needs to contain flux and not absorbed energy because later in the code this will be multiplied with window
                   ! area
                   AWinCFOverlap(BackSurfaceNumber, Lay) = AWinCFOverlap(BackSurfaceNumber, Lay) + &
-                    & Construct(ConstrNumBack)%BSDFInput%Layer(Lay)%BkAbs(1, bestBackTrn) * CFDirBoverlap(CurTrnDir, IBack) & 
+                    & Construct(ConstrNumBack)%BSDFInput%Layer(Lay)%BkAbs(1, bestBackTrn) * CFDirBoverlap(CurTrnDir, IBack) &
                     & / Surface(BackSurfaceNumber)%Area
                 !END IF
                END DO
-               
+
                ! Interior beam transmitted to adjacent zone through an interior back window;
                ! This beam radiation is categorized as diffuse radiation in the adjacent zone.
                ! Note that this is done for each outgoing direction of exterior window
@@ -6509,17 +6770,17 @@ DO ZoneNum = 1, NumOfZones
                     & CFDirBoverlap(CurTrnDir, IBack) * &
                     & SurfaceWindow(BackSurfaceNumber)%ComplexFen%State(CurBackState)%IntegratedBkTrans(bestBackTrn) * &
                     & BeamSolarRad   ![W]
-                  SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRepEnergy = & 
+                  SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRepEnergy = &
                     & SurfaceWindow(BackSurfaceNumber)%BmSolTransThruIntWinRep &
                     & * TimeStepZone * SecInHour
                END IF
-             END DO             
+             END DO
            ELSE
               IF (Construct(ConstrNumBack)%TransDiff <= 0.0d0) THEN
                 AbsIntSurf = Construct(ConstrNumBack)%InsideAbsorpSolar
                 AISurf(BackSurfaceNumber) = AISurf(BackSurfaceNumber) + CFBoverlap(IBack) * &
                     AbsIntSurf/Surface(BackSurfaceNumber)%Area
-                BABSZone = BABSZone + CFBoverlap(IBack) * AbsIntSurf                                  
+                BABSZone = BABSZone + CFBoverlap(IBack) * AbsIntSurf
               ELSE
                 ! Code for mixed windows goes here.  It is same as above code for "ordinary" windows.
                 ! Try to do something which will not produce duplicate code.
@@ -6778,7 +7039,8 @@ SUBROUTINE PerformSolarCalculations
           ! na
 
           ! USE STATEMENTS:
-  USE DaylightingManager, ONLY: CalcDayltgCoefficients, TotWindowsWithDayl
+  USE DaylightingManager,  ONLY: CalcDayltgCoefficients, TotWindowsWithDayl
+  USE DataSystemVariables, ONLY: DetailedSolarTimestepIntegration
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -6818,35 +7080,40 @@ SUBROUTINE PerformSolarCalculations
     ShadowingDaysLeft = 0
   ENDIF
 
-  IF (ShadowingDaysLeft <= 0) THEN
+  IF (ShadowingDaysLeft <= 0 .OR. DetailedSolarTimestepIntegration) THEN
 
-    !  Perform calculations.
-    ShadowingDaysLeft=ShadowingCalcFrequency
-    IF (DayOfSim + ShadowingDaysLeft > NumOfDayInEnvrn) THEN
-      ShadowingDaysLeft=NumOfDayInEnvrn-DayOfSim+1
+    IF (.NOT. DetailedSolarTimestepIntegration) THEN
+      !  Perform calculations.
+      ShadowingDaysLeft=ShadowingCalcFrequency
+      IF (DayOfSim + ShadowingDaysLeft > NumOfDayInEnvrn) THEN
+        ShadowingDaysLeft=NumOfDayInEnvrn-DayOfSim+1
+      ENDIF
+
+      !  Calculate average Equation of Time, Declination Angle for this period
+
+      IF (.not. WarmUpFlag) THEN
+        CALL DisplayString('Updating Shadowing Calculations, Start Date='//CurMnDy)
+        DisplayPerfSimulationFlag=.true.
+      ENDIF
+
+      PerDayOfYear=DayOfYear
+      SumDec=0.0
+      SumET=0.0
+      DO Count=1,ShadowingDaysLeft
+        CALL Sun3(PerDayOfYear,SinDec,EqTime)
+        SumDec=SumDec+SinDec
+        SumET=SumET+EqTime
+        PerDayOfYear=PerDayOfYear+1
+      ENDDO
+
+      !  Compute Period Values
+      AvgSinSolarDeclin=SumDec/REAL(ShadowingDaysLeft,r64)
+      AvgCosSolarDeclin=SQRT(1.0d0-AvgSinSolarDeclin**2)
+      AvgEqOfTime=SumET/REAL(ShadowingDaysLeft,r64)
+    ELSE
+      CALL Sun3(DayOfYear,AvgSinSolarDeclin,AvgEqOfTime)
+      AvgCosSolarDeclin=SQRT(1.0d0-AvgSinSolarDeclin**2)
     ENDIF
-
-    !  Calculate average Equation of Time, Declination Angle for this period
-
-    IF (.not. WarmUpFlag) THEN
-      CALL DisplayString('Updating Shadowing Calculations, Start Date='//CurMnDy)
-      DisplayPerfSimulationFlag=.true.
-    ENDIF
-
-    PerDayOfYear=DayOfYear
-    SumDec=0.0
-    SumET=0.0
-    DO Count=1,ShadowingDaysLeft
-      CALL Sun3(PerDayOfYear,SinDec,EqTime)
-      SumDec=SumDec+SinDec
-      SumET=SumET+EqTime
-      PerDayOfYear=PerDayOfYear+1
-    ENDDO
-
-    !  Compute Period Values
-    AvgSinSolarDeclin=SumDec/REAL(ShadowingDaysLeft,r64)
-    AvgCosSolarDeclin=SQRT(1.0d0-AvgSinSolarDeclin**2)
-    AvgEqOfTime=SumET/REAL(ShadowingDaysLeft,r64)
 
     CALL CalcPerSolarBeam(AvgEqOfTime,AvgSinSolarDeclin,AvgCosSolarDeclin)
 
@@ -8105,17 +8372,17 @@ LOGICAL    :: ShadowingSurf     ! True if surface is a shadowing surface
   ! CurrentModuleObject='Surfaces'
   IF (DetailedSkyDiffuseAlgorithm .and. ShadingTransmittanceVaries .and.  &
       SolarDistribution /= MinimalShadowing) THEN
-    CALL SetupOutputVariable('debug DifShdgRatioIsoSky []',curDifShdgRatioIsoSky(Surfnum),  &
+    CALL SetupOutputVariable('Debug Surface Solar Shading Model DifShdgRatioIsoSky []',curDifShdgRatioIsoSky(Surfnum),  &
                                                         'Zone','Average',Surface(surfnum)%Name)
   ELSE
-    CALL SetupOutputVariable('debug DifShdgRatioIsoSky []',DifShdgRatioIsoSky(Surfnum),  &
+    CALL SetupOutputVariable('Debug Surface Solar Shading Model DifShdgRatioIsoSky []',DifShdgRatioIsoSky(Surfnum),  &
                                                         'Zone','Average',Surface(surfnum)%Name)
   ENDIF
-  CALL SetupOutputVariable('debug DifShdgRatioHoriz []',DifShdgRatioHoriz(Surfnum),  &
+  CALL SetupOutputVariable('Debug Surface Solar Shading Model DifShdgRatioHoriz []',DifShdgRatioHoriz(Surfnum),  &
                                                       'Zone','Average',Surface(surfnum)%Name)
-  CALL SetupOutputVariable('debug WithShdgIsoSky []',WithShdgIsoSky(surfnum),  &
+  CALL SetupOutputVariable('Debug Surface Solar Shading Model WithShdgIsoSky []',WithShdgIsoSky(surfnum),  &
                                                       'Zone','Average',Surface(surfnum)%Name)
-  CALL SetupOutputVariable('debug WoShdgIsoSky []',WoShdgIsoSky(surfnum),  &
+  CALL SetupOutputVariable('Debug Surface Solar Shading Model WoShdgIsoSky []',WoShdgIsoSky(surfnum),  &
                                                       'Zone','Average',Surface(surfnum)%Name)
   enddo
 
@@ -10584,12 +10851,12 @@ subroutine CalcComplexWindowOverlap(Geom, Window, ISurf)
 
       Geom%Aoverlap(IRay, KBkSurf) = HCAREA(LOCHCA)
     END DO ! DO KBkSurf  = 1 , NBkSurf
-    
+
     ! If some of back surfaces is contained in base surface, then need to substract shadow of subsurface
     ! from shadow on base surface.  Reson is that above shadowing algorithm is calculating shadow wihtout
     ! influence of subsurfaces
-    DO KBkSurf  = 1 , Window%NBkSurf    !back surf loop      
-      BackSurfaceNumber = ShadowComb(BaseSurf)%BackSurf(KBkSurf)  
+    DO KBkSurf  = 1 , Window%NBkSurf    !back surf loop
+      BackSurfaceNumber = ShadowComb(BaseSurf)%BackSurf(KBkSurf)
       CurBaseSurf = Surface(BackSurfaceNumber)%BaseSurf
       IF (CurBaseSurf /= BackSurfaceNumber) THEN
         ! Search if that base surface in list of back surfaces for current window
@@ -10601,11 +10868,11 @@ subroutine CalcComplexWindowOverlap(Geom, Window, ISurf)
           END IF
         END DO
         IF (CurBackSurface /= 0) THEN
-          Geom%Aoverlap(IRay, curBackSurface) = Geom%Aoverlap(IRay, curBackSurface) - Geom%Aoverlap(IRay, KBkSurf)  
+          Geom%Aoverlap(IRay, curBackSurface) = Geom%Aoverlap(IRay, curBackSurface) - Geom%Aoverlap(IRay, KBkSurf)
         END IF
       END IF
     END DO
-    
+
   END DO ! DO IRay = 1, Geom%Trn%NBasis
 
   ! Reset back shadowing counter since complex windows do not need it anymore
@@ -10654,7 +10921,7 @@ end subroutine CalcAllComplexWindowsOverlaps
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

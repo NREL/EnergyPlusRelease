@@ -302,15 +302,18 @@ SUBROUTINE GetPlantLoopData
 
          ! FLOW:
   CurrentModuleObject = 'PlantLoop'
-  NumPlantLoops = GetNumObjectsFound(TRIM(CurrentModuleObject)) ! Get the number of primary plant loops
+  NumPlantLoops = GetNumObjectsFound(CurrentModuleObject) ! Get the number of primary plant loops
   CurrentModuleObject = 'CondenserLoop'
-  NumCondLoops = GetNumObjectsFound(TRIM(CurrentModuleObject)) ! Get the number of Condenser loops
+  NumCondLoops = GetNumObjectsFound(CurrentModuleObject) ! Get the number of Condenser loops
   TotNumLoops = NumPlantLoops + NumCondLoops
   ErrFound=.false.
 
   IF (TotNumLoops > 0) THEN
     ALLOCATE(PlantLoop(TotNumLoops))
     ALLOCATE(PlantConvergence(TotNumLoops))
+    IF (.not. ALLOCATED(PlantAvailMgr)) THEN
+     ALLOCATE(PlantAvailMgr(TotNumLoops))
+    ENDIF
   ELSE
     RETURN
   END IF
@@ -321,17 +324,17 @@ SUBROUTINE GetPlantLoopData
     Num=0.
     ALLOCATE(PlantLoop(LoopNum)%LoopSide(SupplySide))
     IF(LoopNum .LE. NumPlantLoops) THEN
-     PlantLoopNum = LoopNum
-     PlantLoop(LoopNum)%TypeofLoop = Plant
-     CurrentModuleObject = 'PlantLoop'
-     CALL GetObjectItem(TRIM(CurrentModuleObject),PlantLoopNum,Alpha,NumAlphas,Num,NumNums,IOSTAT,     &
+      PlantLoopNum = LoopNum
+      PlantLoop(LoopNum)%TypeofLoop = Plant
+      CurrentModuleObject = 'PlantLoop'
+      CALL GetObjectItem(CurrentModuleObject,PlantLoopNum,Alpha,NumAlphas,Num,NumNums,IOSTAT,     &
                 AlphaBlank=lAlphaFieldBlanks,                                                         &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     ELSE
-     CondLoopNum = LoopNum-NumPlantLoops
-     PlantLoop(LoopNum)%TypeofLoop = Condenser
-     CurrentModuleObject = 'CondenserLoop'
-     CALL GetObjectItem(TRIM(CurrentModuleObject),CondLoopNum,Alpha,NumAlphas,Num,NumNums,IOSTAT,     &
+      CondLoopNum = LoopNum-NumPlantLoops
+      PlantLoop(LoopNum)%TypeofLoop = Condenser
+      CurrentModuleObject = 'CondenserLoop'
+      CALL GetObjectItem(CurrentModuleObject,CondLoopNum,Alpha,NumAlphas,Num,NumNums,IOSTAT,     &
                 NumBlank=lNumericFieldBlanks,AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
     END IF
 
@@ -682,14 +685,10 @@ SUBROUTINE GetPlantLoopData
 ! Condenser loop does not have availability manager yet. Once implemented, move the setup output variable to
 ! outside the IF statement.
   DO LoopNum = 1, TotNumLoops
-   IF(LoopNum .LE. NumPlantLoops) THEN
-    CurrentModuleObject = 'Plant Loop'
-    ! CurrentModuleObject='Plant/Condenser Loop'
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' System Cycle On/Off Status', PlantAvailMgr(LoopNum)%AvailStatus, &
+
+    CALL SetupOutputVariable('Plant System Cycle On Off Status []', PlantAvailMgr(LoopNum)%AvailStatus, &
                              'Plant','Average', PlantLoop(LoopNum)%Name)
-   ELSE
-    CurrentModuleObject = 'Condenser Loop'
-   END IF
+
   END DO
 
  RETURN
@@ -1159,24 +1158,8 @@ SUBROUTINE GetPlantInput
           ELSEIF (SameString(CompTypes(CompNum), 'TemperingValve') ) THEN
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_ValveTempering
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_Valve
-          ELSEIF (SameString(CompTypes(CompNum), 'HeatExchanger:WatersideEconomizer') ) THEN
-            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_WaterSideEconHtExchg
-            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_HeatExchanger
-            IF (LoopSideNum == DemandSide) THEN
-              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
-            ELSEIF (LoopSideNum == SupplySide) THEN
-              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = WSEconOpSchemeType
-            ENDIF
-          ELSEIF (SameString(CompTypes(CompNum), 'HeatExchanger:Plate') ) THEN
-            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_HtExchgPlateFreeClng
-            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_HeatExchanger
-            IF (LoopSideNum == DemandSide) THEN
-              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
-            ELSEIF (LoopSideNum == SupplySide) THEN
-              TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = FreeRejectionOpSchemeType
-            ENDIF
-          ELSEIF (SameString(CompTypes(CompNum), 'HeatExchanger:Hydronic') ) THEN
-            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_FreeCoolingHtExchg
+          ELSEIF (SameString(CompTypes(CompNum), 'HeatExchanger:FluidToFluid') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_FluidToFluidPlantHtExchg
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_HeatExchanger
             IF (LoopSideNum == DemandSide) THEN
               TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = DemandOpSchemeType
@@ -1223,6 +1206,9 @@ SUBROUTINE GetPlantInput
             ELSEIF (LoopSideNum == SupplySide) THEN
               TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
             ENDIF
+          ELSEIF (SameString(CompTypes(CompNum), 'CentralHeatPumpSystem') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_CentralGroundSourceHeatPump
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_CentralHeatPumpSystem
 
           !now deal with demand components of the ZoneHVAC type served by ControlCompOutput
           ELSEIF (SameString(CompTypes(CompNum), 'ZoneHVAC:Baseboard:RadiantConvective:Water') ) THEN
@@ -1301,6 +1287,14 @@ SUBROUTINE GetPlantInput
             TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_AirTerminalUserDefined
             TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
             TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UnknownStatusOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'PlantComponent:TemperatureSource')) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_num = TypeOf_WaterSource
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_PlantComponent
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = UncontrolledOpSchemeType
+          ELSEIF (SameString(CompTypes(CompNum), 'GroundHeatExchanger:HorizontalTrench') ) THEN
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%TypeOf_Num = TypeOf_GrndHtExchgHorizTrench
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%GeneralEquipType = GenEquipTypes_Pipe
+            TempLoop%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType = TypeOf_GrndHtExchgHorizTrench
           ELSE
            !discover unsupported equipment on branches.
             CALL ShowSevereError('GetPlantInput: Branch="'//trim(BranchNames(BranchNum))//'", invalid component on branch.')
@@ -1730,6 +1724,13 @@ SUBROUTINE GetPlantInput
           ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
                             'GroundHeatExchanger:Pond')) THEN
             GeneralEquipType=GenEquipTypes_GroundHeatExchanger
+          ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
+                            'PlantComponent:TemperatureSource')) THEN
+            GeneralEquipType=GenEquipTypes_HeatExchanger
+          ELSEIF (SameString(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Comp(CompNum)%TypeOf, &
+                            'CENTRALHEATPUMPSYSTEM')) THEN
+            GeneralEquipType=GenEquipTypes_CentralHeatPumpSystem                            
+
           ELSE
             CALL ShowSevereError('GetPlantInput: PlantLoop="'//trim(PlantLoop(LoopNum)%Name)//'" invalid equipment type.')
             CALL ShowContinueError('...on Branch="'//trim(PlantLoop(LoopNum)%LoopSide(SupplySide)%Branch(BranchNum)%Name)//'".')
@@ -2033,30 +2034,25 @@ SUBROUTINE SetupReports
     CurrentModuleObject = 'Cond Loop'
    END IF
    ! CurrentModuleObject='Plant/Condenser Loop'
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Cooling Demand [W]', &
+    CALL SetupOutputVariable('Plant Supply Side Cooling Demand Rate [W]', &
            PlantReport(LoopNum)%CoolingDemand,'System','Average',PlantLoop(LoopNum)%Name)
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Heating Demand [W]', &
+    CALL SetupOutputVariable('Plant Supply Side Heating Demand Rate [W]', &
            PlantReport(LoopNum)%HeatingDemand,'System','Average',PlantLoop(LoopNum)%Name)
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' InletNode Flowrate [kg/s]', &
+    CALL SetupOutputVariable('Plant Supply Side Inlet Mass Flow Rate [kg/s]', &
            PlantReport(LoopNum)%InletNodeFlowrate,'System','Average',PlantLoop(LoopNum)%Name)
-    IF(LoopNum .LE. NumPlantLoops) THEN
-     CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' InletNode Temperature [C]', &
+
+    CALL SetupOutputVariable('Plant Supply Side Inlet Temperature [C]', &
            PlantReport(LoopNum)%InletNodeTemperature,'System','Average',PlantLoop(LoopNum)%Name)
-     CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' OutletNode Temperature [C]', &
+    CALL SetupOutputVariable('Plant Supply Side Outlet Temperature [C]', &
            PlantReport(LoopNum)%OutletNodeTemperature,'System','Average',PlantLoop(LoopNum)%Name)
-    ELSE
-     CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Inlet Temp [C]', &
-           PlantReport(LoopNum)%InletNodeTemperature,'System','Average',PlantLoop(LoopNum)%Name)
-     CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Outlet Temp [C]', &
-           PlantReport(LoopNum)%OutletNodeTemperature,'System','Average',PlantLoop(LoopNum)%Name)
-    END IF
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Demand Not Distributed [W]', &
+
+    CALL SetupOutputVariable('Plant Supply Side Not Distributed Demand Rate [W]', &
            PlantReport(LoopNum)%DemandNotDispatched,'System','Average',PlantLoop(LoopNum)%Name)
-    CALL SetupOutputVariable(TRIM(CurrentModuleObject)//' Unmet Demand [W]', &
+    CALL SetupOutputVariable('Plant Supply Side Unmet Demand Rate [W]', &
            PlantReport(LoopNum)%UnmetDemand,'System','Average',PlantLoop(LoopNum)%Name)
 
           ! Debug variables -- used by OSU developers
-    CALL SetupOutputVariable('Debug Plant Loop Bypass Fraction', &
+    CALL SetupOutputVariable('Debug Plant Loop Bypass Fraction []', &
            PlantReport(LoopNum)%BypassFrac,'System','Average',PlantLoop(LoopNum)%Name)
 !    CALL SetupOutputVariable('Debug SSInletNode Flowrate[kg/s]', &
 !           PlantReport(LoopNum)%InletNodeFlowrate,'System','Average',PlantLoop(LoopNum)%Name)
@@ -2066,7 +2062,7 @@ SUBROUTINE SetupReports
 !           PlantReport(LoopNum)%OutletNodeFlowrate,'System','Average',PlantLoop(LoopNum)%Name)
 !    CALL SetupOutputVariable('Debug SSOutletNode Temperature[C]', &
 !           PlantReport(LoopNum)%OutletNodeTemperature,'System','Average',PlantLoop(LoopNum)%Name)
-    CALL SetupOutputVariable('Debug Last Loop Side Simulated [-]', &
+    CALL SetupOutputVariable('Debug Plant Last Simulated Loop Side []', &
            PlantReport(LoopNum)%LastLoopSideSimulated, 'System', 'Average', PlantLoop(LoopNum)%Name)
   END DO
 
@@ -2075,10 +2071,10 @@ SUBROUTINE SetupReports
    ! CurrentModuleObject='Plant/Condenser Loop(Advanced)'
   IF (DisplayAdvancedReportVariables) THEN
     DO LoopNum =1, TotNumLoops
-      CALL SetupOutputVariable('Plant Demand Side Inlet Lumped Capacitance Temperature [C]', &
+      CALL SetupOutputVariable('Plant Demand Side Lumped Capacitance Temperature [C]', &
                                PlantLoop(LoopNum)%LoopSide(DemandSide)%LoopSideInlet_TankTemp, &
                                'System', 'Average', PlantLoop(LoopNum)%Name)
-      CALL SetupOutputVariable('Plant Supply Side Inlet Lumped Capacitance Temperature [C]', &
+      CALL SetupOutputVariable('Plant Supply Side Lumped Capacitance Temperature [C]', &
                                PlantLoop(LoopNum)%LoopSide(SupplySide)%LoopSideInlet_TankTemp, &
                                'System', 'Average', PlantLoop(LoopNum)%Name)
       DO LoopSideNum = DemandSide, SupplySide
@@ -2086,7 +2082,7 @@ SUBROUTINE SetupReports
           DO CompNum = 1,  PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%TotalComponents
             IF ( PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType /=   &
                  DemandOpSchemeType ) THEN
-              CALL SetupOutputVariable('Plant Component Load Dispatched [W]', &
+              CALL SetupOutputVariable('Plant Component Distributed Demand Rate [W]', &
                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%MyLoad, &
                   'System', 'Average', &
                   PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%Name)
@@ -3854,33 +3850,13 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority =   &
                LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-          CASE (TypeOf_FreeCoolingHtExchg ) !               = 16
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            IF (LoopSideCtr == DemandSide) THEN
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_NeedyAndTurnsLoopOn
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-            ELSE
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_TakesWhatGets
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-            ENDIF
-          CASE (TypeOf_WaterSideEconHtExchg ) !             = 17
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            IF (LoopSideCtr == DemandSide) THEN
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_NeedyAndTurnsLoopOn
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-            ELSE
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_TakesWhatGets
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-            ENDIF
-          CASE (TypeOf_HeatPumpWtrHeater ) !                = 18
+
+
+          CASE (TypeOf_HeatPumpWtrHeater ) !                = 16
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-          CASE (TypeOf_HPWaterEFCooling ) !                 = 19
+          CASE (TypeOf_HPWaterEFCooling ) !                 = 17
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -3892,7 +3868,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
 
-          CASE (TypeOf_HPWaterEFHeating ) !                 = 20
+          CASE (TypeOf_HPWaterEFHeating ) !                 = 18
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -3903,7 +3879,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                          = LoopFlowStatus_TakesWhatGets
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
-          CASE (TypeOf_HPWaterPECooling ) !                 = 21
+          CASE (TypeOf_HPWaterPECooling ) !                 = 19
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -3914,7 +3890,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                          = LoopFlowStatus_NeedyIfLoopOn
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
-          CASE (TypeOf_HPWaterPEHeating ) !                 = 22
+          CASE (TypeOf_HPWaterPEHeating ) !                 = 20
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -3925,7 +3901,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                          = LoopFlowStatus_NeedyIfLoopOn
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCap
             ENDIF
-          CASE (TypeOf_Pipe ) !                             = 23
+          CASE (TypeOf_Pipe ) !                             = 21
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             IF (BranchIsInSplitterMixer) THEN
@@ -3939,7 +3915,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Passive
             ENDIF
-          CASE (TypeOf_PipeSteam ) !                        = 24
+          CASE (TypeOf_PipeSteam ) !                        = 22
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             IF (BranchIsInSplitterMixer) THEN
@@ -3953,7 +3929,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Passive
             ENDIF
-          CASE (TypeOf_PipeExterior ) !                     = 25
+          CASE (TypeOf_PipeExterior ) !                     = 23
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             IF (BranchIsInSplitterMixer) THEN
@@ -3967,7 +3943,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Passive
             ENDIF
-          CASE (TypeOf_PipeInterior ) !                     = 26
+          CASE (TypeOf_PipeInterior ) !                     = 24
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             IF (BranchIsInSplitterMixer) THEN
@@ -3981,7 +3957,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Passive
             ENDIF
-          CASE (TypeOf_PipeUnderground ) !                  = 27
+          CASE (TypeOf_PipeUnderground ) !                  = 25
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
             IF (BranchIsInSplitterMixer) THEN
@@ -3995,28 +3971,28 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             ELSE
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Passive
             ENDIF
-          CASE (TypeOf_PurchChilledWater ) !                = 28
+          CASE (TypeOf_PurchChilledWater ) !                = 26
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCapLowOutLimit
-          CASE (TypeOf_PurchHotWater ) !                    = 29
+          CASE (TypeOf_PurchHotWater ) !                    = 27
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCapHiOutLimit
-          CASE (TypeOf_TS_IceDetailed ) !                   = 30
+          CASE (TypeOf_TS_IceDetailed ) !                   = 28
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-          CASE (TypeOf_TS_IceSimple  ) !                    = 31
+          CASE (TypeOf_TS_IceSimple  ) !                    = 29
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-          CASE (TypeOf_ValveTempering  ) !                  = 32
+          CASE (TypeOf_ValveTempering  ) !                  = 30
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_WtrHeaterMixed ) !                   = 33
+          CASE (TypeOf_WtrHeaterMixed ) !                   = 31
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -4028,7 +4004,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                           = LoopFlowStatus_TakesWhatGets
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
             ENDIF
-          CASE (TypeOf_WtrHeaterStratified ) !              = 34
+          CASE (TypeOf_WtrHeaterStratified ) !              = 32
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -4040,142 +4016,130 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
                           = LoopFlowStatus_TakesWhatGets
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
             ENDIF
-          CASE (TypeOf_PumpVariableSpeed) !                 = 35
+          CASE (TypeOf_PumpVariableSpeed) !                 = 33
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_PumpConstantSpeed) !                 = 36
+          CASE (TypeOf_PumpConstantSpeed) !                 = 34
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_PumpCondensate) !                    = 37
+          CASE (TypeOf_PumpCondensate) !                    = 35
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_PumpBankVariableSpeed) !             = 38
+          CASE (TypeOf_PumpBankVariableSpeed) !             = 36
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_PumpBankConstantSpeed) !             = 39
+          CASE (TypeOf_PumpBankConstantSpeed) !             = 37
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyIfLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_WaterUseConnection  ) !              = 40
+          CASE (TypeOf_WaterUseConnection  ) !              = 38
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_CoilWaterCooling   ) !               = 41  ! demand side component
+          CASE (TypeOf_CoilWaterCooling   ) !               = 39  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_CoilWaterDetailedFlatCooling) !      = 42  ! demand side component
+          CASE (TypeOf_CoilWaterDetailedFlatCooling) !      = 40  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_CoilWaterSimpleHeating ) !           = 43  ! demand side component
+          CASE (TypeOf_CoilWaterSimpleHeating ) !           = 41  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE (TypeOf_CoilSteamAirHeating      ) !         = 44  ! demand side component
+          CASE (TypeOf_CoilSteamAirHeating      ) !         = 42  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE ( TypeOf_SolarCollectorFlatPlate ) !         = 45  ! demand side component
+          CASE ( TypeOf_SolarCollectorFlatPlate ) !         = 43  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
-          CASE ( TypeOf_PlantLoadProfile     ) !            = 46  ! demand side component
+          CASE ( TypeOf_PlantLoadProfile     ) !            = 44  ! demand side component
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
-          CASE ( TypeOf_GrndHtExchgVertical  ) !            = 47
+          CASE ( TypeOf_GrndHtExchgVertical  ) !            = 45
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_GrndHtExchgSurface   ) !            = 48
+          CASE ( TypeOf_GrndHtExchgSurface   ) !            = 46
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_GrndHtExchgPond      ) !            = 49
+          CASE ( TypeOf_GrndHtExchgPond      ) !            = 47
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_HtExchgPlateFreeClng ) !            = 50
+
+          CASE ( TypeOf_Generator_MicroTurbine ) !          = 48  !newer FSEC turbine
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
-                         = HowMet_NoneDemand
-            ELSE
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                         = LoopFlowStatus_TakesWhatGets
-              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
-                         = HowMet_PassiveCap
-            ENDIF
-          CASE ( TypeOf_Generator_MicroTurbine ) !          = 51  !newer FSEC turbine
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
-                       = LoopFlowStatus_NeedyAndTurnsLoopOn
-            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_ByNominalCap
-          CASE ( TypeOf_Generator_ICEngine  ) !             = 52
+          CASE ( TypeOf_Generator_ICEngine  ) !             = 49
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                       = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_ByNominalCap
-          CASE ( TypeOf_Generator_CTurbine  ) !             = 53  !older BLAST turbine
+          CASE ( TypeOf_Generator_CTurbine  ) !             = 50  !older BLAST turbine
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                       = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_ByNominalCap
-          CASE ( TypeOf_Generator_MicroCHP ) !              = 54
+          CASE ( TypeOf_Generator_MicroCHP ) !              = 51
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                      = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_ByNominalCap
-          CASE ( TypeOf_Generator_FCStackCooler ) !         = 55
+          CASE ( TypeOf_Generator_FCStackCooler ) !         = 52
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                      = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_ByNominalCap
-          CASE ( TypeOf_FluidCooler_SingleSpd ) !           = 56
+          CASE ( TypeOf_FluidCooler_SingleSpd ) !           = 53
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_FluidCooler_TwoSpd   ) !            = 57
+          CASE ( TypeOf_FluidCooler_TwoSpd   ) !            = 54
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_EvapFluidCooler_SingleSpd ) !       = 58
+          CASE ( TypeOf_EvapFluidCooler_SingleSpd ) !       = 55
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_EvapFluidCooler_TwoSpd  ) !         = 59
+          CASE ( TypeOf_EvapFluidCooler_TwoSpd  ) !         = 56
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_ChilledWaterTankMixed   ) !         = 60
+          CASE ( TypeOf_ChilledWaterTankMixed   ) !         = 57
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -4189,7 +4153,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
             ENDIF
-          CASE ( TypeOf_ChilledWaterTankStratified ) !      = 61
+          CASE ( TypeOf_ChilledWaterTankStratified ) !      = 58
             IF (LoopSideCtr == DemandSide) THEN
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
@@ -4203,26 +4167,26 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
             ENDIF
-          CASE ( TypeOf_PVTSolarCollectorFlatPlate ) !      = 62
+          CASE ( TypeOf_PVTSolarCollectorFlatPlate ) !      = 59
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
           !next batch for ZoneHVAC
-          CASE ( TypeOf_BASEBOARD_CONV_WATER   ) !        = 63
+          CASE ( TypeOf_BASEBOARD_CONV_WATER   ) !        = 60
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_NoneDemand
-          CASE ( TypeOf_BASEBOARD_RAD_CONV_STEAM ) !      = 64
+          CASE ( TypeOf_BASEBOARD_RAD_CONV_STEAM ) !      = 61
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_NoneDemand
-          CASE ( TypeOf_BASEBOARD_RAD_CONV_WATER ) !      = 65
+          CASE ( TypeOf_BASEBOARD_RAD_CONV_WATER ) !      = 62
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                          = LoopFlowStatus_NeedyAndTurnsLoopOn
@@ -4305,7 +4269,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
-          CASE ( TypeOf_SolarCollectorICS ) !         = 78
+          CASE ( TypeOf_SolarCollectorICS ) !         = 75
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
                 = LoopFlowStatus_NeedyAndTurnsLoopOn
@@ -4326,7 +4290,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_Unknown
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_Unknown
-          CASE (TypeOf_HeatPumpVRF) !       =  85  ! AirConditioner:VariableRefrigerantFlow
+          CASE (TypeOf_HeatPumpVRF) !       =  82  ! AirConditioner:VariableRefrigerantFlow
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
 
             IF (LoopSideCtr == DemandSide) THEN
@@ -4340,6 +4304,39 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
               PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
                          = HowMet_PassiveCap
             ENDIF
+          CASE (TypeOf_WaterSource) !
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_ByNominalCapLowOutLimit
+          CASE (TypeOf_GrndHtExchgHorizTrench) ! = 83  GroundHeatExchanger:HorizontalTrench
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority = LoopFlowStatus_TakesWhatGets
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_PassiveCap
+          CASE (TypeOf_FluidToFluidPlantHtExchg) !          = 84
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            IF (LoopSideCtr == DemandSide) THEN
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyAndTurnsLoopOn
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_NoneDemand
+            ELSE
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_TakesWhatGets
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed = HowMet_PassiveCap
+            ENDIF
+          CASE (TypeOf_CentralGroundSourceHeatPump ) ! 86              
+            PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowCtrl = ControlType_Active
+            IF (LoopSideCtr == DemandSide) THEN
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyAndTurnsLoopOn
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_NoneDemand
+            ELSE
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%FlowPriority &
+                         = LoopFlowStatus_NeedyIfLoopOn
+              PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%Comp(CompCtr)%HowLoadServed &
+                         = HowMet_ByNominalCap 
+            ENDIF                     
           CASE DEFAULT
             Call ShowSevereError('SetBranchControlTypes: Caught unexpected equipment type of number')
 
@@ -4396,7 +4393,7 @@ END SUBROUTINE StoreAPumpOnCurrentTempLoop
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%ControlType = ControlType_Bypass
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%Branch(BranchCtr)%IsBypass    = .TRUE.
             PlantLoop(LoopCtr)%LoopSide(LoopSideCtr)%ByPassExists                  = .TRUE.
-            
+
             IF(CompCtr > 1) THEN
               CALL ShowSevereError ('A pipe used as a bypass should not be in series with another component')
               CALL ShowContinueError('Occurs in Branch = ' &
@@ -4470,10 +4467,10 @@ SUBROUTINE CheckIfAnyPlant
   INTEGER :: numCondenserLoopsCheck
 
   cCurrentModuleObject = 'PlantLoop'
-  numPlantLoopsCheck = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  numPlantLoopsCheck = GetNumObjectsFound(cCurrentModuleObject)
 
   cCurrentModuleObject = 'CondenserLoop'
-  numCondenserLoopsCheck = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  numCondenserLoopsCheck = GetNumObjectsFound(cCurrentModuleObject)
 
   IF ((numPlantLoopsCheck + numCondenserLoopsCheck) > 0) THEn
     AnyPlantInModel = .TRUE.
@@ -4490,7 +4487,7 @@ END SUBROUTINE CheckIfAnyPlant
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -147,6 +147,7 @@ TYPE :: DefinePrimaryAirSystem ! There is an array of these for each primary air
   INTEGER                                           :: OtherSplitOutNode = 0 ! node num of nonRAB splitter outlet
   INTEGER                                           :: NumOACoolCoils    = 0 ! number of cooling coils in the outside air system
   INTEGER                                           :: NumOAHeatCoils    = 0 ! number of heating coils in the outside air system
+  LOGICAL                                           :: SizeAirloopCoil   = .TRUE. ! simulates air loop coils before calling controllers
 END TYPE DefinePrimaryAirSystem
 
           ! The ConnectionPoint derived type is used to link quickly between loops at connection points
@@ -260,7 +261,7 @@ TYPE (ConnectAirSysSubSubComp), ALLOCATABLE, DIMENSION(:)   :: TempAirSysSubSubC
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

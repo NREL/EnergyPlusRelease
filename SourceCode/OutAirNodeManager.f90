@@ -202,7 +202,7 @@ SUBROUTINE GetOutAirNodesInput
     ! Loop over all outside air inlet nodes in the input and count them
     CurrentModuleObject = 'OutdoorAir:NodeList'
     DO OutAirInletNodeListNum = 1, NumOutAirInletNodeLists
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OutAirInletNodeListNum,Alphas,NumAlphas,Numbers,NumNums,IOStat, &
+      CALL GetObjectItem(CurrentModuleObject,OutAirInletNodeListNum,Alphas,NumAlphas,Numbers,NumNums,IOStat, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -213,7 +213,7 @@ SUBROUTINE GetOutAirNodesInput
               !  here across lists and across objects
         CALL GetNodeNums(Alphas(AlphaNum),NumNodes,NodeNums,ErrInList,NodeType_Air, &
                          TRIM(CurrentModuleObject),TRIM(CurrentModuleObject),NodeConnectionType_OutsideAir, &
-                         NextFluidStreamNum,ObjectIsNotParent, IncrementFluidStreamYes)
+                         NextFluidStreamNum,ObjectIsNotParent, IncrementFluidStreamYes,InputFieldName=cAlphaFields(AlphaNum))
         NextFluidStreamNum = NextFluidStreamNum + NumNodes
         IF (ErrInList) THEN
           CALL ShowContinueError('Occurred in '//TRIM(CurrentModuleObject)//', '// &
@@ -249,7 +249,7 @@ SUBROUTINE GetOutAirNodesInput
     ! Loop over all single outside air nodes in the input
     CurrentModuleObject = 'OutdoorAir:Node'
     DO OutsideAirNodeSingleNum = 1, NumOutsideAirNodeSingles
-      CALL GetObjectItem(TRIM(CurrentModuleObject),OutsideAirNodeSingleNum,Alphas,NumAlphas,Numbers,NumNums,IOStat, &
+      CALL GetObjectItem(CurrentModuleObject,OutsideAirNodeSingleNum,Alphas,NumAlphas,Numbers,NumNums,IOStat, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -259,7 +259,7 @@ SUBROUTINE GetOutAirNodesInput
             !  here across lists and across objects
       CALL GetNodeNums(Alphas(1),NumNodes,NodeNums,ErrInList,NodeType_Air, &
                        TRIM(CurrentModuleObject),TRIM(CurrentModuleObject),NodeConnectionType_OutsideAir, &
-                       NextFluidStreamNum,ObjectIsNotParent,IncrementFluidStreamYes)
+                       NextFluidStreamNum,ObjectIsNotParent,IncrementFluidStreamYes,InputFieldName=cAlphaFields(1))
       NextFluidStreamNum = NextFluidStreamNum + NumNodes
       IF (ErrInList) THEN
         CALL ShowContinueError('Occurred in '//TRIM(CurrentModuleObject)//', '//TRIM(cAlphaFields(1))//' = '//TRIM(Alphas(1)))
@@ -550,7 +550,7 @@ END SUBROUTINE CheckAndAddAirNodeNumber
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

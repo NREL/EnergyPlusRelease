@@ -384,7 +384,7 @@ CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 INTEGER                     :: NumObj !count of objects
 
 CurrentModuleObject = 'LifeCycleCost:Parameters'
-NumObj = GetNumObjectsFound(TRIM(CurrentModuleObject))
+NumObj = GetNumObjectsFound(CurrentModuleObject)
 
 IF (NumObj .EQ. 0) THEN
   LCCparamPresent = .FALSE.
@@ -651,7 +651,7 @@ CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 
 IF (.NOT. LCCparamPresent) RETURN
 CurrentModuleObject = 'LifeCycleCost:RecurringCosts'
-numRecurringCosts = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numRecurringCosts = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(RecurringCosts(numRecurringCosts))
 DO iInObj = 1 , numRecurringCosts
   CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas,NumArray,NumNums,IOSTAT,  &
@@ -845,7 +845,7 @@ INTEGER                     :: numComponentCostLineItems !number of ComponentCos
 
 IF (.NOT. LCCparamPresent) RETURN
 CurrentModuleObject = 'LifeCycleCost:NonrecurringCost'
-numNonrecurringCost = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numNonrecurringCost = GetNumObjectsFound(CurrentModuleObject)
 numComponentCostLineItems = GetNumObjectsFound('ComponentCost:LineItem')
 IF (numComponentCostLineItems .GT. 0) THEN !leave room for component cost total
   ALLOCATE(NonrecurringCost(numNonrecurringCost + 1)) !add a place for CostEstimate total
@@ -991,7 +991,7 @@ INTEGER :: curFld = 0
 
 IF (.NOT. LCCparamPresent) RETURN
 CurrentModuleObject = 'LifeCycleCost:UsePriceEscalation'
-numUsePriceEscalation = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numUsePriceEscalation = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(UsePriceEscalation(numUsePriceEscalation))
 DO iInObj = 1 , numUsePriceEscalation
   ALLOCATE(UsePriceEscalation(iInObj)%Escalation(lengthStudyYears))
@@ -1026,6 +1026,8 @@ IF (numUsePriceEscalation .GT. 0) THEN
     !       \key FuelOil#2
     !       \key Propane
     !       \key Water
+    !       \key OtherFuel1
+    !       \key OtherFuel2
     UsePriceEscalation(iInObj)%resource = AssignResourceTypeNum(AlphaArray(2)) !use function from DataGlobalConstants
     IF (NumAlphas .GT. 3) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' contains more alpha fields than expected.')
@@ -1136,7 +1138,7 @@ INTEGER                      :: numFldsToUse
 
 IF (.NOT. LCCparamPresent) RETURN
 CurrentModuleObject = 'LifeCycleCost:UseAdjustment'
-numUseAdjustment = GetNumObjectsFound(TRIM(CurrentModuleObject))
+numUseAdjustment = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(UseAdjustment(numUseAdjustment))
 DO iInObj = 1 , numUseAdjustment
   ALLOCATE(UseAdjustment(iInObj)%Adjustment(lengthStudyYears))
@@ -1171,6 +1173,8 @@ IF (numUseAdjustment .GT. 0) THEN
     !       \key FuelOil#2
     !       \key Propane
     !       \key Water
+    !       \key OtherFuel1
+    !       \key OtherFuel2
     UseAdjustment(iInObj)%resource = AssignResourceTypeNum(AlphaArray(2)) !use function from DataGlobalConstants
     IF (NumAlphas .GT. 2) THEN
       CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' contains more alpha fields than expected.')
@@ -2681,7 +2685,7 @@ END SUBROUTINE WriteTabularLifeCycleCostReport
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

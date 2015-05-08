@@ -127,13 +127,6 @@ PRIVATE ! Everything private unless explicitly made public
       REAL(r64) :: HtRecSenEff             = 0.0d0      ! Sensible heat recovery effectiveness
       REAL(r64) :: HtRecLatEff             = 0.0d0      ! Latent heat recovery effectiveness
 
-      REAL(r64) :: ZoneFloorArea           = 0.0d0      ! Zone floor area to use for OA calculations
-      INTEGER   :: ZoneOutdoorAirMethod    = 0          ! Outdoor air method
-      REAL(r64) :: OAFlowPerPerson         = 0.0d0      ! OA per person [m3/s-person]
-      REAL(r64) :: OAFlowPerArea           = 0.0d0      ! OA per zone area [m3/s-m2]
-      REAL(r64) :: OAFlowPerZone           = 0.0d0      ! OA per zone [m3/s]
-      REAL(r64) :: OAFlowACH               = 0.0d0      ! Terminal unit requirement for ACH (air changes per hour)
-                                                        !   [m3/s - set in GetInput]
       INTEGER   :: OAFlowFracSchPtr        = 0          ! Fraction schedule applied to total OA requirement
 
       REAL(r64) :: MaxHeatMassFlowRate     = 0.0d0      ! The maximum heating air mass flow rate [kg/s]
@@ -389,7 +382,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
       cCurrentModuleObject='ZoneHVAC:IdealLoadsAirSystem'
 
-      NumPurchAir = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+      NumPurchAir = GetNumObjectsFound(cCurrentModuleObject)
 
       ALLOCATE (PurchAir(NumPurchAir))
       ALLOCATE(CheckEquipName(NumPurchAir))
@@ -399,7 +392,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
         DO PurchAirNum = 1,  NumPurchAir
           PurchAir(PurchAirNum)%cObjectName = cCurrentModuleObject
 
-          CALL GetObjectItem(TRIM(cCurrentModuleObject),PurchAirNum,cAlphaArgs,NumAlphas,rNumericArgs, &
+          CALL GetObjectItem(cCurrentModuleObject,PurchAirNum,cAlphaArgs,NumAlphas,rNumericArgs, &
                              NumNums,IOSTAT, NumBlank=lNumericFieldBlanks, AlphaBlank=lAlphaFieldBlanks, &
                              AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
           IsNotOK=.false.
@@ -412,22 +405,23 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           PurchAir(PurchAirNum)%Name       = cAlphaArgs(1)
           ! get optional  availability schedule
           PurchAir(PurchAirNum)%AvailSched = cAlphaArgs(2)
-          PurchAir(PurchAirNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
-          IF (PurchAir(PurchAirNum)%AvailSchedPtr == 0 .AND. (.NOT. lAlphaFieldBlanks(2))) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//' not found='//TRIM(cAlphaArgs(2)))
-            ErrorsFound=.true.
-          END IF
-          IF (lAlphaFieldBlanks(4)) THEN
-                  ! Purchased air can a problem for node connections if it only has a single node
-                  ! make this an outlet
-            PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum  = &
-                 GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                 NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+          IF (lAlphaFieldBlanks(2)) THEN
+            PurchAir(PurchAirNum)%AvailSchedPtr = ScheduleAlwaysOn
           ELSE
-                  ! If new (optional) exhaust air node name is present, then register inlet and outlet
-            PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum  = &
-                 GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
-                 NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+            PurchAir(PurchAirNum)%AvailSchedPtr = GetScheduleIndex(cAlphaArgs(2))
+            IF (PurchAir(PurchAirNum)%AvailSchedPtr == 0) THEN
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(2))//  &
+                 '="'//TRIM(cAlphaArgs(2))//'".')
+              ErrorsFound=.true.
+            END IF
+          END IF
+                  ! Purchased air supply air node is an outlet node
+          PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum  = &
+               GetOnlySingleNode(cAlphaArgs(3),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+               NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                  ! If new (optional) exhaust air node name is present, then register it as inlet
+          IF (.NOT.lAlphaFieldBlanks(4)) THEN
             PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum  = &
                  GetOnlySingleNode(cAlphaArgs(4),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
                  NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
@@ -462,8 +456,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
               PurchAir(PurchAirNum)%HeatingLimit = LimitFlowRateAndCapacity
             ENDIF
           ELSE
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(5))//'='//TRIM(cAlphaArgs(5)))
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+            CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5))//'".')
             CALL ShowContinueError('Valid entries are NoLimit, LimitFlowRate, LimitCapacity, or LimitFlowRateAndCapacity')
             ErrorsFound=.true.
           END IF
@@ -495,8 +489,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
               PurchAir(PurchAirNum)%CoolingLimit = LimitFlowRateAndCapacity
             ENDIF
           ELSE
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(6))//'='//TRIM(cAlphaArgs(6)))
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+            CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6))//'".')
             CALL ShowContinueError('Valid entries are NoLimit, LimitFlowRate, LimitCapacity, or LimitFlowRateAndCapacity')
             ErrorsFound=.true.
           END IF
@@ -505,17 +499,27 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
           ! get optional heating availability schedule
           PurchAir(PurchAirNum)%HeatSched = cAlphaArgs(7)
-          PurchAir(PurchAirNum)%HeatSchedPtr = GetScheduleIndex(cAlphaArgs(7))
-          IF (PurchAir(PurchAirNum)%HeatSchedPtr == 0 .AND. (.NOT. lAlphaFieldBlanks(7))) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(7))//' not found='//TRIM(cAlphaArgs(7)))
-            ErrorsFound=.true.
+          IF (lAlphaFieldBlanks(7)) THEN
+            PurchAir(PurchAirNum)%HeatSchedPtr = ScheduleAlwaysOn
+          ELSE
+            PurchAir(PurchAirNum)%HeatSchedPtr = GetScheduleIndex(cAlphaArgs(7))
+            IF (PurchAir(PurchAirNum)%HeatSchedPtr == 0) THEN
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(7))//'="'//TRIM(cAlphaArgs(7))//'".')
+              ErrorsFound=.true.
+            END IF
           END IF
           ! get optional cooling availability schedule
           PurchAir(PurchAirNum)%CoolSched = cAlphaArgs(8)
-          PurchAir(PurchAirNum)%CoolSchedPtr = GetScheduleIndex(cAlphaArgs(8))
-          IF (PurchAir(PurchAirNum)%CoolSchedPtr == 0 .AND. (.NOT. lAlphaFieldBlanks(8))) THEN
-            CALL ShowSevereError(TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(8))//' not found='//TRIM(cAlphaArgs(8)))
-            ErrorsFound=.true.
+          IF (lAlphaFieldBlanks(8)) THEN
+            PurchAir(PurchAirNum)%CoolSchedPtr = ScheduleAlwaysOn
+          ELSE
+            PurchAir(PurchAirNum)%CoolSchedPtr = GetScheduleIndex(cAlphaArgs(8))
+            IF (PurchAir(PurchAirNum)%CoolSchedPtr == 0) THEN
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-not found '//TRIM(cAlphaFieldNames(8))//'="'//TRIM(cAlphaArgs(8))//'".')
+              ErrorsFound=.true.
+            END IF
           END IF
           ! get Dehumidification control type
           IF (SameString(cAlphaArgs(9),'None')) THEN
@@ -527,8 +531,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ELSEIF(SameString(cAlphaArgs(9),'ConstantSupplyHumidityRatio')) THEN
                   PurchAir(PurchAirNum)%DehumidCtrlType = ConstantSupplyHumidityRatio
           ELSE
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+            CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(9))//'="'//TRIM(cAlphaArgs(9))//'".')
             CALL ShowContinueError('Valid entries are ConstantSensibleHeatRatio, Humidistat, or ConstantSupplyHumidityRatio')
             ErrorsFound=.true.
           END IF
@@ -542,8 +546,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ELSEIF(SameString(cAlphaArgs(10),'ConstantSupplyHumidityRatio')) THEN
                   PurchAir(PurchAirNum)%HumidCtrlType = ConstantSupplyHumidityRatio
           ELSE
-            CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
-            CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+            CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(10))//'="'//TRIM(cAlphaArgs(10))//'".')
             CALL ShowContinueError('Valid entries are None, Humidistat, or ConstantSupplyHumidityRatio')
             ErrorsFound=.true.
           END IF
@@ -552,8 +556,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           IF(.NOT. lAlphaFieldBlanks(11))THEN
             PurchAir(PurchAirNum)%OARequirementsPtr = FindItemInList(cAlphaArgs(11),OARequirements%Name,NumOARequirements)
             IF(PurchAir(PurchAirNum)%OARequirementsPtr .EQ. 0)THEN
-              CALL ShowSevereError(TRIM(cAlphaFieldNames(11))//' = '//TRIM(cAlphaArgs(11))//' not found.')
-              CALL ShowContinueError('Occurs in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-not found'//TRIM(cAlphaFieldNames(11))//'="'//TRIM(cAlphaArgs(11))//'".')
               ErrorsFound=.true.
             ELSE
               PurchAir(PurchAirNum)%OutdoorAir = .true.
@@ -570,9 +574,10 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                     cAlphaArgs(12) = TRIM(cAlphaArgs(1)(1:75))//' OUTDOOR AIR INLET NODE'
                 ENDIF
                 IF (DisplayExtraWarnings) THEN
-                    CALL ShowWarningError(TRIM(cAlphaFieldNames(12))// &
+                    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' blank field')
+                    CALL ShowContinueError(TRIM(cAlphaFieldNames(12))// &
                           ' is blank, but there is outdoor air requested for this system.')
-                    CALL ShowContinueError('Occurs in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
                     CALL ShowContinueError('Creating node name ='//TRIM(cAlphaArgs(12)))
                 ENDIF
             ENDIF
@@ -583,9 +588,10 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                 ! Check if OA node is initialized in OutdoorAir:Node or OutdoorAir:Nodelist
             CALL CheckAndAddAirNodeNumber(PurchAir(PurchAirNum)%OutdoorAirNodeNum,IsOANodeListed)
             IF ((.not. IsOANodeListed) .AND. DisplayExtraWarnings) THEN
-                CALL ShowWarningError(TRIM(cAlphaArgs(12))// &
+                CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' missing data')
+                CALL ShowContinueError(TRIM(cAlphaArgs(12))// &
                       ' does not appear in an OutdoorAir:NodeList or as an OutdoorAir:Node.')
-                CALL ShowContinueError('Occurs in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
                 CALL ShowContinueError('Adding OutdoorAir:Node='//TRIM(cAlphaArgs(12)))
             ENDIF
 
@@ -599,16 +605,18 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                     PurchAir(PurchAirNum)%DCVType = CO2Setpoint
               ELSE
                     PurchAir(PurchAirNum)%DCVType = NoDCV
-                    CALL ShowWarningError(TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13))// &
+                    CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' invalid data')
+                    CALL ShowContinueError(TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13))// &
                          ' but CO2 simulation is not active.')
-                    CALL ShowContinueError('Occurs in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
                     CALL ShowContinueError('Resetting '//TRIM(cAlphaFieldNames(13))//' to NoDCV')
                     CALL ShowContinueError('To activate CO2 simulation, use ZoneAirContaminantBalance object'// &
                          ' and specify "Carbon Dioxide Concentration"="Yes".')
               END IF
             ELSE
-              CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13)))
-              CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(13))//'='//TRIM(cAlphaArgs(13)))
               CALL ShowContinueError('Valid entries are None, OccupancySchedule, or CO2Setpoint')
               ErrorsFound=.true.
             END IF
@@ -620,8 +628,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             ELSEIF(SameString(cAlphaArgs(14),'DifferentialEnthalpy')) THEN
                     PurchAir(PurchAirNum)%EconomizerType = DifferentialEnthalpy
             ELSE
-              CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(14))//'='//TRIM(cAlphaArgs(14)))
-              CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(14))//'='//TRIM(cAlphaArgs(14)))
               CALL ShowContinueError('Valid entries are NoEconomizer, DifferentialDryBulb, or DifferentialEnthalpy')
               ErrorsFound=.true.
             END IF
@@ -633,8 +642,9 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
             ELSEIF(SameString(cAlphaArgs(15),'Enthalpy')) THEN
                     PurchAir(PurchAirNum)%HtRecType = Enthalpy
             ELSE
-              CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(15))//'='//TRIM(cAlphaArgs(15)))
-              CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+              CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//  &
+                       trim(cAlphaArgs(1))//' invalid data')
+              CALL ShowContinueError('Invalid-entry '//TRIM(cAlphaFieldNames(15))//'='//TRIM(cAlphaArgs(15)))
               CALL ShowContinueError('Valid entries are None, Sensible, or Enthalpy')
               ErrorsFound=.true.
             END IF
@@ -707,114 +717,123 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
 
         ! Setup Output variables
         !    energy variables
-        CALL SetupOutputVariable('Ideal Loads Sensible Heating Energy [J]', PurchAir(PurchAirNum)%SenHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Sensible Heating Energy [J]', PurchAir(PurchAirNum)%SenHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Latent Heating Energy [J]', PurchAir(PurchAirNum)%LatHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Latent Heating Energy [J]', PurchAir(PurchAirNum)%LatHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Total Heating Energy [J]', PurchAir(PurchAirNum)%TotHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Total Heating Energy [J]', PurchAir(PurchAirNum)%TotHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name,  &
                                ResourceTypeKey='DISTRICTHEATING',EndUseKey='Heating',GroupKey='System')
-        CALL SetupOutputVariable('Ideal Loads Sensible Cooling Energy [J]', PurchAir(PurchAirNum)%SenCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Sensible Cooling Energy [J]', PurchAir(PurchAirNum)%SenCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Latent Cooling Energy [J]', PurchAir(PurchAirNum)%LatCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Latent Cooling Energy [J]', PurchAir(PurchAirNum)%LatCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Total Cooling Energy [J]', PurchAir(PurchAirNum)%TotCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Total Cooling Energy [J]', PurchAir(PurchAirNum)%TotCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name,  &
                                ResourceTypeKey='DISTRICTCOOLING',EndUseKey='Cooling',GroupKey='System')
-        CALL SetupOutputVariable('Ideal Loads Zone Sensible Heating Energy [J]', PurchAir(PurchAirNum)%ZoneSenHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Sensible Heating Energy [J]', PurchAir(PurchAirNum)%ZoneSenHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Latent Heating Energy [J]', PurchAir(PurchAirNum)%ZoneLatHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Latent Heating Energy [J]', PurchAir(PurchAirNum)%ZoneLatHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Total Heating Energy [J]', PurchAir(PurchAirNum)%ZoneTotHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Total Heating Energy [J]', PurchAir(PurchAirNum)%ZoneTotHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Sensible Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneSenCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Sensible Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneSenCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Latent Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneLatCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Latent Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneLatCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Total Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneTotCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Total Cooling Energy [J]', PurchAir(PurchAirNum)%ZoneTotCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Sensible Heating Energy [J]', PurchAir(PurchAirNum)%OASenHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Sensible Heating Energy [J]', &
+                                PurchAir(PurchAirNum)%OASenHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Latent Heating Energy [J]', PurchAir(PurchAirNum)%OALatHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Latent Heating Energy [J]', PurchAir(PurchAirNum)%OALatHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Total Heating Energy [J]', PurchAir(PurchAirNum)%OATotHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Total Heating Energy [J]', PurchAir(PurchAirNum)%OATotHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Sensible Cooling Energy [J]', PurchAir(PurchAirNum)%OASenCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Sensible Cooling Energy [J]', &
+                                  PurchAir(PurchAirNum)%OASenCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Latent Cooling Energy [J]', PurchAir(PurchAirNum)%OALatCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Latent Cooling Energy [J]', PurchAir(PurchAirNum)%OALatCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Total Cooling Energy [J]', PurchAir(PurchAirNum)%OATotCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Total Cooling Energy [J]', PurchAir(PurchAirNum)%OATotCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Sensible Heating Energy [J]',PurchAir(PurchAirNum)%HtRecSenHeatEnergy,&
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Sensible Heating Energy [J]', &
+                                  PurchAir(PurchAirNum)%HtRecSenHeatEnergy,&
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Latent Heating Energy [J]', PurchAir(PurchAirNum)%HtRecLatHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Latent Heating Energy [J]', &
+                                  PurchAir(PurchAirNum)%HtRecLatHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Total Heating Energy [J]', PurchAir(PurchAirNum)%HtRecTotHeatEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Total Heating Energy [J]', &
+                                  PurchAir(PurchAirNum)%HtRecTotHeatEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Sensible Cooling Energy [J]',   &
-           PurchAir(PurchAirNum)%HtRecSenCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Sensible Cooling Energy [J]',   &
+                               PurchAir(PurchAirNum)%HtRecSenCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Latent Cooling Energy [J]', PurchAir(PurchAirNum)%HtRecLatCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Latent Cooling Energy [J]', &
+                                  PurchAir(PurchAirNum)%HtRecLatCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Total Cooling Energy [J]', PurchAir(PurchAirNum)%HtRecTotCoolEnergy, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Total Cooling Energy [J]', &
+                                  PurchAir(PurchAirNum)%HtRecTotCoolEnergy, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
 
         !    rate variables
-        CALL SetupOutputVariable('Ideal Loads Sensible Heating Rate [W]', PurchAir(PurchAirNum)%SenHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Sensible Heating Rate [W]', PurchAir(PurchAirNum)%SenHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Latent Heating Rate [W]', PurchAir(PurchAirNum)%LatHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Latent Heating Rate [W]', PurchAir(PurchAirNum)%LatHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Total Heating Rate [W]', PurchAir(PurchAirNum)%TotHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Total Heating Rate [W]', PurchAir(PurchAirNum)%TotHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%SenCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%SenCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Latent Cooling Rate [W]', PurchAir(PurchAirNum)%LatCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Latent Cooling Rate [W]', PurchAir(PurchAirNum)%LatCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Total Cooling Rate [W]', PurchAir(PurchAirNum)%TotCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Supply Air Total Cooling Rate [W]', PurchAir(PurchAirNum)%TotCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Sensible Heating Rate [W]', PurchAir(PurchAirNum)%ZoneSenHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Sensible Heating Rate [W]', PurchAir(PurchAirNum)%ZoneSenHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Latent Heating Rate [W]', PurchAir(PurchAirNum)%ZoneLatHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Latent Heating Rate [W]', PurchAir(PurchAirNum)%ZoneLatHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Total Heating Rate [W]', PurchAir(PurchAirNum)%ZoneTotHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Total Heating Rate [W]', PurchAir(PurchAirNum)%ZoneTotHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneSenCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneSenCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Latent Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneLatCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Latent Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneLatCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Zone Total Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneTotCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Zone Total Cooling Rate [W]', PurchAir(PurchAirNum)%ZoneTotCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Sensible Heating Rate [W]', PurchAir(PurchAirNum)%OASenHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Sensible Heating Rate [W]', PurchAir(PurchAirNum)%OASenHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Latent Heating Rate [W]', PurchAir(PurchAirNum)%OALatHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Latent Heating Rate [W]', PurchAir(PurchAirNum)%OALatHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Total Heating Rate [W]', PurchAir(PurchAirNum)%OATotHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Total Heating Rate [W]', PurchAir(PurchAirNum)%OATotHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%OASenCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%OASenCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Latent Cooling Rate [W]', PurchAir(PurchAirNum)%OALatCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Latent Cooling Rate [W]', PurchAir(PurchAirNum)%OALatCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Outdoor Air Total Cooling Rate [W]', PurchAir(PurchAirNum)%OATotCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Outdoor Air Total Cooling Rate [W]', PurchAir(PurchAirNum)%OATotCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Sensible Heating Rate [W]', PurchAir(PurchAirNum)%HtRecSenHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Sensible Heating Rate [W]', &
+                                  PurchAir(PurchAirNum)%HtRecSenHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Latent Heating Rate [W]', PurchAir(PurchAirNum)%HtRecLatHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Latent Heating Rate [W]', PurchAir(PurchAirNum)%HtRecLatHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Total Heating Rate [W]', PurchAir(PurchAirNum)%HtRecTotHeatRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Total Heating Rate [W]', PurchAir(PurchAirNum)%HtRecTotHeatRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Sensible Cooling Rate [W]', PurchAir(PurchAirNum)%HtRecSenCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Sensible Cooling Rate [W]', &
+                                  PurchAir(PurchAirNum)%HtRecSenCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Latent Cooling Rate [W]', PurchAir(PurchAirNum)%HtRecLatCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Latent Cooling Rate [W]', PurchAir(PurchAirNum)%HtRecLatCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Heat Recovery Total Cooling Rate [W]', PurchAir(PurchAirNum)%HtRecTotCoolRate, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Total Cooling Rate [W]', PurchAir(PurchAirNum)%HtRecTotCoolRate, &
                                'System','Average',PurchAir(PurchAirNum)%Name)
 
-        CALL SetupOutputVariable('Ideal Loads Time Economizer Active [hr]', PurchAir(PurchAirNum)%TimeEconoActive, &
+        CALL SetupOutputVariable('Zone Ideal Loads Economizer Active Time [hr]', PurchAir(PurchAirNum)%TimeEconoActive, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
-        CALL SetupOutputVariable('Ideal Loads Time Heat Recovery Active [hr]', PurchAir(PurchAirNum)%TimeHtRecActive, &
+        CALL SetupOutputVariable('Zone Ideal Loads Heat Recovery Active Time [hr]', PurchAir(PurchAirNum)%TimeHtRecActive, &
                                'System','Sum',PurchAir(PurchAirNum)%Name)
 
-        CALL SetupOutputVariable('Ideal Loads Hybrid Ventilation Availability Status',PurchAir(PurchAirNum)%AvailStatus,&
+        CALL SetupOutputVariable('Zone Ideal Loads Hybrid Ventilation Available Status []',PurchAir(PurchAirNum)%AvailStatus,&
                                'System','Average',PurchAir(PurchAirNum)%Name)
 
         IF (AnyEnergyManagementSystemInModel) THEN
@@ -863,6 +882,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
      USE DataZoneEquipment,  ONLY: ZoneEquipInputsFilled,CheckZoneEquipmentList,ZoneEquipConfig
      USE DataSizing, ONLY: OARequirements   ! to access DesignSpecification:OutdoorAir inputs
      USE DataHeatBalance,  ONLY: Zone ! to access zone area, volume, and multipliers
+     USE General, ONLY: FindNumberinList
+     USE DataLoopNode, ONLY: NodeID
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -892,6 +913,10 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       LOGICAL :: UnitOn   ! simple checks for error
       LOGICAL :: CoolOn   ! simple checks for error
       LOGICAL :: HeatOn   ! simple checks for error
+      Integer             :: SupplyNodeNum    ! Node number for ideal loads supply node
+      Integer             :: ExhaustNodeNum    ! Node number for ideal loads exhaust node
+      Integer             :: NodeIndex  ! Array index of zone inlet or zone exhaust node that matches ideal loads node
+      LOGICAL :: UseReturnNode   ! simple checks for error
 
 
       ! Do the Begin Simulation initializations
@@ -912,8 +937,8 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
         ZoneEquipmentListChecked=.true.
         DO Loop=1,NumPurchAir
           IF (CheckZoneEquipmentList(PurchAir(Loop)%cObjectName,PurchAir(Loop)%Name)) CYCLE
-          CALL ShowSevereError('Ideal Loads Air: ['//TRIM(PurchAir(Loop)%cObjectName)//' = '// &
-                               TRIM(PurchAir(Loop)%Name)//'] is not on any ZoneHVAC:EquipmentList.  It will not be simulated.')
+          CALL ShowSevereError('InitPurchasedAir: '//TRIM(PurchAir(Loop)%cObjectName)//' = '// &
+                               TRIM(PurchAir(Loop)%Name)//' is not on any ZoneHVAC:EquipmentList.  It will not be simulated.')
         ENDDO
       ENDIF
 
@@ -921,40 +946,55 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       IF (.not. OneTimeUnitInitsDone(PurchAirNum)) THEN
         OneTimeUnitInitsDone(PurchAirNum) = .true.
 
+        ! Is the supply node really a zone inlet node?
+        ! this check has to be done here because of SimPurchasedAir passing in ControlledZoneNum
+        SupplyNodeNum = PurchAir(PurchAirNum)%ZoneSupplyAirNodeNum
+        IF (SupplyNodeNum .GT. 0) THEN
+          NodeIndex = FindNumberinList(SupplyNodeNum, ZoneEquipConfig(ControlledZoneNum)%InletNode, &
+                                           ZoneEquipConfig(ControlledZoneNum)%NumInletNodes)
+          IF (NodeIndex == 0) THEN
+            CALL ShowSevereError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                  TRIM(PurchAir(PurchAirNum)%Name))
+            CALL ShowContinueError('Zone Supply Air Node Name='//TRIM(NodeID(SupplyNodeNum))//' is not a zone inlet node.')
+            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// & 
+                                   TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
+            CALL ShowFatalError('Preceding condition causes termination.')
+          END IF
+        END IF
+
         ! Set recirculation node number
         ! If exhaust node is specified, then recirculation is exhaust node, otherwise use zone return node
         ! this check has to be done here because of SimPurchasedAir passing in ControlledZoneNum
+        UseReturnNode = .false.
         IF (PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum .GT. 0) THEN
-          PurchAir(PurchAirNum)%ZoneRecircAirNodeNum = PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum
-        ELSE IF (ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode .GT. 0) THEN
-          PurchAir(PurchAirNum)%ZoneRecircAirNodeNum = ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode
+          ExhaustNodeNum = PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum
+          NodeIndex = FindNumberinList(ExhaustNodeNum, ZoneEquipConfig(ControlledZoneNum)%ExhaustNode, &
+                                           ZoneEquipConfig(ControlledZoneNum)%NumExhaustNodes)
+          IF (NodeIndex == 0) THEN
+            CALL ShowSevereError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                  TRIM(PurchAir(PurchAirNum)%Name))
+            CALL ShowContinueError('Zone Exhaust Air Node Name='//TRIM(NodeID(ExhaustNodeNum))//' is not a zone exhaust node.')
+            CALL ShowContinueError('Check ZoneHVAC:EquipmentConnections for zone='// & 
+                                   TRIM(ZoneEquipConfig(ControlledZoneNum)%ZoneName))
+            CALL ShowContinueError('Zone return air node will be used for ideal loads recirculation air.')
+            UseReturnNode = .true.
+          ELSE
+            PurchAir(PurchAirNum)%ZoneRecircAirNodeNum = PurchAir(PurchAirNum)%ZoneExhaustAirNodeNum
+          END IF
         ELSE
-          CALL ShowFatalError('Ideal Loads Air: ['//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
-                TRIM(PurchAir(PurchAirNum)%Name)//'] Invalid recirculation node, no exhaust or return node has been specified')
+          UseReturnNode = .true.
         END IF
-
-        !  If OA specified, fetch OA specifications and apply zone area, volume and multipliers
-        IF(PurchAir(PurchAirNum)%OutdoorAir) THEN
-          PurchAir(PurchAirNum)%ZoneOutdoorAirMethod = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowMethod
-          PurchAir(PurchAirNum)%OAFlowPerPerson = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowPerPerson
-          PurchAir(PurchAirNum)%OAFlowPerZone   = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowPerZone
-          PurchAir(PurchAirNum)%OAFlowPerArea   = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowPerArea * &
-                                          Zone(ActualZoneNum)%Volume
-          PurchAir(PurchAirNum)%OAFlowFracSchPtr = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowFracSchPtr
-          PurchAir(PurchAirNum)%OAFlowACH = OARequirements(PurchAir(PurchAirNum)%OARequirementsPtr)%OAFlowACH * &
-                                          Zone(ActualZoneNum)%Volume / 3600.d0
-        ! Apply zone multipliers and zone list multipliers
-          PurchAir(PurchAirNum)%OAFlowPerPerson = &
-              PurchAir(PurchAirNum)%OAFlowPerPerson * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier
-          PurchAir(PurchAirNum)%OAFlowPerZone   = &
-              PurchAir(PurchAirNum)%OAFlowPerZone * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier
-          PurchAir(PurchAirNum)%OAFlowPerArea   = &
-              PurchAir(PurchAirNum)%OAFlowPerArea * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier
-          PurchAir(PurchAirNum)%OAFlowACH       = &
-              PurchAir(PurchAirNum)%OAFlowACH * Zone(ActualZoneNum)%Multiplier * Zone(ActualZoneNum)%ListMultiplier
+        IF(UseReturnNode) THEN
+          IF (ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode .GT. 0) THEN
+            PurchAir(PurchAirNum)%ZoneRecircAirNodeNum = ZoneEquipConfig(ControlledZoneNum)%ReturnAirNode
+          ELSE
+            CALL ShowFatalError('InitPurchasedAir: In '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
+                  TRIM(PurchAir(PurchAirNum)%Name))
+            CALL ShowContinueError(' Invalid recirculation node. No exhaust or return node has been'// &
+                  ' specified for this zone in ZoneHVAC:EquipmentConnections.')
+            CALL ShowFatalError('Preceding condition causes termination.')
+          END IF
         END IF
-
-
       END IF
 
       IF ( .NOT. SysSizingCalc .AND. MySizeFlag(PurchAirNum) ) THEN
@@ -992,18 +1032,18 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ZoneThermostatSetPointHi(ActualZoneNum) .NE. 0 .and. PurchAir(PurchAirNum)%CoolingLimit == NoLimit) THEN
             ! Check if the unit is scheduled off
         UnitOn = .true.
-        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
+!        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
           IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%AvailSchedPtr) <= 0) THEN
             UnitOn = .FALSE.
           END IF
-        END IF
+!        END IF
             ! Check if cooling available
         CoolOn = .TRUE.
-        IF (PurchAir(PurchAirNum)%CoolSchedPtr > 0) THEN
+!        IF (PurchAir(PurchAirNum)%CoolSchedPtr > 0) THEN
           IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%CoolSchedPtr) <= 0) THEN
             CoolOn = .FALSE.
           END IF
-        END IF
+!        END IF
         IF (UnitOn .and. CoolOn) THEN
           IF (PurchAir(PurchAirNum)%CoolErrIndex == 0) THEN
             CALL ShowSevereError('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '// &
@@ -1031,18 +1071,18 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
           ZoneThermostatSetPointLo(ActualZoneNum) .NE. 0 .and. PurchAir(PurchAirNum)%HeatingLimit == NoLimit) THEN
             ! Check if the unit is scheduled off
         UnitOn = .true.
-        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
+!        IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
           IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%AvailSchedPtr) <= 0) THEN
             UnitOn = .FALSE.
           END IF
-        END IF
+!        END IF
             ! Check if heating and cooling available
         HeatOn = .TRUE.
-        IF (PurchAir(PurchAirNum)%HeatSchedPtr > 0) THEN
+!        IF (PurchAir(PurchAirNum)%HeatSchedPtr > 0) THEN
           IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%HeatSchedPtr) <= 0) THEN
             HeatOn = .FALSE.
           END IF
-        END IF
+!        END IF
         IF (UnitOn .and. HeatOn) THEN
           IF (PurchAir(PurchAirNum)%HeatErrIndex == 0) THEN
             CALL ShowSevereMessage('InitPurchasedAir: For '//TRIM(PurchAir(PurchAirNum)%cObjectName)//' = '//&
@@ -1179,7 +1219,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
       END IF
 
       IF ((PurchAir(PurchAirNum)%MaxCoolTotCap == AutoSize) .AND. &
-          ((PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRate) .OR. &
+          ((PurchAir(PurchAirNum)%CoolingLimit == LimitCapacity) .OR. &
            (PurchAir(PurchAirNum)%CoolingLimit == LimitFlowRateAndCapacity))) THEN
 
         IF (CurZoneEqNum > 0) THEN
@@ -1353,24 +1393,24 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
          ENDIF
 
             ! Check if the unit is scheduled off
-         IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
+!         IF (PurchAir(PurchAirNum)%AvailSchedPtr > 0) THEN
              IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%AvailSchedPtr) <= 0) THEN
                  UnitOn = .FALSE.
              END IF
-         END IF
+!         END IF
             ! Check if heating and cooling available
          HeatOn = .TRUE.
-         IF (PurchAir(PurchAirNum)%HeatSchedPtr > 0) THEN
+!         IF (PurchAir(PurchAirNum)%HeatSchedPtr > 0) THEN
              IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%HeatSchedPtr) <= 0) THEN
                  HeatOn = .FALSE.
              END IF
-         END IF
+!         END IF
          CoolOn = .TRUE.
-         IF (PurchAir(PurchAirNum)%CoolSchedPtr > 0) THEN
+!         IF (PurchAir(PurchAirNum)%CoolSchedPtr > 0) THEN
              IF (GetCurrentScheduleValue(PurchAir(PurchAirNum)%CoolSchedPtr) <= 0) THEN
                  CoolOn = .FALSE.
              END IF
-         END IF
+!         END IF
 
          IF (UnitON) THEN
              ! Calculate current minimum outdoor air flow rate based on design OA specifications and DCV or CO2 control
@@ -1468,7 +1508,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
              SupplyMassFlowRateForDehum = 0.0d0
              IF (CoolOn) THEN
                IF (PurchAir(PurchAirNum)%DehumidCtrlType .EQ. Humidistat) THEN
-                 MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToDehumidifyingSP
+                 MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToDehumidSP
                  DeltaHumRat = (PurchAir(PurchAirNum)%MinCoolSuppAirHumRat - Node(ZoneNodeNum)%HumRat)
                  IF ((DeltaHumRat < -SmallDeltaHumRat) .AND. (MdotZnDehumidSP .LT. 0.0d0)) THEN
                    SupplyMassFlowRateForDehum = MdotZnDehumidSP/DeltaHumRat
@@ -1484,7 +1524,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                IF (PurchAir(PurchAirNum)%HumidCtrlType .EQ. Humidistat) THEN
                  IF ((PurchAir(PurchAirNum)%DehumidCtrlType .EQ. Humidistat) .OR. &
                      (PurchAir(PurchAirNum)%DehumidCtrlType .EQ. None)) THEN
-                   MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToHumidifyingSP
+                   MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToHumidSP
                    DeltaHumRat = (PurchAir(PurchAirNum)%MaxHeatSuppAirHumRat - Node(ZoneNodeNum)%HumRat)
                    IF ((DeltaHumRat > SmallDeltaHumRat) .AND. (MdotZnHumidSP .GT. 0.0d0)) THEN
                      SupplyMassFlowRateForHumid = MdotZnHumidSP/DeltaHumRat
@@ -1561,7 +1601,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    ! But don't let it be higher than incoming MixedAirHumRat
                    SupplyHumRat = MIN(SupplyHumRat,MixedAirHumRat)
                  CASE(Humidistat)
-                   MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToDehumidifyingSP
+                   MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToDehumidSP
                    SupplyHumRatForDehum = MdotZnDehumidSP/SupplyMassFlowRate + Node(ZoneNodeNum)%HumRat
                    SupplyHumRatForDehum = MIN(SupplyHumRatForDehum,PurchAir(PurchAirNum)%MinCoolSuppAirHumRat)
                    SupplyHumRat = MIN(MixedAirHumRat,SupplyHumRatForDehum)
@@ -1578,7 +1618,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  IF (PurchAir(PurchAirNum)%HumidCtrlType .EQ. Humidistat) THEN
                    IF ((PurchAir(PurchAirNum)%DehumidCtrlType .EQ. Humidistat) .OR. &
                        (PurchAir(PurchAirNum)%DehumidCtrlType .EQ. None)) THEN
-                     MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToHumidifyingSP
+                     MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToHumidSP
                      SupplyHumRatForHumid = MdotZnHumidSP/SupplyMassFlowRate + Node(ZoneNodeNum)%HumRat
                      SupplyHumRatForHumid = MIN(SupplyHumRatForHumid,PurchAir(PurchAirNum)%MaxHeatSuppAirHumRat)
                      SupplyHumRat = MAX(SupplyHumRat,SupplyHumRatForHumid)
@@ -1727,7 +1767,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  IF ((PurchAir(PurchAirNum)%HumidCtrlType .EQ. Humidistat) .OR. &
                      (PurchAir(PurchAirNum)%HumidCtrlType .EQ. None) .OR. &
                      (OperatingMode == Deadband)) THEN
-                   MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToDehumidifyingSP
+                   MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToDehumidSP
                    DeltaHumRat = (PurchAir(PurchAirNum)%MinCoolSuppAirHumRat - Node(ZoneNodeNum)%HumRat)
                    IF ((DeltaHumRat < -SmallDeltaHumRat) .AND. (MdotZnDehumidSP .LT. 0.0d0)) THEN
                      SupplyMassFlowRateForDehum = MdotZnDehumidSP/DeltaHumRat
@@ -1740,7 +1780,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
              SupplyMassFlowRateForHumid = 0.0d0
              IF (HeatOn) THEN
                IF (PurchAir(PurchAirNum)%HumidCtrlType .EQ. Humidistat) THEN
-                 MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToHumidifyingSP
+                 MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToHumidSP
                  DeltaHumRat = (PurchAir(PurchAirNum)%MaxHeatSuppAirHumRat - Node(ZoneNodeNum)%HumRat)
                  IF ((DeltaHumRat > SmallDeltaHumRat) .AND. (MdotZnHumidSP .GT. 0.0d0)) THEN
                    SupplyMassFlowRateForHumid = MdotZnHumidSP/DeltaHumRat
@@ -1799,7 +1839,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                  CASE(None)
                    SupplyHumRat = MixedAirHumRat
                  CASE(Humidistat)
-                   MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToHumidifyingSP
+                   MdotZnHumidSP = ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToHumidSP
                    SupplyHumRatForHumid = MdotZnHumidSP/SupplyMassFlowRate + Node(ZoneNodeNum)%HumRat
                    SupplyHumRatForHumid = MIN(SupplyHumRatForHumid,PurchAir(PurchAirNum)%MaxHeatSuppAirHumRat)
                    SupplyHumRat = MAX(SupplyHumRat,SupplyHumRatForHumid)
@@ -1844,7 +1884,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
                    IF ((PurchAir(PurchAirNum)%HumidCtrlType .EQ. Humidistat) .OR. &
                        (PurchAir(PurchAirNum)%HumidCtrlType .EQ. None) .OR. &
                        (OperatingMode == Deadband)) THEN
-                     MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%OutputRequiredToDehumidifyingSP
+                     MdotZnDehumidSP= ZoneSysMoistureDemand(ActualZoneNum)%RemainingOutputReqToDehumidSP
                      SupplyHumRatForDehum = MdotZnDehumidSP/SupplyMassFlowRate + Node(ZoneNodeNum)%HumRat
                      SupplyHumRatForDehum = MAX(SupplyHumRatForDehum,PurchAir(PurchAirNum)%MinCoolSuppAirHumRat)
                      SupplyHumRat = MIN(SupplyHumRat, SupplyHumRatForDehum)
@@ -2065,6 +2105,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
         USE DataEnvironment,   ONLY: StdRhoAir
         USE DataSizing, ONLY: OAFlowPPer, OAFlow, OAFlowPerArea, OAFlowACH, OAFlowSum, OAFlowMax
         USE DataContaminantBalance, ONLY: ZoneSysContDemand
+        USE DataZoneEquipment, ONLY: CalcDesignSpecificationOutdoorAir
 
         IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2074,7 +2115,7 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
         REAL(r64), INTENT(OUT)   :: OAMassFlowRate ! outside air mass flow rate [kg/s] from volume flow using std density
 
               ! FUNCTION PARAMETER DEFINITIONS:
-              ! na
+        LOGICAL, PARAMETER   :: UseMinOASchFlag = .TRUE. ! Always use min OA schedule in calculations.
 
               ! INTERFACE BLOCK SPECIFICATIONS
               ! na
@@ -2083,58 +2124,18 @@ SUBROUTINE SimPurchasedAir(PurchAirName, SysOutputProvided, MoistOutputProvided,
               ! na
 
               ! FUNCTION LOCAL VARIABLE DECLARATIONS:
-        REAL(r64) :: PeopleOAFlow          ! amount of OA based on occupants [m3/s]
-        REAL(r64) :: OAVolumeFlowRate      ! outside air flow rate (m3/s - standard density, direct from user inputs)
+        LOGICAL   :: UseOccSchFlag     ! TRUE = use actual occupancy, FALSE = use total zone people
+        REAL(r64) :: OAVolumeFlowRate  ! outside air flow rate (m3/s)
 
         IF (PurchAir(PurchAirNum)%OutdoorAir) THEN
-           ! initialize OA flow rates
-          PeopleOAFlow     = 0.0d0
-          OAVolumeFlowRate = 0.0d0
-          OAMassFlowRate   = 0.0d0
 
-          ! Calculate people outdoor air flow rate based on demand controlled ventilation type
-          SELECT CASE(PurchAir(PurchAirNum)%DCVType)
-            CASE(NoDCV, CO2Setpoint)
-              ! For no DCV and CO2Setpoint, use design occupancy level to compute minimum OA flow rate
-              ! CO2Setpoint control may increase this later
-              ! ???? Need multiplier here ????
-              PeopleOAFlow = Zone(ActualZoneNum)%TotOccupants * PurchAir(PurchAirNum)%OAFlowPerPerson
-            CASE(OccupancySchedule)
-              ! For OccupancySchedule, use current occupancy level
-              ! ???? Need multiplier here ????
-              PeopleOAFlow = ZoneIntGain(ActualZoneNum)%NOFOCC * PurchAir(PurchAirNum)%OAFlowPerPerson
-          END SELECT
-
-          ! Calculate minimum outdoor air flow rate, zone multipliers are applied in GetInput
-          SELECT CASE(PurchAir(PurchAirNum)%ZoneOutdoorAirMethod)
-            CASE(OAFlowPPer)
-              OAVolumeFlowRate = PeopleOAFlow
-            CASE(OAFlow)
-              OAVolumeFlowRate = PurchAir(PurchAirNum)%OAFlowPerZone
-            CASE(OAFlowPerArea)
-              ! Multiplied by zone floor area during GetInput
-              OAVolumeFlowRate = PurchAir(PurchAirNum)%OAFlowPerArea
-            CASE(OAFlowACH)
-              ! Multiplied by zone volume during GetInput
-              OAVolumeFlowRate = PurchAir(PurchAirNum)%OAFlowACH
-            CASE(OAFlowSum, OAFlowMax)
-              IF(PurchAir(PurchAirNum)%ZoneOutdoorAirMethod == OAFlowMax)THEN
-                OAVolumeFlowRate = MAX(PeopleOAFlow, PurchAir(PurchAirNum)%OAFlowPerZone, PurchAir(PurchAirNum)%OAFlowPerArea, &
-                                   PurchAir(PurchAirNum)%OAFlowACH)
-              ELSE
-                OAVolumeFlowRate = PeopleOAFlow + PurchAir(PurchAirNum)%OAFlowPerZone + PurchAir(PurchAirNum)%OAFlowPerArea &
-                               + PurchAir(PurchAirNum)%OAFlowACH
-              END IF
-            CASE DEFAULT
-              OAVolumeFlowRate = 0.0d0
-          END SELECT
-
-          ! Apply the Outdoor Air Flow Rate Fraction Schedule
-          ! If no schedule specified, then multiplier is assumed to be 1
-          IF(PurchAir(PurchAirNum)%OAFlowFracSchPtr .GT. 0)THEN
-            OAVolumeFlowRate = OAVolumeFlowRate * GetCurrentScheduleValue(PurchAir(PurchAirNum)%OAFlowFracSchPtr)
+          IF(PurchAir(PurchAirNum)%DCVType == OccupancySchedule)THEN
+            UseOccSchFlag = .TRUE.
+          ELSE
+            UseOccSchFlag = .FALSE.
           END IF
-
+          OAVolumeFlowRate = CalcDesignSpecificationOutdoorAir(PurchAir(PurchAirNum)%OARequirementsPtr, &
+                                                                ActualZoneNum, UseOccSchFlag, UseMinOASchFlag)
           OAMassFlowRate = OAVolumeFlowRate * StdRhoAir
 
           ! If DCV with CO2Setpoint then check required OA flow to meet CO2 setpoint
@@ -2506,7 +2507,7 @@ FUNCTION GetPurchasedAirOutAirMassFlow(PurchAirNum) RESULT(OutAirMassFlow)
 END FUNCTION GetPurchasedAirOutAirMassFlow
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

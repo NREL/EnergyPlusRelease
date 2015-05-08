@@ -41,7 +41,7 @@ module TARCOGGassesParams
   !real(r64), parameter :: UniversalGasConst = 8314.462175d0 !(J/mol*K)
   real(r64), parameter :: alpha1 = 0.5d0 !accomodation coefficient for low pressure gas calculations
   real(r64), parameter :: alpha2 = 0.5d0 !accomodation coefficient for low pressure gas calculations
-  real(r64), parameter :: InputDataTolerance = 1e-7 !coefficient used for input data tolerance in case for displaying error message
+  real(r64), parameter :: InputDataTolerance = 1d-7 !coefficient used for input data tolerance in case for displaying error message
 
   !real(r64) :: gcon(maxgas,3), gvis(maxgas,3), gcp(maxgas,3), grho(maxgas,3), wght(maxgas)
 
@@ -85,7 +85,7 @@ module TARCOGGassesParams
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -377,7 +377,7 @@ module TARCOGGasses90
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -525,11 +525,15 @@ module TARCOGParams
   real(r64), parameter :: tempCorrection = 1d-10 !used in case outside or inside temperature approaches tamb or troom
   real(r64), parameter :: ConvergenceTolerance = 1d-2 ! tolerance used within iterations
 
+  ! Airflow iterations
+  real(r64), parameter :: AirflowConvergenceTolerance = 1d-2
+  real(r64), parameter :: AirflowRelaxationParameter = 0.9d0
+
   real(r64), parameter :: TemperatureQuessDiff = 1 ! in case outside and inside temperatures are identical
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -654,7 +658,7 @@ module TARCOGCommon
     return
   end function LDSumMean
 
-  subroutine matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, dir, asol, qv, &
+  subroutine matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, asol, qv, &
         Tin, Tout, Gin, Gout, theta, tir, rir, emis)
 
     use DataGlobals, only: StefanBoltzmann
@@ -663,7 +667,7 @@ module TARCOGCommon
     integer, intent(in) :: nlayer
     real(r64), dimension(maxlay), intent(in) :: scon, thick
     real(r64), dimension(maxlay1), intent(in) :: hcgas
-    real(r64), intent(in) :: hcout, hcin, Gin, Gout, dir
+    real(r64), intent(in) :: hcout, hcin, Gin, Gout
     real(r64), dimension(maxlay2), intent(in) :: tir, rir, emis, theta
 
     real(r64), dimension(maxlay), intent(in) :: asol
@@ -729,8 +733,8 @@ module TARCOGCommon
       k = 4*i - 3
       front = 2*i - 1
       back = 2*i
-      b(k) = dir * asol(i) + 0.5d0 * qv(i) + 0.5d0 * qv(i+1)
-      b(k+1)   = 0.5d0 * dir * asol(i) + 0.5d0 * qv(i)
+      b(k) = asol(i) + 0.5d0 * qv(i) + 0.5d0 * qv(i+1)
+      b(k+1)   = 0.5d0 * asol(i) + 0.5d0 * qv(i)
       if (i.eq.1) then
         b(k)   = b(k) + hcout*Tout + Gout
         b(k+1) = b(k+1) + hcout*Tout + Gout
@@ -899,7 +903,7 @@ module TARCOGCommon
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -2281,7 +2285,7 @@ module TARCOGOutput
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -2829,7 +2833,7 @@ module TARCOGArgs
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -3091,7 +3095,7 @@ module TARCOGDeflection
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -3474,12 +3478,17 @@ module TarcogShading
     real(r64) ::  dens0, visc0, con0, pr0, cp0
     real(r64) ::  dens1, visc1, con1, pr1, cp1
     real(r64) ::  dens2, visc2, con2, pr2, cp2
-    real(r64) ::  Tup, Tdown, Temp1, Temp2
+    real(r64) ::  Tup, Tdown
     real(r64) ::  H01, H02, beta1, beta2, alpha1, alpha2, P1, P2
     real(r64) ::  qsmooth
 
-    Temp1 = 0
-    Temp2 = 0
+    ! iteration parameters
+    integer :: iter
+    real(r64) :: TGapOld1, TGapOld2, Temp1, Temp2
+    logical :: converged
+
+    TGapOld1 = 0.0d0
+    TGapOld2 = 0.0d0
     tilt = pi/180 * (angle - 90)
     T0 = 0.0d0 + KelvinConv
     A1eqin = 0.0d0
@@ -3490,10 +3499,6 @@ module TarcogShading
     P2 = 0.0d0
 
     call gasses90(T0, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con0, visc0, dens0, cp0, pr0, 1, &
-                    nperr, ErrorMessage)
-    call gasses90(Tgap1, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con1, visc1, dens1, cp1, pr1, 1, &
-                    nperr, ErrorMessage)
-    call gasses90(Tgap2, iprop2, frct2, press2, nmix2, xwght, xgcon, xgvis, xgcp, con2, visc2, dens2, cp2, pr2, 1, &
                     nperr, ErrorMessage)
 
     ! exit on error:
@@ -3513,85 +3518,106 @@ module TarcogShading
       Abot = 0.000001d0
     end if
 
-  !  A = dens0 * T0 * GravityConstant * abs(cos(tilt)) * abs(Tgap1 - Tgap2) / (Tgap1 * Tgap2)
+    converged = .false.
+    iter = 0
+    do while (.not. converged)
+      iter = iter + 1
+      call gasses90(Tgap1, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con1, visc1, dens1, cp1, pr1, 1, &
+                    nperr, ErrorMessage)
+      call gasses90(Tgap2, iprop2, frct2, press2, nmix2, xwght, xgcon, xgvis, xgcp, con2, visc2, dens2, cp2, pr2, 1, &
+                    nperr, ErrorMessage)
 
-  !bi...Bug fix #00005:
-    A = dens0 * T0 * GravityConstant * H * ABS(COS(tilt)) * ABS(Tgap1 - Tgap2) / (Tgap1 * Tgap2)
-    
-    if (A == 0.0d0) then
-      qv1 = 0.0d0
-      qv2 = 0.0d0
-      speed1 = 0.0d0
-      speed2 = 0.0d0
-      hcv1 = 2.0d0 * hc1
-      hcv2 = 2.0d0 * hc2
-      return
-    endif
+      !  A = dens0 * T0 * GravityConstant * abs(cos(tilt)) * abs(Tgap1 - Tgap2) / (Tgap1 * Tgap2)
 
-    B1 = dens1 / 2
-    B2 = (dens2 / 2) * ((s1 / s2) ** 2)
+      !bi...Bug fix #00005:
+      A = dens0 * T0 * GravityConstant * H * ABS(COS(tilt)) * ABS(Tgap1 - Tgap2) / (Tgap1 * Tgap2)
 
-    C1 = 12 * visc1 * H / (s1 ** 2)
-    C2 = 12 * visc2 * (H / (s2 ** 2)) * (s1 / s2)
+      if (A == 0.0d0) then
+        qv1 = 0.0d0
+        qv2 = 0.0d0
+        speed1 = 0.0d0
+        speed2 = 0.0d0
+        hcv1 = 2.0d0 * hc1
+        hcv2 = 2.0d0 * hc2
+        return
+      endif
 
-    if (Tgap1 >= Tgap2) then
-      A1eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A2eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A1eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-      A2eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-    else if (Tgap1 < Tgap2) then
-      A1eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A2eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A1eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-      A2eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-    end if
+      B1 = dens1 / 2
+      B2 = (dens2 / 2) * ((s1 / s2) ** 2)
 
-    Zin1 = ((s1 * L / (0.6d0 * A1eqin)) - 1) ** 2
-    Zin2 = ((s2 * L / (0.6d0 * A2eqin)) - 1) ** 2
-    Zout1 = ((s1 * L / (0.6d0 * A1eqout)) - 1) ** 2
-    Zout2 = ((s2 * L / (0.6d0 * A2eqout)) - 1) ** 2
+      C1 = 12 * visc1 * H / (s1 ** 2)
+      C2 = 12 * visc2 * (H / (s2 ** 2)) * (s1 / s2)
 
-    D1 = (dens1 / 2.0d0) * (Zin1 + Zout1)
-    D2 = (dens2 / 2.0d0) * ((s1 / s2) ** 2.0d0) * (Zin2 + Zout2)
+      if (Tgap1 >= Tgap2) then
+        A1eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A2eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A1eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+        A2eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+      else if (Tgap1 < Tgap2) then
+        A1eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A2eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A1eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+        A2eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+      end if
 
-    A1 = B1 + D1 + B2 + D2
-    A2 = C1 + C2
+      Zin1 = ((s1 * L / (0.6d0 * A1eqin)) - 1) ** 2
+      Zin2 = ((s2 * L / (0.6d0 * A2eqin)) - 1) ** 2
+      Zout1 = ((s1 * L / (0.6d0 * A1eqout)) - 1) ** 2
+      Zout2 = ((s2 * L / (0.6d0 * A2eqout)) - 1) ** 2
 
-    speed1 = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
-    speed2 = speed1 * s1 / s2
+      D1 = (dens1 / 2.0d0) * (Zin1 + Zout1)
+      D2 = (dens2 / 2.0d0) * ((s1 / s2) ** 2.0d0) * (Zin2 + Zout2)
 
-    H01 = (dens1 * cp1 * s1 * speed1) / (4.0d0 * hc1 + 8.0d0 * speed1)
-    H02 = (dens2 * cp2 * s2 * speed2) / (4.0d0 * hc2 + 8.0d0 * speed2)
-    
-    if ((H01 /= 0.0d0).and.(H02 /= 0.0d0)) then
-      P1 = - H / H01
-      P2 = - H / H02
-    end if
+      A1 = B1 + D1 + B2 + D2
+      A2 = C1 + C2
 
-    beta1 = e ** P1
-    beta2 = e ** P2
+      speed1 = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
+      speed2 = speed1 * s1 / s2
 
-    alpha1 = 1 - beta1
-    alpha2 = 1 - beta2
+      H01 = (dens1 * cp1 * s1 * speed1) / (4.0d0 * hc1 + 8.0d0 * speed1)
+      H02 = (dens2 * cp2 * s2 * speed2) / (4.0d0 * hc2 + 8.0d0 * speed2)
 
-    if (Tgap1 > Tgap2) then
-      Tup = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
-      Tdown = alpha2 * Tav2 + beta2 * Tup
-    else if (Tgap2 >= Tgap1) then
-      Tdown = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
-      Tup = alpha2 * Tav2 + beta2 * Tdown
-    end if
+      if ((H01 /= 0.0d0).and.(H02 /= 0.0d0)) then
+        P1 = - H / H01
+        P2 = - H / H02
+      end if
 
-    if (Tgap1 > Tgap2) then
-      Temp1 = Tav1 - (H01 / H) * (Tup - Tdown)
-      Temp2 = Tav2 - (H02 / H) * (Tdown - Tup)
-    else if (Tgap2 >= Tgap1) then
-      Temp1 = Tav1 - (H01 / H) * (Tdown - Tup)
-      Temp2 = Tav2 - (H02 / H) * (Tup - Tdown)
-    end if
+      beta1 = e ** P1
+      beta2 = e ** P2
 
-    Tgap1 = Temp1
-    Tgap2 = Temp2
+      alpha1 = 1 - beta1
+      alpha2 = 1 - beta2
+
+      if (Tgap1 > Tgap2) then
+        Tup = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
+        Tdown = alpha2 * Tav2 + beta2 * Tup
+      else if (Tgap2 >= Tgap1) then
+        Tdown = (alpha1 * Tav1 + beta1 * alpha2 * Tav2) / (1 - beta1 * beta2)
+        Tup = alpha2 * Tav2 + beta2 * Tdown
+      end if
+
+      TGapOld1 = Tgap1
+      TGapOld2 = Tgap2
+
+      if (Tgap1 > Tgap2) then
+        Temp1 = Tav1 - (H01 / H) * (Tup - Tdown)
+        Temp2 = Tav2 - (H02 / H) * (Tdown - Tup)
+      else if (Tgap2 >= Tgap1) then
+        Temp1 = Tav1 - (H01 / H) * (Tdown - Tup)
+        Temp2 = Tav2 - (H02 / H) * (Tup - Tdown)
+      end if
+
+      Tgap1 = AirflowRelaxationParameter * Temp1 + (1 - AirflowRelaxationParameter) * TGapOld1
+      Tgap2 = AirflowRelaxationParameter * Temp2 + (1 - AirflowRelaxationParameter) * TGapOld2
+
+      converged = .false.
+      if ((abs(Tgap1 - TGapOld1) < AirflowConvergenceTolerance) .or. (iter >= NumOfIterations)) then
+        if (abs(Tgap2 - TGapOld2) < AirflowConvergenceTolerance) then
+          converged = .true.
+        end if
+      endif
+
+    end do
 
     hcv1 = 2.0d0 * hc1 + 4.0d0 * speed1
     hcv2 = 2.0d0 * hc2 + 4.0d0 * speed2
@@ -3682,20 +3708,23 @@ module TarcogShading
     real(r64) :: A1eqin, A1eqout
     real(r64) :: T0, tilt
     real(r64) :: dens0, visc0, con0, pr0, cp0
-    real(r64) :: dens1, visc1, con1, pr1, cp1
+    !real(r64) :: dens1, visc1, con1, pr1, cp1
     real(r64) :: dens2, visc2, con2, pr2, cp2
     real(r64) :: Tgapout, forcedspeed
     real(r64) :: H0, P, beta
+
+    ! iteration parameters
+    integer :: iter
+    real(r64) :: TGapOld
+    logical :: converged
 
     tilt = pi/180 * (angle - 90)
     T0 = 0.0d0 + KelvinConv
 
     call gasses90(T0, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con0, visc0, dens0, cp0, pr0, 1, &
                     nperr, ErrorMessage)
-    call gasses90(Tenv, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con1, visc1, dens1, cp1, pr1, 1, &
-                    nperr, ErrorMessage)
-    call gasses90(Tgap, iprop2, frct2, press2, nmix2, xwght, xgcon, xgvis, xgcp, con2, visc2, dens2, cp2, pr2, 1, &
-                    nperr, ErrorMessage)
+    !call gasses90(Tenv, iprop1, frct1, press1, nmix1, xwght, xgcon, xgvis, xgcp, con1, visc1, dens1, cp1, pr1, 1, &
+    !                nperr, ErrorMessage)
 
     ! exit on error:
     if ((nperr.gt.0).and.(nperr.lt.1000))  return
@@ -3717,55 +3746,76 @@ module TarcogShading
       Ah = 0.000001d0
     end if
 
+    converged = .false.
+    iter = 0
+    do while (.not. converged)
+      iter = iter + 1
+      call gasses90(Tgap, iprop2, frct2, press2, nmix2, xwght, xgcon, xgvis, xgcp, con2, visc2, dens2, cp2, pr2, 1, &
+                      nperr, ErrorMessage)
 
-  !  A = dens0 * T0 * gravity * abs(cos(tilt)) * abs(Tgap - Tenv) / (Tgap * Tenv)
+      if ((nperr.gt.0).and.(nperr.lt.1000))  return
 
-  !bi...Bug fix #00005:
-    A = dens0 * T0 * GravityConstant * H * abs(cos(tilt)) * abs(Tgap - Tenv) / (Tgap * Tenv)
-  !  A = dens0 * T0 * GravityConstant * H * abs(cos(tilt)) * (Tgap - Tenv) / (Tgap * Tenv)
+    !  A = dens0 * T0 * gravity * abs(cos(tilt)) * abs(Tgap - Tenv) / (Tgap * Tenv)
 
-    B1 = dens2 / 2
-    C1 = 12.0d0 * visc2 * H / (s ** 2.0d0)
+    !bi...Bug fix #00005:
+      A = dens0 * T0 * GravityConstant * H * abs(cos(tilt)) * abs(Tgap - Tenv) / (Tgap * Tenv)
+    !  A = dens0 * T0 * GravityConstant * H * abs(cos(tilt)) * (Tgap - Tenv) / (Tgap * Tenv)
 
-    if (Tgap > Tenv) then
-      A1eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A1eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-    else if (Tgap <= Tenv) then
-      A1eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
-      A1eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
-    end if
+      B1 = dens2 / 2
+      C1 = 12.0d0 * visc2 * H / (s ** 2.0d0)
 
-    Zin1 = ((s * L / (0.6d0 * A1eqin)) - 1) ** 2.0d0
-    Zout1 = ((s * L / (0.6d0 * A1eqout)) - 1) ** 2.0d0
+      if (Tgap > Tenv) then
+        A1eqin = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A1eqout = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+      else if (Tgap <= Tenv) then
+        A1eqout = Abot + 0.5d0 * Atop * (Al + Ar + Ah) / (Abot + Atop)
+        A1eqin = Atop + 0.5d0 * Abot * (Al + Ar + Ah) / (Abot + Atop)
+      end if
 
-    D1 = (dens2 / 2.0d0) * (Zin1 + Zout1)
+      Zin1 = ((s * L / (0.6d0 * A1eqin)) - 1) ** 2.0d0
+      Zout1 = ((s * L / (0.6d0 * A1eqout)) - 1) ** 2.0d0
 
-    A1 = B1 + D1
-    A2 = C1
+      D1 = (dens2 / 2.0d0) * (Zin1 + Zout1)
 
-  !dr...recalculate speed if forced speed exist
-  !bi...skip forced vent for now
-  !  if (forcedspeed.ne.0) then
-    if ((forcedspeed.ne.0.0d0).and.(CalcForcedVentilation.ne.0.0d0)) then
-      speed = forcedspeed
-    else
-      speed = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
-  !  speed = abs((sqrt((A2 ** 2) + (4 * A * A1)) - A2) / (2 * A1))
-    end if
+      A1 = B1 + D1
+      A2 = C1
 
-    ! Speed is zero when environment temperature is equal to average layer temperatures
-    ! For example, this can happen when inside and outside temperatures are equal
-    if (speed /= 0.0d0) then
-      H0 = (dens2 * cp2 * s * speed) / (4.0d0 * hc + 8.0d0 * speed)
+    !dr...recalculate speed if forced speed exist
+    !bi...skip forced vent for now
+    !  if (forcedspeed.ne.0) then
+      if ((forcedspeed.ne.0.0d0).and.(CalcForcedVentilation.ne.0.0d0)) then
+        speed = forcedspeed
+      else
+        speed = (SQRT((A2 ** 2.0d0) + ABS(4.0d0 * A * A1)) - A2) / (2.0d0 * A1)
+    !  speed = abs((sqrt((A2 ** 2) + (4 * A * A1)) - A2) / (2 * A1))
+      end if
 
-      P = - H / H0
-      beta = e ** P
-      Tgapout = Tav - (Tav - Tenv) * beta
-      Tgap = Tav - (H0 / H) * (Tgapout - Tenv)
-    else
-      Tgapout = Tav
-      Tgap = Tav
-    end if
+      TGapOld = Tgap
+
+      ! Speed is zero when environment temperature is equal to average layer temperatures
+      ! For example, this can happen when inside and outside temperatures are equal
+      if (speed /= 0.0d0) then
+        H0 = (dens2 * cp2 * s * speed) / (4.0d0 * hc + 8.0d0 * speed)
+
+        P = - H / H0
+        beta = e ** P
+        Tgapout = Tav - (Tav - Tenv) * beta
+        Tgap = Tav - (H0 / H) * (Tgapout - Tenv)
+      else
+        Tgapout = Tav
+        Tgap = Tav
+      end if
+
+      converged = .false.
+      if ((abs(Tgap - TGapOld) < AirflowConvergenceTolerance) .or. (iter >= NumOfIterations)) then
+        converged = .true.
+      end if
+
+      !if (iter > NumOfIterations) then
+      !  converged = .true.
+      !end if
+
+    end do
 
   !bi...Test output:
   !  write(*,101) tenv, tgap, tgapout
@@ -3779,7 +3829,7 @@ module TarcogShading
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -3901,6 +3951,8 @@ module ThermalEN673Calc
     real(r64) :: rtot, sft
 
     !call  propcon90(standard, mgas, gcon, gvis, gcp, grho, wght, nperr)
+    rtot=0.0d0
+    sft=0.0d0
     if (GoAhead(nperr)) then
       call  EN673ISO10292(nlayer, tout, tind, emis, gap, thick, scon, tilt, iprop, frct,xgcon,xgvis,xgcp,xwght, &
                               presure, nmix, theta,standard, hg, hr, hs, hin, hout, hcin, ibc, rs, ufactor, Ra, Nu, nperr, &
@@ -3967,7 +4019,8 @@ module ThermalEN673Calc
 
     if (ibc(1).ne.1) then
       nperr = 38
-      ErrorMessage = 'Boundary conditions for EN673 can be combined hout for outdoor and either convective (hcin) or combined (hin) for indoor.  Others are not supported currently.'
+      ErrorMessage = 'Boundary conditions for EN673 can be combined hout for outdoor and either convective (hcin) '//  &
+         'or combined (hin) for indoor.  Others are not supported currently.'
       return
     end if
 
@@ -4202,7 +4255,7 @@ module ThermalEN673Calc
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -4455,7 +4508,7 @@ module ThermalISO15099Calc
 
     real(r64), dimension(maxlay2) :: thetas, rir
     real(r64), dimension(maxlay1) :: hcgass, hrgass
-    real(r64), dimension(maxlay3) :: rs
+    real(r64), dimension(maxlay3) :: rs=0.0d0
 
   !  real(r64) :: grho(maxgas,3)
     real(r64), dimension(maxlay3) :: qs
@@ -4520,9 +4573,18 @@ module ThermalISO15099Calc
     real(r64) ::  flux, hint, houtt, Ebsky, Ebroom
     integer :: i, j
     integer :: OriginalIndex, UnshadedDebug
-    real(r64) ::  rtot, sft
-    real(r64) ::  hcins, hrins, hins, hcouts, hrouts, houts, ufactors, fluxs
-    real(r64) ::  qeff, flux_nonsolar
+    real(r64) ::  rtot=0.0d0
+    real(r64) ::  sft=0.0d0
+    real(r64) ::  hcins=0.0d0
+    real(r64) ::  hrins=0.0d0
+    real(r64) ::  hins=0.0d0
+    real(r64) ::  hcouts=0.0d0
+    real(r64) ::  hrouts=0.0d0
+    real(r64) ::  houts=0.0d0
+    real(r64) ::  ufactors=0.0d0
+    real(r64) ::  fluxs=0.0d0
+    real(r64) ::  qeff=0.0d0
+    real(r64) ::  flux_nonsolar=0.0d0
 
     AchievedErrorTolerance = 0.0d0
     AchievedErrorToleranceSolar = 0.0d0
@@ -4642,7 +4704,7 @@ module ThermalISO15099Calc
                         ThermalMod, Debug_mode, AchievedErrorTolerance, NumOfIter)
 
           NumOfIterations = NumOfIter
-          
+
           !exit on error:
           if (.not.(GoAhead(nperr))) return
 
@@ -5069,6 +5131,7 @@ module ThermalISO15099Calc
 
     logical :: iterationsFinished ! To mark whether or not iterations are finished
     logical :: saveIterationResults
+    logical :: updateGapTemperature
     !logical :: TurnOnNewton
 
     SDLayerIndex = -1
@@ -5159,6 +5222,11 @@ module ThermalISO15099Calc
             hcin, hcout, hrin, hrout, hin, hout, Ebb, Ebf, Rb, Rf, nperr)
     end if
 
+    Tgap(1) = tout
+    Tgap(nlayer+1) = tind
+    do i =2, nlayer
+      Tgap(i) = (theta(2*i-1) + theta(2*i-2) ) / 2
+    end do
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!! MAIN ITERATION LOOP
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -5170,13 +5238,31 @@ module ThermalISO15099Calc
         end if
       end do
 
+      !do i=1,nlayer+1
+      !  if (i == 1) then
+      !    Tgap(i) = tout
+      !  else if (i == nlayer+1) then
+      !    Tgap(i) = tind
+      !  else
+      !    Tgap(i) = (theta(2*i-2) + theta(2*i-1)) / 2.0d0
+      !  end if
+      !end do
+
+      ! skip updating gap temperatures for shading devices. Gap temperature in that case is not simply average
+      ! between two layer temperatures
       do i =2, nlayer
-        Tgap(i) = (theta(2*i-1) + theta(2*i-2) ) / 2
+        updateGapTemperature = .false.
+        if ((.not.(IsShadingLayer(LayerType(i-1)))).and.(.not.(IsShadingLayer(LayerType(i))))) then
+          updateGapTemperature = .true.
+        end if
+        if (updateGapTemperature) then
+          Tgap(i) = (theta(2*i-1) + theta(2*i-2) ) / 2
+        end if
       end do
 
       ! evaluate convective/conductive components of gap
       call hatter(nlayer, iwd, tout, tind, wso, wsi, VacuumPressure, VacuumMaxGapThickness, Ebsky, Tamb, Ebroom, Troom, &
-                    gap, height, heightt, scon, tilt, theta, Radiation, Trmout, Trmin,  &
+                    gap, height, heightt, scon, tilt, theta, Tgap, Radiation, Trmout, Trmin,  &
                     iprop, frct, presure, nmix, wght, gcon, gvis, gcp, gama, &
                     SupportPillar, PillarSpacing, PillarRadius, &
                     hgas, hcgas, hrgas, hcin, hcout, hin, hout,  &
@@ -5197,7 +5283,7 @@ module ThermalISO15099Calc
           !qv(i)    = 0.0
           !hcv(i)   = 0.0
         !end do
-        call matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, dir, asol, qv, &
+        call matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, asol, qv, &
             Tind, Tout, Gin, Gout, theta, tir, rir, emis)
       else
         !bi...There are no Venetian layers, or ThermalMod is not CSM, so carry on as usual:
@@ -5208,7 +5294,7 @@ module ThermalISO15099Calc
         ! exit on error
         if (.not.(GoAhead(nperr))) return
 
-        call matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, dir, asol, qv, &
+        call matrixQBalance(nlayer, a, b, scon, thick, hcgas, hcout, hcin, asol, qv, &
             Tind, Tout, Gin, Gout, theta, tir, rir, emis)
 
       end if !  end if
@@ -5269,9 +5355,11 @@ module ThermalISO15099Calc
       !end do
 
       curDifference = abs(theta(1) - told(1))
+      !curDifference = abs(FRes(1))
       do i = 2, 2*nlayer
+      !do i = 2, 4*nlayer
         curDifference = max(curDifference, abs(theta(i) - told(i)))
-        !curDifference = curDifference + abs(FRes(i))
+        !curDifference = MAX(abs(FRes(i)), curDifference)
       end do
 
       do i=1, nlayer
@@ -5296,12 +5384,29 @@ module ThermalISO15099Calc
         !end if
       end do
 
-      do i=1, nlayer
-        j = 2*i
-        if (i.eq.1) then
-          Tgap(1) = tout
+      ! it is important not to update gaps around shading layers since that is already calculated by
+      ! shading routines
+      do i=1, nlayer+1
+        updateGapTemperature = .true.
+        if ((i.eq.1).or.(i.eq.nlayer+1)) then
+          ! update gap array with interior and exterior temperature
+          updateGapTemperature = .true.
         else
-          Tgap(i) = (theta(j) + theta(j-1) ) / 2
+          ! update gap temperature only if gap on both sides
+          updateGapTemperature = .false.
+          if ((.not.(IsShadingLayer(LayerType(i-1)))).and.(.not.(IsShadingLayer(LayerType(i))))) then
+            updateGapTemperature = .true.
+          end if
+        end if
+        j = 2*(i-1)
+        if (updateGapTemperature) then
+          if (i.eq.1) then
+            Tgap(1) = tout
+          else if (i.eq.(nlayer+1)) then
+            Tgap(i) = tind
+          else
+            Tgap(i) = (theta(j) + theta(j+1) ) / 2
+          end if
         end if
       end do
 
@@ -5380,12 +5485,19 @@ module ThermalISO15099Calc
       end do
 
       do i =2, nlayer
-        Tgap(i) = (theta(2*i-1) + theta(2*i-2) ) / 2
+        updateGapTemperature = .false.
+        if ((.not.(IsShadingLayer(LayerType(i-1)))).and.(.not.(IsShadingLayer(LayerType(i))))) then
+          updateGapTemperature = .true.
+        end if
+
+        if (updateGapTemperature) then
+          Tgap(i) = (theta(2*i-1) + theta(2*i-2) ) / 2
+        end if
       end do
 
       ! Simon: It is important to recalculate coefficients from most accurate run
       call hatter(nlayer, iwd, tout, tind, wso, wsi, VacuumPressure, VacuumMaxGapThickness, Ebsky, Tamb, Ebroom, Troom, &
-                    gap, height, heightt, scon, tilt, theta, Radiation, Trmout, Trmin,  &
+                    gap, height, heightt, scon, tilt, theta, Tgap, Radiation, Trmout, Trmin,  &
                     iprop, frct, presure, nmix, wght, gcon, gvis, gcp, gama, &
                     SupportPillar, PillarSpacing, PillarRadius, hgas, hcgas, hrgas, hcin, hcout, hin, hout,  &
                     index, ibc, nperr, ErrorMessage, hrin, hrout, Ra, Nu)
@@ -5618,7 +5730,7 @@ module ThermalISO15099Calc
     fract = 0.0d0
     flowin = 0.0d0
     sf = 0.0d0
-    
+
     if (rtot == 0.0d0) then
       return
     end if
@@ -5710,7 +5822,7 @@ module ThermalISO15099Calc
   end subroutine
 
   subroutine hatter(nlayer, iwd, tout, tind, wso, wsi, VacuumPressure, VacuumMaxGapThickness, Ebsky, tamb, Ebroom, troom, &
-                      gap, height, heightt, scon, tilt, theta, Radiation, Trmout, Trmin, &
+                      gap, height, heightt, scon, tilt, theta, Tgap, Radiation, Trmout, Trmin, &
                       iprop, frct, presure, nmix, wght, gcon, gvis, gcp, gama, SupportPillar, PillarSpacing, PillarRadius, &
                       hgas, hcgas, hrgas, hcin, hcout, hin, hout, index, ibc, nperr, ErrorMessage, hrin, hrout, Ra, Nu )
     !***********************************************************************
@@ -5771,6 +5883,7 @@ module ThermalISO15099Calc
     real(r64), dimension(maxlay), intent(in) :: scon
     real(r64), dimension(maxlay1), intent(in) :: presure
     real(r64), dimension(maxlay2), intent(inout) :: theta, Radiation
+    real(r64), dimension(maxlay1), intent(in) :: Tgap
     real(r64), intent(inout) :: Ebsky, Ebroom
     real(r64), dimension(MaxGap), intent(in) :: gap
     integer, intent(in) :: SupportPillar(maxlay)
@@ -5814,7 +5927,7 @@ module ThermalISO15099Calc
       !end if
     !end do
 
-    call filmg(tilt, theta, nlayer, height, gap, iprop, frct, VacuumPressure, presure, nmix, &
+    call filmg(tilt, theta, Tgap, nlayer, height, gap, iprop, frct, VacuumPressure, presure, nmix, &
         wght, gcon, gvis, gcp, gama, hcgas, Ra, Nu, nperr, ErrorMessage)
 
     if (.not.(GoAhead(nperr))) then
@@ -5997,7 +6110,7 @@ module ThermalISO15099Calc
 
   end subroutine filmi
 
-  subroutine filmg(tilt, theta, nlayer, height, gap, iprop, frct, VacuumPressure, presure, &
+  subroutine filmg(tilt, theta, Tgap, nlayer, height, gap, iprop, frct, VacuumPressure, presure, &
                     nmix, wght, gcon, gvis, gcp, gama, hcgas, Rayleigh, Nu, nperr, ErrorMessage)
     !***********************************************************************
     ! sobroutine to calculate effective conductance of gaps
@@ -6027,6 +6140,7 @@ module ThermalISO15099Calc
 
     real(r64), intent(in) :: tilt, height, VacuumPressure
     real(r64), dimension(maxlay2), intent(in) :: theta
+    real(r64), dimension(maxlay1), intent(in) :: Tgap
     real(r64), dimension(MaxGap), intent(in) :: gap
     real(r64), dimension(maxlay1), intent(in) :: presure
     real(r64), dimension(maxlay1, maxgas), intent(in) :: frct
@@ -6040,7 +6154,7 @@ module ThermalISO15099Calc
     integer, intent (inout) :: nperr
     character(len=*), intent (inout) :: ErrorMessage
 
-    real(r64) :: con, visc, dens, cp, pr, tmean, delt, ra, asp, gnu
+    real(r64) :: con, visc, dens, cp, pr, delt, tmean, ra, asp, gnu
     real(r64), dimension(maxgas) :: frctg
     integer :: ipropg(maxgas), i, j, k, l
 
@@ -6050,7 +6164,8 @@ module ThermalISO15099Calc
       j = 2*i
       k = j+1
       ! determine the gas properties of each gap:
-      tmean = (theta(j)+theta(k))/2.
+      !tmean = (theta(j)+theta(k))/2.
+      tmean = Tgap(i+1) ! Tgap(1) is exterior environment
       delt = ABS(theta(j)-theta(k))
       do l=1, nmix(i+1)
         ipropg(l) = iprop(i+1,l)
@@ -6118,12 +6233,12 @@ module ThermalISO15099Calc
     do i=1, nlayer-1
       k = 2*i + 1
       if (SupportPillar(i).eq.YES_SupportPillar) then
-        if (gap(i).gt.(VacuumMaxGapThickness + InputDataTolerance)) then
-          nperr = 1007 !support pillar is not necessary for wide gaps (calculation will continue)
-          write(a, '(f12.6)') VacuumMaxGapThickness
-          write(b, '(i3)') i
-          ErrorMessage = 'Gap width is more than '//trim(a)//' and it contains support pillar. Gap #'//trim(b)
-        end if  !if (gap(i).gt.VacuumMaxGapThickness) then
+!lkl        if (gap(i).gt.(VacuumMaxGapThickness + InputDataTolerance)) then
+!lkl          nperr = 1007 !support pillar is not necessary for wide gaps (calculation will continue)
+!lkl          write(a, '(f12.6)') VacuumMaxGapThickness
+!lkl          write(b, '(i3)') i
+!lkl          ErrorMessage = 'Gap width is more than '//trim(a)//' and it contains support pillar. Gap #'//trim(b)
+!lkl        end if  !if (gap(i).gt.VacuumMaxGapThickness) then
 
         !Average glass conductivity is taken as average from both glass surrounding gap
         aveGlassConductivity = (scon(i) + scon(i+1)) / 2;
@@ -6639,7 +6754,7 @@ module ThermalISO15099Calc
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
@@ -7459,7 +7574,7 @@ module TARCOGMain
   end subroutine TARCOG90
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

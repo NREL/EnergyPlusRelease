@@ -302,6 +302,7 @@ SUBROUTINE CreateSQLiteDatabase
     USE InputProcessor
     USE DataGlobals, ONLY: MaxNameLength
     USE DataPrecisionGlobals, ONLY: r64
+    USE DataSystemVariables, ONLY: DDOnly
 
     IMPLICIT NONE ! Enforce explicit typing of all variables in this routine
 
@@ -343,10 +344,17 @@ SUBROUTINE CreateSQLiteDatabase
             CALL ShowSevereError('Output:SQLite Object, Option Type = ' //Alphas(1))
             CALL ShowContinueError('Valid choices are "Simple" and "SimpleAndTabular"')
             WriteOutputToSQLite = .FALSE.
+            WriteTabularDataToSQLite = .FALSE.
         END SELECT
     ELSE
-        WriteOutputToSQLite = .FALSE.
+      WriteTabularDataToSQLite = .FALSE.
+      WriteOutputToSQLite = .FALSE.
     END IF
+
+    IF (DDOnly) THEN
+      WriteTabularDataToSQLite = .FALSE.
+      WriteOutputToSQLite = .FALSE.
+    ENDIF
 
     IF (WriteOutputToSQLite) THEN
         result = SQLiteOpenDatabaseMacro (nameString)
@@ -629,7 +637,7 @@ SUBROUTINE InitializeIndexes
     result = SQLiteExecuteCommandMacro('CREATE INDEX rmdDI ON ReportMeterData (ReportMeterDataDictionaryIndex ASC);')
     result = SQLiteExecuteCommandMacro('CREATE INDEX tiTI ON Time (TimeIndex ASC);')
     result = SQLiteExecuteCommandMacro('CREATE INDEX dmhdHRI ON DaylightMapHourlyData (HourlyReportIndex ASC);')
-    
+
 END SUBROUTINE InitializeIndexes
 
 SUBROUTINE InitializeSimulationsTable
@@ -5547,7 +5555,7 @@ END MODULE SQLiteProcedures
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

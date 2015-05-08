@@ -40,11 +40,18 @@ INTEGER, PARAMETER :: WaterCooled = 2
 INTEGER, PARAMETER :: EvapCooled = 3
 REAL(r64), PARAMETER   :: KJtoJ = 1000.d0        !convert Kjoules to joules
 
+!chiller flow modes
+INTEGER, PARAMETER :: FlowModeNotSet           = 200
+INTEGER, PARAMETER :: ConstantFlow             = 201
+INTEGER, PARAMETER :: NotModulated             = 202
+INTEGER, PARAMETER :: LeavingSetpointModulated = 203
+
           ! MODULE VARIABLE DECLARATIONS:
 INTEGER, SAVE ,PUBLIC    :: NumElectricChillers    =0   ! number of Electric chillers specified in input
 REAL(r64)                :: CondMassFlowRate       =0.0 ! Kg/s - condenser mass flow rate, water side
 REAL(r64)                :: EvapMassFlowRate       =0.0 ! Kg/s - evaporator mass flow rate, water side
-REAL(r64)                :: CondOutletTemp         =0.0 ! C - condenser outlet temperature, water side
+REAL(r64)                :: CondOutletTemp         =0.0 ! C - condenser outlet temperature, air or water side
+REAL(r64)                :: CondOutletHumRat       =0.0 ! kg/kg - condenser outlet humditiy ratio, air side
 REAL(r64)                :: EvapOutletTemp         =0.0 ! C - evaporator outlet temperature, water side
 REAL(r64)                :: Power                  =0.0 ! W - rate of chiller energy use
 REAL(r64)                :: QEvaporator            =0.0 ! W - rate of heat transfer to the evaporator coil
@@ -54,6 +61,7 @@ REAL(r64)                :: EvaporatorEnergy       =0.0 ! J - rate of heat trans
 REAL(r64)                :: CondenserEnergy        =0.0 ! J - rate of heat transfer to the condenser coil
 REAL(r64)                :: QHeatRecovered         =0.0 ! W - rate of heat transfer to the Heat Recovery coil
 REAL(r64)                :: HeatRecOutletTemp      =0.0 ! C - Heat Rec outlet temperature, water side
+REAL(r64)                :: AvgCondSinkTemp        =0.d0!  condenser temperature value for use in curves [C]
 REAL(r64)                :: ChillerCyclingRatio    =0.0 ! Cycling ratio for chiller when load is below MinPLR
 REAL(r64)                :: BasinHeaterPower       =0.0 ! Basin heater power (W)
 
@@ -88,10 +96,10 @@ TYPE BaseChillerSpecs
   INTEGER           :: CondenserType       =0    ! Type of Condenser - Air or Water Cooled
   REAL(r64)         :: NomCap            =0.0 ! design nominal capacity of chiller
   REAL(r64)         :: COP               =0.0 ! COP
-  LOGICAL           :: ConstantFlow     =.false.! True if this is a Constant Flow Chiller
-  LOGICAL           :: VariableFlow     =.false.! True if this is a Variable Flow Chiller
-  LOGICAL           :: VariableFlowSetToLoop= .FALSE. ! True if the setpoint is missing at the outlet node
-  LOGICAL           :: VariableFlowErrDone  = .FALSE.  ! true if setpoint warning issued
+  INTEGER           :: FlowMode          = FlowModeNotSet ! one of 3 modes for componet flow during operation
+  LOGICAL           :: ModulatedFlowSetToLoop= .FALSE. ! True if the setpoint is missing at the outlet node
+  LOGICAL           :: ModulatedFlowErrDone  = .FALSE.  ! true if setpoint warning issued
+  LOGICAL           :: HRSPErrDone          = .FALSE.  ! TRUE if set point warning issued for heat recovery loop
   INTEGER           :: EvapInletNodeNum  =0   ! Node number on the inlet side of the plant
   INTEGER           :: EvapOutletNodeNum =0   ! Node number on the outlet side of the plant
   INTEGER           :: CondInletNodeNum  =0   ! Node number on the inlet side of the condenser
@@ -147,6 +155,10 @@ TYPE, PUBLIC             :: ElectricChillerSpecs
   LOGICAL           :: HeatRecActive = .False.    ! True entered Heat Rec Vol Flow Rate >0
   INTEGER           :: HeatRecInletNodeNum = 0    ! Node number on the heat recovery inlet side of the condenser
   INTEGER           :: HeatRecOutletNodeNum = 0   ! Node number on the heat recovery outlet side of the condenser
+  REAL(r64)         :: HeatRecCapacityFraction   = 0.d0 ! user input for heat recovery capacity fraction []
+  REAL(r64)         :: HeatRecMaxCapacityLimit   = 0.d0 ! Capacity limit for Heat recovery, one time calc [W]
+  INTEGER           :: HeatRecSetpointNodeNum    = 0    ! index for system node with the heat recover leaving setpoint
+  INTEGER           :: HeatRecInletLimitSchedNum = 0    ! index for schedule for the inlet high limit for heat recovery operation
   INTEGER           :: HRLoopNum     = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRLoopSideNum = 0  ! heat recovery water plant loop side index
   INTEGER           :: HRBranchNum   = 0  ! heat recovery water plant loop branch index
@@ -278,12 +290,13 @@ END TYPE BaseReportVars
 
 TYPE ElectricReportVars
   TYPE(BaseReportVars) :: Base
-  REAL(r64)    :: ActualCOP      = 0.0 !
-  REAL(r64)    :: QHeatRecovery      = 0.0
-  REAL(r64)    :: EnergyHeatRecovery = 0.0
-  REAL(r64)    :: HeatRecInletTemp   = 0.0
-  REAL(r64)    :: HeatRecOutletTemp  = 0.0
-  REAL(r64)    :: HeatRecMassFlow    = 0.0
+  REAL(r64)    :: ActualCOP          = 0.d0 !
+  REAL(r64)    :: QHeatRecovery      = 0.d0
+  REAL(r64)    :: EnergyHeatRecovery = 0.d0
+  REAL(r64)    :: HeatRecInletTemp   = 0.d0
+  REAL(r64)    :: HeatRecOutletTemp  = 0.d0
+  REAL(r64)    :: HeatRecMassFlow    = 0.d0
+  REAL(r64)    :: ChillerCondAvgTemp = 0.d0 ! the effective condenser temperature for chiller performance [C]
 END TYPE ElectricReportVars
 
 TYPE EngineDrivenReportVars
@@ -476,7 +489,7 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
       IF (InitLoopEquip) THEN
         TempEvapOutDesign  = ElectricChiller(ChillNum)%TempDesEvapOut
         TempCondInDesign   = ElectricChiller(ChillNum)%TempDesCondIn
-        CALL InitElectricChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
+        CALL InitElectricChiller(ChillNum,RunFlag,MyLoad)
         CALL SizeElectricChiller(ChillNum)
         IF (LoopNum == ElectricChiller(ChillNum)%Base%CWLoopNum) THEN ! chilled water loop
           MinCap = ElectricChiller(ChillNum)%Base%NomCap*ElectricChiller(ChillNum)%MinPartLoadRat
@@ -496,8 +509,8 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
         ! calculate model depending on where called from
       IF (LoopNum == ElectricChiller(ChillNum)%Base%CWLoopNum) THEN ! chilled water loop
 
-        CALL InitElectricChiller(ChillNum,RunFlag,MyLoad, FirstHVACIteration)
-        CALL CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstHVACIteration)
+        CALL InitElectricChiller(ChillNum,RunFlag,MyLoad)
+        CALL CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag)
         CALL UpdateElectricChillerRecords(MyLoad,RunFlag,ChillNum)
 
       ELSEIF (LoopNum == ElectricChiller(ChillNum)%Base%CDLoopNum) THEN ! condenser loop
@@ -561,7 +574,7 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
       IF (InitLoopEquip) THEN
         TempEvapOutDesign  = EngineDrivenChiller(ChillNum)%TempDesEvapOut
         TempCondInDesign   = EngineDrivenChiller(ChillNum)%TempDesCondIn
-        CALL InitEngineDrivenChiller(ChillNum, RunFlag, MyLoad, FirstHVACIteration)
+        CALL InitEngineDrivenChiller(ChillNum, RunFlag, MyLoad)
         CALL SizeEngineDrivenChiller(ChillNum)
         IF (LoopNum == EngineDrivenChiller(ChillNum)%Base%CWLoopNum) THEN
           MinCap = EngineDrivenChiller(ChillNum)%Base%NomCap*EngineDrivenChiller(ChillNum)%MinPartLoadRat
@@ -580,8 +593,8 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
 
       ! calculate model depending on where called from
       IF (LoopNum == EngineDrivenChiller(ChillNum)%Base%CWLoopNum) THEN ! chilled water loop
-        CALL InitEngineDrivenChiller(ChillNum, RunFlag, MyLoad, FirstHVACIteration)
-        CALL CalcEngineDrivenChillerModel(ChillNum,MyLoad,Runflag,FirstHVACIteration,EquipFlowCtrl)
+        CALL InitEngineDrivenChiller(ChillNum, RunFlag, MyLoad)
+        CALL CalcEngineDrivenChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
         CALL UpdateEngineDrivenChiller(MyLoad,RunFlag,ChillNum)
       ELSEIF (LoopNum == EngineDrivenChiller(ChillNum)%Base%CDLoopNum) THEN ! condenser loop
         CALL UpdateChillerComponentCondenserSide(EngineDrivenChiller(ChillNum)%Base%CDLoopNum, &
@@ -644,7 +657,7 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
       IF (InitLoopEquip) THEN
         TempEvapOutDesign  = GTChiller(ChillNum)%TempDesEvapOut
         TempCondInDesign   = GTChiller(ChillNum)%TempDesCondIn
-        CALL InitGTChiller(ChillNum,RunFlag, MyLoad,FirstHVACIteration)
+        CALL InitGTChiller(ChillNum,RunFlag, MyLoad)
         CALL SizeGTChiller(ChillNum)
         IF (LoopNum == GTChiller(ChillNum)%Base%CWLoopNum) THEN
           MinCap = GTChiller(ChillNum)%Base%NomCap*GTChiller(ChillNum)%MinPartLoadRat
@@ -664,8 +677,8 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
         ! calculate model depending on where called from
       IF (LoopNum == GTChiller(ChillNum)%Base%CWLoopNum) THEN ! chilled water loop
 
-        CALL InitGTChiller(ChillNum,RunFlag, MyLoad,FirstHVACIteration)
-        CALL CalcGTChillerModel(ChillNum,MyLoad,Runflag,FirstHVACIteration,EquipFlowCtrl)
+        CALL InitGTChiller(ChillNum,RunFlag, MyLoad)
+        CALL CalcGTChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
         CALL UpdateGTChillerRecords(MyLoad,RunFlag,ChillNum)
 
       ELSEIF (LoopNum == GTChiller(ChillNum)%Base%CDLoopNum) THEN ! condenser loop
@@ -729,7 +742,7 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
       IF (InitLoopEquip) THEN
         TempEvapOutDesign  = 0.0d0
         TempCondInDesign   = 0.0d0
-        CALL InitConstCOPChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
+        CALL InitConstCOPChiller(ChillNum,RunFlag,MyLoad)
         CALL SizeConstCOPChiller(ChillNum)
         IF (LoopNum == ConstCOPChiller(ChillNum)%Base%CWLoopNum) THEN
           MinCap = 0
@@ -749,8 +762,8 @@ SUBROUTINE SimChiller(LoopNum, LoopSide, ChillerType,ChillerName,EquipFlowCtrl,C
       IF (LoopNum == ConstCOPChiller(ChillNum)%Base%CWLoopNum) THEN
      ! Calculate Load
        ! IF MinPlr, MaxPlr, OptPlr are not defined, assume min = 0, max=opt=Nomcap
-        CALL InitConstCOPChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
-        CALL CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstHVACIteration,EquipFlowCtrl)
+        CALL InitConstCOPChiller(ChillNum,RunFlag,MyLoad)
+        CALL CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
         CALL UpdateConstCOPChillerRecords(MyLoad,RunFlag,ChillNum)
       ELSEIF (LoopNum == ConstCOPChiller(ChillNum)%Base%CDLoopNum) THEN
         CALL UpdateChillerComponentCondenserSide(ConstCOPChiller(ChillNum)%Base%CDLoopNum, &
@@ -795,11 +808,12 @@ SUBROUTINE GetElectricChillerInput
   USE General,           ONLY: RoundSigDigits
   USE PlantUtilities,    ONLY: RegisterPlantCompDesignFlow
   USE ScheduleManager,    ONLY: GetScheduleIndex
+  USE DataSizing,        ONLY: Autosize
 
   IMPLICIT NONE !
 
             ! PARAMETERS
-
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetElectricChillerInput: ' ! include trailing blank space
             !LOCAL VARIABLES
   INTEGER                     :: ChillerNum !chiller counter
   INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
@@ -816,7 +830,7 @@ SUBROUTINE GetElectricChillerInput
 
          !FLOW
   cCurrentModuleObject = 'Chiller:Electric'
-  NumElectricChillers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumElectricChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumElectricChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' Equipment specified in input file')
@@ -832,8 +846,8 @@ SUBROUTINE GetElectricChillerInput
 
          !LOAD ARRAYS WITH Electric CURVE FIT CHILLER DATA
   DO ChillerNum = 1 , NumElectricChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ChillerNum,cAlphaArgs,NumAlphas, &
-                    rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
+    CALL GetObjectItem(cCurrentModuleObject,ChillerNum,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, NumBlank=lNumericFieldBlanks, &
                     NumericFieldNames=cNumericFieldNames,AlphaFieldnames=cAlphaFieldNames)
 
     IsNotOK=.false.
@@ -978,20 +992,30 @@ SUBROUTINE GetElectricChillerInput
     ElectricChiller(ChillerNum)%Base%SizFac              = rNumericArgs(22)
     IF (ElectricChiller(ChillerNum)%Base%SizFac <= 0.0) ElectricChiller(ChillerNum)%Base%SizFac = 1.0d0
 
-    If(cAlphaArgs(7) .eq. 'CONSTANTFLOW') Then
-       ElectricChiller(ChillerNum)%Base%ConstantFlow = .True.
-       ElectricChiller(ChillerNum)%Base%VariableFlow = .False.
-    Else If(cAlphaArgs(7) .eq. 'VARIABLEFLOW') Then
-       ElectricChiller(ChillerNum)%Base%ConstantFlow = .False.
-       ElectricChiller(ChillerNum)%Base%VariableFlow = .True.
-    Else  ! We will assume a variable flow chiller is none specified
-       ElectricChiller(ChillerNum)%Base%ConstantFlow = .False.
-       ElectricChiller(ChillerNum)%Base%VariableFlow = .True.
-    End If
+    SELECT CASE (TRIM(cAlphaArgs(7)))
+    CASE ( 'CONSTANTFLOW' )
+      ElectricChiller(ChillerNum)%Base%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      ElectricChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      ElectricChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      ElectricChiller(ChillerNum)%Base%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      ElectricChiller(ChillerNum)%Base%FlowMode = NotModulated
+    END SELECT
 
    ! These are the Heat Recovery Inputs
     ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate = rNumericArgs(21)
-    IF (ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0) THEN
+    IF ((ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.0) &
+        .OR. (ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate == Autosize ) ) THEN
       ElectricChiller(ChillerNum)%HeatRecActive=.true.
       ElectricChiller(ChillerNum)%HeatRecInletNodeNum   = &
                GetOnlySingleNode(cAlphaArgs(8),ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
@@ -1011,9 +1035,10 @@ SUBROUTINE GetElectricChillerInput
       ENDIF
 
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(8),cAlphaArgs(9),'Heat Recovery Nodes')
-      CALL RegisterPlantCompDesignFlow(ElectricChiller(ChillerNum)%HeatRecInletNodeNum, &
+      IF ( ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate > 0.d0) THEN
+        CALL RegisterPlantCompDesignFlow(ElectricChiller(ChillerNum)%HeatRecInletNodeNum, &
                                 ElectricChiller(ChillerNum)%DesignHeatRecVolFlowRate )
-
+      ENDIF
       ! Condenser flow rate must be specified for heat reclaim
       IF (ElectricChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
           ElectricChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
@@ -1024,6 +1049,44 @@ SUBROUTINE GetElectricChillerInput
           ErrorsFound=.true.
         END IF
       END IF
+
+      IF(NumNums > 24) THEN
+        IF ( .NOT. lNumericFieldBlanks(25)) THEN
+          ElectricChiller(ChillerNum)%HeatRecCapacityFraction = rNumericArgs(25)
+        ELSE
+          ElectricChiller(ChillerNum)%HeatRecCapacityFraction = 1.d0
+        ENDIF
+      ELSE
+        ElectricChiller(ChillerNum)%HeatRecCapacityFraction = 1.d0
+      ENDIF
+
+      IF (NumAlphas > 10) THEN
+        IF ( .NOT. lAlphaFieldBlanks(11)) THEN
+          ElectricChiller(ChillerNum)%HeatRecInletLimitSchedNum = GetScheduleIndex(cAlphaArgs(11))
+          IF (ElectricChiller(ChillerNum)%HeatRecInletLimitSchedNum  == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'"')
+            CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(11))//'='//TRIM(cAlphaArgs(11)))
+            ErrorsFound=.True.
+          ENDIF
+        ELSE
+          ElectricChiller(ChillerNum)%HeatRecInletLimitSchedNum = 0
+        ENDIF
+      ELSE
+        ElectricChiller(ChillerNum)%HeatRecInletLimitSchedNum = 0
+      ENDIF
+
+      IF (NumAlphas > 11) THEN
+        IF( .NOT. lAlphaFieldBlanks(12)) THEN
+          ElectricChiller(ChillerNum)%HeatRecSetpointNodeNum = &
+              GetOnlySingleNode(cAlphaArgs(12), ErrorsFound,TRIM(cCurrentModuleObject),cAlphaArgs(1), &
+                           NodeType_Water,NodeConnectionType_Sensor, 1, ObjectIsNotParent)
+        ELSE
+          ElectricChiller(ChillerNum)%HeatRecSetpointNodeNum = 0
+        ENDIF
+      ELSE
+        ElectricChiller(ChillerNum)%HeatRecSetpointNodeNum = 0
+      ENDIf
+
     ELSE
       ElectricChiller(ChillerNum)%HeatRecActive=.false.
       ElectricChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
@@ -1079,25 +1142,25 @@ SUBROUTINE GetElectricChillerInput
   DO ChillerNum = 1, NumElectricChillers
      CALL SetupOutputVariable('Chiller Electric Power [W]', &
           ElectricChillerReport(ChillerNum)%Base%Power,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Electric Consumption [J]', &
+     CALL SetupOutputVariable('Chiller Electric Energy [J]', &
           ElectricChillerReport(ChillerNum)%Base%Energy,'System','Sum',ElectricChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           ElectricChillerReport(ChillerNum)%Base%QEvap,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           ElectricChillerReport(ChillerNum)%Base%EvapEnergy,'System','Sum',ElectricChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           ElectricChillerReport(ChillerNum)%Base%EvapInletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           ElectricChillerReport(ChillerNum)%Base%EvapOutletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           ElectricChillerReport(ChillerNum)%Base%Evapmdot,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           ElectricChillerReport(ChillerNum)%Base%QCond,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           ElectricChillerReport(ChillerNum)%Base%CondEnergy,'System','Sum',ElectricChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
      CALL SetupOutputVariable('Chiller COP [W/W]', &
@@ -1105,22 +1168,22 @@ SUBROUTINE GetElectricChillerInput
 
         !Condenser mass flow and outlet temp are valid for water cooled
      IF (ElectricChiller(ChillerNum)%Base%CondenserType == WaterCooled)THEN
-       CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             ElectricChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
             ElectricChillerReport(ChillerNum)%Base%CondOutletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+       CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
             ElectricChillerReport(ChillerNum)%Base%Condmdot,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
      ELSEIF (ElectricChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN
-       CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             ElectricChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
      ELSEIF (ElectricChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-       CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             ElectricChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
        IF(ElectricChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
          CALL SetupOutputVariable('Chiller Basin Heater Electric Power [W]', &
           ElectricChillerReport(ChillerNum)%Base%BasinHeaterPower,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-         CALL SetupOutputVariable('Chiller Basin Heater Electric Consumption [J]', &
+         CALL SetupOutputVariable('Chiller Basin Heater Electric Energy [J]', &
           ElectricChillerReport(ChillerNum)%Base%BasinHeaterConsumption,'System','Sum',ElectricChiller(ChillerNum)%Base%Name, &
           ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
        END IF
@@ -1128,19 +1191,23 @@ SUBROUTINE GetElectricChillerInput
 
      !If heat recovery is active then setup report variables
      IF (ElectricChiller(ChillerNum)%HeatRecActive) THEN
-         CALL SetupOutputVariable('Chiller Heat Recovery Rate [W]', &
+         CALL SetupOutputVariable('Chiller Total Recovered Heat Rate [W]', &
            ElectricChillerReport(ChillerNum)%QHeatRecovery,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
-         CALL SetupOutputVariable('Chiller Heat Recovery [J]', &
+         CALL SetupOutputVariable('Chiller Total Recovered Heat Energy [J]', &
            ElectricChillerReport(ChillerNum)%EnergyHeatRecovery,'System','Sum',ElectricChiller(ChillerNum)%Base%Name,  &
                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
-         CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temp[C]', &
+         CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temperature [C]', &
            ElectricChillerReport(ChillerNum)%HeatRecInletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
 
-         CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temp[C]', &
+         CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temperature [C]', &
            ElectricChillerReport(ChillerNum)%HeatRecOutletTemp,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
 
          CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
            ElectricChillerReport(ChillerNum)%HeatRecMassFlow,'System','Average',ElectricChiller(ChillerNum)%Base%Name)
+
+         CALL SetupOutputVariable('Chiller Effective Heat Rejection Temperature [C]', &
+           ElectricChillerReport(ChillerNum)%ChillerCondAvgTemp, 'System','Average',ElectricChiller(ChillerNum)%Base%Name)
+
      ENDIF
 
   END DO
@@ -1180,7 +1247,7 @@ SUBROUTINE GetEngineDrivenChillerInput
   IMPLICIT NONE !
 
             ! PARAMETERS
-
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetEngineDrivenChillerInput: ' ! include trailing blank space
             !LOCAL VARIABLES
   INTEGER                     :: ChillerNum !chiller counter
   INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
@@ -1194,7 +1261,7 @@ SUBROUTINE GetEngineDrivenChillerInput
 
          !FLOW
   cCurrentModuleObject = 'Chiller:EngineDriven'
-  NumEngineDrivenChillers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumEngineDrivenChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumEngineDrivenChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -1209,7 +1276,7 @@ SUBROUTINE GetEngineDrivenChillerInput
 
          !LOAD ARRAYS WITH EngineDriven CURVE FIT CHILLER DATA
   DO ChillerNum = 1 , NumEngineDrivenChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ChillerNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,ChillerNum,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1420,9 +1487,17 @@ SUBROUTINE GetEngineDrivenChillerInput
     CASE ('Propane','LPG','PROPANEGAS','PROPANE GAS')
        EngineDrivenChiller(ChillerNum)%FuelType = 'Propane'
 
+    CASE ('OTHERFUEL1')
+       EngineDrivenChiller(ChillerNum)%FuelType = 'OtherFuel1'
+
+    CASE ('OTHERFUEL2')
+       EngineDrivenChiller(ChillerNum)%FuelType = 'OtherFuel2'
+
     CASE DEFAULT
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(12))//'='//TRIM(cAlphaArgs(12)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowContinueError('Valid choices are Electricity, NaturalGas, PropaneGas, Diesel, Gasoline, FuelOil#1, FuelOil#2,'//  &
+       'OtherFuel1 or OtherFuel2')
       ErrorsFound=.true.
     END SELECT
 
@@ -1448,7 +1523,7 @@ SUBROUTINE GetEngineDrivenChillerInput
         ErrorsFound=.true.
       ENDIF
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(13),cAlphaArgs(14),'Heat Recovery Nodes')
-      CALL RegisterPlantCompDesignFlow(EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum, &
+        CALL RegisterPlantCompDesignFlow(EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum, &
                                 EngineDrivenChiller(ChillerNum)%DesignHeatRecVolFlowRate)
       ! Condenser flow rate must be specified for heat reclaim
       IF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
@@ -1460,7 +1535,11 @@ SUBROUTINE GetEngineDrivenChillerInput
           ErrorsFound=.true.
         END IF
       END IF
-    ELSE
+
+      ELSE
+
+
+
       EngineDrivenChiller(ChillerNum)%HeatRecActive=.false.
       EngineDrivenChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
       EngineDrivenChiller(ChillerNum)%HeatRecInletNodeNum   = 0
@@ -1477,18 +1556,25 @@ SUBROUTINE GetEngineDrivenChillerInput
       ENDIF
     ENDIF
 
-
-    If(cAlphaArgs(15) .eq. 'CONSTANTFLOW') Then
-       EngineDrivenChiller(ChillerNum)%Base%ConstantFlow = .True.
-       EngineDrivenChiller(ChillerNum)%Base%VariableFlow = .False.
-    Else If(cAlphaArgs(15) .eq. 'VARIABLEFLOW') Then
-       EngineDrivenChiller(ChillerNum)%Base%ConstantFlow = .False.
-       EngineDrivenChiller(ChillerNum)%Base%VariableFlow = .True.
-    Else  ! We will assume a variable flow chiller is none specified
-       EngineDrivenChiller(ChillerNum)%Base%ConstantFlow = .False.
-       EngineDrivenChiller(ChillerNum)%Base%VariableFlow = .True.
-    End If
-
+    SELECT CASE (TRIM(cAlphaArgs(15)))
+    CASE ( 'CONSTANTFLOW' )
+      EngineDrivenChiller(ChillerNum)%Base%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      EngineDrivenChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(15))//'='//TRIM(cAlphaArgs(15)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      EngineDrivenChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      EngineDrivenChiller(ChillerNum)%Base%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(15))//'='//TRIM(cAlphaArgs(15)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      EngineDrivenChiller(ChillerNum)%Base%FlowMode = NotModulated
+    END SELECT
 
     EngineDrivenChiller(ChillerNum)%HeatRecMaxTemp = rNumericArgs(27)
     EngineDrivenChiller(ChillerNum)%Base%SizFac = rNumericArgs(28)
@@ -1531,99 +1617,104 @@ SUBROUTINE GetEngineDrivenChillerInput
   ENDIF
 
   DO ChillerNum = 1, NumEngineDrivenChillers
-     CALL SetupOutputVariable('Chiller Shaft Power [W]', &
+     CALL SetupOutputVariable('Chiller Drive Shaft Power [W]', &
           EngineDrivenChillerReport(ChillerNum)%Base%Power,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Shaft Energy [J]', &
+     CALL SetupOutputVariable('Chiller Drive Shaft Energy [J]', &
           EngineDrivenChillerReport(ChillerNum)%Base%Energy,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           EngineDrivenChillerReport(ChillerNum)%Base%QEvap,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           EngineDrivenChillerReport(ChillerNum)%Base%EvapEnergy,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           EngineDrivenChillerReport(ChillerNum)%Base%EvapInletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           EngineDrivenChillerReport(ChillerNum)%Base%EvapOutletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           EngineDrivenChillerReport(ChillerNum)%Base%Evapmdot,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           EngineDrivenChillerReport(ChillerNum)%Base%QCond,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           EngineDrivenChillerReport(ChillerNum)%Base%CondEnergy,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
 
        !Condenser mass flow and outlet temp are valid for Water Cooled
      IF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == WaterCooled)THEN
-       CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             EngineDrivenChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
             EngineDrivenChillerReport(ChillerNum)%Base%CondOutletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-       CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+       CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
             EngineDrivenChillerReport(ChillerNum)%Base%Condmdot,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
      ELSEIF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN
-       CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             EngineDrivenChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
      ELSEIF (EngineDrivenChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-       CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+       CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
             EngineDrivenChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
        IF(EngineDrivenChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
          CALL SetupOutputVariable('Chiller Basin Heater Electric Power [W]', &
           EngineDrivenChillerReport(ChillerNum)%Base%BasinHeaterPower,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-         CALL SetupOutputVariable('Chiller Basin Heater Electric Consumption [J]', &
+         CALL SetupOutputVariable('Chiller Basin Heater Electric Energy [J]', &
           EngineDrivenChillerReport(ChillerNum)%Base%BasinHeaterConsumption,'System','Sum',  &
              EngineDrivenChiller(ChillerNum)%Base%Name, &
           ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
        END IF
      End IF
 
-     CALL SetupOutputVariable('Chiller Jacket Heat Recovery Rate [W]', &
-          EngineDrivenChillerReport(ChillerNum)%QJacketRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Jacket Heat Recovery [J]', &
-          EngineDrivenChillerReport(ChillerNum)%JacketEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
-                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Lube Heat Recovery Rate [W]', &
-          EngineDrivenChillerReport(ChillerNum)%QLubeOilRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Lube Heat Recovery [J]', &
-          EngineDrivenChillerReport(ChillerNum)%LubeOilEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
-                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Exhaust Heat Recovery Rate [W]', &
-          EngineDrivenChillerReport(ChillerNum)%QExhaustRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Exhaust Heat Recovery [J]', &
-          EngineDrivenChillerReport(ChillerNum)%ExhaustEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
-                              ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
-
-     CALL SetupOutputVariable('Chiller Total Heat Recovery Rate [W]', &
-          EngineDrivenChillerReport(ChillerNum)%QTotalHEatRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Total Heat Recovery [J]', &
-          EngineDrivenChillerReport(ChillerNum)%TotalHeatEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name)
-
-     CALL SetupOutputVariable('Chiller ' // TRIM(EngineDrivenChiller(ChillerNum)%FuelType) //' Consumption Rate [W]', &
+     CALL SetupOutputVariable('Chiller ' // TRIM(EngineDrivenChiller(ChillerNum)%FuelType) //' Rate [W]', &
           EngineDrivenChillerReport(ChillerNum)%FuelEnergyUseRate,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller ' // TRIM(EngineDrivenChiller(ChillerNum)%FuelType) //' Consumption [J]', &
+     CALL SetupOutputVariable('Chiller ' // TRIM(EngineDrivenChiller(ChillerNum)%FuelType) //' Energy [J]', &
           EngineDrivenChillerReport(ChillerNum)%FuelEnergy,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey=EngineDrivenChiller(ChillerNum)%FuelType,EndUseKey='Cooling',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Fuel COP [W/W]', &
+     CALL SetupOutputVariable('Chiller COP [W/W]', &
           EngineDrivenChillerReport(ChillerNum)%FuelCOP,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
 
      CALL SetupOutputVariable('Chiller ' // TRIM(EngineDrivenChiller(ChillerNum)%FuelType) //' Mass Flow Rate [kg/s]', &
           EngineDrivenChillerReport(ChillerNum)%FuelMdot,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Exhaust Stack Temp[C]', &
+     CALL SetupOutputVariable('Chiller Exhaust Temperature [C]', &
           EngineDrivenChillerReport(ChillerNum)%ExhaustStackTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
 
      CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
           EngineDrivenChillerReport(ChillerNum)%HeatRecMdot,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
 
      IF (EngineDrivenChiller(ChillerNum)%HeatRecActive) THEN
-       CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temp[C]', &
+  ! need to only report if heat recovery active
+       CALL SetupOutputVariable('Chiller Jacket Recovered Heat Rate [W]', &
+            EngineDrivenChillerReport(ChillerNum)%QJacketRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
+       CALL SetupOutputVariable('Chiller Jacket Recovered Heat Energy [J]', &
+            EngineDrivenChillerReport(ChillerNum)%JacketEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
+
+       CALL SetupOutputVariable('Chiller Lube Recovered Heat Rate [W]', &
+            EngineDrivenChillerReport(ChillerNum)%QLubeOilRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
+       CALL SetupOutputVariable('Chiller Lube Recovered Heat Energy [J]', &
+            EngineDrivenChillerReport(ChillerNum)%LubeOilEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
+
+       CALL SetupOutputVariable('Chiller Exhaust Recovered Heat Rate [W]', &
+            EngineDrivenChillerReport(ChillerNum)%QExhaustRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
+       CALL SetupOutputVariable('Chiller Exhaust Recovered Heat Energy [J]', &
+            EngineDrivenChillerReport(ChillerNum)%ExhaustEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name,  &
+                                ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATRECOVERY',GroupKey='Plant')
+
+       CALL SetupOutputVariable('Chiller Total Recovered Heat Rate [W]', &
+            EngineDrivenChillerReport(ChillerNum)%QTotalHEatRecovered,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
+       CALL SetupOutputVariable('Chiller Total Recovered Heat Energy [J]', &
+            EngineDrivenChillerReport(ChillerNum)%TotalHeatEnergyRec,'System','Sum',EngineDrivenChiller(ChillerNum)%Base%Name)
+
+       CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temperature [C]', &
           EngineDrivenChillerReport(ChillerNum)%HeatRecInletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
 
-       CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temp[C]', &
+       CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temperature [C]', &
           EngineDrivenChillerReport(ChillerNum)%HeatRecOutletTemp,'System','Average',EngineDrivenChiller(ChillerNum)%Base%Name)
+
+
      ENDIF
   END DO
 
@@ -1659,7 +1750,7 @@ SUBROUTINE GetGTChillerInput
   IMPLICIT NONE !
 
             ! PARAMETERS
-
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetGTChillerInput: ' ! include trailing blank space
             !LOCAL VARIABLES
   INTEGER                     :: ChillerNum !chiller counter
   INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
@@ -1673,7 +1764,7 @@ SUBROUTINE GetGTChillerInput
 
          !FLOW
   cCurrentModuleObject = 'Chiller:CombustionTurbine'
-  NumGTChillers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumGTChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumGTChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -1687,7 +1778,7 @@ SUBROUTINE GetGTChillerInput
   ALLOCATE (GTChillerReport(NumGTChillers))
 
   DO ChillerNum = 1 , NumGTChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ChillerNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,ChillerNum,cAlphaArgs,NumAlphas, &
                     rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
                     AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1868,18 +1959,21 @@ SUBROUTINE GetGTChillerInput
         ErrorsFound=.true.
       ENDIF
       CALL TestCompSet(TRIM(cCurrentModuleObject),cAlphaArgs(1),cAlphaArgs(7),cAlphaArgs(8),'Heat Recovery Nodes')
-      CALL RegisterPlantCompDesignFlow(GTChiller(ChillerNum)%HeatRecInletNodeNum, &
+
+        CALL RegisterPlantCompDesignFlow(GTChiller(ChillerNum)%HeatRecInletNodeNum, &
                                 GTChiller(ChillerNum)%DesignHeatRecVolFlowRate )
-      ! Condenser flow rate must be specified for heat reclaim
+       ! Condenser flow rate must be specified for heat reclaim
       IF (GTChiller(ChillerNum)%Base%CondenserType == AirCooled .OR. &
           GTChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
         IF(GTChiller(ChillerNum)%Base%CondVolFlowRate .LE. 0.0)THEN
           CALL ShowSevereError('Invalid '//TRIM(cNumericFieldNames(10))//'='//TRIM(RoundSigDigits(rNumericArgs(10),6)))
           CALL ShowSevereError('Condenser fluid flow rate must be specified for Heat Reclaim applications.')
           CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
-          ErrorsFound=.true.
-        END IF
-      END IF
+          ErrorsFound=.True.
+      ENDIF
+
+      ENDIf
+
     ELSE
       GTChiller(ChillerNum)%HeatRecActive=.false.
       GTChiller(ChillerNum)%DesignHeatRecMassFlowRate = 0.0
@@ -1896,16 +1990,25 @@ SUBROUTINE GetGTChillerInput
       END IF
     ENDIF
 
-    If(cAlphaArgs(9) .eq. 'CONSTANTFLOW') Then
-       GTChiller(ChillerNum)%Base%ConstantFlow = .True.
-       GTChiller(ChillerNum)%Base%VariableFlow = .False.
-    Else If(cAlphaArgs(9) .eq. 'VARIABLEFLOW') Then
-       GTChiller(ChillerNum)%Base%ConstantFlow = .False.
-       GTChiller(ChillerNum)%Base%VariableFlow = .True.
-    Else  ! We will assume a variable flow chiller is none specified
-       GTChiller(ChillerNum)%Base%ConstantFlow = .False.
-       GTChiller(ChillerNum)%Base%VariableFlow = .True.
-    End If
+    SELECT CASE (TRIM(cAlphaArgs(9)))
+    CASE ( 'CONSTANTFLOW' )
+      GTChiller(ChillerNum)%Base%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      GTChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      GTChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      GTChiller(ChillerNum)%Base%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(9))//'='//TRIM(cAlphaArgs(9)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      GTChiller(ChillerNum)%Base%FlowMode = NotModulated
+    END SELECT
 
     !Fuel Type Case Statement
     SELECT CASE (cAlphaArgs(10))
@@ -1927,9 +2030,17 @@ SUBROUTINE GetGTChillerInput
     CASE ('PROPANE','LPG','PROPANEGAS','PROPANE GAS')
        GTChiller(ChillerNum)%FuelType = 'Propane'
 
+    CASE ('OTHERFUEL1')
+       GTChiller(ChillerNum)%FuelType = 'OtherFuel1'
+
+    CASE ('OTHERFUEL2')
+       GTChiller(ChillerNum)%FuelType = 'OtherFuel2'
+
     CASE DEFAULT
       CALL ShowSevereError('Invalid '//TRIM(cAlphaFieldNames(10))//'='//TRIM(cAlphaArgs(10)))
       CALL ShowContinueError('Entered in '//TRIM(cCurrentModuleObject)//'='//TRIM(cAlphaArgs(1)))
+      CALL ShowContinueError('Valid choices are Electricity, NaturalGas, PropaneGas, Diesel, Gasoline, FuelOil#1, FuelOil#2,'//  &
+       'OtherFuel1 or OtherFuel2')
       ErrorsFound=.true.
     END SELECT
 
@@ -1941,8 +2052,8 @@ SUBROUTINE GetGTChillerInput
     !   Basin heater power as a function of temperature must be greater than or equal to 0
     GTChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff = rNumericArgs(48)
     IF(rNumericArgs(48) .LT. 0.0d0) THEN
-      CALL ShowSevereError(TRIM(cCurrentModuleObject)//', "'//TRIM(GTChiller(ChillerNum)%Base%Name)//&
-                     '" TRIM(cNumericFieldNames(48)) must be >= 0')
+      CALL ShowSevereError(TRIM(cCurrentModuleObject)//'="'//TRIM(GTChiller(ChillerNum)%Base%Name)//&
+                     '"'//TRIM(cNumericFieldNames(48))//' must be >= 0')
       ErrorsFound = .TRUE.
     END IF
 
@@ -1974,84 +2085,85 @@ SUBROUTINE GetGTChillerInput
   ENDIF
 
   DO ChillerNum = 1, NumGTChillers
-     CALL SetupOutputVariable('Chiller Shaft Power [W]', &
+     CALL SetupOutputVariable('Chiller Drive Shaft Power [W]', &
           GTChillerReport(ChillerNum)%Base%Power,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Shaft Energy [J]', &
+     CALL SetupOutputVariable('Chiller Drive Shaft Energy [J]', &
           GTChillerReport(ChillerNum)%Base%Energy,'System','Sum',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           GTChillerReport(ChillerNum)%Base%QEvap,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           GTChillerReport(ChillerNum)%Base%EvapEnergy,'System','Sum',GTChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           GTChillerReport(ChillerNum)%Base%EvapInletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           GTChillerReport(ChillerNum)%Base%EvapOutletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           GTChillerReport(ChillerNum)%Base%Evapmdot,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           GTChillerReport(ChillerNum)%Base%QCond,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           GTChillerReport(ChillerNum)%Base%CondEnergy,'System','Sum',GTChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
 
         !Condenser mass flow and outlet temp are valid for water cooled
      IF (GTChiller(ChillerNum)%Base%CondenserType == WaterCooled)THEN
-        CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              GTChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
-        CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
              GTChillerReport(ChillerNum)%Base%CondOutletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
-        CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+        CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
              GTChillerReport(ChillerNum)%Base%Condmdot,'System','Average',GTChiller(ChillerNum)%Base%Name)
      ELSEIF (GTChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN
-        CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              GTChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
      ELSEIF (GTChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-        CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              GTChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
         IF(GTChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
           CALL SetupOutputVariable('Chiller Basin Heater Electric Power [W]', &
                GTChillerReport(ChillerNum)%Base%BasinHeaterPower,'System','Average',GTChiller(ChillerNum)%Base%Name)
-          CALL SetupOutputVariable('Chiller Basin Heater Electric Consumption [J]', &
+          CALL SetupOutputVariable('Chiller Basin Heater Electric Energy [J]', &
                GTChillerReport(ChillerNum)%Base%BasinHeaterConsumption,'System','Sum',GTChiller(ChillerNum)%Base%Name, &
                ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
         END IF
      ENDIF
 
-     CALL SetupOutputVariable('Chiller Lube Heat Recovery Rate [W]', &
+     CALL SetupOutputVariable('Chiller Lube Recovered Heat Rate [W]', &
           GTChillerReport(ChillerNum)%HeatRecLubeRate,'System','Average',GTChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Lube Heat Recovery [J]', &
+     CALL SetupOutputVariable('Chiller Lube Recovered Heat Energy [J]', &
           GTChillerReport(ChillerNum)%HeatRecLubeEnergy,'System','Sum',GTChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HeatRecovery',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Consumption Rate [W]', &
+     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Rate [W]', &
           GTChillerReport(ChillerNum)%FuelEnergyUsedRate,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Consumption [J]', &
+     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Energy [J]', &
           GTChillerReport(ChillerNum)%FuelEnergyUsed,'System','Sum',GTChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey=GTChiller(ChillerNum)%FuelType,EndUseKey='Cooling',GroupKey='Plant')
 
      CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Mass Flow Rate [kg/s]', &
           GTChillerReport(ChillerNum)%FuelMassUsedRate,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Mass Consumption [kg]', &
+     CALL SetupOutputVariable('Chiller '// TRIM(GTChiller(ChillerNum)%FuelType)//' Mass [kg]', &
           GTChillerReport(ChillerNum)%FuelMassUsed,'System','Sum',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Exhaust Stack Temp[C]', &
+     CALL SetupOutputVariable('Chiller Exhaust Temperature [C]', &
           GTChillerReport(ChillerNum)%ExhaustStackTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Heat Recovery Inlet Temperature [C]', &
           GTChillerReport(ChillerNum)%HeatRecInletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Heat Recovery Outlet Temperature [C]', &
           GTChillerReport(ChillerNum)%HeatRecOutletTemp,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
      CALL SetupOutputVariable('Chiller Heat Recovery Mass Flow Rate [kg/s]', &
           GTChillerReport(ChillerNum)%HeatRecMdot,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Fuel COP [W/W]', &
+
+     CALL SetupOutputVariable('Chiller COP [W/W]', &
           GTChillerReport(ChillerNum)%FuelCOP,'System','Average',GTChiller(ChillerNum)%Base%Name)
 
   END DO
@@ -2092,7 +2204,7 @@ SUBROUTINE GetConstCOPChillerInput
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetConstCOPChillerInput: ' ! include trailing blank space
 
           ! DERIVED TYPE DEFINITIONS
           ! na
@@ -2110,7 +2222,7 @@ SUBROUTINE GetConstCOPChillerInput
 
             !GET NUMBER OF ALL EQUIPMENT TYPES
   cCurrentModuleObject = 'Chiller:ConstantCOP'
-  NumConstCOPChillers = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+  NumConstCOPChillers = GetNumObjectsFound(cCurrentModuleObject)
 
   IF (NumConstCOPChillers <= 0) THEN
     CALL ShowSevereError('No '//TRIM(cCurrentModuleObject)//' equipment specified in input file')
@@ -2125,7 +2237,7 @@ SUBROUTINE GetConstCOPChillerInput
 
              !LOAD ARRAYS WITH BLAST ConstCOP CHILLER DATA
   DO ChillerNum = 1 , NumConstCOPChillers
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),ChillerNum,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,ChillerNum,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -2253,16 +2365,25 @@ SUBROUTINE GetConstCOPChillerInput
       ENDIF
     ENDIF
 
-    If(cAlphaArgs(7) .eq. 'CONSTANTFLOW') Then
-       ConstCOPChiller(ChillerNum)%Base%ConstantFlow = .True.
-       ConstCOPChiller(ChillerNum)%Base%VariableFlow = .False.
-    Else If(cAlphaArgs(7) .eq. 'VARIABLEFLOW') Then
-       ConstCOPChiller(ChillerNum)%Base%ConstantFlow = .False.
-       ConstCOPChiller(ChillerNum)%Base%VariableFlow = .True.
-    Else  ! We will assume a variable flow chiller is none specified
-       ConstCOPChiller(ChillerNum)%Base%ConstantFlow = .False.
-       ConstCOPChiller(ChillerNum)%Base%VariableFlow = .True.
-    End If
+    SELECT CASE (TRIM(cAlphaArgs(7)))
+    CASE ( 'CONSTANTFLOW' )
+      ConstCOPChiller(ChillerNum)%Base%FlowMode = ConstantFlow
+    CASE ( 'VARIABLEFLOW' )
+      ConstCOPChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+      CALL ShowWarningError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+      CALL ShowContinueError('Key choice is now called "LeavingSetpointModulated" and the simulation continues')
+    CASE ('LEAVINGSETPOINTMODULATED')
+      ConstCOPChiller(ChillerNum)%Base%FlowMode = LeavingSetpointModulated
+    CASE ('NOTMODULATED')
+      ConstCOPChiller(ChillerNum)%Base%FlowMode = NotModulated
+    CASE DEFAULT
+      CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//'="'//TRIM(cAlphaArgs(1))//'",')
+      CALL ShowContinueError('Invalid '//TRIM(cAlphaFieldNames(7))//'='//TRIM(cAlphaArgs(7)))
+      CALL ShowContinueError('Available choices are ConstantFlow, NotModulated, or LeavingSetpointModulated')
+      CALL ShowContinueError('Flow mode NotModulated is assumed and the simulation continues.')
+      ConstCOPChiller(ChillerNum)%Base%FlowMode = NotModulated
+    END SELECT
 
     !   Basin heater power as a function of temperature must be greater than or equal to 0
     ConstCOPChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff = rNumericArgs(6)
@@ -2303,48 +2424,48 @@ SUBROUTINE GetConstCOPChillerInput
   DO ChillerNum = 1, NumConstCOPChillers
      CALL SetupOutputVariable('Chiller Electric Power [W]', &
           ConstCOPChillerReport(ChillerNum)%Base%Power,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Electric Consumption [J]', &
+     CALL SetupOutputVariable('Chiller Electric Energy [J]', &
           ConstCOPChillerReport(ChillerNum)%Base%Energy,'System','Sum',ConstCOPChiller(ChillerNum)%Base%Name, &
           ResourceTypeKey='ELECTRICITY',EndUseKey='Cooling',GroupKey='Plant')
 
-     CALL SetupOutputVariable('Chiller Evap Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Rate [W]', &
           ConstCOPChillerReport(ChillerNum)%Base%QEvap,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Evaporator Cooling Energy [J]', &
           ConstCOPChillerReport(ChillerNum)%Base%EvapEnergy,'System','Sum',ConstCOPChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='CHILLERS',GroupKey='Plant')
-     CALL SetupOutputVariable('Chiller Evap Water Inlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Inlet Temperature [C]', &
           ConstCOPChillerReport(ChillerNum)%Base%EvapInletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Outlet Temp [C]', &
+     CALL SetupOutputVariable('Chiller Evaporator Outlet Temperature [C]', &
           ConstCOPChillerReport(ChillerNum)%Base%EvapOutletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Evap Water Mass Flow Rate [kg/s]', &
+     CALL SetupOutputVariable('Chiller Evaporator Mass Flow Rate [kg/s]', &
           ConstCOPChillerReport(ChillerNum)%Base%Evapmdot,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
      CALL SetupOutputVariable('Chiller COP [W/W]', &
           ConstCOPChillerReport(ChillerNum)%ActualCOP,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
 
-     CALL SetupOutputVariable('Chiller Cond Heat Trans Rate [W]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Rate [W]', &
           ConstCOPChillerReport(ChillerNum)%Base%QCond,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-     CALL SetupOutputVariable('Chiller Cond Heat Trans [J]', &
+     CALL SetupOutputVariable('Chiller Condenser Heat Transfer Energy [J]', &
           ConstCOPChillerReport(ChillerNum)%Base%CondEnergy,'System','Sum',ConstCOPChiller(ChillerNum)%Base%Name,  &
                               ResourceTypeKey='ENERGYTRANSFER',EndUseKey='HEATREJECTION',GroupKey='Plant')
 
         !Condenser mass flow and outlet temp are valid for water cooled
      IF (ConstCOPChiller(ChillerNum)%Base%CondenserType == WaterCooled)THEN
-        CALL SetupOutputVariable('Chiller Cond Water Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              ConstCOPChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-        CALL SetupOutputVariable('Chiller Cond Water Outlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Outlet Temperature [C]', &
              ConstCOPChillerReport(ChillerNum)%Base%CondOutletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-        CALL SetupOutputVariable('Chiller Cond Water Mass Flow Rate [kg/s]', &
+        CALL SetupOutputVariable('Chiller Condenser Mass Flow Rate [kg/s]', &
              ConstCOPChillerReport(ChillerNum)%Base%Condmdot,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
      ELSEIF (ConstCOPChiller(ChillerNum)%Base%CondenserType == AirCooled) THEN
-        CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              ConstCOPChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
      ELSEIF (ConstCOPChiller(ChillerNum)%Base%CondenserType == EvapCooled) THEN
-        CALL SetupOutputVariable('Chiller Cond Air Inlet Temp [C]', &
+        CALL SetupOutputVariable('Chiller Condenser Inlet Temperature [C]', &
              ConstCOPChillerReport(ChillerNum)%Base%CondInletTemp,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
         IF(ConstCOPChiller(ChillerNum)%Base%BasinHeaterPowerFTempDiff .GT. 0.0d0)THEN
           CALL SetupOutputVariable('Chiller Basin Heater Electric Power [W]', &
                ConstCOPChillerReport(ChillerNum)%Base%BasinHeaterPower,'System','Average',ConstCOPChiller(ChillerNum)%Base%Name)
-          CALL SetupOutputVariable('Chiller Basin Heater Electric Consumption [J]', &
+          CALL SetupOutputVariable('Chiller Basin Heater Electric Energy [J]', &
                ConstCOPChillerReport(ChillerNum)%Base%BasinHeaterConsumption,'System','Sum',ConstCOPChiller(ChillerNum)%Base%Name, &
                ResourceTypeKey='Electric',EndUseKey='CHILLERS',GroupKey='Plant')
         END IF
@@ -2354,7 +2475,7 @@ SUBROUTINE GetConstCOPChillerInput
 RETURN
 END SUBROUTINE GetConstCOPChillerInput
 
-SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
+SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad )
 
 
           ! SUBROUTINE INFORMATION:
@@ -2390,7 +2511,7 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
   INTEGER, INTENT (IN) :: ChillNum     ! number of the current electric chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag      ! TRUE when chiller operating
   REAL(r64), INTENT(IN):: MyLoad
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration      ! initialize variables when TRUE
+
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: RoutineName='InitElectricChiller'
@@ -2415,6 +2536,7 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
   REAL(r64) :: rho ! local fluid density
   REAL(r64) :: mdot ! local mass flow rate
   REAL(r64) :: mdotCond ! local mass flow rate for condenser
+  REAL(r64) :: THeatRecSetpoint ! tests set point node for proper set point value
 
   INTEGER :: InletNode
   INTEGER :: OutletNode
@@ -2503,7 +2625,14 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
       CALL ShowFatalError('InitElectricChiller: Program terminated due to previous condition(s).')
     ENDIF
 
-    IF (ElectricChiller(ChillNum)%Base%VariableFlow) Then
+    IF (ElectricChiller(ChillNum)%Base%FlowMode == ConstantFlow ) Then
+      ! reset flow priority
+      PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%LoopSide(ElectricChiller(ChillNum)%Base%CWLoopSideNum)% &
+          Branch(ElectricChiller(ChillNum)%Base%CWBranchNum)%Comp(ElectricChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
+
+    IF (ElectricChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) Then
       ! reset flow priority
       PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%LoopSide(ElectricChiller(ChillNum)%Base%CWLoopSideNum)% &
           Branch(ElectricChiller(ChillNum)%Base%CWBranchNum)%Comp(ElectricChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
@@ -2513,34 +2642,34 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
       IF ((Node(ElectricChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint   == SensedNodeFlagValue) .AND. &
           (Node(ElectricChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. ElectricChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. ElectricChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElectricChiller(ChillNum)%Base%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            ElectricChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+            ElectricChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(ElectricChiller(ChillNum)%Base%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. ElectricChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. ElectricChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ElectricChiller(ChillNum)%Base%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              ElectricChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+              ElectricChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
 
 
         ENDIF
-        ElectricChiller(ChillNum)%Base%VariableFlowSetToLoop = .TRUE.
+        ElectricChiller(ChillNum)%Base%ModulatedFlowSetToLoop = .TRUE.
         SELECT CASE (PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
         CASE (SingleSetpoint)
           Node(ElectricChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -2590,9 +2719,11 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
                          ElectricChiller(ChillNum)%Base%CDBranchNum,             &
                          ElectricChiller(ChillNum)%Base%CDCompNum)
     ELSE ! air or evap-air
-      Node(CondInletNode)%MassFlowRate        = ElectricChiller(ChillNum)%Base%CondVolFlowRate * &
-        PsyRhoAirFnPbTdbW(StdBaroPress,ElectricChiller(ChillNum)%TempDesCondIn,0.0D0,RoutineName)
 
+      rho = PsyRhoAirFnPbTdbW(StdBaroPress,ElectricChiller(ChillNum)%TempDesCondIn,0.0D0,RoutineName)
+      ElectricChiller(ChillNum)%Base%CondMassFlowRateMax = rho * ElectricChiller(ChillNum)%Base%CondVolFlowRate
+
+      Node(CondInletNode)%MassFlowRate        = ElectricChiller(ChillNum)%Base%CondMassFlowRateMax
       Node(CondOutletNode)%MassFlowrate         = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMaxAvail  = Node(CondInletNode)%MassFlowrate
       Node(CondInletNode)%MassFlowRateMax       = Node(CondInletNode)%MassFlowrate
@@ -2618,7 +2749,50 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
                          ElectricChiller(ChillNum)%HRLoopSideNum,           &
                          ElectricChiller(ChillNum)%HRBranchNum,             &
                          ElectricChiller(ChillNum)%HRCompNum)
-    ENDIF
+      ElectricChiller(ChillNum)%HeatRecMaxCapacityLimit = ElectricChiller(ChillNum)%HeatRecCapacityFraction &
+                           *(ElectricChiller(ChillNum)%Base%NomCap + ElectricChiller(ChillNum)%Base%NomCap &
+                                                                 /ElectricChiller(ChillNum)%Base%COP  )
+
+      IF(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum > 0)THEN
+        SELECT CASE (PlantLoop(ElectricChiller(ChillNum)%HRLoopNum)%LoopDemandCalcScheme)
+          CASE (SingleSetPoint)
+            THeatRecSetpoint = Node(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum)%TempSetPoint
+          CASE (DualSetPointDeadBand)
+            THeatRecSetpoint = Node(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum)%TempSetPointHi
+        END SELECT
+        IF(THeatRecSetpoint == SensedNodeFlagValue)THEN
+          IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+            IF (.NOT. ElectricChiller(ChillNum)%Base%HRSPErrDone) THEN
+              CALL ShowWarningError('Missing heat recovery temperature setpoint for chiller named ' // &
+                                          TRIM(ElectricChiller(ChillNum)%Base%Name) )
+              CALL ShowContinueError('  A temperature setpoint is needed at the heat recovery leaving temperature ' // &
+                                             'setpoint node specified, use a SetpointManager')
+              CALL ShowContinueError('  The overall loop setpoint will be assumed for heat recovery. The simulation continues ...')
+              ElectricChiller(ChillNum)%HeatRecSetpointNodeNum = PlantLoop(ElectricChiller(ChillNum)%HRLoopNum)%TempSetPointNodeNum
+                ElectricChiller(ChillNum)%Base%HRSPErrDone = .TRUE.
+            ENDIF
+          ELSE
+           ! need call to EMS to check node
+            FatalError = .FALSE. ! but not really fatal yet, but should be.
+            CALL CheckIfNodeSetpointManagedByEMS(ElectricChiller(ChillNum)%Base%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
+            IF (FatalError) THEN
+              IF (.NOT. ElectricChiller(ChillNum)%Base%HRSPErrDone) THEN
+                CALL ShowWarningError('Missing heat recovery temperature setpoint for chiller named ' // &
+                                          TRIM(ElectricChiller(ChillNum)%Base%Name) )
+                CALL ShowContinueError('  A temperature setpoint is needed at the heat recovery leaving temperature ' // &
+                                     'setpoint node specified, use a SetpointManager to establish a setpoint')
+                CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at this node ')
+                CALL ShowContinueError('  The overall loop setpoint will be assumed '//  &
+                   'for heat recovery. The simulation continues ...')
+                ElectricChiller(ChillNum)%HeatRecSetpointNodeNum =   &
+                   PlantLoop(ElectricChiller(ChillNum)%HRLoopNum)%TempSetPointNodeNum
+                ElectricChiller(ChillNum)%Base%HRSPErrDone = .TRUE.
+              ENDIF
+            ENDIF
+          END IF ! IF (.NOT. AnyEnergyManagementSystemInModel) THEN
+        END IF ! IF(THeatRecSetpoint == SensedNodeFlagValue)THEN
+      END IF ! IF(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum > 0)THEN
+    ENDIF ! IF (ElectricChiller(ChillNum)%HeatRecActive) THEN
 
     MyEnvrnFlag(ChillNum) = .FALSE.
   END IF
@@ -2626,7 +2800,8 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
     MyEnvrnFlag(ChillNum)=.true.
   ENDIF
 
-  IF (ElectricChiller(ChillNum)%Base%VariableFlow .AND. ElectricChiller(ChillNum)%Base%VariableFlowSetToLoop) THEN
+  IF ( (ElectricChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) &
+       .AND. (ElectricChiller(ChillNum)%Base%ModulatedFlowSetToLoop)) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     SELECT CASE (PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
@@ -2675,13 +2850,9 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
     BranchIndex  =  ElectricChiller(ChillNum)%HRBranchNum
     CompIndex    =  ElectricChiller(ChillNum)%HRCompNum
 
-    If (FirstHVACIteration .AND. RunFlag) Then
+    If ( RunFlag ) Then
       mdot = ElectricChiller(ChillNum)%DesignHeatRecMassFlowRate
-    ELSEIF (FirstHVACIteration .AND. (.NOT. RunFlag)) Then
-      mdot = 0.d0
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. RunFlag) THEN
-      mdot = ElectricChillerReport(ChillNum)%HeatRecMassFlow
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. (.NOT. RunFlag)) THEN
+    ELSE
       mdot = 0.d0
     ENDIF
 
@@ -2698,7 +2869,7 @@ SUBROUTINE InitElectricChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
 END SUBROUTINE InitElectricChiller
 
 
-SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
+SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -2732,7 +2903,6 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
   INTEGER, INTENT (IN) :: ChillNum     ! number of the current engine driven chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag      ! TRUE when chiller operating
   REAL(r64), INTENT(IN):: MyLoad
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: RoutineName='InitEngineDrivenChiller'
@@ -2845,8 +3015,14 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
       CALL ShowFatalError('InitEngineDrivenChiller: Program terminated due to previous condition(s).')
     ENDIF
 
+    IF (EngineDrivenChiller(ChillNum)%Base%FlowMode == ConstantFlow) THEN
+      ! reset flow priority
+      PlantLoop(EngineDrivenChiller(ChillNum)%Base%CWLoopNum)%LoopSide(EngineDrivenChiller(ChillNum)%Base%CWLoopSideNum)% &
+          Branch(EngineDrivenChiller(ChillNum)%Base%CWBranchNum)%Comp(EngineDrivenChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
 
-    IF (EngineDrivenChiller(ChillNum)%Base%VariableFlow) Then
+    IF (EngineDrivenChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) THEN
       ! reset flow priority
       PlantLoop(EngineDrivenChiller(ChillNum)%Base%CWLoopNum)%LoopSide(EngineDrivenChiller(ChillNum)%Base%CWLoopSideNum)% &
           Branch(EngineDrivenChiller(ChillNum)%Base%CWBranchNum)%Comp(EngineDrivenChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
@@ -2855,13 +3031,13 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
       IF ((Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. EngineDrivenChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. EngineDrivenChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(EngineDrivenChiller(ChillNum)%Base%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            EngineDrivenChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+            EngineDrivenChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
@@ -2869,21 +3045,21 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
           CALL CheckIfNodeSetpointManagedByEMS(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum,  &
              iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. EngineDrivenChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. EngineDrivenChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(EngineDrivenChiller(ChillNum)%Base%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              EngineDrivenChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+              EngineDrivenChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
 
 
         ENDIF
-        EngineDrivenChiller(ChillNum)%Base%VariableFlowSetToLoop = .TRUE.
+        EngineDrivenChiller(ChillNum)%Base%ModulatedFlowSetToLoop = .TRUE.
         Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(EngineDrivenChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
         Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi =                        &
@@ -2971,7 +3147,8 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
     MyEnvrnFlag(ChillNum)=.true.
   ENDIF
 
-  IF (EngineDrivenChiller(ChillNum)%Base%VariableFlow .AND. EngineDrivenChiller(ChillNum)%Base%VariableFlowSetToLoop) THEN
+  IF ((EngineDrivenChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) &
+       .AND. (EngineDrivenChiller(ChillNum)%Base%ModulatedFlowSetToLoop)) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -2979,22 +3156,13 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
     Node(EngineDrivenChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi =                        &
          Node(PlantLoop(EngineDrivenChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
-  IF (FirstHVACIteration) THEN
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = EngineDrivenChiller(ChillNum)%Base%EvapMassFlowRateMax
-      mdotCond = EngineDrivenChiller(ChillNum)%Base%CondMassFlowRateMax
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+
+  IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
+    mdot     = EngineDrivenChiller(ChillNum)%Base%EvapMassFlowRateMax
+    mdotCond = EngineDrivenChiller(ChillNum)%Base%CondMassFlowRateMax
   ELSE
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = EngineDrivenChillerReport(ChillNum)%Base%Evapmdot
-      mdotCond = EngineDrivenChillerReport(ChillNum)%Base%Condmdot
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+    mdot     = 0.d0
+    mdotCond = 0.d0
   ENDIF
 
   CALL SetComponentFlowRate( mdot, EvapInletNode, EvapOutletNode,            &
@@ -3019,13 +3187,9 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
     BranchIndex  =  EngineDrivenChiller(ChillNum)%HRBranchNum
     CompIndex    =  EngineDrivenChiller(ChillNum)%HRCompNum
 
-    If (FirstHVACIteration .AND. RunFlag) Then
+    If ( RunFlag ) Then
       mdot = EngineDrivenChiller(ChillNum)%DesignHeatRecMassFlowRate
-    ELSEIF (FirstHVACIteration .AND. (.NOT. RunFlag)) Then
-      mdot = 0.d0
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. RunFlag) THEN
-      mdot = EngineDrivenChillerReport(ChillNum)%HeatRecMdot
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. (.NOT. RunFlag)) THEN
+    ELSE
       mdot = 0.d0
     ENDIF
 
@@ -3040,7 +3204,7 @@ SUBROUTINE InitEngineDrivenChiller(ChillNum,RunFlag,MyLoad,FirstHVACIteration)
 
 END SUBROUTINE InitEngineDrivenChiller
 
-SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
+SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Fred Buhl
@@ -3074,7 +3238,6 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
   INTEGER, INTENT (IN) :: ChillNum     ! number of the current engine driven chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag      ! TRUE when chiller operating
   REAL(r64), INTENT(IN):: MyLoad
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: RoutineName='InitGTChiller'
@@ -3185,7 +3348,14 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
       CALL ShowFatalError('InitGTChiller: Program terminated due to previous condition(s).')
     ENDIF
 
-    IF (GTChiller(ChillNum)%Base%VariableFlow) Then
+    IF (GTChiller(ChillNum)%Base%FlowMode == ConstantFlow) THEN
+      ! reset flow priority
+      PlantLoop(GTChiller(ChillNum)%Base%CWLoopNum)%LoopSide(GTChiller(ChillNum)%Base%CWLoopSideNum)% &
+          Branch(GTChiller(ChillNum)%Base%CWBranchNum)%Comp(GTChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
+
+    IF (GTChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) THEN
       ! reset flow priority
       PlantLoop(GTChiller(ChillNum)%Base%CWLoopNum)%LoopSide(GTChiller(ChillNum)%Base%CWLoopSideNum)% &
           Branch(GTChiller(ChillNum)%Base%CWBranchNum)%Comp(GTChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
@@ -3195,34 +3365,34 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
       IF ((Node(GTChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(GTChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue))  THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. GTChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. GTChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(GTChiller(ChillNum)%Base%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            GTChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+            GTChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(GTChiller(ChillNum)%Base%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. GTChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. GTChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(GTChiller(ChillNum)%Base%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              GTChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+              GTChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
 
 
         ENDIF
-        GTChiller(ChillNum)%Base%VariableFlowSetToLoop = .TRUE.
+        GTChiller(ChillNum)%Base%ModulatedFlowSetToLoop = .TRUE.
         Node(GTChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(GTChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
         Node(GTChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi =                        &
@@ -3296,6 +3466,7 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
                          GTChiller(ChillNum)%HRLoopSideNum,              &
                          GTChiller(ChillNum)%HRBranchNum,                &
                          GTChiller(ChillNum)%HRCompNum)
+
     ENDIF
 
     MyEnvrnFlag(ChillNum) = .FALSE.
@@ -3305,7 +3476,8 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
     MyEnvrnFlag(ChillNum)=.true.
   ENDIF
 
-  IF (GTChiller(ChillNum)%Base%VariableFlow .AND. GTChiller(ChillNum)%Base%VariableFlowSetToLoop) THEN
+  IF ( (GTChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) &
+      .AND. (GTChiller(ChillNum)%Base%ModulatedFlowSetToLoop)) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(GTChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -3314,22 +3486,12 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
          Node(PlantLoop(GTChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
-  IF (FirstHVACIteration) THEN
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = GTChiller(ChillNum)%Base%EvapMassFlowRateMax
-      mdotCond = GTChiller(ChillNum)%Base%CondMassFlowRateMax
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+  IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
+    mdot     = GTChiller(ChillNum)%Base%EvapMassFlowRateMax
+    mdotCond = GTChiller(ChillNum)%Base%CondMassFlowRateMax
   ELSE
-    IF ((ABS(MyLoad) > 0.d0) .AND. RunFlag)  THEN
-      mdot     = GTChillerReport(ChillNum)%Base%Evapmdot
-      mdotCond = GTChillerReport(ChillNum)%Base%Condmdot
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+    mdot     = 0.d0
+    mdotCond = 0.d0
   ENDIF
 
   CALL SetComponentFlowRate( mdot, EvapInletNode, EvapOutletNode,            &
@@ -3355,13 +3517,9 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
     BranchIndex  =  GTChiller(ChillNum)%HRBranchNum
     CompIndex    =  GTChiller(ChillNum)%HRCompNum
 
-    If (FirstHVACIteration .AND. RunFlag) Then
+    IF ( RunFlag ) THEN
       mdot = GTChiller(ChillNum)%DesignHeatRecMassFlowRate
-    ELSEIF (FirstHVACIteration .AND. (.NOT. RunFlag)) Then
-      mdot = 0.d0
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. RunFlag) THEN
-      mdot = GTChillerReport(ChillNum)%HeatRecMdot
-    ELSEIF ((.NOT. FirstHVACIteration) .AND. (.NOT. RunFlag)) THEN
+    ELSE
       mdot = 0.d0
     ENDIF
 
@@ -3375,7 +3533,7 @@ SUBROUTINE InitGTChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration )
 
 END SUBROUTINE InitGTChiller
 
-SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
+SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Chandan Sharma
@@ -3410,7 +3568,6 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
   INTEGER, INTENT (IN) :: ChillNum     ! number of the current electric chiller being simulated
   LOGICAL, INTENT(IN)  :: RunFlag      ! TRUE when chiller operating
   REAL(r64), INTENT(IN):: MyLoad
-  LOGICAL, INTENT(IN)  :: FirstHVACIteration      ! initialize variables when TRUE
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
   CHARACTER(len=*), PARAMETER :: RoutineName='InitConstCOPChiller'
@@ -3483,9 +3640,14 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
     IF (errFlag) THEN
       CALL ShowFatalError('CalcConstCOPChillerModel: Program terminated due to previous condition(s).')
     ENDIF
+    IF (ConstCOPChiller(ChillNum)%Base%FlowMode == ConstantFlow ) THEN
+      ! reset flow priority
+      PlantLoop(ConstCOPChiller(ChillNum)%Base%CWLoopNum)%LoopSide(ConstCOPChiller(ChillNum)%Base%CWLoopSideNum)% &
+          Branch(ConstCOPChiller(ChillNum)%Base%CWBranchNum)%Comp(ConstCOPChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
+              = LoopFlowStatus_NeedyIfLoopOn
+    ENDIF
 
-
-    IF (ConstCOPChiller(ChillNum)%Base%VariableFlow) Then
+    IF (ConstCOPChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated ) THEN
       ! reset flow priority
       PlantLoop(ConstCOPChiller(ChillNum)%Base%CWLoopNum)%LoopSide(ConstCOPChiller(ChillNum)%Base%CWLoopSideNum)% &
           Branch(ConstCOPChiller(ChillNum)%Base%CWBranchNum)%Comp(ConstCOPChiller(ChillNum)%Base%CWCompNum)%FlowPriority &
@@ -3495,32 +3657,32 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
       IF ((Node(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint == SensedNodeFlagValue) .AND. &
           (Node(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi == SensedNodeFlagValue)) THEN
         IF (.NOT. AnyEnergyManagementSystemInModel) THEN
-          IF (.NOT. ConstCOPChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-            CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+          IF (.NOT. ConstCOPChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+            CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ConstCOPChiller(ChillNum)%Base%Name) )
             CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller ' // &
                                              'in variable flow mode, use a SetpointManager')
             CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-            ConstCOPChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+            ConstCOPChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
           ENDIF
         ELSE
          ! need call to EMS to check node
           FatalError = .FALSE. ! but not really fatal yet, but should be.
           CALL CheckIfNodeSetpointManagedByEMS(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum,iTemperatureSetpoint, FatalError)
           IF (FatalError) THEN
-            IF (.NOT. ConstCOPChiller(ChillNum)%Base%VariableFlowErrDone) THEN
-              CALL ShowWarningError('Missing temperature setpoint for VariableFlow mode chiller named ' // &
+            IF (.NOT. ConstCOPChiller(ChillNum)%Base%ModulatedFlowErrDone) THEN
+              CALL ShowWarningError('Missing temperature setpoint for LeavingSetpointModulated mode chiller named ' // &
                                           TRIM(ConstCOPChiller(ChillNum)%Base%Name) )
               CALL ShowContinueError('  A temperature setpoint is needed at the outlet node of a chiller evaporator ' // &
                                              'in variable flow mode')
               CALL ShowContinueError('  use a Setpoint Manager to establish a setpoint at the chiller evaporator outlet node ')
               CALL ShowContinueError('  or use an EMS actuator to establish a setpoint at the outlet node ')
               CALL ShowContinueError('  The overall loop setpoint will be assumed for chiller. The simulation continues ... ')
-              ConstCOPChiller(ChillNum)%Base%VariableFlowErrDone = .TRUE.
+              ConstCOPChiller(ChillNum)%Base%ModulatedFlowErrDone = .TRUE.
             ENDIF
           ENDIF
         ENDIF
-        ConstCOPChiller(ChillNum)%Base%VariableFlowSetToLoop = .TRUE.
+        ConstCOPChiller(ChillNum)%Base%ModulatedFlowSetToLoop = .TRUE.
         Node(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
           Node(PlantLoop(ConstCOPChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPoint
         Node(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPointHi =                        &
@@ -3584,7 +3746,8 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
   IF (.not. BeginEnvrnFlag) THEN
     MyEnvironFlag(ChillNum)=.true.
   ENDIF
-  IF (ConstCOPChiller(ChillNum)%Base%VariableFlow .AND. ConstCOPChiller(ChillNum)%Base%VariableFlowSetToLoop) THEN
+  IF ((ConstCOPChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) &
+      .AND. (ConstCOPChiller(ChillNum)%Base%ModulatedFlowSetToLoop)) THEN
   ! fix for clumsy old input that worked because loop setpoint was spread.
   !  could be removed with transition, testing , model change, period of being obsolete.
     Node(ConstCOPChiller(ChillNum)%Base%EvapOutletNodeNum)%TempSetPoint =                        &
@@ -3593,22 +3756,12 @@ SUBROUTINE InitConstCOPChiller(ChillNum,RunFlag, MyLoad, FirstHVACIteration)
          Node(PlantLoop(ConstCOPChiller(ChillNum)%Base%CWLoopNum)%TempSetPointNodeNum)%TempSetPointHi
   ENDIF
 
-  IF (FirstHVACIteration) THEN
-    IF ((MyLoad < 0.d0) .AND. RunFlag)  THEN
-      mdot     = ConstCOPChiller(ChillNum)%Base%EvapMassFlowRateMax
-      mdotCond = ConstCOPChiller(ChillNum)%Base%CondMassFlowRateMax
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+  IF ((MyLoad < 0.d0) .AND. RunFlag)  THEN
+    mdot     = ConstCOPChiller(ChillNum)%Base%EvapMassFlowRateMax
+    mdotCond = ConstCOPChiller(ChillNum)%Base%CondMassFlowRateMax
   ELSE
-    IF ((MyLoad < 0.d0) .AND. RunFlag)  THEN
-      mdot     = ConstCOPChillerReport(ChillNum)%Base%Evapmdot
-      mdotCond = ConstCOPChillerReport(ChillNum)%Base%Condmdot
-    ELSE
-      mdot     = 0.d0
-      mdotCond = 0.d0
-    ENDIF
+    mdot     = 0.d0
+    mdotCond = 0.d0
   ENDIF
 
   CALL SetComponentFlowRate( mdot, EvapInletNode, EvapOutletNode,            &
@@ -3685,6 +3838,7 @@ SUBROUTINE SizeElectricChiller(ChillNum)
   REAL(r64)           :: tmpNomCap ! local nominal capacity cooling power
   REAL(r64)           :: tmpEvapVolFlowRate ! local evaporator design volume flow rate
   REAL(r64)           :: tmpCondVolFlowRate ! local condenser design volume flow rate
+  REAL(r64)           :: tmpHeatRecVolFlowRate ! local heat recovery design volume flow rate
 
   PltSizNum = 0
   PltSizCondNum = 0
@@ -3789,6 +3943,21 @@ SUBROUTINE SizeElectricChiller(ChillNum)
   IF (ErrorsFound) THEN
     CALL ShowFatalError('Preceding sizing errors cause program termination')
   END IF
+
+  IF (ElectricChiller(ChillNum)%HeatRecActive) THEN
+    tmpHeatRecVolFlowRate = ElectricChiller(ChillNum)%DesignHeatRecVolFlowRate
+    IF ( ElectricChiller(ChillNum)%DesignHeatRecVolFlowRate == Autosize) THEN
+      tmpHeatRecVolFlowRate = tmpCondVolFlowRate * ElectricChiller(ChillNum)%HeatRecCapacityFraction
+      IF (PlantSizesOkayToFinalize) THEN
+        ElectricChiller(ChillNum)%DesignHeatRecVolFlowRate = tmpHeatRecVolFlowRate
+        CALL ReportSizingOutput('Chiller:Electric', ElectricChiller(ChillNum)%Base%Name, &
+                              'Design Heat Recovery Fluid Flow Rate [m3/s]', &
+                              ElectricChiller(ChillNum)%DesignHeatRecVolFlowRate)
+      ENDIF
+    ENDIF
+    ! save the reference heat recovery fluid volumetric flow rate
+    CALL RegisterPlantCompDesignFlow(ElectricChiller(ChillNum)%HeatRecInletNodeNum,tmpHeatRecVolFlowRate)
+  ENDIF
 
   IF (PlantSizesOkayToFinalize) Then
     !create predefined report
@@ -4319,7 +4488,7 @@ SUBROUTINE SizeConstCOPChiller(ChillNum)
   RETURN
 END SUBROUTINE SizeConstCOPChiller
 
-SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstIteration)
+SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher / Brandon Anderson
           !       DATE WRITTEN   Sept. 2000
@@ -4347,6 +4516,7 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstI
   USE DataEnvironment, ONLY : EnvironmentName, CurMnDy
   USE FluidProperties, ONLY : GetSpecificHeatGlycol
   USE PlantUtilities,  ONLY : SetComponentFlowRate, PullCompInterconnectTrigger
+  USE Psychrometrics,  ONLY : PsyCpAirFnWTdb, PsyWFnTdbTwbPb
 
   IMPLICIT NONE
 
@@ -4354,7 +4524,6 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstI
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER                :: ChillNum        ! chiller number
   REAL(r64)              :: MyLoad          ! operating load
-  LOGICAL                :: FirstIteration  ! TRUE when first iteration of timestep !unused1208
   LOGICAL, INTENT(IN)    :: RunFlag         ! TRUE when chiller operating
   !INTEGER, INTENT(IN)    :: FlowLock        ! TRUE when flow resolver has calculated branch flow
   INTEGER, INTENT(IN)    :: EquipFlowCtrl  ! Flow control mode for the equipment
@@ -4375,7 +4544,6 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstI
   REAL(r64), DIMENSION(3)     :: FullLoadFactor        ! intermediate result:  full load factor
   REAL(r64)              :: MinPartLoadRat        ! min allowed operating frac full load
   REAL(r64)              :: MaxPartLoadRat        ! max allowed operating frac full load
-  REAL(r64)              :: TempCondIn            ! C - (Electric ADJTC(1)The design secondary loop fluid
   REAL(r64)              :: TempCondInDesign      ! C - (Electric ADJTC(1)The design secondary loop fluid
   REAL(r64)              :: TempRiseRat           ! intermediate result:  temperature rise ratio
   REAL(r64)              :: EvapInletTemp         ! C - evaporator inlet temperature, water side
@@ -4501,39 +4669,7 @@ SUBROUTINE CalcElectricChillerModel(ChillNum,MyLoad,EquipFlowCtrl,Runflag,FirstI
     RETURN
   END IF
 
-  IF (ElectricChiller(ChillNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
-    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
-      !  Warn user if entering condenser temperature falls below 0C
-      IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
-        ElectricChiller(ChillNum)%Base%PrintMessage = .TRUE.
-        WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
-        ElectricChiller(ChillNum)%Base%MsgBuffer1 = 'CalcElectricChillerModel - Chiller:Electric "' &
-                             //TRIM(ElectricChiller(ChillNum)%Base%Name)// &
-                             '" - Air Cooled Condenser Inlet Temperature below 0C'
-        ElectricChiller(ChillNum)%Base%MsgBuffer2 = '... Outdoor Dry-bulb Condition = '//TRIM(OutputChar)// &
-                   ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
-                   //TRIM(CreateSysTimeIntervalString())
-        ElectricChiller(ChillNum)%Base%MsgDataLast = Node(CondInletNode)%Temp
-      ELSE
-        ElectricChiller(ChillNum)%Base%PrintMessage = .FALSE.
-      ENDIF
-  Else IF (ElectricChiller(ChillNum)%Base%CondenserType == EvapCooled) THEN !Condenser inlet temp = (outdoor wet bulb)
-    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirWetBulb
-!  Warn user if evap condenser wet bulb temperature falls below 10C
-    IF(Node(CondInletNode)%Temp .LT. 10.0d0 .and. .not. WarmupFlag) THEN
-      ElectricChiller(ChillNum)%Base%PrintMessage = .TRUE.
-      WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
-      ElectricChiller(ChillNum)%Base%MsgBuffer1 = 'CalcElectricChillerModel - Chiller:Electric "' &
-                           //TRIM(ElectricChiller(ChillNum)%Base%Name)// &
-                           '" - Evap Cooled Condenser Inlet Temperature below 10C'
-      ElectricChiller(ChillNum)%Base%MsgBuffer2 = '... Outdoor Wet-bulb Condition = '//TRIM(OutputChar)// &
-                 ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
-                 //TRIM(CreateSysTimeIntervalString())
-      ElectricChiller(ChillNum)%Base%MsgDataLast = Node(CondInletNode)%Temp
-    ELSE
-      ElectricChiller(ChillNum)%Base%PrintMessage = .FALSE.
-    ENDIF
-  ENDIF ! End of the Air Cooled/Evap Cooled Logic block
+
 
    ! If not air or evap cooled then set to the condenser node that is attached to a cooling tower
   CondInletTemp  = Node(CondInletNode)%Temp
@@ -4574,13 +4710,72 @@ END IF
   TempLowLimitEout   = ElectricChiller(ChillNum)%TempLowLimitEvapOut
   EvapMassFlowRateMax    = ElectricChiller(ChillNum)%Base%EvapMassFlowRateMax
   PlantLoopNum       = ElectricChiller(ChillNum)%Base%CWLoopNum
-  TempCondIn         = Node(ElectricChiller(ChillNum)%Base%CondInletNodeNum)%Temp
+
   LoopNum            = ElectricChiller(ChillNum)%Base%CWLoopNum
   LoopSideNum        = ElectricChiller(ChillNum)%Base%CWLoopSideNum
 
+! initialize outlet air humidity ratio of air or evap cooled chillers
+  CondOutletHumRat = Node(CondInletNode)%HumRat
+
+  IF (ElectricChiller(ChillNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
+    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
+      !  Warn user if entering condenser temperature falls below 0C
+      IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
+        ElectricChiller(ChillNum)%Base%PrintMessage = .TRUE.
+        WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
+        ElectricChiller(ChillNum)%Base%MsgBuffer1 = 'CalcElectricChillerModel - Chiller:Electric "' &
+                             //TRIM(ElectricChiller(ChillNum)%Base%Name)// &
+                             '" - Air Cooled Condenser Inlet Temperature below 0C'
+        ElectricChiller(ChillNum)%Base%MsgBuffer2 = '... Outdoor Dry-bulb Condition = '//TRIM(OutputChar)// &
+                   ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
+                   //TRIM(CreateSysTimeIntervalString())
+        ElectricChiller(ChillNum)%Base%MsgDataLast = Node(CondInletNode)%Temp
+      ELSE
+        ElectricChiller(ChillNum)%Base%PrintMessage = .FALSE.
+      ENDIF
+  Else IF (ElectricChiller(ChillNum)%Base%CondenserType == EvapCooled) THEN !Condenser inlet temp = (outdoor wet bulb)
+    Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirWetBulb
+!  line above assumes evaporation pushes condenser inlet air humidity ratio to saturation
+    CondOutletHumRat = PsyWFnTdbTwbPb(Node(CondInletNode)%Temp,Node(CondInletNode)%Temp,Node(CondInletNode)%Press)
+!  Warn user if evap condenser wet bulb temperature falls below 10C
+    IF(Node(CondInletNode)%Temp .LT. 10.0d0 .and. .not. WarmupFlag) THEN
+      ElectricChiller(ChillNum)%Base%PrintMessage = .TRUE.
+      WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
+      ElectricChiller(ChillNum)%Base%MsgBuffer1 = 'CalcElectricChillerModel - Chiller:Electric "' &
+                           //TRIM(ElectricChiller(ChillNum)%Base%Name)// &
+                           '" - Evap Cooled Condenser Inlet Temperature below 10C'
+      ElectricChiller(ChillNum)%Base%MsgBuffer2 = '... Outdoor Wet-bulb Condition = '//TRIM(OutputChar)// &
+                 ' C. Occurrence info = '//TRIM(EnvironmentName)//', '//Trim(CurMnDy)//' '&
+                 //TRIM(CreateSysTimeIntervalString())
+      ElectricChiller(ChillNum)%Base%MsgDataLast = Node(CondInletNode)%Temp
+    ELSE
+      ElectricChiller(ChillNum)%Base%PrintMessage = .FALSE.
+    ENDIF
+  ENDIF ! End of the Air Cooled/Evap Cooled Logic block
+
+  CondInletTemp  = Node(CondInletNode)%Temp
+
+  ! correct inlet temperature if using heat recovery
+  IF (ElectricChiller(ChillNum)%HeatRecActive) THEN
+    IF ((ElectricChillerReport(ChillNum)%QHeatRecovery + &
+         ElectricChillerReport(ChillNum)%Base%QCond) > 0.d0) THEN
+      AvgCondSinkTemp = (ElectricChillerReport(ChillNum)%QHeatRecovery &
+                           * ElectricChillerReport(ChillNum)%HeatRecInletTemp &
+                         + ElectricChillerReport(ChillNum)%Base%QCond &
+                           * ElectricChillerReport(ChillNum)%Base%CondInletTemp) &
+                        / ( ElectricChillerReport(ChillNum)%QHeatRecovery &
+                            + ElectricChillerReport(ChillNum)%Base%QCond)
+    ELSE
+      AvgCondSinkTemp = CondInletTemp
+    ENDIF
+  ELSE
+    AvgCondSinkTemp = CondInletTemp
+  ENDIF
+
   !Calculate chiller performance from this set of performance equations.
   !  from BLAST...Z=(TECONDW-ADJTC(1))/ADJTC(2)-(TLCHLRW-ADJTC(3))
-  DeltaTemp= (TempCondIn   -  TempCondInDesign) / TempRiseRat &
+
+  DeltaTemp= (AvgCondSinkTemp   -  TempCondInDesign) / TempRiseRat &
          - (TempEvapOut -  TempEvapOutDesign)
 
   ! model should have bounds on DeltaTemp and check them (also needs engineering ref content)
@@ -4649,7 +4844,8 @@ END IF
        Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap/RatedCOP * FRAC
 
        ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-       If(ElectricChiller(ChillNum)%Base%ConstantFlow)Then
+       IF ( (ElectricChiller(ChillNum)%Base%FlowMode == ConstantFlow)  &
+            .OR. (ElectricChiller(ChillNum)%Base%FlowMode == NotModulated)) THEN
 
           ! Start by assuming max (design) flow
           EvapMassFlowRate = EvapMassFlowRateMax
@@ -4669,7 +4865,7 @@ END IF
           ! Evaluate outlet temp based on delta
           EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
 
-       Else IF(ElectricChiller(ChillNum)%Base%VariableFlow)Then
+       ELSE IF (ElectricChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) THEN
 
           ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
           SELECT CASE (PlantLoop(ElectricChiller(ChillNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
@@ -4750,7 +4946,7 @@ END IF
 
       SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
       CASE (SingleSetpoint)
-        IF ((ElectricChiller(ChillNum)%Base%VariableFlow) .OR. &
+        IF ((ElectricChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated ) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
             (Node(EvapOutletNode)%TempSetPoint /= SensedNodeFlagValue) ) THEN
@@ -4759,7 +4955,7 @@ END IF
           TempEvapOutSetpoint = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
         ENDIF
       CASE (DualSetpointDeadband)
-        IF ((ElectricChiller(ChillNum)%Base%VariableFlow) .OR. &
+        IF ((ElectricChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(BranchNum)%Comp(CompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
             (Node(EvapOutletNode)%TempSetPointHi /= SensedNodeFlagValue) ) THEN
@@ -4867,11 +5063,21 @@ END IF
     END IF
   ELSE !Air Cooled or Evap Cooled
 
+    IF(QCondenser > 0.0d0) THEN
+      CondMassFlowRate = ElectricChiller(ChillNum)%Base%CondMassFlowRateMax * OperPartLoadRat
+    ELSE
+      CondMassFlowRate = 0.0d0
+    END IF
+
     ! If Heat Recovery specified for this vapor compression chiller, then Qcondenser will be adjusted by this subroutine
     If(ElectricChiller(ChillNum)%HeatRecActive) Call CalcElectricChillerHeatRecovery(ChillNum,QCondenser, &
                                                  CondMassFlowRate,CondInletTemp,QHeatRecovered)
-    !don't care about outlet temp for Air-Cooled or Evap Cooled and there is no CondMassFlowRate and would divide by zero
-    CondOutletTemp = CondInletTemp
+    IF(CondMassFlowRate .GT. 0.0d0)THEN
+      CpCond = PsyCpAirFnWTdb(Node(CondInletNode)%HumRat,CondInletTemp,'CalcElectricChillerModel')
+      CondOutletTemp = CondInletTemp + QCondenser/CondMassFlowRate/CpCond
+    ELSE
+      CondOutletTemp = CondInletTemp
+    END IF
   END IF
 
 
@@ -4916,7 +5122,7 @@ END IF
 END SUBROUTINE CalcElectricChillerModel
 
 
-SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlowCtrl)
+SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher / Brandon Anderson
           !       DATE WRITTEN   Sept. 2000
@@ -4951,7 +5157,6 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER                :: ChillerNum      ! chiller number
   REAL(r64)              :: MyLoad          ! operating load
-  LOGICAL                :: FirstIteration  ! TRUE when first iteration of timestep
   LOGICAL, INTENT(IN)    :: RunFlag         ! TRUE when chiller operating
  ! INTEGER, INTENT(IN)    :: FlowLock        ! TRUE when flow resolver has calculated branch flow
   INTEGER, INTENT(IN) :: EquipFlowCtrl  ! Flow control mode for the equipment
@@ -5211,6 +5416,8 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
   EvapMassFlowRateMax    = EngineDrivenChiller(ChillerNum)%Base%EvapMassFlowRateMax
 
 !*********************************
+
+
   !Calculate chiller performance from this set of performance equations.
   !  from BLAST...Z=(TECONDW-ADJTC(1))/ADJTC(2)-(TLCHLRW-ADJTC(3))
     DeltaTemp= (TempCondIn   -  TempCondInDesign) / TempRiseRat &
@@ -5266,7 +5473,8 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap/COP * FRAC
 
     ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-    If(EngineDrivenChiller(ChillerNum)%Base%ConstantFlow)Then
+    If ((EngineDrivenChiller(ChillerNum)%Base%FlowMode == ConstantFlow)  &
+        .OR. (EngineDrivenChiller(ChillerNum)%Base%FlowMode == NotModulated)) THEN
       ! Start by assuming max (design) flow
       EvapMassFlowRate = EvapMassFlowRateMax
       ! Use SetComponentFlowRate to decide actual flow
@@ -5285,7 +5493,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
       ! Evaluate outlet temp based on delta
       EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
 
-    Else IF(EngineDrivenChiller(ChillerNum)%Base%VariableFlow)Then
+    ELSE IF (EngineDrivenChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated ) THEN
 
       ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
       SELECT CASE (PlantLoop(EngineDrivenChiller(ChillerNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
@@ -5363,7 +5571,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
 
       SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
       CASE (SingleSetpoint)
-        IF ((EngineDrivenChiller(ChillerNum)%Base%VariableFlow) .OR. &
+        IF ((EngineDrivenChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(EngineDrivenChiller(ChillerNum)%Base%CWBranchNum) &
               %Comp(EngineDrivenChiller(ChillerNum)%Base%CWCompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
@@ -5373,7 +5581,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
           TempEvapOutSetpoint = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
         ENDIF
       CASE (DualSetpointDeadband)
-        IF ((EngineDrivenChiller(ChillerNum)%Base%VariableFlow) .OR. &
+        IF ((EngineDrivenChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(EngineDrivenChiller(ChillerNum)%Base%CWBranchNum) &
               %Comp(EngineDrivenChiller(ChillerNum)%Base%CWCompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
@@ -5543,7 +5751,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
 
   !Update Heat Recovery temperatures
   IF (EngineDrivenChiller(ChillerNum)%HeatRecActive) THEN
-    CALL CalcEngineChillerHeatRec(ChillerNum,QTotalHeatRecovered,FirstIteration,HeatRecRatio)
+    CALL CalcEngineChillerHeatRec(ChillerNum,QTotalHeatRecovered,HeatRecRatio)
     QExhaustRecovered = QExhaustRecovered*HeatRecRatio
     QLubeOilRecovered = QLubeOilRecovered*HeatRecRatio
     QJacketRecovered  = QJacketRecovered*HeatRecRatio
@@ -5601,7 +5809,7 @@ SUBROUTINE CalcEngineDrivenChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration
   RETURN
 END SUBROUTINE CalcEngineDrivenChillerModel
 
-SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlowCtrl)
+SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,EquipFlowCtrl)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher / Brandon Anderson
           !       DATE WRITTEN   Sept. 2000
@@ -5635,9 +5843,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER                :: ChillerNum        ! chiller number
   REAL(r64)              :: MyLoad          ! operating load
-  LOGICAL                :: FirstIteration  ! TRUE when first iteration of timestep !unused1208
   LOGICAL, INTENT(IN)    :: RunFlag         ! TRUE when chiller operating
- ! INTEGER, INTENT(IN)    :: FlowLock        ! TRUE when flow resolver has calculated branch flow
   INTEGER, INTENT(IN) :: EquipFlowCtrl  ! Flow control mode for the equipment
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -5886,6 +6092,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
   LoopSideNum        = GTChiller(ChillerNum)%Base%CWLoopSideNum
 
 !*********************************
+
   !Calculate chiller performance from this set of performance equations.
   !  from BLAST...Z=(TECONDW-ADJTC(1))/ADJTC(2)-(TLCHLRW-ADJTC(3))
   DeltaTemp= (TempCondIn   -  TempCondInDesign) / TempRiseRat &
@@ -5941,7 +6148,8 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
     Power = FracFullLoadPower * FullLoadPowerRat * AvailChillerCap/COP * FRAC
 
     ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-    If(GTChiller(ChillerNum)%Base%ConstantFlow)Then
+    IF ((GTChiller(ChillerNum)%Base%FlowMode == ConstantFlow) &
+        .OR. (GTChiller(ChillerNum)%Base%FlowMode == NotModulated )) THEN
       ! Start by assuming max (design) flow
       EvapMassFlowRate = EvapMassFlowRateMax
       ! Use SetComponentFlowRate to decide actual flow
@@ -5959,7 +6167,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
       ENDIF
       ! Evaluate outlet temp based on delta
       EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
-    Else IF(GTChiller(ChillerNum)%Base%VariableFlow)Then
+    ELSE IF (GTChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated) THEN
       ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
       SELECT CASE (PlantLoop(GTChiller(ChillerNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
       CASE (SingleSetpoint)
@@ -6030,7 +6238,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
     ELSE  !No subcooling in this case.No recalculation required.Still need to check chiller low temp limit
       SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
       CASE (SingleSetpoint)
-        IF ((GTChiller(ChillerNum)%Base%VariableFlow) .OR. &
+        IF ((GTChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(GTChiller(ChillerNum)%Base%CWBranchNum) &
               %Comp(GTChiller(ChillerNum)%Base%CWCompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
@@ -6040,7 +6248,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
           TempEvapOutSetpoint = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
         ENDIF
       CASE (DualSetpointDeadband)
-        IF ((GTChiller(ChillerNum)%Base%VariableFlow) .OR. &
+        IF ((GTChiller(ChillerNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
             (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(GTChiller(ChillerNum)%Base%CWBranchNum) &
               %Comp(GTChiller(ChillerNum)%Base%CWCompNum)%CurOpSchemeType &
                  == CompSetPtBasedSchemeType)          .OR. &
@@ -6389,7 +6597,7 @@ SUBROUTINE CalcGTChillerModel(ChillerNum,MyLoad,Runflag,FirstIteration,EquipFlow
   RETURN
 END SUBROUTINE CalcGTChillerModel
 
-SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,EquipFlowCtrl)
+SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,EquipFlowCtrl)
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Dan Fisher
           !       DATE WRITTEN   Sept. 1998
@@ -6422,8 +6630,6 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
   INTEGER                :: ChillNum
   REAL(r64)              :: MyLoad
   LOGICAL                :: RunFlag
-  LOGICAL                :: FirstIteration  !unused1208
- ! INTEGER, INTENT(IN)    :: FlowLock
   INTEGER, INTENT(IN) :: EquipFlowCtrl  ! Flow control mode for the equipment
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
@@ -6461,7 +6667,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
   LoopSideNum              = ConstCOPChiller(ChillNum)%Base%CWLoopSideNum
   SELECT CASE (PlantLoop(LoopNum)%LoopDemandCalcScheme)
   CASE (SingleSetpoint)
-    IF ((ConstCOPChiller(ChillNum)%Base%VariableFlow) .OR. &
+    IF ((ConstCOPChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(ConstCOPChiller(ChillNum)%Base%CWBranchNum) &
           %Comp(ConstCOPChiller(ChillNum)%Base%CWCompNum)%CurOpSchemeType &
              == CompSetPtBasedSchemeType)          .OR. &
@@ -6471,7 +6677,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
       TempEvapOutSetpoint = Node(PlantLoop(LoopNum)%TempSetPointNodeNum)%TempSetPoint
     ENDIF
   CASE (DualSetpointDeadband)
-    IF ((ConstCOPChiller(ChillNum)%Base%VariableFlow) .OR. &
+    IF ((ConstCOPChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) .OR. &
         (PlantLoop(LoopNum)%LoopSide(LoopSideNum)%Branch(ConstCOPChiller(ChillNum)%Base%CWBranchNum) &
           %Comp(ConstCOPChiller(ChillNum)%Base%CWCompNum)%CurOpSchemeType &
              == CompSetPtBasedSchemeType)          .OR. &
@@ -6572,7 +6778,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
   IF (ConstCOPChiller(ChillNum)%Base%CondenserType == AirCooled) THEN !Condenser inlet temp = outdoor temp
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirDryBulb
 !  Warn user if entering condenser temperature falls below 0C
-      IF(Node(CondInletNode)%Temp .LT. 0.0 .and. .not. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 0.0d0 .and. .not. WarmupFlag) THEN
         ConstCOPChiller(ChillNum)%Base%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         ConstCOPChiller(ChillNum)%Base%MsgBuffer1 = 'CalcConstCOPChillerModel - Chiller:ConstantCOP "' &
@@ -6588,7 +6794,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
   Else IF (ConstCOPChiller(ChillNum)%Base%CondenserType == EvapCooled) THEN !Condenser inlet temp = (outdoor wet bulb)
     Node(CondInletNode)%Temp = Node(CondInletNode)%OutAirWetBulb
 !  Warn user if evap condenser wet bulb temperature falls below 10C
-      IF(Node(CondInletNode)%Temp .LT. 10.0 .and. .not. WarmupFlag) THEN
+      IF(Node(CondInletNode)%Temp .LT. 10.0d0 .and. .not. WarmupFlag) THEN
         ConstCOPChiller(ChillNum)%Base%PrintMessage = .TRUE.
         WRITE(OutputChar,OutputFormat)Node(CondInletNode)%Temp
         ConstCOPChiller(ChillNum)%Base%MsgBuffer1 = 'CalcConstCOPChillerModel - Chiller:ConstantCOP "' &
@@ -6642,7 +6848,8 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
      Power = ABS(MyLoad) / ConstCOPChiller(ChillNum)%Base%COP
 
      ! Either set the flow to the Constant value or caluclate the flow for the variable volume
-     If(ConstCOPChiller(ChillNum)%Base%ConstantFlow)Then
+     IF ((ConstCOPChiller(ChillNum)%Base%FlowMode == ConstantFlow)  &
+        .OR. (ConstCOPChiller(ChillNum)%Base%FlowMode == NotModulated)) THEN
 
           ! Start by assuming max (design) flow
         EvapMassFlowRate = ConstCOPChiller(ChillNum)%Base%EvapMassFlowRateMax
@@ -6662,7 +6869,7 @@ SUBROUTINE CalcConstCOPChillerModel(ChillNum,MyLoad,Runflag,FirstIteration,Equip
           ! Evaluate outlet temp based on delta
         EvapOutletTemp = Node(EvapInletNode)%Temp - EvapDeltaTemp
 
-     Else IF(ConstCOPChiller(ChillNum)%Base%VariableFlow)Then
+     ELSE IF(ConstCOPChiller(ChillNum)%Base%FlowMode == LeavingSetpointModulated) THEN
 
         ! Calculate the Delta Temp from the inlet temp to the chiller outlet setpoint
         SELECT CASE (PlantLoop(ConstCOPChiller(ChillNum)%Base%CWLoopNum)%LoopDemandCalcScheme)
@@ -6864,7 +7071,9 @@ SUBROUTINE CalcElectricChillerHeatRecovery(ChillNum,QCond,CondMassFlow,CondInlet
             ! USE STATEMENTS:
 USE Psychrometrics, ONLY: PsyCpAirFnWTdb
 USE FluidProperties, ONLY: GetSpecificHeatGlycol
-USE DataPlant,       ONLY: PlantLoop
+USE DataPlant,       ONLY: PlantLoop, SingleSetpoint, DualSetPointDeadBand
+USE ScheduleManager, ONLY: GetCurrentScheduleValue
+
 IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -6894,6 +7103,9 @@ IMPLICIT NONE
   REAL(r64)    :: TAvgOut
   REAL(r64)    :: CpHeatRec
   REAL(r64)    :: CpCond
+  REAL(r64)    :: THeatRecSetpoint
+  REAL(r64)    :: QHeatRecToSetpoint
+  REAL(r64)    :: HeatRecHighInletLimit
 
 
   ! Begin routine
@@ -6921,29 +7133,41 @@ IMPLICIT NONE
   ! Before we modify the QCondenser, the total or original value is transferred to QTot
   QTotal = QCond
 
-  TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
-             (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
+  IF (ElectricChiller(ChillNum)%HeatRecSetpointNodeNum == 0) THEN ! use original algorithm that blends temps
+    TAvgIn = (HeatRecMassFlowRate*CpHeatRec*HeatRecInletTemp + CondMassFlow*CpCond*CondInletTemp)/  &
+               (HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond)
 
-  TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
+    TAvgOut = QTotal/(HeatRecMassFlowRate*CpHeatRec + CondMassFlow*CpCond) + TAvgIn
 
-  QCondTmp = CondMassFlow*CpCond*(TAvgOut-CondInletTemp)
+    QHeatRec = HeatRecMassFlowRate * CpHeatRec * (TAvgOut - HeatRecInletTemp)
+    QHeatRec = MAX(QHeatRec, 0.d0) ! ensure non negative
+   !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElectricChiller(ChillNum)%HeatRecMaxCapacityLimit)
+  ELSE ! use new algorithm to meet setpoint
+    SELECT CASE (PlantLoop(ElectricChiller(ChillNum)%HRLoopNum)%LoopDemandCalcScheme)
 
-  If(QCondTmp <= 0.0)Then
-    FracHeatRec = 1.0d0
-  Else
-    FracHeatRec = (HeatRecMassFlowRate*CpHeatRec*(TAvgOut-HeatRecInletTemp))/QCondTmp
-  End If
+    CASE (SingleSetPoint)
+      THeatRecSetpoint = Node(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum)%TempSetPoint
+    CASE (DualSetPointDeadBand)
+      THeatRecSetpoint = Node(ElectricChiller(ChillNum)%HeatRecSetpointNodeNum)%TempSetPointHi
+    END SELECT
 
-  If(FracHeatRec <= 0.0d0) FracHeatRec = 0.0d0
-  If(FracHeatRec > 1.0d0) FracHeatRec = 1.0d0
+    QHeatRecToSetpoint = HeatRecMassFlowRate *  CpHeatRec * (THeatRecSetpoint - HeatRecInletTemp)
+    QHeatRecToSetpoint = MAX(QHeatRecToSetpoint, 0.d0)
+    QHeatRec = MIN(QTotal,QHeatRecToSetpoint)
+     !check if heat flow too large for physical size of bundle
+    QHeatRec = MIN(QHeatRec, ElectricChiller(ChillNum)%HeatRecMaxCapacityLimit)
 
-  QCond = QTotal*(1.0d0 - FracHeatRec)
+  ENDIF
+   ! check if limit on inlet is present and exceeded.
+  IF (ElectricChiller(ChillNum)%HeatRecInletLimitSchedNum > 0) THEN
+    HeatRecHighInletLimit =  GetCurrentScheduleValue(ElectricChiller(ChillNum)%HeatRecInletLimitSchedNum)
+    IF ( HeatRecInletTemp > HeatRecHighInletLimit) THEN ! shut down heat recovery
+      QHeatRec = 0.d0
+    ENDIF
+  ENDIF
 
-  If(FracHeatRec == 0.0) Then
-    QHeatRec = 0.0
-  Else
-    QHeatRec = QTotal*FracHeatRec
-  End If
+  QCond = QTotal - QHeatRec
 
   ! Calculate a new Heat Recovery Coil Outlet Temp
   IF (HeatRecMassFlowRate > 0.0) THEN
@@ -6956,7 +7180,7 @@ IMPLICIT NONE
  RETURN
 END SUBROUTINE CalcElectricChillerHeatRecovery
 
-SUBROUTINE CalcEngineChillerHeatRec(ChillerNum, EnergyRecovered, FirstHVACIteration,HeatRecRatio)
+SUBROUTINE CalcEngineChillerHeatRec(ChillerNum, EnergyRecovered, HeatRecRatio)
             ! SUBROUTINE INFORMATION:
             !       AUTHOR:          Brandon Anderson
             !       DATE WRITTEN:    November 2000
@@ -6982,7 +7206,6 @@ IMPLICIT NONE
           ! SUBROUTINE ARGUMENT DEFINITIONS:
   INTEGER,INTENT(IN)          :: ChillerNum          ! Chiller number
   REAL(r64), INTENT(IN)       :: EnergyRecovered     ! Amount of heat recovered
-  LOGICAL                     :: FirstHVACIteration  ! TRUE when first iteration of timestep !unused1208
   REAL(r64),INTENT(INOUT)     :: HeatRecRatio        ! Max Heat recovery ratio
 
 
@@ -7071,6 +7294,7 @@ SUBROUTINE UpdateElectricChillerRecords(MyLoad,RunFlag, Num)
   USE DataGlobals,     ONLY : SecInHour
   USE DataHVACGlobals, ONLY : TimeStepSys
   USE PlantUtilities,  ONLY : SetComponentFlowRate, SafeCopyPlantNode
+  USE Psychrometrics,  ONLY : PsyHFnTdbW
 
 
 IMPLICIT NONE
@@ -7108,6 +7332,10 @@ IMPLICIT NONE
           !set node temperatures
     Node(EvapOutletNode)%Temp     = Node(EvapInletNode)%Temp
     Node(CondOutletNode)%Temp     = Node(CondInletNode)%Temp
+    IF(ElectricChiller(Num)%Base%CondenserType /= WaterCooled) THEN
+      Node(CondOutletNode)%HumRat   = Node(CondInletNode)%HumRat
+      Node(CondOutletNode)%Enthalpy = Node(CondInletNode)%Enthalpy
+    END IF
 
 
     ElectricChillerReport(Num)%Base%Power            = 0.0
@@ -7137,12 +7365,18 @@ IMPLICIT NONE
       ElectricChillerReport(Num)%HeatRecInletTemp   = Node(HeatRecInNode)%Temp
       ElectricChillerReport(Num)%HeatRecOutletTemp  = Node(HeatRecOutNode)%Temp
       ElectricChillerReport(Num)%HeatRecMassFlow    = Node(HeatRecInNode)%MassFlowRate
+
+      ElectricChillerReport(Num)%ChillerCondAvgTemp = AvgCondSinkTemp
     End If
 
   ELSE !Chiller is running, so pass calculated values
           !set node temperatures
     Node(EvapOutletNode)%Temp     = EvapOutletTemp
     Node(CondOutletNode)%Temp     = CondOutletTemp
+    IF(ElectricChiller(Num)%Base%CondenserType /= WaterCooled) THEN
+      Node(CondOutletNode)%HumRat   = CondOutletHumRat
+      Node(CondOutletNode)%Enthalpy = PsyHFnTdbW(CondOutletTemp, CondOutletHumRat)
+    END IF
           !set node flow rates;  for these load based models
           !assume that the sufficient evaporator flow rate available
     ElectricChillerReport(Num)%Base%Power            = Power
@@ -7176,6 +7410,7 @@ IMPLICIT NONE
        ElectricChillerReport(Num)%HeatRecInletTemp   = Node(HeatRecInNode)%Temp
        ElectricChillerReport(Num)%HeatRecOutletTemp  = Node(HeatRecOutNode)%Temp
        ElectricChillerReport(Num)%HeatRecMassFlow    = Node(HeatRecInNode)%MassFlowRate
+       ElectricChillerReport(Num)%ChillerCondAvgTemp = AvgCondSinkTemp
     End If
 
   END IF
@@ -7579,7 +7814,7 @@ END MODULE PlantChillers
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

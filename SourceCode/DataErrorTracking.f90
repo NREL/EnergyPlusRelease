@@ -30,7 +30,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 
           ! MODULE PARAMETER DEFINITIONS:
-  INTEGER, PARAMETER :: SearchCounts=19
+  INTEGER, PARAMETER :: SearchCounts=20
   CHARACTER(len=*), PARAMETER, DIMENSION(SearchCounts) ::  &
                MessageSearch=(/'InterZone Surface Areas',  &
                                'CAUTION -- Interzone   ',  &
@@ -50,7 +50,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                'Temperature (low) out o',  &
                                'Temperature (high) out ',  &
                                'nominally unused       ',  &
-                               'InfraredTransparent    '/)
+                               'InfraredTransparent    ',  &
+                               'No reporting elements  '/)
   CHARACTER(len=*), PARAMETER, DIMENSION(SearchCounts) ::  &
                Summaries    =(/'InterZone Surface Areas -- mismatch   ',  &
                                'Interzone surfaces - different zones  ',  &
@@ -70,7 +71,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                                'Temperature (low) out of bounds       ',  &
                                'Temperature (high) out of bounds      ',  &
                                'Nominally Unused Constructions        ',  &
-                               'Material:InfraredTransparent usage    '/)
+                               'Material:InfraredTransparent usage    ',  &
+                               'No Reporting Elements requested       '/)
   ! in below -- simple line end <CR>.  End of Whole message <CRE>
   INTEGER, PARAMETER :: iDTEstrLeng=693
   CHARACTER(len=iDTEstrLeng), PARAMETER ::  &  ! InterZone Surface Areas -- mismatch
@@ -157,6 +159,11 @@ PUBLIC          ! By definition, all variables which are placed in this data
                'in interzone surface<CR>'//  &
                'constructions. Warnings are given if they are used in other kinds of surfaces.<CR>'//  &
                'They CANNOT currently be used with ConductionFiniteDifference algorithms.<CRE>'
+  CHARACTER(len=iDTEstrLeng), PARAMETER ::  &  ! No reporting elements requested
+         MoreDetails_20 = 'No Reporting elements have been requested. You will see no output values from your run.<CR>'//  &
+               'Add Output:Variable, Output:Meter, Output:Table:SummaryReports, Output:Table:Monthly, '//  &
+               'Output:Table:TimeBins<CR>'//  &
+               'objects to your input file to receive output values from the simulation.<CRE>'
   CHARACTER(len=iDTEstrLeng), PARAMETER, DIMENSION(SearchCounts) ::  &
           MoreDetails = (/MoreDetails_1,   &
                           MoreDetails_2,   &
@@ -176,7 +183,8 @@ PUBLIC          ! By definition, all variables which are placed in this data
                           MoreDetails_16,  &   ! Details 16 applies to both temperature out of bounds
                           MoreDetails_16,  &
                           MoreDetails_18,  &
-                          MoreDetails_19/)     ! errors.
+                          MoreDetails_19,  &
+                          MoreDetails_20/)     ! errors.
 
   INTEGER, PARAMETER :: MaxRecurringErrorMsgLength = 250  ! Maximum error message length for recurring error messages
 
@@ -228,7 +236,7 @@ PUBLIC          ! By definition, all variables which are placed in this data
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

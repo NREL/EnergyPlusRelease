@@ -19,7 +19,7 @@ MODULE DemandManager
 
         ! USE STATEMENTS:
 USE DataPrecisionGlobals
-USE DataGlobals, ONLY: MaxNameLength, NumOfTimeStepInHour, SecInHour
+USE DataGlobals, ONLY: MaxNameLength, NumOfTimeStepInHour, SecInHour, ScheduleAlwaysOn
 
 IMPLICIT NONE ! Enforce explicit typing of all variables
 
@@ -418,9 +418,9 @@ SUBROUTINE GetDemandManagerListInput
 
           ! FLOW:
   CurrentModuleObject = 'DemandManagerAssignmentList'
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),ListNum,NumAlphas,NumNums)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,ListNum,NumAlphas,NumNums)
 
-  NumDemandManagerList = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDemandManagerList = GetNumObjectsFound(CurrentModuleObject)
 
   IF (NumDemandManagerList > 0) THEN
     ALLOCATE(AlphArray(NumAlphas))
@@ -432,7 +432,7 @@ SUBROUTINE GetDemandManagerListInput
 
     DO ListNum = 1, NumDemandManagerList
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),ListNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,ListNum,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
 
@@ -559,35 +559,31 @@ SUBROUTINE GetDemandManagerListInput
       END IF
 
       ! Setup report variables
-      CALL SetupOutputVariable('Demand Manager Meter Demand '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Meter Demand Power [W]', &
         DemandManagerList(ListNum)%MeterDemand,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-      CALL SetupOutputVariable('Demand Manager Average Demand '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Average Demand Power [W]', &
         DemandManagerList(ListNum)%AverageDemand,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-      CALL SetupOutputVariable('Demand Manager Peak Demand '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Peak Demand Power [W]', &
         DemandManagerList(ListNum)%PeakDemand,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-      CALL SetupOutputVariable('Demand Manager Scheduled Limit '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Scheduled Limit Power [W]', &
         DemandManagerList(ListNum)%ScheduledLimit,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-      CALL SetupOutputVariable('Demand Manager Demand Limit '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Demand Limit Power [W]', &
         DemandManagerList(ListNum)%DemandLimit,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-!      CALL SetupOutputVariable('Demand Manager Avoided Demand '//TRIM(Units), &
-!        DemandManagerList(ListNum)%AvoidedDemand,'Zone','Average', &
-!        DemandManagerList(ListNum)%Name)
-
-      CALL SetupOutputVariable('Demand Manager Over Limit '//TRIM(Units), &
+      CALL SetupOutputVariable('Demand Manager Over Limit Power [W]', &
         DemandManagerList(ListNum)%OverLimit,'Zone','Average', &
         DemandManagerList(ListNum)%Name)
 
-      CALL SetupOutputVariable('Demand Manager Over Limit Duration [hr]', &
+      CALL SetupOutputVariable('Demand Manager Over Limit Time [hr]', &
         DemandManagerList(ListNum)%OverLimitDuration,'Zone','Sum', &
         DemandManagerList(ListNum)%Name)
 
@@ -601,13 +597,13 @@ SUBROUTINE GetDemandManagerListInput
     DEALLOCATE(NumArray)
 
     ! Iteration diagnostic reporting for all DEMAND MANAGER LISTs
-    CALL SetupOutputVariable('Demand Manager Exterior Energy Iterations []', &
+    CALL SetupOutputVariable('Demand Manager Exterior Energy Iteration Count []', &
       DemandManagerExtIterations,'Zone','Sum','ManageDemand')
 
-    CALL SetupOutputVariable('Demand Manager Heat Balance Iterations []', &
+    CALL SetupOutputVariable('Demand Manager Heat Balance Iteration Count []', &
       DemandManagerHBIterations,'Zone','Sum','ManageDemand')
 
-    CALL SetupOutputVariable('Demand Manager HVAC Iterations []', &
+    CALL SetupOutputVariable('Demand Manager HVAC Iteration Count []', &
       DemandManagerHVACIterations,'Zone','Sum','ManageDemand')
 
   END IF
@@ -678,30 +674,30 @@ SUBROUTINE GetDemandManagerInput
   MaxAlphas=0
   MaxNums=0
   CurrentModuleObject='DemandManager:ExteriorLights'
-  NumDemandMgrExtLights = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDemandMgrExtLights = GetNumObjectsFound(CurrentModuleObject)
   IF (NumDemandMgrExtLights > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
     MaxNums=MAX(MaxNums,NumNums)
   ENDIF
   CurrentModuleObject='DemandManager:Lights'
-  NumDemandMgrLights = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDemandMgrLights = GetNumObjectsFound(CurrentModuleObject)
   IF (NumDemandMgrLights > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
     MaxNums=MAX(MaxNums,NumNums)
   ENDIF
   CurrentModuleObject='DemandManager:ElectricEquipment'
-  NumDemandMgrElecEquip = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDemandMgrElecEquip = GetNumObjectsFound(CurrentModuleObject)
   IF (NumDemandMgrElecEquip > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
     MaxNums=MAX(MaxNums,NumNums)
   ENDIF
   CurrentModuleObject='DemandManager:Thermostats'
-  NumDemandMgrThermostats = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumDemandMgrThermostats = GetNumObjectsFound(CurrentModuleObject)
   IF (NumDemandMgrThermostats > 0) THEN
-    CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNums)
+    CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNums)
     MaxAlphas=MAX(MaxAlphas,NumAlphas)
     MaxNums=MAX(MaxNums,NumNums)
   ENDIF
@@ -724,7 +720,7 @@ SUBROUTINE GetDemandManagerInput
 
     DO MgrNum = StartIndex, EndIndex
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
       IsNotOK = .FALSE.
@@ -746,6 +742,8 @@ SUBROUTINE GetDemandManagerInput
              trim(cAlphaFieldNames(2))//'="'//trim(AlphArray(2))//'" not found.')
           ErrorsFound = .TRUE.
         END IF
+      ELSE
+        DemandMgr(MgrNum)%AvailSchedule = ScheduleAlwaysOn
       END IF
 
       ! Validate Limiting Control
@@ -821,7 +819,7 @@ SUBROUTINE GetDemandManagerInput
 
     DO MgrNum = StartIndex, EndIndex
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject),MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
       IsNotOK = .FALSE.
@@ -835,7 +833,7 @@ SUBROUTINE GetDemandManagerInput
 
       DemandMgr(MgrNum)%Type = ManagerTypeLights
 
-      IF (AlphArray(2) .NE. Blank) THEN
+      IF (.not. lAlphaFieldBlanks(2)) THEN
         DemandMgr(MgrNum)%AvailSchedule = GetScheduleIndex(AlphArray(2))
 
         IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
@@ -843,6 +841,8 @@ SUBROUTINE GetDemandManagerInput
              trim(cAlphaFieldNames(2))//'="'//trim(AlphArray(2))//'" not found.')
           ErrorsFound = .TRUE.
         END IF
+      ELSE
+        DemandMgr(MgrNum)%AvailSchedule = ScheduleAlwaysOn
       END IF
 
       ! Validate Limiting Control
@@ -938,7 +938,7 @@ SUBROUTINE GetDemandManagerInput
 
     DO MgrNum = StartIndex, EndIndex
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject), &
+      CALL GetObjectItem(CurrentModuleObject, &
         MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                     AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -954,7 +954,7 @@ SUBROUTINE GetDemandManagerInput
 
       DemandMgr(MgrNum)%Type = ManagerTypeElecEquip
 
-      IF (AlphArray(2) .NE. Blank) THEN
+      IF (.not. lAlphaFieldBlanks(2)) THEN
         DemandMgr(MgrNum)%AvailSchedule = GetScheduleIndex(AlphArray(2))
 
         IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
@@ -962,6 +962,8 @@ SUBROUTINE GetDemandManagerInput
              trim(cAlphaFieldNames(2))//'="'//trim(AlphArray(2))//'" not found.')
           ErrorsFound = .TRUE.
         END IF
+      ELSE
+        DemandMgr(MgrNum)%AvailSchedule = ScheduleAlwaysOn
       END IF
 
       ! Validate Limiting Control
@@ -1057,7 +1059,7 @@ SUBROUTINE GetDemandManagerInput
 
     DO MgrNum = StartIndex, EndIndex
 
-      CALL GetObjectItem(TRIM(CurrentModuleObject), &
+      CALL GetObjectItem(CurrentModuleObject, &
         MgrNum - StartIndex + 1,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
         AlphaBlank=lAlphaFieldBlanks, AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
 
@@ -1073,7 +1075,7 @@ SUBROUTINE GetDemandManagerInput
 
       DemandMgr(MgrNum)%Type = ManagerTypeThermostats
 
-      IF (AlphArray(2) .NE. Blank) THEN
+      IF (.not. lAlphaFieldBlanks(2)) THEN
         DemandMgr(MgrNum)%AvailSchedule = GetScheduleIndex(AlphArray(2))
 
         IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
@@ -1081,6 +1083,8 @@ SUBROUTINE GetDemandManagerInput
              trim(cAlphaFieldNames(2))//'="'//trim(AlphArray(2))//'" not found.')
           ErrorsFound = .TRUE.
         END IF
+      ELSE
+        DemandMgr(MgrNum)%AvailSchedule = ScheduleAlwaysOn
       END IF
 
       ! Validate Limiting Control
@@ -1377,15 +1381,15 @@ SUBROUTINE UpdateDemandManagers
   DO MgrNum = 1, NumDemandMgr
 
     ! Check availability
-    IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
-      Available = .TRUE.  ! No schedule defaults to available
-    ELSE
-      IF (GetCurrentScheduleValue(DemandMgr(MgrNum)%AvailSchedule) > 0.0) THEN
-        Available = .TRUE.
-      ELSE
-        Available = .FALSE.
-      END IF
-    END IF
+!    IF (DemandMgr(MgrNum)%AvailSchedule .EQ. 0) THEN
+!      Available = .TRUE.  ! No schedule defaults to available
+!    ELSE
+     IF (GetCurrentScheduleValue(DemandMgr(MgrNum)%AvailSchedule) > 0.0) THEN
+       Available = .TRUE.
+     ELSE
+       Available = .FALSE.
+     END IF
+!    END IF
 
     DemandMgr(MgrNum)%Available = Available
 
@@ -1729,7 +1733,7 @@ END SUBROUTINE InitDemandManagers
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

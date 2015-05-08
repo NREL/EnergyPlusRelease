@@ -1268,7 +1268,7 @@ SUBROUTINE GetBranchInput
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetBranchInput: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1305,7 +1305,7 @@ SUBROUTINE GetBranchInput
 
     IF (GetInputFlag) THEN
       CurrentModuleObject='Branch'
-      NumOfBranches=GetNumObjectsFound(TRIM(CurrentModuleObject))
+      NumOfBranches=GetNumObjectsFound(CurrentModuleObject)
       IF (NumOfBranches > 0) THEN
         ALLOCATE(Branch(NumOfBranches))
         Branch%AssignedLoopName=Blank
@@ -1313,7 +1313,7 @@ SUBROUTINE GetBranchInput
         CALL GetObjectDefMaxArgs('NodeList',NumParams,NumAlphas,NumNumbers)
         ALLOCATE(NodeNums(NumParams))
         NodeNums=0
-        CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+        CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
         ALLOCATE(Alphas(NumAlphas))
         Alphas=' '
         ALLOCATE(Numbers(NumNumbers))
@@ -1328,7 +1328,7 @@ SUBROUTINE GetBranchInput
         lNumericBlanks=.true.
         BCount=0
         DO Count=1,NumOfBranches
-          CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
+          CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
           IsNotOK=.false.
@@ -1347,8 +1347,8 @@ SUBROUTINE GetBranchInput
           Branch(BCount)%MaxFlowRate=Numbers(1)
           CALL GetPressureCurveTypeAndIndex(Alphas(2), PressureCurveType, PressureCurveIndex)
           IF (PressureCurveType == PressureCurve_Error) THEN
-            CALL ShowSevereError('GetBranchInput: Invalid '//TRIM(cAlphaFields(2))//'='//TRIM(Alphas(2)))
-            CALL ShowContinueError(' found on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+            CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+            CALL ShowContinueError('..Invalid '//TRIM(cAlphaFields(2))//'="'//TRIM(Alphas(2))//'".')
             CALL ShowContinueError('This curve could not be found in the input deck.  Ensure that this curve has been entered')
             CALL ShowContinueError(' as either a Curve:Functional:PressureDrop or one of Curve:{Linear,Quadratic,Cubic,Exponent}')
             CALL ShowContinueError('This error could be caused by a misspelled curve name')
@@ -1363,14 +1363,14 @@ SUBROUTINE GetBranchInput
           Comp=1
           DO Loop=3,NumAlphas,5
             IF (SameString(Alphas(Loop),cSPLITTER) .or. SameString(Alphas(Loop),cMIXER)) THEN
-              CALL ShowSevereError('Connector:Splitter/Connector:Mixer not allowed in '//  &
-                 TRIM(CurrentModuleObject)//', found in '//  &
-                 TRIM(CurrentModuleObject)//'='//TRIM(Branch(Count)%Name))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+              CALL ShowContinueError('Connector:Splitter/Connector:Mixer not allowed in object '//  &
+                 TRIM(CurrentModuleObject))
               ErrFound=.true.
               CYCLE
             ENDIF
             IF (Comp > NumInComps) THEN
-              CALL ShowSevereError('GetBranchInput: '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
               CALL ShowContinueError('...Number of Arguments indicate ['//trim(RoundSigDigits(NumInComps))// &
                   '], but count of fields indicates ['//trim(RoundSigDigits(Comp))//']')
               CALL ShowContinueError('...examine '//trim(CurrentModuleObject)//' carefully.')
@@ -1392,22 +1392,23 @@ SUBROUTINE GetBranchInput
             ENDIF
             IF (.not. lAlphaBlanks(Loop+2)) THEN
               CALL GetNodeNums(Branch(BCount)%Component(Comp)%InletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
-                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
+                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent,  &
+                   InputFieldName=cAlphaFields(Loop+2))
               IF (NumNodes > 1) THEN
-                CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
-                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
-                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
-                   TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
-                CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+                CALL ShowContinueError('..invalid '//TRIM(cAlphaFields(Loop+2))//'="'//  &
+                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//'" must be a single node - appears to be a list.')
+                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'="'//TRIM(Alphas(Loop))//'", '//  &
+                   TRIM(cAlphaFields(Loop+1))//'="'//TRIM(Alphas(Loop+1))//'".')
                 ErrFound=.true.
               ELSE
                 Branch(BCount)%Component(Comp)%InletNode=NodeNums(1)
               ENDIF
             ELSE
-              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', required field is blank.')
-              CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
-                 TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
-              CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+              CALL ShowContinueError('blank required field: '//TRIM(cAlphaFields(Loop+2)))
+              CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'="'//TRIM(Alphas(Loop))//'", '//  &
+                 TRIM(cAlphaFields(Loop+1))//'="'//TRIM(Alphas(Loop+1))//'".')
               ErrFound=.true.
             ENDIF
             Branch(BCount)%Component(Comp)%OutletNodeName=Alphas(Loop+3)
@@ -1419,22 +1420,23 @@ SUBROUTINE GetBranchInput
             ENDIF
             IF (.not. lAlphaBlanks(Loop+3)) THEN
               CALL GetNodeNums(Branch(BCount)%Component(Comp)%OutletNodeName,NumNodes,NodeNums,ErrFound,NodeType_Unknown, &
-                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent)
+                   TRIM(CurrentModuleObject),Branch(BCount)%Name,ConnectionType,1,ObjectIsParent,  &
+                   InputFieldName=cAlphaFields(Loop+3))
               IF (NumNodes > 1) THEN
-                CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+2))//', Name='//  &
-                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//' must be a single node - appears to be a list.')
-                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
-                   TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
-                CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+                CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+                CALL ShowContinueError('..invalid '//TRIM(cAlphaFields(Loop+2))//'="'//  &
+                   TRIM(Branch(BCount)%Component(Comp)%InletNodeName)//'" must be a single node - appears to be a list.')
+                CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'="'//TRIM(Alphas(Loop))//'", '//  &
+                   TRIM(cAlphaFields(Loop+1))//'="'//TRIM(Alphas(Loop+1))//'".')
                 ErrFound=.true.
               ELSE
                 Branch(BCount)%Component(Comp)%OutletNode=NodeNums(1)
               ENDIF
             ELSE
-              CALL ShowSevereError('GetBranchInput: '//TRIM(cAlphaFields(Loop+3))//', required field is blank.')
-              CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'='//TRIM(Alphas(Loop))//', '//  &
-                 TRIM(cAlphaFields(Loop+1))//'='//TRIM(Alphas(Loop+1)))
-              CALL ShowContinueError('Occurs on '//TRIM(CurrentModuleObject)//'='//TRIM(Alphas(1)))
+              CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(Alphas(1))//'", invalid data.')
+              CALL ShowContinueError('blank required field: '//TRIM(cAlphaFields(Loop+3)))
+              CALL ShowContinueError('Occurs on '//TRIM(cAlphaFields(Loop))//'="'//TRIM(Alphas(Loop))//'", '//  &
+                 TRIM(cAlphaFields(Loop+1))//'="'//TRIM(Alphas(Loop+1))//'".')
               ErrFound=.true.
             ENDIF
 
@@ -1459,8 +1461,8 @@ SUBROUTINE GetBranchInput
         DEALLOCATE(lAlphaBlanks)
         DEALLOCATE(lNumericBlanks)
         IF (ErrFound) THEN
-          CALL ShowFatalError('GetBranchInput: Invalid '//TRIM(CurrentModuleObject)//  &
-             ' Input, preceding condition(s) cause termination.')
+          CALL ShowSevereError(RoutineName//' Invalid '//TRIM(CurrentModuleObject)//  &
+             ' Input, preceding condition(s) will likely cause termination.')
         ENDIF
         CALL TestInletOutletNodes(ErrFound)
         GetInputFlag=.false.
@@ -1514,7 +1516,7 @@ SUBROUTINE GetBranchListInput
           ! na
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+  CHARACTER(len=*), PARAMETER :: RoutineName='GetBranchListInput: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1547,11 +1549,11 @@ SUBROUTINE GetBranchListInput
 
   ErrFound=.false.
   CurrentModuleObject='BranchList'
-  NumOfBranchLists=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumOfBranchLists=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(BranchList(NumOfBranchLists))
   BranchList%LoopName=Blank
   BranchList%LoopType=Blank
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
@@ -1566,13 +1568,13 @@ SUBROUTINE GetBranchListInput
   lNumericBlanks=.true.
 
   IF (NumNumbers > 0) THEN
-    CALL ShowSevereError(TRIM(CurrentModuleObject)//  &
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//  &
        ' Object definition contains numbers, cannot be decoded by GetBranchListInput routine.')
     ErrFound=.true.
   ENDIF
   BCount=0
   DO Count=1,NumOfBranchLists
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     IsNotOK=.false.
@@ -1588,8 +1590,8 @@ SUBROUTINE GetBranchListInput
     BranchList(BCount)%NumOfBranchNames=NumAlphas-1
     ALLOCATE(BranchList(BCount)%BranchNames(NumAlphas-1))
     IF (BranchList(BCount)%NumOfBranchNames == 0) THEN
-      CALL ShowSevereError('GetBranchListInput: No branch names on '//  &
-         TRIM(CurrentModuleObject)//'='//TRIM(BranchList(BCount)%Name))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(BranchList(BCount)%Name)//  &
+         '", No branch names entered.')
       ErrFound=.true.
     ELSE
       BranchList(BCount)%BranchNames(1:NumAlphas-1)=Alphas(2:NumAlphas)
@@ -1601,9 +1603,10 @@ SUBROUTINE GetBranchListInput
         IF (BranchList(BCount)%BranchNames(Loop) /= Blank) THEN
            Found=FindItemInList(BranchList(BCount)%BranchNames(Loop),Branch%Name,NumOfBranches)
            IF (Found == 0) THEN
-             CALL ShowSevereError('GetBranchListInput: Branch Name not found='//  &
-                 TRIM(BranchList(BCount)%BranchNames(Loop))//  &
-                 ' in '//TRIM(CurrentModuleObject)//'='//TRIM(BranchList(BCount)%Name))
+             CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(BranchList(BCount)%Name)//  &
+                 '", invalid data.')
+             CALL ShowContinueError('..invalid Branch Name not found="'//  &
+                 TRIM(BranchList(BCount)%BranchNames(Loop))//'".')
              ErrFound=.true.
            ENDIF
         ENDIF
@@ -1617,8 +1620,9 @@ SUBROUTINE GetBranchListInput
     TestName=BranchList(Count)%BranchNames(1)
     DO Loop=2,BranchList(Count)%NumOfBranchNames
       IF (TestName /= BranchList(Count)%BranchNames(Loop)) CYCLE
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//'='//TRIM(BranchList(Count)%Name)//  &
-         ' specifies a duplicate branch name in the list.')
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//TRIM(BranchList(BCount)%Name)//  &
+                '", invalid data.')
+      CALL ShowContinueError('..invalid: duplicate branch name specified in the list.')
       CALL ShowContinueError('..Branch Name='//TRIM(TestName))
       CALL ShowContinueError('..Branch Name #'//TRIM(TrimSigDigits(Loop))//  &
          ' is duplicate.')
@@ -1627,7 +1631,7 @@ SUBROUTINE GetBranchListInput
   ENDDO
 
   IF (ErrFound) THEN
-    CALL ShowSevereError('GetBranchListInput: Invalid Input -- preceding condition(s) will likely cause termination.')
+    CALL ShowSevereError(RoutineName//' Invalid Input -- preceding condition(s) will likely cause termination.')
   ENDIF
   NumOfBranchLists=BCount
   DEALLOCATE(Alphas)
@@ -1726,9 +1730,9 @@ SUBROUTINE GetConnectorListInput
   IF (.not. GetConnectorListInputFlag) RETURN
   ErrorsFound=.false.
   CurrentModuleObject='ConnectorList'
-  NumOfConnectorLists=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumOfConnectorLists=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(ConnectorLists(NumOfConnectorLists))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   IF (NumAlphas /= 5 .or. NumNumbers /= 0) THEN
     CALL ShowWarningError('GetConnectorList: Illegal "extension" to '//TRIM(CurrentModuleObject)//' object. '//  &
        'Internal code does not support > 2 connectors (Connector:Splitter and Connector:Mixer)')
@@ -1746,7 +1750,7 @@ SUBROUTINE GetConnectorListInput
   ALLOCATE(lNumericBlanks(NumNumbers))
   lNumericBlanks=.true.
   DO Count=1,NumOfConnectorLists
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     ConnectorLists(Count)%Name=Alphas(1)
@@ -1988,9 +1992,9 @@ SUBROUTINE GetSplitterInput
 
   IF (.not. GetSplitterInputFlag) RETURN
   CurrentModuleObject = cSPLITTER
-  NumSplitters=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumSplitters=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(Splitters(NumSplitters))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
@@ -2004,7 +2008,7 @@ SUBROUTINE GetSplitterInput
   ALLOCATE(lNumericBlanks(NumNumbers))
   lNumericBlanks=.true.
   DO Count=1,NumSplitters
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     Splitters(Count)%Name=Alphas(1)
@@ -2246,9 +2250,9 @@ SUBROUTINE GetMixerInput
 
   CurrentModuleObject = cMIXER
 
-  NumMixers=GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumMixers=GetNumObjectsFound(CurrentModuleObject)
   ALLOCATE(Mixers(NumMixers))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
   ALLOCATE(Numbers(NumNumbers))
@@ -2262,7 +2266,7 @@ SUBROUTINE GetMixerInput
   ALLOCATE(lNumericBlanks(NumNumbers))
   lNumericBlanks=.true.
   DO Count=1,NumMixers
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
+    CALL GetObjectItem(CurrentModuleObject,Count,Alphas,NumAlphas,Numbers,NumNumbers,IOStat,  &
                    AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                    AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
     Mixers(Count)%Name=Alphas(1)
@@ -2474,13 +2478,13 @@ SUBROUTINE FindPlantLoopBranchConnection(BranchListName,FoundPlantLoopName,Found
       ! Get Inputs
   CurrentModuleObject = 'PlantLoop'
 
-  NumPlantLoops=GetNumObjectsFound(Trim(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(Trim(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  NumPlantLoops=GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   ALLOCATE(Numbers(NumNumbers))
 
   DO Num=1,NumPlantLoops
-    CALL GetObjectItem(Trim(CurrentModuleObject),Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
+    CALL GetObjectItem(CurrentModuleObject,Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
     ! Only looking for BranchList here.
     IF (Alphas(8) == BranchListName) THEN
       FoundPlantLoopName=Alphas(1)
@@ -2559,13 +2563,13 @@ SUBROUTINE FindCondenserLoopBranchConnection(BranchListName,FoundCondLoopName,Fo
       ! Get Inputs
   CurrentModuleObject = 'CondenserLoop'
 
-  NumCondLoops=GetNumObjectsFound( TRIM(CurrentModuleObject) )
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  NumCondLoops=GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   ALLOCATE(Numbers(NumNumbers))
 
   DO Num=1,NumCondLoops
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
+    CALL GetObjectItem(CurrentModuleObject,Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
     ! Only looking for BranchList here.
     IF (Alphas(8) == BranchListName) THEN
       FoundCondLoopName=Alphas(1)
@@ -2643,13 +2647,13 @@ SUBROUTINE FindAirLoopBranchConnection(BranchListName,FoundAirLoopName,FoundAirL
 
       ! Get Inputs
   CurrentModuleObject = 'AirLoopHVAC'
-  NumAirLoops=GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumParams,NumAlphas,NumNumbers)
+  NumAirLoops=GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumParams,NumAlphas,NumNumbers)
   ALLOCATE(Alphas(NumAlphas))
   ALLOCATE(Numbers(NumNumbers))
 
   DO Num=1,NumAirLoops
-    CALL GetObjectItem(TRIM(CurrentModuleObject),Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
+    CALL GetObjectItem(CurrentModuleObject,Num,Alphas,NumAlphas,Numbers,NumNumbers,IOSTAT)
     ! Only looking for BranchList here.
     IF (Alphas(4) == BranchListName) THEN
       FoundAirLoopName=Alphas(1)
@@ -2870,6 +2874,7 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
 
           ! USE STATEMENTS:
   USE NodeInputManager, ONLY: InitUniqueNodeCheck,CheckUniqueNodes,EndUniqueNodeCheck
+  USE General, ONLY: RoundSigDigits
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2982,8 +2987,9 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
     NumFluidNodes=0
     DO Count=1,BranchList(BCount)%NumOfBranchNames
 
-      WRITE(ChrOut,*) Count
-      ChrOut=ADJUSTL(ChrOut)
+      ChrOut=RoundSigDigits(Count)
+!      WRITE(ChrOut,*) Count
+!      ChrOut=ADJUSTL(ChrOut)
 
       Found=FoundBranches(Count)
       IF (Found == 0) THEN
@@ -3071,7 +3077,8 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
         TRIM(BranchInletNodeName)//','//TRIM(BranchOutletNodeName)
     ENDDO
     IF (MixedFluidTypesOnBranchList) THEN
-      CALL ShowWarningError('BranchList='//TRIM(BranchList(BCount)%Name)//' has mixed fluid types in its nodes.')
+      CALL ShowSevereError('BranchList='//TRIM(BranchList(BCount)%Name)//' has mixed fluid types in its nodes.')
+      Errfound=.true.
       IF (OriginalBranchFluidType == Blank) OriginalBranchFluidType='**Unknown**'
       CALL ShowContinueError('Initial Node='//trim(NodeID(InitialBranchFluidNode))//  &
            ', Fluid Type='//trim(OriginalBranchFluidType))
@@ -3146,18 +3153,21 @@ SUBROUTINE TestBranchIntegrity(ErrFound)
   ENDDO
   IF (BCount > 0) THEN
     WRITE(OutputFileBNDetails,706)
-    WRITE(ChrOut,*) BCount
-    WRITE(OutputFileBNDetails,701) ' #Orphaned Branches,'//TRIM(ADJUSTL(ChrOut))
-    CALL ShowWarningError('There are orphaned Branches in input')
+    ChrOut=RoundSigDigits(BCount)
+!    WRITE(ChrOut,*) BCount
+    WRITE(OutputFileBNDetails,701) ' #Orphaned Branches,'//TRIM(ChrOut)
+    CALL ShowWarningError('There are orphaned Branches in input. See .bnd file for details.')
 
     BCount=0
 
     DO Count=1,NumOfBranches
       IF (BranchReported(Count)) CYCLE
       BCount=BCount+1
+      CALL ShowWarningError('Orphan Branch="'//trim(Branch(Count)%Name)//'".')
 
-        WRITE(ChrOut,*) BCount
-        ChrOut=ADJUSTL(ChrOut)
+!        WRITE(ChrOut,*) BCount
+!        ChrOut=ADJUSTL(ChrOut)
+        ChrOut=RoundSigDigits(BCount)
         IF (Branch(Count)%NumOfComponents > 0) THEN
           MatchNode=Branch(Count)%Component(1)%InletNode
           MatchNodeName=Branch(Count)%Component(1)%InletNodeName
@@ -3204,7 +3214,7 @@ END SUBROUTINE TestBranchIntegrity
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

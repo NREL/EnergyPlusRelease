@@ -253,7 +253,7 @@ CONTAINS
 
     cCurrentModuleObject = cCMO_BBRadiator_Electric
 
-    NumElecBaseboards = GetNumObjectsFound(TRIM(cCurrentModuleObject))
+    NumElecBaseboards = GetNumObjectsFound(cCurrentModuleObject)
 
     ! object is extensible, no max args needed as IPShortCuts being used
 
@@ -263,7 +263,7 @@ CONTAINS
 
       DO BaseboardNum = 1,  NumElecBaseboards
 
-        CALL GetObjectItem(TRIM(cCurrentModuleObject),BaseboardNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT, &
+        CALL GetObjectItem(cCurrentModuleObject,BaseboardNum,cAlphaArgs,NumAlphas,rNumericArgs,NumNumbers,IOSTAT, &
                            NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                            AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
         IsNotOK=.false.
@@ -281,18 +281,16 @@ CONTAINS
         ElecBaseboard(BaseboardNum)%EquipName = cAlphaArgs(1) ! name of this baseboard
         ElecBaseboard(BaseboardNum)%EquipType = BaseboardRadiator_Electric
         ElecBaseboard(BaseboardNum)%Schedule  = cAlphaArgs(2)
-        ElecBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
-
-        IF (ElecBaseboard(BaseboardNum)%SchedPtr == 0) THEN
-          IF (lAlphaFieldBlanks(2)) THEN
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': '//TRIM(cAlphaFieldNames(2))//  &
-                  ' is required, missing for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
-          ELSE
-             CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
+        IF (lAlphaFieldBlanks(2)) THEN
+          ElecBaseboard(BaseboardNum)%SchedPtr  = ScheduleAlwaysOn
+        ELSE
+          ElecBaseboard(BaseboardNum)%SchedPtr  = GetScheduleIndex(cAlphaArgs(2))
+          IF (ElecBaseboard(BaseboardNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(RoutineName//TRIM(cCurrentModuleObject)//': invalid '//TRIM(cAlphaFieldNames(2))//  &
                                   ' entered ='//TRIM(cAlphaArgs(2))// &
                                   ' for '//TRIM(cAlphaFieldNames(1))//'='//TRIM(cAlphaArgs(1)))
+            ErrorsFound=.true.
           END IF
-          ErrorsFound=.true.
         ENDIF
         ! get inlet node number
         ElecBaseboard(BaseboardNum)%NominalCapacity      = rNumericArgs(1)
@@ -411,29 +409,26 @@ CONTAINS
 
       ! Setup Report variables for the Electric BaseBoards
       ! CurrentModuleObject='ZoneHVAC:Baseboard:RadiantConvective:Electric'
-      CALL SetupOutputVariable('Baseboard Convective System Impact Rate[W]', ElecBaseboard(BaseboardNum)%TotPower, &
+      CALL SetupOutputVariable('Baseboard Total Heating Rate [W]', ElecBaseboard(BaseboardNum)%TotPower, &
                                'System','Average',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Heating Rate[W]', ElecBaseboard(BaseboardNum)%Power, &
+
+      CALL SetupOutputVariable('Baseboard Convective Heating Rate [W]', ElecBaseboard(BaseboardNum)%ConvPower, &
                                'System','Average',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Convective Heating Rate[W]', ElecBaseboard(BaseboardNum)%ConvPower, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Rate [W]', ElecBaseboard(BaseboardNum)%RadPower, &
                                'System','Average',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Rate[W]', ElecBaseboard(BaseboardNum)%RadPower, &
-                               'System','Average',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Heating Energy[J]', ElecBaseboard(BaseboardNum)%Energy, &
-                               'System','Sum',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('BaseBoard Electric Consumption [J]',ElecBaseboard(BaseboardNum)%ElecUseLoad, &
+
+      CALL SetupOutputVariable('Baseboard Electric Energy [J]',ElecBaseboard(BaseboardNum)%ElecUseLoad, &
                               'System','Sum',ElecBaseboard(BaseboardNum)%EquipName,  &
                                 ResourceTypeKey='Electric',EndUseKey='HEATING',GroupKey='System')
-      CALL SetupOutputVariable('BaseBoard Electric Power [W]',ElecBaseboard(BaseboardNum)%ElecUseRate, &
+      CALL SetupOutputVariable('Baseboard Electric Power [W]',ElecBaseboard(BaseboardNum)%ElecUseRate, &
                               'System','Average',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Convective System Impact Energy[J]', ElecBaseboard(BaseboardNum)%TotEnergy, &
+      CALL SetupOutputVariable('Baseboard Total Heating Energy [J]', ElecBaseboard(BaseboardNum)%TotEnergy, &
                                'System','Sum',ElecBaseboard(BaseboardNum)%EquipName, &
                                 ResourceTypeKey='ENERGYTRANSFER',EndUseKey='BASEBOARD',GroupKey='System')
-!      CALL SetupOutputVariable('Baseboard Heating Energy[J]', ElecBaseboard(BaseboardNum)%Energy, &
-!                               'System','Sum',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Convective Heating Energy[J]', ElecBaseboard(BaseboardNum)%ConvEnergy, &
+
+      CALL SetupOutputVariable('Baseboard Convective Heating Energy [J]', ElecBaseboard(BaseboardNum)%ConvEnergy, &
                                'System','Sum',ElecBaseboard(BaseboardNum)%EquipName)
-      CALL SetupOutputVariable('Baseboard Radiant Heating Energy[J]', ElecBaseboard(BaseboardNum)%RadEnergy, &
+      CALL SetupOutputVariable('Baseboard Radiant Heating Energy [J]', ElecBaseboard(BaseboardNum)%RadEnergy, &
                                'System','Sum',ElecBaseboard(BaseboardNum)%EquipName)
     END DO
 
@@ -1114,7 +1109,7 @@ END FUNCTION SumHATsurf
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

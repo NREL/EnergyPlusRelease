@@ -124,9 +124,9 @@ PRIVATE
 
   ! Parameters for controls used here
   INTEGER, PARAMETER :: iNoControlVariable           = 0
-  INTEGER, PARAMETER :: iTemperature                 = 1
-  INTEGER, PARAMETER :: iHumidityRatio               = 2
-  INTEGER, PARAMETER :: iTemperatureAndHumidityRatio = 3
+  INTEGER, PUBLIC, PARAMETER :: iTemperature         = 1
+  INTEGER, PUBLIC, PARAMETER :: iHumidityRatio       = 2
+  INTEGER, PUBLIC, PARAMETER :: iTemperatureAndHumidityRatio = 3
   INTEGER, PARAMETER :: iFlow                        = 4
 
   INTEGER, PARAMETER :: CoilType_Cooling=1
@@ -160,6 +160,9 @@ PRIVATE
     INTEGER      :: ControlVar = iNoControlVariable       ! The type of control variable being sensed
     INTEGER      :: ActuatorVar = 0                       ! The variable that the controller will act on ie. flow
     INTEGER      :: Action = iNoAction                    ! Controller Action - Reverse or Normal
+
+    ! Controller must be initialized to set MinActuated and MaxActuated
+    LOGICAL      :: InitFirstPass = .TRUE.
 
     ! --------------------
     ! Internal data used for optimal restart across successive calls to SimAirLoop()
@@ -445,10 +448,10 @@ SUBROUTINE ManageControllers( &
 
   ! detect if plant is locked and flow cannot change
   IF (ControllerProps(ControlNum)%ActuatedNodePlantLoopNum > 0) THEN
-  
+
     IF (PlantLoop(ControllerProps(ControlNum)%ActuatedNodePlantLoopNum)% &
        LoopSide(ControllerProps(ControlNum)%ActuatedNodePlantLoopSide)%Flowlock == FlowLocked) THEN
-    ! plant is rigid so controller cannot change anything. 
+    ! plant is rigid so controller cannot change anything.
            ! Update the current Controller to the outlet nodes
       CALL UpdateController(ControlNum)
 
@@ -456,7 +459,7 @@ SUBROUTINE ManageControllers( &
       RETURN
     ENDIF
 
-  ENDIF 
+  ENDIF
 
   ! Detect if speculative warm restart is supported by this computer
   IF ( PRESENT(AllowWarmRestartFlag) ) THEN
@@ -470,11 +473,17 @@ SUBROUTINE ManageControllers( &
     END IF
   END IF
 
+  IF(ControllerProps(ControlNum)%InitFirstPass)THEN
+    ! Coil must first be sized to:
+    ! Initialize ControllerProps(ControlNum)%MinActuated and ControllerProps(ControlNum)%MaxActuated
+    CALL InitController(ControlNum, FirstHVACIteration, IsConvergedFlag)
+    ControllerProps(ControlNum)%InitFirstPass = .FALSE.
+  END IF
 
   ! Perform requested operation
   ! Note that InitController() is not called upon START/RESTART ops in order to avoid
-  ! side-effects onthe calculation of Node(ActuatedNode)%MassFlowRateMaxAvail used to
-  ! determine ControllerProps(ControlNum)%MaxActuated .
+  ! side-effects on the calculation of Node(ActuatedNode)%MassFlowRateMaxAvail used to
+  ! determine ControllerProps(ControlNum)%MaxAvailActuated.
   ! Plant upgrades for V7 added init to these cases because MassFlowRateMaxAvail is better controlled
   ControllerOp : SELECT CASE (Operation)
     CASE (iControllerOpColdStart)
@@ -636,8 +645,10 @@ SUBROUTINE GetControllerInput
   USE NodeInputManager,    ONLY : GetOnlySingleNode
   USE DataHVACGlobals,     ONLY : NumPrimaryAirSys
   USE DataAirSystems,      ONLY : PrimaryAirSystem
-  USE WaterCoils,          ONLY : CheckActuatorNode
+  USE WaterCoils,          ONLY : CheckActuatorNode, CheckForSensorAndSetpointNode
   USE MixedAir,            ONLY : CheckForControllerWaterCoil
+  USE SetPointManager,     ONLY : NodeHasSPMCtrlVarType, iCtrlVarType_Temp, iCtrlVarType_MaxHumRat
+  USE EMSManager,          ONLY : CheckIfNodeSetpointManagedByEMS, iTemperatureSetpoint, iHumidityRatioMaxSetpoint
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -673,14 +684,17 @@ SUBROUTINE GetControllerInput
   LOGICAL       :: IsBlank               ! Flag for blank name
   LOGICAL       :: ErrorsFound=.FALSE.
   INTEGER       :: iNodeType  ! for checking actuator node type
-
+  INTEGER       :: WaterCoilNum          ! water coil index
+  LOGICAL       :: NodeNotFound          ! flag true if the sensor node is on the coil air outlet node
+  LOGICAL       :: NotHeatingCoil        ! flag true if the water coil is a cooling coil
+  LOGICAL       :: EMSSetpointErrorFlag  ! flag true is EMS is used to set node setpoints
 
   ! All the controllers are loaded into the same derived type, both the PI and Limit
   ! These controllers are separate objects and loaded sequentially, but will
   ! be retrieved by name as they are needed.
 
   CurrentModuleObject = 'Controller:WaterCoil'
-  NumSimpleControllers = GetNumObjectsFound(TRIM(CurrentModuleObject))
+  NumSimpleControllers = GetNumObjectsFound(CurrentModuleObject)
   NumControllers = NumSimpleControllers
 
   ! Allocate stats data structure for each air loop and controller if needed
@@ -705,7 +719,7 @@ SUBROUTINE GetControllerInput
   ALLOCATE(CheckEquipName(NumControllers))
   CheckEquipName=.true.
 
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumArgs,NumAlphas,NumNums)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumArgs,NumAlphas,NumNums)
   ALLOCATE(AlphArray(NumAlphas))
   AlphArray=' '
   ALLOCATE(cAlphaFields(NumAlphas))
@@ -722,7 +736,7 @@ SUBROUTINE GetControllerInput
   ! Now find and load all of the simple controllers.
   IF (NumSimpleControllers .GT. 0) THEN
     DO Num = 1, NumSimpleControllers
-      CALL GetObjectItem(TRIM(CurrentModuleObject),Num,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
+      CALL GetObjectItem(CurrentModuleObject,Num,AlphArray,NumAlphas,NumArray,NumNums,IOSTAT, &
                          NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                          AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -789,6 +803,65 @@ SUBROUTINE GetControllerInput
         ErrorsFound = .TRUE.
       ENDIF
 
+      IF ( ControllerProps(Num)%SensedNode > 0) THEN
+        CALL CheckForSensorAndSetpointNode(ControllerProps(Num)%SensedNode,ControllerProps(Num)%ControlVar,NodeNotFound)
+
+        IF (NodeNotFound) THEN
+            ! the sensor node is not on the water coil air outlet node
+            CALL ShowWarningError(RoutineName//TRIM(ControllerProps(Num)%ControllerType)//'="'//  &
+                                    TRIM(ControllerProps(Num)%ControllerName)//'". ')
+            CALL ShowContinueError(' ..Sensor node not found on water coil air outlet node.')
+            CALL ShowContinueError(' ..The sensor node may have been placed on a node downstream of the coil'// &
+                                    ' or on an airloop outlet node.')
+        ELSE
+            ! check if the setpoint is also on the same node where the sensor is placed on
+            EMSSetpointErrorFlag = .FALSE.
+            SELECT CASE (ControllerProps(Num)%ControlVar)
+            CASE (iTemperature)
+                CALL CheckIfNodeSetpointManagedByEMS(ControllerProps(Num)%SensedNode,iTemperatureSetpoint, EMSSetpointErrorFlag)
+                IF (EMSSetpointErrorFlag) THEN
+                    IF(.NOT. NodeHasSPMCtrlVarType(ControllerProps(Num)%SensedNode, iCtrlVarType_Temp)) THEN
+                    CALL ShowContinueError(' ..Temperature setpoint not found on coil air outlet node.')
+                    CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                            ' or on an airloop outlet node.')
+                    CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+                    END IF
+                ENDIF
+            CASE (iHumidityRatio)
+                CALL CheckIfNodeSetpointManagedByEMS(ControllerProps(Num)%SensedNode,iHumidityRatioMaxSetpoint,   &
+                   EMSSetpointErrorFlag)
+                IF (EMSSetpointErrorFlag) THEN
+                    IF(.NOT. NodeHasSPMCtrlVarType(ControllerProps(Num)%SensedNode, iCtrlVarType_MaxHumRat)) THEN
+                    CALL ShowContinueError(' ..Humidity ratio setpoint not found on coil air outlet node.')
+                    CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                            ' or on an airloop outlet node.')
+                    CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+                    END IF
+                ENDIF
+            CASE (iTemperatureAndHumidityRatio)
+                CALL CheckIfNodeSetpointManagedByEMS(ControllerProps(Num)%SensedNode,iTemperatureSetpoint, EMSSetpointErrorFlag)
+                IF (EMSSetpointErrorFlag) THEN
+                    IF(.NOT. NodeHasSPMCtrlVarType(ControllerProps(Num)%SensedNode, iCtrlVarType_Temp)) THEN
+                    CALL ShowContinueError(' ..Temperature setpoint not found on coil air outlet node.')
+                    CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                            ' or on an airloop outlet node.')
+                    CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+                    END IF
+                ENDIF
+                EMSSetpointErrorFlag = .FALSE.
+                CALL CheckIfNodeSetpointManagedByEMS(ControllerProps(Num)%SensedNode,iHumidityRatioMaxSetpoint,   &
+                   EMSSetpointErrorFlag)
+                IF (EMSSetpointErrorFlag) THEN
+                    IF(.NOT. NodeHasSPMCtrlVarType(ControllerProps(Num)%SensedNode, iCtrlVarType_MaxHumRat)) THEN
+                    CALL ShowContinueError(' ..Humidity ratio setpoint not found on coil air outlet node.')
+                    CALL ShowContinueError(' ..The setpoint may have been placed on a node downstream of the coil'// &
+                                            ' or on an airloop outlet node.')
+                    CALL ShowContinueError(' ..Specify the setpoint and the sensor on the coil air outlet node when possible.')
+                    END IF
+                ENDIF
+            END SELECT
+        ENDIF
+      ENDIF
     END DO
   END IF
 
@@ -1274,29 +1347,12 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
     MyEnvrnFlag(ControlNum)=.TRUE.
   ENDIF
 
-
-  IF (FirstHVACIteration) THEN
-    Call SetActuatedBranchFlowRate(ControllerProps(ControlNum)%NextActuatedValue, &
+  Call SetActuatedBranchFlowRate(ControllerProps(ControlNum)%NextActuatedValue, &
                                        ActuatedNode, &
                                        ControllerProps(ControlNum)%ActuatedNodePlantLoopNum,&
                                        ControllerProps(ControlNum)%ActuatedNodePlantLoopSide, &
                                        ControllerProps(ControlNum)%ActuatedNodePlantLoopBranchNum, &
                                        .FALSE.)
-!    Node(ActuatedNode)%MassFlowRateMaxAvail = ControllerProps(ControlNum)%MaxActuated
-!    Node(ActuatedNode)%MassFlowRateMinAvail = MAX( &
-!      ControllerProps(ControlNum)%MinActuated, &
-!      Node(ActuatedNode)%MassFlowRateMin &
-!    )
-  ELSE
-    Call SetActuatedBranchFlowRate(ControllerProps(ControlNum)%NextActuatedValue, &
-                                       ActuatedNode, &
-                                       ControllerProps(ControlNum)%ActuatedNodePlantLoopNum,&
-                                       ControllerProps(ControlNum)%ActuatedNodePlantLoopSide, &
-                                       ControllerProps(ControlNum)%ActuatedNodePlantLoopBranchNum, &
-                                       .FALSE. )
-  END IF  ! End of FirstHVACIteration Conditional If
-
-
 
   ! Do the following initializations (every time step): This should be the info from
   ! the previous components outlets or the node data in this section.
@@ -1404,6 +1460,11 @@ SUBROUTINE InitController(ControlNum,FirstHVACIteration,IsConvergedFlag)
         ControllerProps(ControlNum)%MaxAvailActuated  = MIN( &
           Node(ActuatedNode)%MassFlowRateMaxAvail, &
           ControllerProps(ControlNum)%MaxActuated)
+        ! MinActuated is user input for minimum actuated flow, use that value if allowed
+        ! (i.e., reset MinAvailActuated based on Node%MassFlowRateMaxAvail)
+        ControllerProps(ControlNum)%MinAvailActuated = MIN( &
+          ControllerProps(ControlNum)%MinAvailActuated, &
+          ControllerProps(ControlNum)%MaxAvailActuated)
        END IF
 
     CASE DEFAULT
@@ -4017,7 +4078,7 @@ END SUBROUTINE CheckCoilWaterInletNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

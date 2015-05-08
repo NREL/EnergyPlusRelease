@@ -22,8 +22,8 @@ MODULE Pumps
  USE DataPrecisionGlobals, ONLY: r64
  USE DataGlobals,          ONLY: InitConvTemp, AnyEnergyManagementSystemInModel, SecInHour, BeginEnvrnFlag
  USE DataHVACGlobals,      ONLY: MaxNameLength, SmallWaterVolFlow, NumPlantLoops, NumCondLoops, ForceOff, CycleOn, TimeStepSys
- USE DataLoopNode,         ONLY: Node, NodeType_Water, NodeType_Steam, NodeConnectionType_Inlet, NodeConnectionType_Outlet, &
-                                 ObjectIsNotParent
+ USE DataLoopNode,         ONLY: NodeID, Node, NodeType_Water, NodeType_Steam, NodeConnectionType_Inlet,   &
+                                 NodeConnectionType_Outlet, ObjectIsNotParent
  USE DataInterfaces,       ONLY: ShowRecurringWarningErrorAtEnd, ShowRecurringContinueErrorAtEnd, &
                                  ShowFatalError, ShowWarningError, ShowContinueError, ShowSevereError, &
                                  ShowContinueErrorTimeStamp, ShowWarningMessage, SetupEMSInternalVariable, &
@@ -342,11 +342,11 @@ SUBROUTINE GetPumpInput()
   ErrorsFound = .FALSE.
 
             !GET NUMBER OF ALL EQUIPMENT TYPES
-  NumVarSpeedPumps      = GetNumObjectsFound(TRIM(cPump_VarSpeed) )
-  NumConstSpeedPumps    = GetNumObjectsFound(TRIM(cPump_ConSpeed) )
-  NumCondensatePumps    = GetNumObjectsFound(TRIM(cPump_Cond) )
-  NumPumpBankSimpleVar  = GetNumObjectsFound(TRIM(cPumpBank_VarSpeed) )
-  NumPumpBankSimpleConst= GetNumObjectsFound(TRIM(cPumpBank_ConSpeed))
+  NumVarSpeedPumps      = GetNumObjectsFound(cPump_VarSpeed)
+  NumConstSpeedPumps    = GetNumObjectsFound(cPump_ConSpeed)
+  NumCondensatePumps    = GetNumObjectsFound(cPump_Cond)
+  NumPumpBankSimpleVar  = GetNumObjectsFound(cPumpBank_VarSpeed)
+  NumPumpBankSimpleConst= GetNumObjectsFound(cPumpBank_ConSpeed)
   NumPumps = NumVarSpeedPumps + NumConstSpeedPumps + NumCondensatePumps + NumPumpBankSimpleVar + NumPumpBankSimpleConst
 
   IF(NumPumps<=0)THEN
@@ -363,7 +363,7 @@ SUBROUTINE GetPumpInput()
 
   DO NumVarPump = 1 , NumVarSpeedPumps
     PumpNum = NumVarPump
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),NumVarPump,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,NumVarPump,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT, &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -523,7 +523,7 @@ SUBROUTINE GetPumpInput()
 
   DO NumConstPump = 1, NumConstSpeedPumps
     PumpNum = NumVarSpeedPumps + NumConstPump
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),NumConstPump,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,NumConstPump,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT,  &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -632,7 +632,7 @@ SUBROUTINE GetPumpInput()
   cCurrentModuleObject = cPump_Cond
   DO NumCondPump = 1 , NumCondensatePumps
     PumpNum = NumCondPump + NumVarSpeedPumps + NumConstSpeedPumps
-    CALL GetObjectItem(TRIM(cCurrentModuleObject) ,NumCondPump,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject ,NumCondPump,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT,  &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -713,7 +713,7 @@ SUBROUTINE GetPumpInput()
   cCurrentModuleObject = cPumpBank_VarSpeed
   DO NumVarPumpBankSimple = 1 , NumPumpBankSimpleVar
     PumpNum = NumVarPumpBankSimple + NumVarSpeedPumps + NumConstSpeedPumps + NumCondensatePumps
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),NumVarPumpBankSimple,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,NumVarPumpBankSimple,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT,  &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -810,7 +810,7 @@ SUBROUTINE GetPumpInput()
   cCurrentModuleObject = TRIM(cPumpBank_ConSpeed)
   DO NumConstPumpBankSimple = 1 , NumPumpBankSimpleConst
     PumpNum = NumConstPumpBankSimple + NumVarSpeedPumps + NumConstSpeedPumps + NumCondensatePumps + NumPumpBankSimpleVar
-    CALL GetObjectItem(TRIM(cCurrentModuleObject),NumConstPumpBankSimple,cAlphaArgs,NumAlphas, &
+    CALL GetObjectItem(cCurrentModuleObject,NumConstPumpBankSimple,cAlphaArgs,NumAlphas, &
                        rNumericArgs,NumNums,IOSTAT,  &
                        NumBlank=lNumericFieldBlanks,AlphaBlank=lAlphaFieldBlanks, &
                        AlphaFieldNames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
@@ -914,18 +914,18 @@ SUBROUTINE GetPumpInput()
       PumpEquip(PumpNum)%PumpType == Pump_ConSpeed .OR. &
       PumpEquip(PumpNum)%PumpType == Pump_Cond) THEN
 
-    CALL SetupOutputVariable('Pump Electric Consumption [J]',PumpEquip(PumpNum)%Energy, &
+    CALL SetupOutputVariable('Pump Electric Energy [J]',PumpEquip(PumpNum)%Energy, &
                              'System','Sum',PumpEquip(PumpNum)%Name,  &
                               ResourceTypeKey='Electric',EndUseKey='Pumps',GroupKey='Plant')
     CALL SetupOutputVariable('Pump Electric Power [W]',PumpEquip(PumpNum)%Power, &
                              'System','Average',PumpEquip(PumpNum)%Name)
     CALL SetupOutputVariable('Pump Shaft Power [W]', &
           PumpEquipReport(PumpNum)%ShaftPower,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Heat To Fluid [W]', &
+    CALL SetupOutputVariable('Pump Fluid Heat Gain Rate [W]', &
           PumpEquipReport(PumpNum)%PumpHeattoFluid,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Heat To Fluid Energy [J]', &
+    CALL SetupOutputVariable('Pump Fluid Heat Gain Energy [J]', &
           PumpEquipReport(PumpNum)%PumpHeattoFluidEnergy,'System','Sum',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Outlet Temp [C]', &
+    CALL SetupOutputVariable('Pump Outlet Temperature [C]', &
           PumpEquipReport(PumpNum)%OutletTemp,'System','Average',PumpEquip(PumpNum)%Name)
     CALL SetupOutputVariable('Pump Mass Flow Rate [kg/s]', &
           PumpEquipReport(PumpNum)%PumpMassFlowRate,'System','Average',PumpEquip(PumpNum)%Name)
@@ -934,22 +934,22 @@ SUBROUTINE GetPumpInput()
    If(PumpEquip(PumpNum)%PumpType == PumpBank_VarSpeed .OR. &   ! CurrentModuleObject='HeaderedPumps'
       PumpEquip(PumpNum)%PumpType == PumpBank_ConSpeed) THEN
 
-    CALL SetupOutputVariable('Pump Bank Electric Consumption [J]',PumpEquip(PumpNum)%Energy, &
+    CALL SetupOutputVariable('Pump Electric Energy [J]',PumpEquip(PumpNum)%Energy, &
                              'System','Sum',PumpEquip(PumpNum)%Name,  &
                               ResourceTypeKey='Electric',EndUseKey='Pumps',GroupKey='Plant')
-    CALL SetupOutputVariable('Pump Bank Electric Power [W]',PumpEquip(PumpNum)%Power, &
+    CALL SetupOutputVariable('Pump Electric Power [W]',PumpEquip(PumpNum)%Power, &
                              'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Bank Shaft Power [W]', &
+    CALL SetupOutputVariable('Pump Shaft Power [W]', &
           PumpEquipReport(PumpNum)%ShaftPower,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Bank Heat To Fluid [W]', &
+    CALL SetupOutputVariable('Pump Fluid Heat Gain Rate [W]', &
           PumpEquipReport(PumpNum)%PumpHeattoFluid,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Bank Heat To Fluid Energy [J]', &
+    CALL SetupOutputVariable('Pump Fluid Heat Gain Energy [J]', &
           PumpEquipReport(PumpNum)%PumpHeattoFluidEnergy,'System','Sum',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Bank Outlet Temp [C]', &
+    CALL SetupOutputVariable('Pump Outlet Temperature [C]', &
           PumpEquipReport(PumpNum)%OutletTemp,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Pump Bank Mass Flow Rate [kg/s]', &
+    CALL SetupOutputVariable('Pump Mass Flow Rate [kg/s]', &
           PumpEquipReport(PumpNum)%PumpMassFlowRate,'System','Average',PumpEquip(PumpNum)%Name)
-    CALL SetupOutputVariable('Number of Pumps Operating in Pump Bank []', &
+    CALL SetupOutputVariable('Pump Operating Pumps Count []', &
           PumpEquipReport(PumpNum)%NumPumpsOperating,'System','Average',PumpEquip(PumpNum)%Name)
    End If
 
@@ -962,13 +962,13 @@ SUBROUTINE GetPumpInput()
 
    IF (PumpEquip(PumpNum)%HeatLossesToZone) THEN
      ! setup skin loss output vars
-     CALL SetupOutputVariable('Pump Heat Loss to Zone Rate [W]', &
+     CALL SetupOutputVariable('Pump Zone Total Heating Rate [W]', &
             PumpEquipReport(PumpNum)%ZoneTotalGainRate,'System','Average',PumpEquip(PumpNum)%Name)
-     CALL SetupOutputVariable('Pump Heat Loss to Zone [J]', &
+     CALL SetupOutputVariable('Pump Zone Total Heating Energy [J]', &
             PumpEquipReport(PumpNum)%ZoneTotalGainEnergy,'System','Sum',PumpEquip(PumpNum)%Name)
-     CALL SetupOutputVariable('Pump Convection Heat Loss to Zone Rate [W]', &
+     CALL SetupOutputVariable('Pump Zone Convective Heating Rate [W]', &
             PumpEquipReport(PumpNum)%ZoneConvGainRate,'System','Average',PumpEquip(PumpNum)%Name)
-     CALL SetupOutputVariable('Pump Radiation Heat Loss to Zone Rate [W]', &
+     CALL SetupOutputVariable('Pump Zone Radiative Heating Rate [W]', &
             PumpEquipReport(PumpNum)%ZoneRadGainRate,'System','Average',PumpEquip(PumpNum)%Name)
 
      ! setup internal gains
@@ -1064,6 +1064,10 @@ SUBROUTINE InitializePumps(PumpNum)
   LOGICAL        :: errFlag
   REAL(r64)      :: mdotMax ! local fluid mass flow rate maximum
   REAL(r64)      :: mdotMin ! local fluid mass flow rate minimum
+  INTEGER        :: plloopnum
+  INTEGER        :: lsnum
+  INTEGER        :: brnum
+  INTEGER        :: cpnum
 
   ! Set some variables for convenience
   InletNode         = PumpEquip(PumpNum)%InletNodeNum
@@ -1081,6 +1085,25 @@ SUBROUTINE InitializePumps(PumpNum)
                                  PumpEquip(PumpNum)%BranchNum,   &
                                  PumpEquip(PumpNum)%CompNum,     &
                                  errFlag=errFlag)
+    plloopnum=PumpEquip(PumpNum)%LoopNum
+    lsnum=PumpEquip(PumpNum)%LoopSideNum
+    brnum=PumpEquip(PumpNum)%BranchNum
+    cpnum=PumpEquip(PumpNum)%CompNum
+    IF (PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn /= InletNode .or.  &
+        PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut /= OutletNode) THEN
+      CALL ShowSevereError('InitializePumps: '//trim(cPumpTypes(PumpEquip(PumpNum)%PumpType))//'="'//  &
+        trim(PumpEquip(PumpNum)%Name)//'", non-matching nodes.')
+      CALL ShowContinueError('...in Branch="'//trim(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Name)//  &
+         '", Component referenced with:')
+      CALL ShowContinueError('...Inlet Node="'//  &
+         trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumIn)))
+      CALL ShowContinueError('...Outlet Node="'//  &
+         trim(NodeID(PlantLoop(plloopnum)%LoopSide(lsnum)%Branch(brnum)%Comp(cpnum)%NodeNumOut)))
+      CALL ShowContinueError('...Pump Inlet Node="'//trim(NodeID(InletNode)))
+      CALL ShowContinueError('...Pump Outlet Node="'//trim(NodeID(OutletNode)))
+      errflag=.true.
+    ENDIF
+
     IF (errFlag) THEN
       CALL ShowFatalError('InitializePumps: Program terminated due to previous condition(s).')
     ENDIF
@@ -2143,7 +2166,7 @@ END SUBROUTINE
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

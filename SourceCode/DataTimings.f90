@@ -60,6 +60,25 @@ PUBLIC          ! By definition, all variables which are placed in this data
   LOGICAL :: lmanageSimulationTiming = .false.
   LOGICAL :: lcloseoutReportingTiming = .false.
 
+  ! Following for calls to routines
+#ifdef EP_Count_Calls
+  INTEGER :: NumShadow_Calls = 0
+  INTEGER :: NumShadowAtTS_Calls = 0
+  INTEGER :: NumClipPoly_Calls = 0
+  INTEGER :: NumInitSolar_Calls = 0
+  INTEGER :: NumAnisoSky_Calls = 0
+  INTEGER :: NumDetPolyOverlap_Calls = 0
+  INTEGER :: NumCalcPerSolBeam_Calls = 0
+  INTEGER :: NumDetShadowCombs_Calls = 0
+  INTEGER :: NumIntSolarDist_Calls = 0
+  INTEGER :: NumIntRadExchange_Calls = 0
+  INTEGER :: NumIntRadExchangeZ_Calls = 0
+  INTEGER :: NumIntRadExchangeMain_Calls = 0
+  INTEGER :: NumIntRadExchangeOSurf_Calls = 0
+  INTEGER :: NumIntRadExchangeISurf_Calls = 0
+  INTEGER :: NumMaxInsideSurfIterations = 0
+  INTEGER :: NumCalcScriptF_Calls = 0
+#endif
 
 CONTAINS
 
@@ -534,7 +553,7 @@ END FUNCTION epElapsedTime
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

@@ -102,7 +102,7 @@ TYPE SysDesignParams
                                                     ! fan outlet node, coil inlet node for VAV VS Fan
   INTEGER      :: ReheatControlNode           = 0   ! hot water inlet node for heating coil
   INTEGER      :: ReheatCoilOutletNode        = 0   ! outlet node for heating coil
-  REAL(r64)    :: ReheatCoilMaxCapacity       = 0.d0  ! heating coil capacity, W
+  REAL(r64)    :: ReheatCoilMaxCapacity       = 0.0D0  ! heating coil capacity, W
   INTEGER      :: ReheatAirOutletNode         = 0   ! terminal unit outlet node; heating coil air outlet node
   REAL(r64)    :: MaxReheatWaterVolFlow       = 0.0D0 ! m3/s
   REAL(r64)    :: MaxReheatSteamVolFlow       = 0.0D0 ! m3/s
@@ -133,11 +133,6 @@ TYPE SysDesignParams
   REAL(r64)    :: OutdoorAirFlowRate            = 0.0D0 ! report variable for TU outdoor air flow rate
   LOGICAL      :: NoOAFlowInputFromUser         = .TRUE. ! avoids OA calculation if no input specified by user
 
-  REAL(r64)    :: OAFlowPerPerson  = 0.0D0  !- Terminal unit requirement for OA per person [m3/person]
-  REAL(r64)    :: OAFlowPerArea    = 0.0D0  !- Terminal unit requirement for OA per zone area [m3/s - set in GetInput]
-  REAL(r64)    :: OAFlowPerZone    = 0.0D0  !- Terminal unit requirement for OA per zone [m3/s]
-  REAL(r64)    :: OAFlowACH        = 0.0D0  !- Terminal unit requirement for ACH (air changes per hour) [m3/s - set in GetInput]
-  INTEGER      :: OAFlowFracSchPtr = 0      !- Fraction schedule applied to total OA requirement
   INTEGER      :: OARequirementsPtr = 0     !- Index to DesignSpecification:OutdoorAir object
 
   INTEGER      :: AirLoopNum       = 0
@@ -154,12 +149,12 @@ END TYPE SysDesignParams
 
 
 TYPE SysFlowConditions
-  REAL(r64) :: AirMassFlowRate                    = 0.0 ! MassFlow through the Sys being Simulated [kg/Sec]
-  REAL(r64) :: AirMassFlowRateMaxAvail            = 0.0 ! MassFlow through the Sys being Simulated [kg/Sec]
-  REAL(r64) :: AirMassFlowRateMinAvail            = 0.0 ! MassFlow through the Sys being Simulated [kg/Sec]
-  REAL(r64) :: AirTemp                            = 0.0 ! (C)
-  REAL(r64) :: AirHumRat                          = 0.0 ! (Kg/Kg)
-  REAL(r64) :: AirEnthalpy                        = 0.0 ! (J/Kg)
+  REAL(r64) :: AirMassFlowRate                    = 0.0D0 ! MassFlow through the Sys being Simulated [kg/Sec]
+  REAL(r64) :: AirMassFlowRateMaxAvail            = 0.0D0 ! MassFlow through the Sys being Simulated [kg/Sec]
+  REAL(r64) :: AirMassFlowRateMinAvail            = 0.0D0 ! MassFlow through the Sys being Simulated [kg/Sec]
+  REAL(r64) :: AirTemp                            = 0.0D0 ! (C)
+  REAL(r64) :: AirHumRat                          = 0.0D0 ! (Kg/Kg)
+  REAL(r64) :: AirEnthalpy                        = 0.0D0 ! (J/Kg)
 END TYPE SysFlowConditions
 
 
@@ -355,7 +350,7 @@ SUBROUTINE GetSysInput
     USE DataHeatBalance
     USE DataSizing,        ONLY: OARequirements, NumOARequirements
     USE DataPlant,         ONLY: TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
-    USE DataGlobals,       ONLY: DoZoneSizing
+    USE DataGlobals,       ONLY: DoZoneSizing, ScheduleAlwaysOn
 
     IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -424,10 +419,10 @@ SUBROUTINE GetSysInput
     ALLOCATE(MassFlow3(NumSys))
     ALLOCATE(MassFlowDiff(NumSys))
 
-    MassFlow1 = 0.0
-    MassFlow2 = 0.0
-    MassFlow3 = 0.0
-    MassFlowDiff = 0.0
+    MassFlow1 = 0.0D0
+    MassFlow2 = 0.0D0
+    MassFlow3 = 0.0D0
+    MassFlowDiff = 0.0D0
 
     CALL GetObjectDefMaxArgs('AirTerminal:SingleDuct:VAV:Reheat',TotalArgs,NumAlphas,NumNums)
     MaxNums=MAX(MaxNums,NumNums)
@@ -455,7 +450,7 @@ SUBROUTINE GetSysInput
     ALLOCATE(cNumericFields(MaxNums))
     cNumericFields=' '
     ALLOCATE(Numbers(MaxNums))
-    Numbers=0.0
+    Numbers=0.0D0
     ALLOCATE(lAlphaBlanks(MaxAlphas))
     lAlphaBlanks=.true.
     ALLOCATE(lNumericBlanks(MaxNums))
@@ -466,7 +461,7 @@ SUBROUTINE GetSysInput
 
         CurrentModuleObject='AirTerminal:SingleDuct:VAV:Reheat'
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -504,21 +499,25 @@ SUBROUTINE GetSysInput
           ErrorsFound=.true.
         ENDIF
         Sys(SysNum)%Schedule       = Alphas(2)
-        Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
           ! For node connections, this object is both a parent and a non-parent, because the
           ! VAV damper is not called out as a separate component, its nodes must be connected
           ! as ObjectIsNotParent.  But for the reheat coil, the nodes are connected as ObjectIsParent
         Sys(SysNum)%OutletNodeNum  = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Sys(SysNum)%InletNodeNum   = &
                GetOnlySingleNode(Alphas(4),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Sys(SysNum)%MaxAirVolFlowRate = Numbers(1)
 
         IF (SameString(Alphas(5) , 'Constant')) THEN
@@ -584,7 +583,7 @@ SUBROUTINE GetSysInput
         END IF
         Sys(SysNum)%ReheatAirOutletNode  = &
                GetOnlySingleNode(Alphas(9),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFields(9))
         IF  (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_SteamAirHeating)THEN
           Sys(SysNum)%MaxReheatSteamVolFlow = Numbers(4)
           Sys(SysNum)%MinReheatSteamVolFlow = Numbers(5)
@@ -623,7 +622,8 @@ SUBROUTINE GetSysInput
 
               Sys(SysNum)%CtrlZoneNum   = CtrlZone
               Sys(SysNum)%ActualZoneNum = ZoneEquipConfig(CtrlZone)%ActualZoneNum
-              Sys(SysNum)%ZoneFloorArea = Zone(Sys(SysNum)%ActualZoneNum)%FloorArea
+              Sys(SysNum)%ZoneFloorArea = Zone(Sys(SysNum)%ActualZoneNum)%FloorArea* &
+                    Zone(Sys(SysNum)%ActualZoneNum)%Multiplier*Zone(Sys(SysNum)%ActualZoneNum)%ListMultiplier
 
             END IF
           END DO
@@ -659,22 +659,6 @@ SUBROUTINE GetSysInput
             ErrorsFound=.true.
           ELSE
             Sys(SysNum)%NoOAFlowInputFromUser = .FALSE.
-            Sys(SysNum)%ZoneOutdoorAirMethod = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowMethod
-            Sys(SysNum)%OAFlowPerPerson = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerPerson
-            Sys(SysNum)%OAFlowPerZone   = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerZone
-            Sys(SysNum)%OAFlowPerArea   = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerArea * &
-                                            Sys(SysNum)%ZoneFloorArea
-            IF(Sys(SysNum)%ActualZoneNum .GT. 0) THEN
-              ZoneNum = Sys(SysNum)%ActualZoneNum
-              Sys(SysNum)%OAFlowACH       = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowACH * &
-                                              Zone(ZoneNum)%Volume / 3600.D0
-            ! Apply zone multipliers and zone list multipliers here instead of doing calculation each time step
-              Sys(SysNum)%OAFlowPerPerson = Sys(SysNum)%OAFlowPerPerson * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowPerZone   = Sys(SysNum)%OAFlowPerZone * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowPerArea   = Sys(SysNum)%OAFlowPerArea * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowACH       = Sys(SysNum)%OAFlowACH * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-            END IF
-            Sys(SysNum)%OAFlowFracSchPtr = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowFracSchPtr
           END IF
         END IF
 
@@ -689,11 +673,11 @@ SUBROUTINE GetSysInput
                            Alphas(7),Alphas(8),Alphas(3),Alphas(9))
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('VAV Terminal Damper Position', Sys(Sysnum)%DamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal VAV Damper Position []', Sys(Sysnum)%DamperPosition, &
                               'System','Average',Sys(Sysnum)%SysName)
-        CALL SetupOutputVariable('VAV Terminal Minimum Air Flow Fraction', Sys(Sysnum)%ZoneMinAirFrac, &
+        CALL SetupOutputVariable('Zone Air Terminal Minimum Air Flow Fraction []', Sys(Sysnum)%ZoneMinAirFrac, &
                               'System','Average',Sys(Sysnum)%SysName)
-        CALL SetupOutputVariable('VAV Terminal Outdoor Air Flow Rate [m3/s]', Sys(Sysnum)%OutdoorAirFlowRate, &
+        CALL SetupOutputVariable('Zone Air Terminal Outdoor Air Volume Flow Rate [m3/s]', Sys(Sysnum)%OutdoorAirFlowRate, &
                               'System','Average',Sys(Sysnum)%SysName)
 
       END DO   ! end Number of Sys Loop
@@ -702,7 +686,7 @@ SUBROUTINE GetSysInput
 
         CurrentModuleObject='AirTerminal:SingleDuct:VAV:HeatAndCool:Reheat'
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -740,21 +724,25 @@ SUBROUTINE GetSysInput
           ErrorsFound=.true.
         ENDIF
         Sys(SysNum)%Schedule       = Alphas(2)
-        Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
           ! For node connections, this object is both a parent and a non-parent, because the
           ! VAV damper is not called out as a separate component, its nodes must be connected
           ! as ObjectIsNotParent.  But for the reheat coil, the nodes are connected as ObjectIsParent
         Sys(SysNum)%OutletNodeNum  = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Sys(SysNum)%InletNodeNum   = &
                GetOnlySingleNode(Alphas(4),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Sys(SysNum)%MaxAirVolFlowRate = Numbers(1)
         Sys(SysNum)%ZoneMinAirFrac    = Numbers(2)
         IF (Sys(SysNum)%ZoneMinAirFrac .LT. 0.0d0) THEN
@@ -806,7 +794,7 @@ SUBROUTINE GetSysInput
         END IF
         Sys(SysNum)%ReheatAirOutletNode  = &
                GetOnlySingleNode(Alphas(8),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFields(8))
         IF  (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_SteamAirHeating)THEN
           Sys(SysNum)%MaxReheatSteamVolFlow = Numbers(3)
           Sys(SysNum)%MinReheatSteamVolFlow = Numbers(4)
@@ -865,16 +853,16 @@ SUBROUTINE GetSysInput
                            Alphas(6),Alphas(7),Alphas(3),Alphas(8))
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('VAV Terminal Damper Position', Sys(Sysnum)%DamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal VAV Damper Position []', Sys(Sysnum)%DamperPosition, &
                               'System','Average',Sys(Sysnum)%SysName)
 
       END DO   ! end Number of VAVHeatandCool Sys Loop
 
+      CurrentModuleObject='AirTerminal:SingleDuct:ConstantVolume:Reheat'
+
       DO SysIndex = 1,  NumConstVolSys
 
-        CurrentModuleObject='AirTerminal:SingleDuct:ConstantVolume:Reheat'
-
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -887,7 +875,7 @@ SUBROUTINE GetSysInput
           IF (IsBlank) Alphas(1)='xxxxx'
         ENDIF
         Sys(SysNum)%SysName     = Alphas(1)
-        Sys(SysNum)%SysType     = TRIM(CurrentModuleObject)
+        Sys(SysNum)%SysType     = CurrentModuleObject
         Sys(SysNum)%SysType_Num = SingleDuctConstVolReheat
         Sys(SysNum)%ReheatComp  = Alphas(6)
         IF (SameString(Sys(SysNum)%ReheatComp,'Coil:Heating:Gas')) THEN
@@ -912,18 +900,22 @@ SUBROUTINE GetSysInput
           ErrorsFound=.true.
         ENDIF
         Sys(SysNum)%Schedule       = Alphas(2)
-        Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Sys(SysNum)%OutletNodeNum  = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsParent,cAlphaFields(3))
         Sys(SysNum)%InletNodeNum   = &
                GetOnlySingleNode(Alphas(4),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsParent,cAlphaFields(4))
         ! The reheat coil control node is necessary for hot water reheat, but not necessary for
         ! electric or gas reheat.
         IF (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_Gas .OR. Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_Electric) THEN
@@ -960,7 +952,7 @@ SUBROUTINE GetSysInput
         END IF
         Sys(SysNum)%ReheatAirOutletNode= Sys(SysNum)%OutletNodeNum
         Sys(SysNum)%MaxAirVolFlowRate     = Numbers(1)
-        Sys(SysNum)%ZoneMinAirFrac        = 0.0
+        Sys(SysNum)%ZoneMinAirFrac        = 0.0D0
         IF  (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_SteamAirHeating)THEN
           Sys(SysNum)%MaxReheatSteamVolFlow = Numbers(2)
           Sys(SysNum)%MinReheatSteamVolFlow = Numbers(3)
@@ -1028,7 +1020,7 @@ SUBROUTINE GetSysInput
 
         CurrentModuleObject='AirTerminal:SingleDuct:VAV:NoReheat'
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1041,23 +1033,27 @@ SUBROUTINE GetSysInput
           IF (IsBlank) Alphas(1)='xxxxx'
         ENDIF
         Sys(SysNum)%SysName     = Alphas(1)
-        Sys(SysNum)%SysType     = TRIM(CurrentModuleObject)
+        Sys(SysNum)%SysType     = CurrentModuleObject
         Sys(SysNum)%SysType_Num = SingleDuctVAVNoReheat
         Sys(SysNum)%ReheatComp  = ' '
         Sys(SysNum)%ReheatName  = ' '
         Sys(SysNum)%Schedule    = Alphas(2)
-        Sys(SysNum)%SchedPtr    = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Sys(SysNum)%OutletNodeNum  = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Sys(SysNum)%InletNodeNum   = &
                GetOnlySingleNode(Alphas(4),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Sys(SysNum)%MaxAirVolFlowRate  = Numbers(1)
 
         IF (SameString(Alphas(5) , 'Constant')) THEN
@@ -1133,7 +1129,8 @@ SUBROUTINE GetSysInput
 
               Sys(SysNum)%CtrlZoneNum   = CtrlZone
               Sys(SysNum)%ActualZoneNum = ZoneEquipConfig(CtrlZone)%ActualZoneNum
-              Sys(SysNum)%ZoneFloorArea = Zone(Sys(SysNum)%ActualZoneNum)%FloorArea
+              Sys(SysNum)%ZoneFloorArea = Zone(Sys(SysNum)%ActualZoneNum)%FloorArea* &
+                    Zone(Sys(SysNum)%ActualZoneNum)%Multiplier*Zone(Sys(SysNum)%ActualZoneNum)%ListMultiplier
 
             END IF
           END DO
@@ -1147,30 +1144,13 @@ SUBROUTINE GetSysInput
             ErrorsFound=.true.
           ELSE
             Sys(SysNum)%NoOAFlowInputFromUser = .FALSE.
-            Sys(SysNum)%ZoneOutdoorAirMethod = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowMethod
-            Sys(SysNum)%OAFlowPerPerson = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerPerson
-            Sys(SysNum)%OAFlowPerZone   = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerZone
-            Sys(SysNum)%OAFlowPerArea   = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowPerArea * &
-                                            Sys(SysNum)%ZoneFloorArea
-            IF(Sys(SysNum)%ActualZoneNum .GT. 0) THEN
-              ZoneNum = Sys(SysNum)%ActualZoneNum
-              Sys(SysNum)%OAFlowACH       = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowACH * &
-                                              Zone(ZoneNum)%Volume / 3600.D0
-              ! Apply zone multipliers and zone list multipliers here instead of doing calculation each time step
-              Sys(SysNum)%OAFlowPerPerson = Sys(SysNum)%OAFlowPerPerson * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowPerZone   = Sys(SysNum)%OAFlowPerZone * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowPerArea   = Sys(SysNum)%OAFlowPerArea * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-              Sys(SysNum)%OAFlowACH       = Sys(SysNum)%OAFlowACH * Zone(ZoneNum)%Multiplier * Zone(ZoneNum)%ListMultiplier
-
-            END IF
-            Sys(SysNum)%OAFlowFracSchPtr = OARequirements(Sys(SysNum)%OARequirementsPtr)%OAFlowFracSchPtr
           END IF
         END IF
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('VAV Terminal Damper Position', Sys(Sysnum)%DamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal VAV Damper Position []', Sys(Sysnum)%DamperPosition, &
                               'System','Average',Sys(Sysnum)%SysName)
-        CALL SetupOutputVariable('VAV Terminal Outdoor Air Flow Rate [m3/s]', Sys(Sysnum)%OutdoorAirFlowRate, &
+        CALL SetupOutputVariable('Zone Air Terminal Outdoor Air Volume Flow Rate [m3/s]', Sys(Sysnum)%OutdoorAirFlowRate, &
                               'System','Average',Sys(Sysnum)%SysName)
 
       END DO   ! end Number of Sys Loop
@@ -1179,7 +1159,7 @@ SUBROUTINE GetSysInput
 
         CurrentModuleObject='AirTerminal:SingleDuct:VAV:HeatAndCool:NoReheat'
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1197,18 +1177,22 @@ SUBROUTINE GetSysInput
         Sys(SysNum)%ReheatComp  = ' '
         Sys(SysNum)%ReheatName  = ' '
         Sys(SysNum)%Schedule    = Alphas(2)
-        Sys(SysNum)%SchedPtr    = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
         Sys(SysNum)%OutletNodeNum  = &
                GetOnlySingleNode(Alphas(3),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Outlet,1,ObjectIsNotParent,cAlphaFields(3))
         Sys(SysNum)%InletNodeNum   = &
                GetOnlySingleNode(Alphas(4),ErrorsFound,Sys(SysNum)%SysType,Alphas(1), &
-                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent)
+                            NodeType_Air,NodeConnectionType_Inlet,1,ObjectIsNotParent,cAlphaFields(4))
         Sys(SysNum)%MaxAirVolFlowRate = Numbers(1)
         Sys(SysNum)%ZoneMinAirFrac    = Numbers(2)
         IF (Sys(SysNum)%ZoneMinAirFrac .LT. 0.0d0) THEN
@@ -1257,7 +1241,7 @@ SUBROUTINE GetSysInput
         END DO
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('VAV Terminal Damper Position', Sys(Sysnum)%DamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal VAV Damper Position []', Sys(Sysnum)%DamperPosition, &
                               'System','Average',Sys(Sysnum)%SysName)
 
       END DO   ! end Number of VAVHeatandCool:NoReheat Sys Loop
@@ -1267,7 +1251,7 @@ SUBROUTINE GetSysInput
 
         CurrentModuleObject='AirTerminal:SingleDuct:VAV:Reheat:VariableSpeedFan'
 
-        CALL GetObjectItem(TRIM(CurrentModuleObject),SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
+        CALL GetObjectItem(CurrentModuleObject,SysIndex,Alphas,NumAlphas,Numbers,NumNums,IOSTAT, &
                            AlphaBlank=lAlphaBlanks,NumBlank=lNumericBlanks,  &
                            AlphaFieldnames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -1333,11 +1317,15 @@ SUBROUTINE GetSysInput
         ENDIF
 
         Sys(SysNum)%Schedule       = Alphas(2)
-        Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
-        IF (Sys(SysNum)%SchedPtr == 0) THEN
-          CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
-          CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
-          ErrorsFound=.true.
+        IF (lAlphaBlanks(2)) THEN
+          Sys(SysNum)%SchedPtr       = ScheduleAlwaysOn
+        ELSE
+          Sys(SysNum)%SchedPtr       = GetScheduleIndex(Alphas(2))
+          IF (Sys(SysNum)%SchedPtr == 0) THEN
+            CALL ShowSevereError(TRIM(cAlphaFields(2))//' = '//TRIM(Alphas(2))//' not found.')
+            CALL ShowContinueError('Occurs in '//trim(Sys(SysNum)%SysType)//' = '//TRIM(Sys(SysNum)%SysName))
+            ErrorsFound=.true.
+          ENDIF
         ENDIF
 
 !  A5,     \field heating coil air inlet node
@@ -1482,7 +1470,7 @@ SUBROUTINE GetSysInput
                            Alphas(7),Alphas(8),Alphas(3),Alphas(5))
 
         !Setup the Average damper Position output variable
-        CALL SetupOutputVariable('VAV Terminal Flow Fraction', Sys(Sysnum)%DamperPosition, &
+        CALL SetupOutputVariable('Zone Air Terminal VAV Damper Position []', Sys(Sysnum)%DamperPosition, &
                               'System','Average',Sys(Sysnum)%SysName)
 
       END DO
@@ -1518,7 +1506,7 @@ SUBROUTINE GetSysInput
                   CALL ShowContinueError('...terminal unit "'//TRIM(Sys(SysIndex)%SysName)//  &
                      '" , that indicates a single path system')
                   CALL ShowContinueError('...The zone secondary recirculation for that zone was set to 0.0')
-                  FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0
+                  FinalZoneSizing(ZoneSizIndex)%ZoneSecondaryRecirculation = 0.0D0
                   EXIT SizLoop
                 END IF
               END IF
@@ -1726,11 +1714,11 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
     IF (AirDistUnit(ADUNum)%UpStreamLeak) THEN
       AirDistUnit(ADUNum)%MassFlowRateUpStrLk = Sys(SysNum)%AirMassFlowRateMax * AirDistUnit(ADUNum)%UpStreamLeakFrac
     ELSE
-      AirDistUnit(ADUNum)%MassFlowRateUpStrLk = 0.0
+      AirDistUnit(ADUNum)%MassFlowRateUpStrLk = 0.0D0
     END IF
 
     IF  (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_SteamAirHeating)THEN
-        SteamTemp=100.0
+        SteamTemp=100.d0
         SteamDensity=GetSatDensityRefrig('STEAM',SteamTemp,1.0d0,Sys(SysNum)%FluidIndex,'InitHVACSingleDuct')
         Sys(SysNum)%MaxReheatSteamFlow = SteamDensity * Sys(SysNum)%MaxReheatSteamVolFlow
         Sys(SysNum)%MinReheatSteamFlow = SteamDensity * Sys(SysNum)%MinReheatSteamVolFlow
@@ -1749,8 +1737,8 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
       Node(InletNode)%MassFlowRateMin = Node(InletNode)%MassFlowRateMax * &
                                         Sys(SysNum)%ZoneMinAirFrac
     ELSE
-      Node(OutletNode)%MassFlowRateMin = 0.0
-      Node(InletNode)%MassFlowRateMin = 0.0
+      Node(OutletNode)%MassFlowRateMin = 0.0D0
+      Node(InletNode)%MassFlowRateMin = 0.0D0
     END IF
     IF ((Sys(SysNum)%ReheatControlNode .gt. 0) .AND. .NOT. PlantLoopScanFlag(SysNum)) THEN
         IF  (Sys(SysNum)%ReheatComp_Num .EQ. HCoilType_SteamAirHeating)THEN
@@ -1800,37 +1788,37 @@ SUBROUTINE InitSys(SysNum,FirstHVACIteration)
 
   IF (FirstHVACIteration) THEN
      !The first time through set the mass flow rate to the Max
-    If((Node(InletNode)%MassFlowRate > 0.0) .AND.  &
-       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0)) Then
+    If((Node(InletNode)%MassFlowRate > 0.0D0) .AND.  &
+       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0D0)) Then
       if (.NOT. (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated)) then
         Node(InletNode)%MassFlowRate = Sys(SysNum)%AirMassFlowRateMax
       endif
     Else
-      Node(InletNode)%MassFlowRate = 0.0
+      Node(InletNode)%MassFlowRate = 0.0D0
     END IF
 
-    If((Node(InletNode)%MassFlowRateMaxAvail > 0.0) .AND.  &
-       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0)) Then
+    If((Node(InletNode)%MassFlowRateMaxAvail > 0.0D0) .AND.  &
+       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0D0)) Then
       if (.NOT. (SimulateAirflowNetwork .GT. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated)) then
         Node(InletNode)%MassFlowRateMaxAvail = Sys(SysNum)%AirMassFlowRateMax
       endif
     Else
-      Node(InletNode)%MassFlowRateMaxAvail = 0.0
+      Node(InletNode)%MassFlowRateMaxAvail = 0.0D0
     END IF
 
-    If((Node(InletNode)%MassFlowRate > 0.0) .AND.  &
-       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0)) Then
+    If((Node(InletNode)%MassFlowRate > 0.0D0) .AND.  &
+       (GetCurrentScheduleValue(Sys(SysNum)%SchedPtr) .gt. 0.0D0)) Then
       if (.NOT. (SimulateAirflowNetwork .GT. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated)) then
         Node(InletNode)%MassFlowRateMinAvail = Sys(SysNum)%AirMassFlowRateMax * Sys(SysNum)%ZoneMinAirFrac
       endif
     Else
-      Node(InletNode)%MassFlowRateMinAvail = 0.0
+      Node(InletNode)%MassFlowRateMinAvail = 0.0D0
     END IF
     ! reset the mass flow rate histories
-    MassFlow1(SysNum) = 0.0
-    MassFlow2(SysNum) = 0.0
-    MassFlow3(SysNum) = 0.0
-    MassFlow3(SysNum) = 0.0
+    MassFlow1(SysNum) = 0.0D0
+    MassFlow2(SysNum) = 0.0D0
+    MassFlow3(SysNum) = 0.0D0
+    MassFlow3(SysNum) = 0.0D0
 
   End If
 
@@ -1920,10 +1908,10 @@ SUBROUTINE SizeSys(SysNum)
   REAL(r64)           :: rho ! local fluid density
   REAL(r64)           :: Cp  ! local fluid specific heat
   INTEGER             :: DummyWaterIndex = 1
-  REAL(r64)           :: UserInputMaxHeatAirVolFlowRate = 0.0  ! user input for MaxHeatAirVolFlowRate
+  REAL(r64)           :: UserInputMaxHeatAirVolFlowRate = 0.0D0  ! user input for MaxHeatAirVolFlowRate
 
   PltSizHeatNum = 0
-  DesMassFlow = 0.0
+  DesMassFlow = 0.0D0
   ErrorsFound = .FALSE.
 
   IF (Sys(SysNum)%MaxAirVolFlowRate == AutoSize) THEN
@@ -1936,7 +1924,7 @@ SUBROUTINE SizeSys(SysNum)
                                            TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow)
 
       IF (Sys(SysNum)%MaxAirVolFlowRate < SmallAirVolFlow) THEN
-          Sys(SysNum)%MaxAirVolFlowRate = 0.0
+          Sys(SysNum)%MaxAirVolFlowRate = 0.0D0
       END IF
       CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                               'Maximum Air Flow Rate [m3/s]', Sys(SysNum)%MaxAirVolFlowRate)
@@ -1950,13 +1938,13 @@ SUBROUTINE SizeSys(SysNum)
       CALL CheckZoneSizing(Sys(SysNum)%SysType, Sys(SysNum)%SysName)
       Sys(SysNum)%MaxHeatAirVolFlowRate =  TermUnitFinalZoneSizing(CurZoneEqNum)%DesHeatVolFlow
       IF (Sys(SysNum)%MaxHeatAirVolFlowRate < SmallAirVolFlow) THEN
-          Sys(SysNum)%MaxHeatAirVolFlowRate = 0.0
+          Sys(SysNum)%MaxHeatAirVolFlowRate = 0.0D0
       END IF
       CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                               'Maximum Heating Air Flow Rate [m3/s]', Sys(SysNum)%MaxHeatAirVolFlowRate)
     END IF
 
-    UserInputMaxHeatAirVolFlowRate = 0.0
+    UserInputMaxHeatAirVolFlowRate = 0.0D0
 
   ELSE
 
@@ -1994,7 +1982,7 @@ SUBROUTINE SizeSys(SysNum)
   END IF
 
   IF(Sys(SysNum)%MaxAirVolFlowRateDuringReheat == Autocalculate)THEN
-    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(0.002032*Sys(SysNum)%ZoneFloorArea, &
+    Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MIN(0.002032D0*Sys(SysNum)%ZoneFloorArea, &
                                                      Sys(SysNum)%MaxAirVolFlowRate)
     ! apply limit based on min stop
     Sys(SysNum)%MaxAirVolFlowRateDuringReheat = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
@@ -2006,8 +1994,8 @@ SUBROUTINE SizeSys(SysNum)
 
   IF(Sys(SysNum)%MaxAirVolFractionDuringReheat == Autocalculate)THEN
     IF(Sys(SysNum)%MaxAirVolFlowRate .GT. 0.0D0)THEN
-      Sys(SysNum)%MaxAirVolFractionDuringReheat = MIN(1.0D0,(0.002032*Sys(SysNum)%ZoneFloorArea/ &
-                                                     Sys(SysNum)%MaxAirVolFlowRate))
+      Sys(SysNum)%MaxAirVolFractionDuringReheat = MIN(1.0D0,(0.002032D0*Sys(SysNum)%ZoneFloorArea/ &
+                                                      Sys(SysNum)%MaxAirVolFlowRate))
       ! apply limit based on min stop
       Sys(SysNum)%MaxAirVolFractionDuringReheat = MAX(Sys(SysNum)%MaxAirVolFractionDuringReheat, &
                                                       Sys(SysNum)%ZoneMinAirFrac )
@@ -2046,7 +2034,7 @@ SUBROUTINE SizeSys(SysNum)
         TermUnitSizing(CurZoneEqNum)%AirVolFlow = Sys(SysNum)%MaxAirVolFlowRate
       ELSE
         IF (Sys(SysNum)%DamperHeatingAction == ReverseAction) THEN
-          IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0) THEN
+          IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
             TermUnitSizing(CurZoneEqNum)%AirVolFlow = MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
                                                           (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) )
           ELSE
@@ -2058,7 +2046,7 @@ SUBROUTINE SizeSys(SysNum)
       END IF
     END IF
     IF (TermUnitSizing(CurZoneEqNum)%AirVolFlow > SmallAirVolFlow) THEN
-      IF (Sys(SysNum)%DamperHeatingAction == ReverseAction .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0) THEN
+      IF (Sys(SysNum)%DamperHeatingAction == ReverseAction .AND. Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
         TermUnitSizing(CurZoneEqNum)%ReheatMult =  MAX(Sys(SysNum)%MaxAirVolFlowRateDuringReheat, &
                                                           (Sys(SysNum)%MaxAirVolFlowRate * Sys(SysNum)%ZoneMinAirFrac) ) &
                                                              / TermUnitSizing(CurZoneEqNum)%AirVolFlow
@@ -2110,7 +2098,7 @@ SUBROUTINE SizeSys(SysNum)
                                                   ( PlantSizData(PltSizHeatNum)%DeltaT * &
                                                    Cp * rho )
           ELSE
-            Sys(SysNum)%MaxReheatWaterVolFlow = 0.0
+            Sys(SysNum)%MaxReheatWaterVolFlow = 0.0D0
           END IF
           CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                                   'Maximum Reheat Water Flow Rate [m3/s]', Sys(SysNum)%MaxReheatWaterVolFlow)
@@ -2152,7 +2140,7 @@ SUBROUTINE SizeSys(SysNum)
              Sys(SysNum)%MaxReheatSteamVolFlow = DesCoilLoad /(SteamDensity*(LatentHeatSteam + &
               PlantSizData(PltSizHeatNum)%DeltaT * Cp ))
           ELSE
-            Sys(SysNum)%MaxReheatSteamVolFlow = 0.0
+            Sys(SysNum)%MaxReheatSteamVolFlow = 0.0D0
           END IF
           CALL ReportSizingOutput(Sys(SysNum)%SysType, Sys(SysNum)%SysName, &
                                   'Maximum Reheat Steam Flow Rate [m3/s]', Sys(SysNum)%MaxReheatSteamVolFlow)
@@ -2163,8 +2151,8 @@ SUBROUTINE SizeSys(SysNum)
         END IF
       ELSE
 
-        Sys(SysNum)%MaxReheatWaterVolFlow = 0.0
-        Sys(SysNum)%MaxReheatSteamVolFlow = 0.0
+        Sys(SysNum)%MaxReheatWaterVolFlow = 0.0D0
+        Sys(SysNum)%MaxReheatSteamVolFlow = 0.0D0
 
       END IF
 
@@ -2183,7 +2171,7 @@ SUBROUTINE SizeSys(SysNum)
   END IF
 
 
-  IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.d0) THEN
+  IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat > 0.0D0) THEN
     ! check for inconsistent dual max input
     IF (Sys(SysNum)%MaxAirVolFlowRateDuringReheat < (Sys(SysNum)%ZoneMinAirFrac * Sys(SysNum)%MaxAirVolFlowRate) ) THEN
       ! Only warn when really out of bounds
@@ -2251,6 +2239,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 !unused   USE DataAirLoop,       ONLY: AirLoopControlInfo
   USE PlantUtilities,    ONLY: SetActuatedBranchFlowRate
   USE DataHVACGlobals,   ONLY: SmallLoad
+  USE DataAirflowNetwork, ONLY: SimulateAirflowNetwork,AirflowNetworkFanActivated,AirflowNetworkControlMultizone,VAVTerminalRatio
 
   IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
@@ -2288,8 +2277,8 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   REAL(r64) :: QHeatingDelivered ! the actual output from heating coil
   REAL(r64) :: LeakLoadMult      ! load multiplier to adjust for downstream leaks
   REAL(r64) :: MinFlowFrac       ! minimum flow fraction (and minimum damper position)
-  REAL(r64) :: MinAirMassFlowRevAct=0.0 ! minimum air mass flow rate used in "reverse action" air mass flow rate calculation
-  REAL(r64) :: MaxAirMassFlowRevAct=0.0 ! maximum air mass flow rate used in "reverse action" air mass flow rate calculation
+  REAL(r64) :: MinAirMassFlowRevAct=0.0D0 ! minimum air mass flow rate used in "reverse action" air mass flow rate calculation
+  REAL(r64) :: MaxAirMassFlowRevAct=0.0D0 ! maximum air mass flow rate used in "reverse action" air mass flow rate calculation
   REAL(r64) :: MassFlowBasedOnOA ! supply air mass flow rate based on zone OA requirements
   REAL(r64) :: AirLoopOAFrac     ! fraction of outside air entering air loop
   REAL(r64) :: DummyMdot  ! temporary mass flow rate argument
@@ -2330,21 +2319,21 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    ! the massflow rate for cooling is determined to meet the entire load.  Then
    ! if the massflow is below the minimum or greater than the Max it is set to either the Min
    ! or the Max as specified for the VAV model.
-  If( (QTotLoad < 0.d0) .AND. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. &
+  If( (QTotLoad < 0.0D0) .AND. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0) .AND. &
       (TempControlType(ZoneNum) .NE. SingleHeatingSetPoint) ) THEN
      ! Calculate the flow required for cooling
     CpAirSysIn = PsyCpAirFnWTdb(SysInlet(SysNum)%AirHumRat,SysInlet(SysNum)%AirTemp)
     DeltaTemp = CpAirSysIn*SysInlet(SysNum)%AirTemp - CpAirZn*ZoneTemp
 
      !Need to check DeltaTemp and ensure that it is not zero
-    If (DeltaTemp .ne. 0.0) THEN
+    If (DeltaTemp .ne. 0.0D0) THEN
       MassFlow= QTotLoad/DeltaTemp
     ELSE
       MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
     END IF
 
      ! Apply the zone maximum outdoor air fraction FOR VAV boxes - a TRACE feature
-    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0) THEN
+    IF (ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor > 1.0D0) THEN
       MassFlow = MassFlow * ZoneSysEnergyDemand(ZoneNum)%SupplyAirAdjustFactor
     ENDIF
 
@@ -2362,7 +2351,15 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
     MassFlow = MAX(MassFlow,SysInlet(SysNum)%AirMassFlowRateMinAvail)
     MassFlow = MIN(MassFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
 
-  ELSE IF ((SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .AND. (QTotLoad >= 0.d0 .OR. &
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
+       .AND. VAVTerminalRatio .GT. 0.0) then
+      MassFlow = MassFlow * VAVTerminalRatio
+      If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
+        MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
+      End If
+    End If
+
+  ELSE IF ((SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0) .AND. (QTotLoad >= 0.0D0 .OR. &
              TempControlType(ZoneNum) .EQ. SingleHeatingSetPoint) ) THEN
 !     IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction .AND. SysInlet(SysNum)%AirMassFlowRateMinAvail <= SmallMassFlow) THEN
        ! special case for heating: reverse action and damper allowed to close - set the minimum flow rate to a small but nonzero value
@@ -2388,9 +2385,18 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
     END IF
 
+    ! the AirflowNetwork model overrids the mass flow rate value 
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
+       .AND. VAVTerminalRatio .GT. 0.0) then
+      MassFlow = MassFlow * VAVTerminalRatio
+      If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
+        MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
+      End If
+    End If
+
   ELSE
      ! System is Off set massflow to 0.0
-    MassFlow = 0.0
+    MassFlow = 0.0D0
     AirLoopOAFrac = 0.0D0
   END IF
 
@@ -2399,7 +2405,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
           (ABS(MassFlow-MassFlow3(SysNum)) < MassFlowDiff(SysNum)) ) .AND. &
           (ABS(MassFlow-MassFlow1(SysNum)) >= MassFlowDiff(SysNum)) ) THEN
-    IF (MassFlow > 0.0) MassFlow = MassFlow1(SysNum)
+    IF (MassFlow > 0.0D0) MassFlow = MassFlow1(SysNum)
   END IF
 
    !Move data to the damper outlet node
@@ -2411,19 +2417,19 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   SysOutlet(SysNum)%AirEnthalpy             = SysInlet(SysNum)%AirEnthalpy
 
 !   ! Calculate the Damper Position when there is a Max air flow specified.
-!  If (MassFlow == 0.0) THEN
-!    Sys(SysNum)%DamperPosition = 0.0
+!  If (MassFlow == 0.0D0) THEN
+!    Sys(SysNum)%DamperPosition = 0.0D0
 !  ELSE IF (SysInlet(SysNum)%AirMassFlowRateMaxAvail > SysInlet(SysNum)%AirMassFlowRateMinAvail) THEN
 !    Sys(SysNum)%DamperPosition = ((MassFlow-SysInlet(SysNum)%AirMassFlowRateMinAvail) / &
 !                                   (SysInlet(SysNum)%AirMassFlowRateMaxAvail-SysInlet(SysNum)%AirMassFlowRateMinAvail)) * &
 !                                  (1.0d0-MinFlowFrac) + MinFlowFrac
 !  ELSE
-!    Sys(SysNum)%DamperPosition = 1.0
+!    Sys(SysNum)%DamperPosition = 1.0D0
 !  END IF
 
-  IF (MassFlow == 0.d0) THEN
-    Sys(SysNum)%DamperPosition = 0.d0
-  ELSEIF ((MassFlow > 0.d0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
+  IF (MassFlow == 0.0D0) THEN
+    Sys(SysNum)%DamperPosition = 0.0D0
+  ELSEIF ((MassFlow > 0.0D0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
     Sys(SysNum)%DamperPosition =  MassFlow / Sys(SysNum)%AirMassFlowRateMax
   ELSEIF (MassFlow == Sys(SysNum)%AirMassFlowRateMax) THEN
     Sys(SysNum)%DamperPosition = 1.d0
@@ -2439,7 +2445,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    ! there's a heating requirement, and there's a thermostat with a heating setpoint
    ! Reverse damper option is working only for water coils for now.
   IF((MassFlow > SmallMassFlow ) .AND. &
-      (QActualHeating > 0.0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) THEN
+      (QActualHeating > 0.0D0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) THEN
      ! At this point we know that there is a heating requirement: i.e., the heating coil needs to
      ! be activated (there's a zone heating load or there's a reheat requirement). There are 3 possible
      ! situations: 1) the coil load can be met by variable temperature air (below the max heat temp) at
@@ -2469,7 +2475,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       IF (QToHeatSetPt > SmallLoad) THEN ! zone has a postive load to heating setpoint
         MassFlowReqToLimitLeavingTemp = QToHeatSetPt/(CpAirZn*(MaxHeatTemp - ZoneTemp))
       ELSE
-        MassFlowReqToLimitLeavingTemp = 0.d0
+        MassFlowReqToLimitLeavingTemp = 0.0D0
       ENDIF
     ENDIF
 
@@ -2479,6 +2485,14 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
     MassFlow = MAX(MassFlow, MassFlowBasedOnOA)
     MassFlow = MIN(MassFlow, SysInlet(SysNum)%AirMassFlowRateMaxAvail)
     MassFlow = MAX(MassFlow, SysInlet(SysNum)%AirMassFlowRateMinAvail)
+
+    If (SimulateAirflowNetwork .gt. AirflowNetworkControlMultizone .AND. AirflowNetworkFanActivated & 
+       .AND. VAVTerminalRatio .GT. 0.0) then
+      MassFlow = MassFlow * VAVTerminalRatio
+      If (MassFlow .gt. Node(Sys(SysNum)%InletNodeNum)%MassFlowRate) Then
+        MassFlow = Node(Sys(SysNum)%InletNodeNum)%MassFlowRate
+      End If
+    End If
 
     ! now make any corrections to heating coil loads
     IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
@@ -2501,7 +2515,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       QZnReq = QZoneMax2 + MassFlow*CpAirZn*ZoneTemp
 
        ! Initialize hot water flow rate to zero.
-      DummyMdot = 0.d0
+      DummyMdot = 0.0D0
       CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
             Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
       !On the first HVAC iteration the system values are given to the controller, but after that
@@ -2575,7 +2589,7 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
           IF ( ( (ABS(MassFlow-MassFlow2(SysNum)) < MassFlowDiff(SysNum)) .OR. &
               (ABS(MassFlow-MassFlow3(SysNum)) < MassFlowDiff(SysNum)) ) .AND. &
               (ABS(MassFlow-MassFlow1(SysNum)) >= MassFlowDiff(SysNum)) ) THEN
-            IF (MassFlow > 0.0) MassFlow = MassFlow1(SysNum)
+            IF (MassFlow > 0.0D0) MassFlow = MassFlow1(SysNum)
             SysOutlet(SysNum)%AirMassFlowRate = MassFlow
             CALL UpdateSys(SysNum)
 
@@ -2607,9 +2621,9 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       END IF     ! IF (Sys(SysNum)%DamperHeatingAction .EQ. ReverseAction) THEN
 
       ! Recalculate the Damper Position.
-    IF (MassFlow == 0.d0) THEN
-      Sys(SysNum)%DamperPosition = 0.d0
-    ELSEIF ((MassFlow > 0.d0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
+    IF (MassFlow == 0.0D0) THEN
+      Sys(SysNum)%DamperPosition = 0.0D0
+    ELSEIF ((MassFlow > 0.0D0) .AND. (MassFlow < Sys(SysNum)%AirMassFlowRateMax)) THEN
       Sys(SysNum)%DamperPosition =  MassFlow / Sys(SysNum)%AirMassFlowRateMax
     ELSEIF (MassFlow == Sys(SysNum)%AirMassFlowRateMax) THEN
       Sys(SysNum)%DamperPosition = 1.d0
@@ -2659,8 +2673,8 @@ SUBROUTINE SimVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
     CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
          ! Simulate reheat coil for the Const Volume system
-        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0  !DSU
-      DummyMdot = 0.d0
+        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0D0  !DSU
+      DummyMdot = 0.0D0
       CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
          !call the reheat coil with the NO FLOW condition to make sure that the Node values
@@ -2728,8 +2742,7 @@ SUBROUTINE CalcOAMassFlow(SysNum, SAMassFlow, AirLoopOAFrac)
 
           ! USE STATEMENTS:
    USE DataAirLoop,       ONLY: AirLoopFlow, AirLoopControlInfo
-   USE DataZoneEquipment, ONLY: ZoneEquipConfig
-   USE DataHeatBalance,   ONLY: ZoneIntGain, People, TotPeople
+   USE DataZoneEquipment, ONLY: ZoneEquipConfig, CalcDesignSpecificationOutdoorAir
    USE Psychrometrics,    ONLY: PsyRhoAirFnPbTdbW
 
    IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
@@ -2738,6 +2751,9 @@ SUBROUTINE CalcOAMassFlow(SysNum, SAMassFlow, AirLoopOAFrac)
     INTEGER, INTENT(IN)      :: SysNum        ! index to terminal unit
     REAL(r64), INTENT(INOUT) :: SAMassFlow    ! outside air based on optional user input
     REAL(r64), INTENT(INOUT) :: AirLoopOAFrac ! outside air based on optional user input
+
+          ! FUNCTION PARAMETER DEFINITIONS:
+    LOGICAL, PARAMETER   :: UseMinOASchFlag = .TRUE. ! Always use min OA schedule in calculations.
 
           ! FUNCTION PARAMETER DEFINITIONS:
           ! na
@@ -2750,17 +2766,15 @@ SUBROUTINE CalcOAMassFlow(SysNum, SAMassFlow, AirLoopOAFrac)
 
           ! FUNCTION LOCAL VARIABLE DECLARATIONS:
    INTEGER   :: AirLoopNum        ! Index to air loop
-   REAL(r64) :: PeopleFlow        ! amount of OA based on occupants
    REAL(r64) :: RhoAir            ! density of terminal unit inlet air
-   REAL(r64) :: OAMassFlow        ! outside air flow rate (m3/s converted to kg/s at end of routine)
-   INTEGER   :: PeopleObjIndex    ! Index to people objects
+   REAL(r64) :: OAVolumeFlowRate  ! outside air volume flow rate (m3/s)
+   REAL(r64) :: OAMassFlow        ! outside air mass flow rate (kg/s)
 
      ! initialize OA flow rate and OA report variable
      SAMassFlow    = 0.0D0
      AirLoopOAFrac = 0.0D0
      AirLoopNum    = 0
-     OAMassFlow = 0.0d0
-     PeopleFlow = 0.0d0
+
      If(Sys(SysNum)%CtrlZoneNum .GT. 0) AirLoopNum = ZoneEquipConfig(Sys(SysNum)%CtrlZoneNum)%AirLoopNum
 
      ! Calculate the amount of OA based on optional user inputs
@@ -2770,55 +2784,12 @@ SUBROUTINE CalcOAMassFlow(SysNum, SAMassFlow, AirLoopOAFrac)
        IF(Sys(SysNum)%NoOAFlowInputFromUser)RETURN
        ! Calculate outdoor air flow rate, zone multipliers are applied in GetInput
        IF(AirLoopOAFrac .GT. 0.0D0)THEN
-         SELECT CASE(Sys(SysNum)%ZoneOutdoorAirMethod)
-           CASE(OAFlowPPer)
-             ! Check if DCV is specified for this AirLoop
-             IF (AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag) THEN
-                OAMassFlow = ZoneIntGain(Sys(SysNum)%ActualZoneNum)%NOFOCC * Sys(SysNum)%OAFlowPerPerson
-             ELSE
-                OAMassFlow = 0.0d0
-                DO PeopleObjIndex = 1, TotPeople
-                    IF (People(PeopleObjIndex)%ZonePtr == Sys(SysNum)%ActualZoneNum) THEN
-                        OAMassFlow = OAMassFlow + People(PeopleObjIndex)%NumberOfPeople * Sys(SysNum)%OAFlowPerPerson
-                    ENDIF
-                END DO
-             ENDIF
-           CASE(OAFlow)
-             OAMassFlow = Sys(SysNum)%OAFlowPerZone
-           CASE(OAFlowPerArea)
-             OAMassFlow = Sys(SysNum)%OAFlowPerArea
-           CASE(OAFlowACH)
-             OAMassFlow = Sys(SysNum)%OAFlowACH
-           CASE(OAFlowSum, OAFlowMax)
-             ! Check if DCV is specified for this AirLoop
-             IF (AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag) THEN
-                PeopleFlow = ZoneIntGain(Sys(SysNum)%ActualZoneNum)%NOFOCC * Sys(SysNum)%OAFlowPerPerson
-             ELSE
-                PeopleFlow = 0.0d0
-                DO PeopleObjIndex = 1, TotPeople
-                    IF (People(PeopleObjIndex)%ZonePtr == Sys(SysNum)%ActualZoneNum) THEN
-                        PeopleFlow = PeopleFlow + People(PeopleObjIndex)%NumberOfPeople * Sys(SysNum)%OAFlowPerPerson
-                    ENDIF
-                END DO
-             END IF
-             IF(Sys(SysNum)%ZoneOutdoorAirMethod == OAFlowMax)THEN
-               OAMassFlow = MAX(PeopleFlow, Sys(SysNum)%OAFlowPerZone, Sys(SysNum)%OAFlowPerArea, Sys(SysNum)%OAFlowACH)
-             ELSE
-               OAMassFlow = PeopleFlow + Sys(SysNum)%OAFlowPerZone + Sys(SysNum)%OAFlowPerArea + Sys(SysNum)%OAFlowACH
-             END IF
-           CASE DEFAULT
-             OAMassFlow = 0.0D0
-         END SELECT
+         OAVolumeFlowRate = CalcDesignSpecificationOutdoorAir(Sys(SysNum)%OARequirementsPtr, &
+                            Sys(SysNum)%ActualZoneNum, AirLoopControlInfo(AirLoopNum)%AirLoopDCVFlag, UseMinOASchFlag)
          RhoAir = PsyRhoAirFnPbTdbW(Node(Sys(SysNum)%InletNodeNum)%Press, &
                                     Node(Sys(SysNum)%InletNodeNum)%Temp, &
                                     Node(Sys(SysNum)%InletNodeNum)%HumRat)
-         OAMassFlow = OAMassFlow * RhoAir
-
-         ! multiply the supply air flow based on OA requirements by the fractional schedule
-         ! multiplier is assumed to be 1 if the schedule name is not entered
-         IF(Sys(SysNum)%OAFlowFracSchPtr .GT. 0)THEN
-           OAMassFlow = OAMassFlow * GetCurrentScheduleValue(Sys(SysNum)%OAFlowFracSchPtr)
-         END IF
+         OAMassFlow = OAVolumeFlowRate * RhoAir
 
          ! convert OA mass flow rate to supply air flow rate based on air loop OA fraction
          SAMassFlow = OAMassFlow / AirLoopOAFrac
@@ -2925,13 +2896,13 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    ! the massflow rate for cooling is determined to meet the entire load.  Then
    ! if the massflow is below the minimum or greater than the Max it is set to either the Min
    ! or the Max as specified for the VAV model.
-   If(SysInlet(SysNum)%AirMassFlowRateMaxAvail .GT. 0.0) Then
+   If(SysInlet(SysNum)%AirMassFlowRateMaxAvail .GT. 0.0D0) Then
    ! Calculate the flow required for cooling
      CpAirSysIn = PsyCpAirFnWTdb(SysInlet(SysNum)%AirHumRat,SysInlet(SysNum)%AirTemp)
      DeltaTemp = CpAirSysIn*SysInlet(SysNum)%AirTemp - CpAirZn*ZoneTemp
 
      !Need to check DeltaTemp and ensure that it is not zero
-     If(DeltaTemp .ne. 0.0) Then
+     If(DeltaTemp .ne. 0.0D0) Then
         MassFlow= QTotLoad/DeltaTemp
      Else
         MassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
@@ -2942,7 +2913,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
      MassFlow = MIN(MassFlow,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
    Else
    ! System is Off set massflow to 0.0
-     MassFlow = 0.0
+     MassFlow = 0.0D0
    End If
    ! look for bang-bang condition: flow rate oscillating between 2 values during the air loop / zone
    ! equipment iteration. If detected, set flow rate to previous value.
@@ -2961,8 +2932,8 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    SysOutlet(SysNum)%AirEnthalpy             = SysInlet(SysNum)%AirEnthalpy
 
    ! Calculate the Damper Position when there is a Max air flow specified.
-   If(Sys(Sysnum)%AirMassFlowRateMax == 0.0) Then
-     Sys(Sysnum)%DamperPosition = 0.0
+   If(Sys(Sysnum)%AirMassFlowRateMax == 0.0D0) Then
+     Sys(Sysnum)%DamperPosition = 0.0D0
    Else
      Sys(Sysnum)%DamperPosition = MassFlow/Sys(Sysnum)%AirMassFlowRateMax
    End If
@@ -2973,7 +2944,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    QActualHeating = QToHeatSetPt - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp)
 
    If( (MassFlow > SmallMassFlow) .AND. &
-      (QActualHeating > 0.0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) Then
+      (QActualHeating > 0.0D0) .AND. (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint) ) Then
 !   VAVHeatandCool boxes operate at varying mass flow rates when reheating, VAV boxes operate at min flow
 !      (MassFlow <= SysInlet(SysNum)%AirMassFlowRateMinAvail) .AND. &
 !   Per Fred Buhl, don't use DeadBandOrSetback to determine if heaters operate
@@ -3036,11 +3007,11 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
          ! Although this equation looks strange (using temp instead of deltaT), it is corrected later in ControlCompOutput
          ! and is working as-is, temperature setpoints are maintained as expected.
          QZnReq = QZoneMax2 + MassFlow * CpAirZn * Node(ZoneNodeNum)%Temp
-         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0
+         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0D0
 
          ! Initialize hot water flow rate to zero.
-         ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0
-         DummyMdot = 0.d0
+         ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0D0
+         DummyMdot = 0.0D0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
 !On the first HVAC iteration the system values are given to the controller, but after that
@@ -3126,8 +3097,8 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
            END IF
            ! recalculate damper position
-           If(Sys(Sysnum)%AirMassFlowRateMax == 0.0) Then
-             Sys(Sysnum)%DamperPosition = 0.0
+           If(Sys(Sysnum)%AirMassFlowRateMax == 0.0D0) Then
+             Sys(Sysnum)%DamperPosition = 0.0D0
            Else
              Sys(Sysnum)%DamperPosition = MassFlow/Sys(Sysnum)%AirMassFlowRateMax
            End If
@@ -3135,7 +3106,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
        CASE(HCoilType_SteamAirHeating) ! ! COIL:STEAM:AIRHEATING
          ! Determine the load required to pass to the Component controller
          QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp)
-         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0
+         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0D0
 
          ! Simulate reheat coil for the VAV system
          CALL SimulateSteamCoilComponents (CompName=Sys(SysNum)%ReheatName,        &
@@ -3147,7 +3118,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
          ! Determine the load required to pass to the Component controller
          QSupplyAir = Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp)
          QZnReq = QZoneMax2 - QSupplyAir
-         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0
+         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0D0
 
          ! Simulate reheat coil for the VAV system
          CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,        &
@@ -3158,7 +3129,7 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
        CASE(HCoilType_Gas) ! COIL:GAS:HEATING
          ! Determine the load required to pass to the Component controller
          QZnReq = QZoneMax2 - Massflow * CpAirZn * (SysInlet(SysNum)%AirTemp-ZoneTemp)
-         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0
+         IF(QZnReq .LT. SmallLoad)QZnReq = 0.0D0
 
          ! Simulate reheat coil for the VAV system
          CALL SimulateHeatingCoilComponents(CompName=Sys(SysNum)%ReheatName,       &
@@ -3179,9 +3150,9 @@ SUBROUTINE SimCBVAV(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
        CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
          ! Simulate reheat coil for the Const Volume system
-        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0
+        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0D0
          ! Initialize hot water flow rate to zero.
-         DummyMdot = 0.d0
+         DummyMdot = 0.0D0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE. )
 
@@ -3320,11 +3291,11 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   MaxCoolMassFlow = SysInlet(SysNum)%AirMassFlowRateMaxAvail
   MaxHeatMassFlow = MIN(Sys(SysNum)%HeatAirMassFlowRateMax,SysInlet(SysNum)%AirMassFlowRateMaxAvail)
   MinMassFlow = MaxCoolMassFlow * Sys(SysNum)%ZoneMinAirFrac
-  UnitFlowToler = 0.001*HVACFlowRateToler
-  QDelivered = 0.0
-  HWFlow = 0.0
-  IF (SysInlet(SysNum)%AirMassFlowRateMaxAvail <= 0.0 .OR. CurDeadbandOrSetback(ZoneNum)) THEN
-    MassFlow = 0.0
+  UnitFlowToler = 0.001D0*HVACFlowRateToler
+  QDelivered = 0.0D0
+  HWFlow = 0.0D0
+  IF (SysInlet(SysNum)%AirMassFlowRateMaxAvail <= 0.0D0 .OR. CurDeadbandOrSetback(ZoneNum)) THEN
+    MassFlow = 0.0D0
     FanOp = 0
     CALL CalcVAVVS(SysNum,FirstHVACIteration,ZoneNodeNum,HCType,0.0d0,0.0d0,  &
                                FanType,MassFlow,FanOp,QDelivered)
@@ -3333,7 +3304,7 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
   IF (HCType == HCoilType_SimpleHeating) THEN
     WaterControlNode = Sys(SysNum)%ReheatControlNode
-    HCLoad = 0.0
+    HCLoad = 0.0D0
     If (FirstHVACIteration) Then
       MaxFlowWater = Sys(SysNum)%MaxReheatWaterFlow
       MinFlowWater = Sys(SysNum)%MinReheatWaterFlow
@@ -3345,14 +3316,14 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   ELSE
     WaterControlNode = 0
     HCLoad = BigLoad
-    MaxFlowWater = 0.0
-    MinFlowWater = 0.0
+    MaxFlowWater = 0.0D0
+    MinFlowWater = 0.0D0
   END IF
 
 
   IF (HCType == HCoilType_SteamAirHeating) THEN
     SteamControlNode = Sys(SysNum)%ReheatControlNode
-    HCLoad = 0.0
+    HCLoad = 0.0D0
     If (FirstHVACIteration) Then
       MaxFlowSteam = Sys(SysNum)%MaxReheatSteamFlow
       MinFlowSteam = Sys(SysNum)%MinReheatSteamFlow
@@ -3364,8 +3335,8 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
   ELSE
     SteamControlNode = 0
     HCLoad = BigLoad
-    MaxFlowSteam = 0.0
-    MinFlowSteam = 0.0
+    MaxFlowSteam = 0.0D0
+    MinFlowSteam = 0.0D0
   END IF
 
 
@@ -3404,16 +3375,16 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
  EndIF
 
    ! Active cooling
-  IF (QTotLoad < QCoolFanOnMin - SmallLoad .AND. SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0 &
+  IF (QTotLoad < QCoolFanOnMin - SmallLoad .AND. SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0 &
        .AND. .NOT. CurDeadBandOrSetback(ZoneNum)) THEN
     ! check that it can meet the load
     FanOp = 1
     IF (QCoolFanOnMax < QTotLoad - SmallLoad) THEN
       Par(1) = REAL(SysNum,r64)
       IF (FirstHVACIteration) THEN
-        Par(2) = 1.
+        Par(2) = 1.0D0
       ELSE
-        Par(2) = 0.
+        Par(2) = 0.0D0
       END IF
       Par(3) = REAL(ZoneNodeNum,r64)
       Par(4) = REAL(HCType,r64)
@@ -3459,7 +3430,7 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
   ! no active heating or cooling
   ELSE IF ( (QTotLoad >= QCoolFanOnMin - SmallLoad .AND. QTotLoad <= QNoHeatFanOff + SmallLoad .AND. &
-             SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0) .OR. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0 &
+             SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0) .OR. (SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0 &
              .AND. CurDeadBandOrSetback(ZoneNum)) ) THEN
     MassFlow = MinMassFlow
     FanOp = 0
@@ -3472,7 +3443,7 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
       End If
 
   ! active heating
-  ELSE IF (QTotLoad > QNoHeatFanOff + SmallLoad .AND. SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0 &
+  ELSE IF (QTotLoad > QNoHeatFanOff + SmallLoad .AND. SysInlet(SysNum)%AirMassFlowRateMaxAvail > 0.0D0 &
            .AND. .NOT. CurDeadBandOrSetback(ZoneNum)) THEN
     ! hot water coil
     IF (HCType == HCoilType_SimpleHeating) THEN
@@ -3482,9 +3453,9 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
         FanOp = 0
         Par(1) = REAL(SysNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.0D0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0D0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = REAL(HCType,r64)
@@ -3516,9 +3487,9 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
         FanOp = 1
         Par(1) = REAL(SysNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.0D0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0D0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = REAL(HCType,r64)
@@ -3557,9 +3528,9 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
         FanOp = 0
         Par(1) = REAL(SysNum,r64)
         IF (FirstHVACIteration) THEN
-          Par(2) = 1.
+          Par(2) = 1.0D0
         ELSE
-          Par(2) = 0.
+          Par(2) = 0.0D0
         END IF
         Par(3) = REAL(ZoneNodeNum,r64)
         Par(4) = REAL(HCType,r64)
@@ -3676,7 +3647,7 @@ SUBROUTINE SimVAVVS(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
   ELSE
 
-  MassFlow = 0.0
+  MassFlow = 0.0D0
   FanOp = 0
   CALL CalcVAVVS(SysNum,FirstHVACIteration,ZoneNodeNum,HCType,0.0d0,0.0d0,  &
      FanType,MassFlow,FanOp,QDelivered)
@@ -3755,16 +3726,16 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
        QMax2 = MIN(QToHeatSetPt,QMax)
    END IF     ! IF (Sys(SysNum)%MaxReheatTempSetByUser) THEN
 
-   If(((SysInlet(SysNum)%AirMassFlowRateMaxAvail == 0.0) .and.  &
-            (SysInlet(SysNum)%AirMassFlowRateMinAvail == 0.0)) .or.  &
-            (SysInlet(SysNum)%AirMassFlowRate == 0.0)) Then
+   If(((SysInlet(SysNum)%AirMassFlowRateMaxAvail == 0.0D0) .and.  &
+            (SysInlet(SysNum)%AirMassFlowRateMinAvail == 0.0D0)) .or.  &
+            (SysInlet(SysNum)%AirMassFlowRate == 0.0D0)) Then
    ! System is Off set massflow to 0.0
-     MassFlow = 0.0
+     MassFlow = 0.0D0
    End If
 
    ! Calculate the Damper Position when there is a Max air flow specified.
-   If(Sys(Sysnum)%AirMassFlowRateMax == 0.0) Then
-     Sys(Sysnum)%DamperPosition = 0.0
+   If(Sys(Sysnum)%AirMassFlowRateMax == 0.0D0) Then
+     Sys(Sysnum)%DamperPosition = 0.0D0
    Else
      Sys(Sysnum)%DamperPosition = MassFlow/Sys(Sysnum)%AirMassFlowRateMax
    End If
@@ -3778,7 +3749,7 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
    QActualHeating = QToHeatSetPt - Massflow * CpAir * (SysInlet(SysNum)%AirTemp-ZoneTemp) ! reheat needed
    !Now the massflow for reheating has been determined. If it is zero, or in SetBack, or the
    ! system scheduled OFF then not operational and shut the system down.
-   If((MassFlow > SmallMassFlow) .AND. (QActualHeating > 0.0) .AND. &
+   If((MassFlow > SmallMassFlow) .AND. (QActualHeating > 0.0D0) .AND. &
       (TempControlType(ZoneNum) .NE. SingleCoolingSetPoint)) Then
 
      SELECT CASE(Sys(SysNum)%ReheatComp_Num)
@@ -3789,9 +3760,9 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
          !Before Iterating through the Reheat Coil and Controller set the flags for the
          ! Do Loop to initialized conditions.
-        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0
+        ! Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0D0
          ! Initialize hot water flow rate to zero.
-         DummyMdot = 0.d0
+         DummyMdot = 0.0D0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE.)
 
@@ -3863,9 +3834,9 @@ SUBROUTINE SimConstVol(SysNum,FirstHVACIteration, ZoneNum, ZoneNodeNum)
 
        CASE(HCoilType_SimpleHeating) ! COIL:WATER:SIMPLEHEATING
          ! Simulate reheat coil for the Const Volume system
-         !Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0
+         !Node(Sys(SysNum)%ReheatControlNode)%MassFlowRate = 0.0D0
          ! Initialize hot water flow rate to zero.
-         DummyMdot = 0.d0
+         DummyMdot = 0.0D0
          CALL SetActuatedBranchFlowRate(DummyMdot,Sys(SysNum)%ReheatControlNode,  &
               Sys(SysNum)%HWLoopNum,Sys(SysNum)%HWLoopSide, Sys(SysNum)%HWBranchIndex, .TRUE.)
 
@@ -4091,7 +4062,7 @@ FUNCTION VAVVSCoolingResidual(SupplyAirMassFlow, Par) RESULT (Residuum)
   REAL(r64)    :: UnitOutput        ! cooling output [W] (cooling is negative)
 
   UnitIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0D0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.
@@ -4170,7 +4141,7 @@ FUNCTION VAVVSHWNoFanResidual(HWMassFlow, Par) RESULT (Residuum)
   REAL(r64) :: MaxSteamCoilCapacity
 
   UnitIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0D0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.
@@ -4180,14 +4151,14 @@ FUNCTION VAVVSHWNoFanResidual(HWMassFlow, Par) RESULT (Residuum)
   AirMassFlow = Par(5)
   FanType = INT(Par(6))
   FanOp = INT(Par(7))
-  QSteamLoad = 0.d0
+  QSteamLoad = 0.0D0
 ! vary the load to be met by the steam coil to converge on a steam flow rate to meet the load
   IF(HCType == HCoilType_SteamAirHeating)THEN
 !   backwards way of varying steam flow rate. Steam coil calculates a flow rate to meet a load.
     MinSteamFlow = Par(9)
     MaxSteamFlow = Par(10)
     MaxSteamCoilCapacity = Par(11)
-    IF( (MaxSteamFlow - MinSteamFlow) == 0.d0)THEN
+    IF( (MaxSteamFlow - MinSteamFlow) == 0.0D0)THEN
       QSteamLoad = Par(8) ! Use QTotLoad, bad starting value error for RegulaFalsi will occur
     ELSE
       QSteamLoad = MaxSteamCoilCapacity * HWMassFlow/(MaxSteamFlow - MinSteamFlow)
@@ -4256,7 +4227,7 @@ FUNCTION VAVVSHWFanOnResidual(SupplyAirMassFlow, Par) RESULT (Residuum)
   REAL(r64)    :: UnitOutput        ! heating output [W]
 
   UnitIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0D0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.
@@ -4331,7 +4302,7 @@ FUNCTION VAVVSHCFanOnResidual(HeatingFrac, Par) RESULT (Residuum)
   REAL(r64)    :: HeatOut           ! heating coil output [W]
 
   UnitIndex = INT(Par(1))
-  IF (Par(2) > 0.0) THEN
+  IF (Par(2) > 0.0D0) THEN
     FirstHVACSoln = .TRUE.
   ELSE
     FirstHVACSoln = .FALSE.
@@ -4481,7 +4452,7 @@ SUBROUTINE ReportSys(SysNum)
   RETURN
 END Subroutine ReportSys
 
-SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType)
+SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType,DamperInletNode,DamperOutletNode)
 
           ! SUBROUTINE INFORMATION:
           !       AUTHOR         Lixing Gu
@@ -4509,6 +4480,8 @@ SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType
   INTEGER, INTENT(INOUT)       :: SDSIndex
   LOGICAL, INTENT(INOUT)       :: ErrorsFound
   CHARACTER(len=*), INTENT(IN), OPTIONAL :: ThisObjectType
+  INTEGER, INTENT(OUT), OPTIONAL :: DamperInletNode       ! Damper inlet node number
+  INTEGER, INTENT(OUT), OPTIONAL :: DamperOutletNode      ! Damper outlet node number
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -4526,7 +4499,7 @@ SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType
     GetInputFlag=.false.
   End If
 
-  SDSIndex = FindItemInList(SDSName,Sys%SysName,NumConstVolSys)
+  SDSIndex = FindItemInList(SDSName,Sys%SysName,NumSys)
   IF (SDSIndex == 0) THEN
     IF (PRESENT(ThisObjectType)) THEN
       CALL ShowSevereError(TRIM(ThisObjectType)//', GetHVACSingleDuctSysIndex: Single duct system not found='//TRIM(SDSName))
@@ -4534,8 +4507,18 @@ SUBROUTINE GetHVACSingleDuctSysIndex(SDSName,SDSIndex,ErrorsFound,ThisObjectType
       CALL ShowSevereError('GetHVACSingleDuctSysIndex: Single duct system not found='//TRIM(SDSName))
     ENDIF
     ErrorsFound=.TRUE.
-
-
+  ELSE
+    IF ((Sys(SDSIndex)%SysType_Num .NE. SingleDuctConstVolReheat)  .AND. &
+       (Sys(SDSIndex)%SysType_Num .NE. SingleDuctVAVReheat) ) THEN
+      CALL ShowSevereError(TRIM(ThisObjectType)//', GetHVACSingleDuctSysIndex: Could not find allowed types='//TRIM(SDSName))
+      CALL ShowContinueError('The allowed types are: AirTerminal:SingleDuct:ConstantVolume:Reheat and ' &
+           //'AirTerminal:SingleDuct:VAV:Reheat') 
+      ErrorsFound=.TRUE.
+    END IF
+    If (Sys(SDSIndex)%SysType_Num .EQ. SingleDuctVAVReheat) Then
+      If (PRESENT(DamperInletNode)) DamperInletNode = Sys(SDSIndex)%InletNodeNum     
+      If (PRESENT(DamperOutletNode)) DamperOutletNode = Sys(SDSIndex)%OutletNodeNum     
+    End If
   ENDIF
 
   RETURN
@@ -4547,7 +4530,7 @@ END SUBROUTINE GetHVACSingleDuctSysIndex
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !

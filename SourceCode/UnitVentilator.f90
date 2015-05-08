@@ -321,7 +321,7 @@ SUBROUTINE GetUnitVentilatorInput
   USE DataSizing,   ONLY: AutoSize
   USE General,      ONLY: TrimSigDigits
   USE DataZoneEquipment,         ONLY: UnitVentilator_Num, ZoneEquipConfig
-  USE DataGlobals,               ONLY: NumOfZones
+  USE DataGlobals,               ONLY: NumOfZones, ScheduleAlwaysOn
   USE DataPlant,    ONLY: TypeOf_CoilWaterCooling, TypeOf_CoilWaterDetailedFlatCooling, &
                           TypeOf_CoilWaterSimpleHeating, TypeOf_CoilSteamAirHeating
 
@@ -371,8 +371,8 @@ SUBROUTINE GetUnitVentilatorInput
           ! Figure out how many unit ventilators there are in the input file
 
   CurrentModuleObject = cMO_UnitVentilator
-  NumOfUnitVents=GetNumObjectsFound(TRIM(CurrentModuleObject))
-  CALL GetObjectDefMaxArgs(TRIM(CurrentModuleObject),NumFields,NumAlphas,NumNumbers)
+  NumOfUnitVents=GetNumObjectsFound(CurrentModuleObject)
+  CALL GetObjectDefMaxArgs(CurrentModuleObject,NumFields,NumAlphas,NumNumbers)
 
   ALLOCATE(Alphas(NumAlphas))
   Alphas=' '
@@ -396,7 +396,7 @@ SUBROUTINE GetUnitVentilatorInput
 
   DO UnitVentNum = 1, NumOfUnitVents    ! Begin looping over all of the unit ventilators found in the input file...
 
-    CALL GetObjectItem(TRIM(CurrentModuleObject),UnitVentNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
+    CALL GetObjectItem(CurrentModuleObject,UnitVentNum,Alphas,NumAlphas,Numbers,NumNumbers,IOStatus, &
                        NumBlank=lNumericBlanks,AlphaBlank=lAlphaBlanks, &
                        AlphaFieldNames=cAlphaFields,NumericFieldNames=cNumericFields)
 
@@ -410,17 +410,15 @@ SUBROUTINE GetUnitVentilatorInput
 
     UnitVent(UnitVentNum)%Name      = Alphas(1)
     UnitVent(UnitVentNum)%SchedName = Alphas(2)
-    UnitVent(UnitVentNum)%SchedPtr  = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
-
-    IF (UnitVent(UnitVentNum)%SchedPtr == 0) THEN
-      IF (lAlphaBlanks(2)) THEN
-        CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'// TRIM(Alphas(1))//'", blank required field')
-        CALL ShowContinueError(trim(cAlphaFields(2))//' must be input.')
-      ELSE
+    IF (lAlphaBlanks(2)) THEN
+      UnitVent(UnitVentNum)%SchedPtr  = ScheduleAlwaysOn
+    ELSE
+      UnitVent(UnitVentNum)%SchedPtr  = GetScheduleIndex(Alphas(2))  ! convert schedule name to pointer
+      IF (UnitVent(UnitVentNum)%SchedPtr == 0) THEN
         CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'// TRIM(Alphas(1))//'", invalid')
         CALL ShowContinueError('not found: '//trim(cAlphaFields(2))//'="'//trim(Alphas(2))//'".')
+        ErrorsFound=.TRUE.
       ENDIF
-      ErrorsFound=.TRUE.
     END IF
 
     UnitVent(UnitVentNum)%MaxAirVolFlow = Numbers(1)
@@ -923,32 +921,32 @@ SUBROUTINE GetUnitVentilatorInput
 
           ! Setup Report variables for the Unit Ventilators, CurrentModuleObject='ZoneHVAC:UnitVentilator'
   DO UnitVentNum = 1, NumOfUnitVents
-    CALL SetupOutputVariable('Unit Ventilator Heating Rate[W]',        &
+    CALL SetupOutputVariable('Zone Unit Ventilator Heating Rate [W]',        &
                              UnitVent(UnitVentNum)%HeatPower,'System', &
                              'Average',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Heating Energy[J]',       &
+    CALL SetupOutputVariable('Zone Unit Ventilator Heating Energy [J]',       &
                              UnitVent(UnitVentNum)%HeatEnergy,'System', &
                              'Sum',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Total Cooling Rate[W]',     &
+    CALL SetupOutputVariable('Zone Unit Ventilator Total Cooling Rate [W]',     &
                              UnitVent(UnitVentNum)%TotCoolPower,'System', &
                              'Average',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Total Cooling Energy[J]',    &
+    CALL SetupOutputVariable('Zone Unit Ventilator Total Cooling Energy [J]',    &
                              UnitVent(UnitVentNum)%TotCoolEnergy,'System', &
                              'Sum',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Sensible Cooling Rate[W]', &
+    CALL SetupOutputVariable('Zone Unit Ventilator Sensible Cooling Rate [W]', &
                              UnitVent(UnitVentNum)%SensCoolPower,'System',      &
                              'Average',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Sensible Cooling Energy[J]',  &
+    CALL SetupOutputVariable('Zone Unit Ventilator Sensible Cooling Energy [J]',  &
                              UnitVent(UnitVentNum)%SensCoolEnergy,'System', &
                              'Sum',UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Fan Electric Power[W]',  &
+    CALL SetupOutputVariable('Zone Unit Ventilator Fan Electric Power [W]',  &
                              UnitVent(UnitVentNum)%ElecPower,'System', &
                              'Average',UnitVent(UnitVentNum)%Name)
           ! Note that the unit vent fan electric is NOT metered because this value is already metered through the fan component
-    CALL SetupOutputVariable('Unit Ventilator Fan Electric Consumption[J]',   &
+    CALL SetupOutputVariable('Zone Unit Ventilator Fan Electric Energy [J]',   &
                              UnitVent(UnitVentNum)%ElecEnergy,'System','Sum', &
                              UnitVent(UnitVentNum)%Name)
-    CALL SetupOutputVariable('Unit Ventilator Fan Availability Status',&
+    CALL SetupOutputVariable('Zone Unit Ventilator Fan Availability Status []',&
                              UnitVent(UnitVentNum)%AvailStatus,&
                              'System','Average',UnitVent(UnitVentNum)%Name)
   END DO
@@ -2232,8 +2230,9 @@ SUBROUTINE CalcUnitVentilator(UnitVentNum,ZoneNum,FirstHVACIteration,PowerMet,La
 
   END IF    ! ...end of unit ON/OFF IF-THEN block
 
-  SpecHumOut = Node(OutletNode)%HumRat / (1.0d0 + Node(OutletNode)%HumRat)
-  SpecHumIn  = Node(InletNode)%HumRat / (1.0d0 + Node(InletNode)%HumRat)
+! CR9155 Remove specific humidity calculations
+  SpecHumOut = Node(OutletNode)%HumRat 
+  SpecHumIn  = Node(InletNode)%HumRat
   LatentOutput = AirMassFlow * (SpecHumOut - SpecHumIn) ! Latent rate (kg/s), dehumid = negative
 
   QTotUnitOut = AirMassFlow * (Node(OutletNode)%Enthalpy - Node(InletNode)%Enthalpy)
@@ -2748,7 +2747,7 @@ END FUNCTION GetUnitVentilatorReturnAirNode
 
 !     NOTICE
 !
-!     Copyright © 1996-2012 The Board of Trustees of the University of Illinois
+!     Copyright © 1996-2013 The Board of Trustees of the University of Illinois
 !     and The Regents of the University of California through Ernest Orlando Lawrence
 !     Berkeley National Laboratory.  All rights reserved.
 !
