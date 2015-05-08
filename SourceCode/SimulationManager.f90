@@ -261,6 +261,9 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   END IF
 
   IF (WriteOutputToSQLite) CALL CreateSQLiteSimulationsRecord(1)
+
+  CALL GetInputForLifeCycleCost !must be prior to WriteTabularReports -- do here before big simulation stuff.
+
   CALL ShowMessage('Beginning Simulation')
   CALL ResetEnvironmentCounter
 
@@ -402,8 +405,6 @@ SUBROUTINE ManageSimulation     ! Main driver routine for this module
   CALL SimCostEstimate
 
   CALL ComputeTariff          !     Compute the utility bills
-
-  CALL GetInputForLifeCycleCost !must be prior to WriteTabularReports
 
   CALL OpenOutputTabularFile
 

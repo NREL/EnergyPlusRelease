@@ -6079,8 +6079,6 @@ module ThermalISO15099Calc
       !   The grashoff number is the Rayleigh Number (equation 5.29) in SPC142 divided by the Prandtl Number (prand):
       gr = GravityConstant * height**3 * delt*dens**2. / (tmean*visc**2.)
 
-      !   if the room air is still THEN use equations 5.43 - 5.48:
-      RaCrit = 2.5e5 * (EXP(0.72d0 * tilt) / SIN(tiltr))**0.2d0
       RaL = gr*pr
       !   write(*,*)' RaCrit,RaL,gr,pr '
       !   write(*,*) RaCrit,RaL,gr,pr
@@ -6088,6 +6086,8 @@ module ThermalISO15099Calc
       if ((0.0d0.le.tilt).and.(tilt.lt.15.0d0)) then      ! IF no. 1
         Gnui = 0.13d0 * RaL**(1/3.0d0)
       else if ((15.0d0.le.tilt).and.(tilt.le.90.0d0)) then
+        !   if the room air is still THEN use equations 5.43 - 5.48:
+        RaCrit = 2.5e5 * (EXP(0.72d0 * tilt) / SIN(tiltr))**0.2d0
         if (RaL.le.RaCrit)  THEN           ! IF no. 2
           Gnui = 0.56d0 * (RaL * SIN(tiltr))**0.25d0
           ! write(*,*) ' Nu ', Gnui
@@ -6167,6 +6167,8 @@ module ThermalISO15099Calc
       !tmean = (theta(j)+theta(k))/2.
       tmean = Tgap(i+1) ! Tgap(1) is exterior environment
       delt = ABS(theta(j)-theta(k))
+      ! Temperatures should not be equal. This can happen in initial temperature guess before iterations started
+      if (delt == 0.0d0) delt = 1d-6
       do l=1, nmix(i+1)
         ipropg(l) = iprop(i+1,l)
         frctg(l) = frct(i+1,l)

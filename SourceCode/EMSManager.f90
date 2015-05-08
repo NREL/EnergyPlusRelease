@@ -605,10 +605,10 @@ SUBROUTINE GetEMSInput
   CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
   MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
   MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
-  cCurrentModuleObject = 'EnergyManagementSystem:Sensor'
-  CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
-  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
-  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
+!  cCurrentModuleObject = 'EnergyManagementSystem:Sensor'
+!  CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
+!  MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
+!  MaxNumAlphas=MAX(MaxNumAlphas,NumAlphas)
   cCurrentModuleObject = 'EnergyManagementSystem:GlobalVariable'
   CALL GetObjectDefMaxArgs(cCurrentModuleObject,TotalArgs,NumAlphas,NumNums)
   MaxNumNumbers=MAX(MaxNumNumbers,NumNums)
@@ -662,6 +662,7 @@ SUBROUTINE GetEMSInput
         END IF
       END IF
 
+      IF (cAlphaArgs(2) == '*') cAlphaArgs(2)=blank
       Sensor(SensorNum)%UniqueKeyName = cAlphaArgs(2)
       Sensor(SensorNum)%OutputVarName = cAlphaArgs(3)
 

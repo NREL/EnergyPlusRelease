@@ -326,7 +326,7 @@ INTEGER, PARAMETER ::  IntGainTypeOf_AirTerminalUserDefined                    =
 
 !Parameters for checking surface heat transfer models
 REAL(r64), PARAMETER :: HighDiffusivityThreshold = 1.d-5 ! used to check if Material properties are out of line.
-REAL(r64), PARAMETER :: ThinMaterialLayerThreshold = 0.003d0 ! 3 mm lower limit to expected material layers 
+REAL(r64), PARAMETER :: ThinMaterialLayerThreshold = 0.003d0 ! 3 mm lower limit to expected material layers
 
           ! DERIVED TYPE DEFINITIONS:
 
@@ -696,7 +696,8 @@ TYPE ZoneData
     REAL(r64) :: CalcFloorArea          =0.0 ! Calculated floor area used for this zone
     LOGICAL :: HasFloor             =.false. ! Has "Floor" surface
     LOGICAL :: HasRoof              =.false. ! Has "Roof" or "Ceiling" Surface
-    LOGICAL :: IntZWindow           =.false. ! Interzone Window present in this zone
+    LOGICAL :: HasInterZoneWindow   =.false. ! Interzone Window(s) present in this zone
+    LOGICAL :: HasWindow            =.false. ! Window(s) present in this zone
     REAL(r64) :: AirCapacity            =0.0
     REAL(r64) :: ExtWindowArea          =0.0 ! Exterior Window Area for Zone
     REAL(r64) :: ExtGrossWallArea       =0.0 ! Exterior Wall Area for Zone (Gross)

@@ -707,6 +707,9 @@ DO TabNum = 1 , MonthlyInputCount
     CALL AddMonthlyFieldSetInput(curTable,AlphArray(jField),'',curAggType)
   END DO
 END DO
+DEALLOCATE(AlphArray)
+DEALLOCATE(NumArray)
+
 END SUBROUTINE GetInputTabularMonthly
 
 INTEGER FUNCTION AddMonthlyReport(inReportName,inNumDigitsShown)
@@ -1663,6 +1666,9 @@ IF (WriteTabularFiles) THEN
   WRITE(OutputFileInits,"('Tabular Report,',A,',',A)") TRIM(AlphArray(1)),TRIM(AlphArray(2))
 ENDIF
 
+DEALLOCATE(AlphArray)
+DEALLOCATE(NumArray)
+
 END SUBROUTINE GetInputTabularStyle
 
 SUBROUTINE GetInputTabularPredefined
@@ -1907,6 +1913,8 @@ IF (NumTabularPredefined .EQ. 1) THEN
     ENDIF
   END DO
   CALL CreatePredefinedMonthlyReports
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(NumArray)
 ELSEIF (NumTabularPredefined > 1) THEN
   CALL ShowSevereError(CurrentModuleObject//': Only one instance of this object is allowed.')
   ErrorsFound=.true.
@@ -2129,6 +2137,8 @@ IF (NumTabularPredefined .EQ. 1) THEN
       isFound = .TRUE.
     END IF
   END DO
+  DEALLOCATE(AlphArray)
+  DEALLOCATE(NumArray)
 END IF
 isCompLoadRepReq = isFound !return true if either report was found
 END FUNCTION
@@ -5799,7 +5809,7 @@ USE ZonePlenum,        ONLY: NumZoneReturnPlenums, NumZoneSupplyPlenums
 USE DataEnvironment,   ONLY : EnvironmentName, WeatherFileLocationTitle
 USE DataErrorTracking, ONLY: TotalSevereErrors, TotalWarningErrors
 USE General, ONLY: RoundSigDigits
-
+USE DataAirflowNetwork,  ONLY : SimulateAirflowNetwork,AirflowNetworkControlMultizone,AirflowNetworkControlMultiADS
 IMPLICIT NONE
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
@@ -5927,7 +5937,16 @@ DO iZone = 1, NumOfZones
         CALL PreDefTableEntry(pdchOaoMinInfil, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%InfilVolMin / Zone(iZone)%volume,3)
       END IF
-      !AFN infiltration
+      !AFN infiltration -- check that afn sim is being done.
+      if (SimulateAirflowNetwork .lt. AirflowNetworkControlMultizone) then
+        ZonePreDefRep(iZone)%AFNInfilVolMin =0.0d0
+        ZonePreDefRep(iZone)%AFNInfilVolTotal = 0.0d0
+        If (.NOT. (SimulateAirflowNetwork == AirflowNetworkControlMultizone .OR. &
+                   SimulateAirflowNetwork == AirflowNetworkControlMultiADS)) THEN
+          ZonePreDefRep(iZone)%AFNInfilVolMin =0.0d0
+          ZonePreDefRep(iZone)%AFNInfilVolTotal = 0.0d0
+        endif
+      endif
       IF (ZonePreDefRep(iZone)%TotTimeOcc .GT. 0) THEN
         CALL PreDefTableEntry(pdchOaoAvgAFNInfil, Zone(iZone)%Name, &
           ZonePreDefRep(iZone)%AFNInfilVolTotal / (ZonePreDefRep(iZone)%TotTimeOcc * Zone(iZone)%volume),3)
@@ -10272,6 +10291,8 @@ SUBROUTINE WriteAdaptiveComfortTable
   INTEGER :: i
   INTEGER, ALLOCATABLE, DIMENSION(:) :: peopleInd ! Index the relevant people
 
+! Should deallocate after writing table. - LKL
+
   IF (displayAdaptiveComfort .AND. TotPeople > 0 ) THEN
     ALLOCATE(peopleInd(TotPeople))
 
@@ -11042,15 +11063,15 @@ LOGICAL, SAVE     :: DoAllocate = .TRUE.
 
 IF (DoAllocate) THEN
 	!For many of the following arrays the last dimension is the number of environments and is same as sizing arrays
-  ALLOCATE(radiantPulseUsed(NumOfZones,TotDesDays+TotRunDesPersDays))
+  ALLOCATE(radiantPulseUsed(NumOfZones,0:TotDesDays+TotRunDesPersDays))
   radiantPulseUsed = 0.0
-  ALLOCATE(radiantPulseTimestep(NumOfZones,TotDesDays+TotRunDesPersDays))
-  radiantPulseTimestep = 0
-  ALLOCATE(radiantPulseReceived(TotSurfaces,TotDesDays+TotRunDesPersDays))
+  ALLOCATE(radiantPulseTimestep(NumOfZones,0:TotDesDays+TotRunDesPersDays))
+  radiantPulseTimestep = 0.0
+  ALLOCATE(radiantPulseReceived(TotSurfaces,0:TotDesDays+TotRunDesPersDays))
   radiantPulseReceived = 0.0
-  ALLOCATE(loadConvectedNormal(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  ALLOCATE(loadConvectedNormal(TotSurfaces,0:NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
   loadConvectedNormal = 0.0
-  ALLOCATE(loadConvectedWithPulse(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
+  ALLOCATE(loadConvectedWithPulse(TotSurfaces,0:NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
   loadConvectedWithPulse = 0.0
   ALLOCATE(netSurfRadSeq(TotSurfaces,NumOfTimeStepInHour*24,TotDesDays+TotRunDesPersDays))
   netSurfRadSeq = 0.0
@@ -11239,46 +11260,50 @@ DO SurfNum = 1, TotSurfaces
   IF (ZoneNum .EQ. 0) CYCLE
   IF (.not. ZoneEquipConfig(ZoneNum)%IsControlled) CYCLE
   CoolDesSelected = CalcFinalZoneSizing(ZoneNum)%CoolDDNum
-  IF (CoolDesSelected .EQ. 0) CYCLE
-  HeatDesSelected = CalcFinalZoneSizing(ZoneNum)%HeatDDNum
-  IF (HeatDesSelected .EQ. 0) CYCLE
   !loop over timesteps after pulse occured
-  TimeOfPulse = radiantPulseTimestep(ZoneNum,CoolDesSelected)
-  ! if the CoolDesSelected time is on a different day than
-  ! when the pulse occurred, need to scan back and find when
-  ! the pulse occurred.
-  IF (TimeOfPulse .EQ. 0) THEN
-    DO i = CoolDesSelected, 1, -1
-      TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
-      IF (TimeOfPulse .NE. 0) EXIT
+  IF (CoolDesSelected .NE. 0) THEN
+    TimeOfPulse = radiantPulseTimestep(ZoneNum,CoolDesSelected)
+    ! if the CoolDesSelected time is on a different day than
+    ! when the pulse occurred, need to scan back and find when
+    ! the pulse occurred.
+    IF (TimeOfPulse .EQ. 0) THEN
+      DO i = CoolDesSelected, 1, -1
+        TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
+        IF (TimeOfPulse .NE. 0) EXIT
+      END DO
+    END IF
+    IF (TimeOfPulse == 0) TimeOfPulse=1
+    DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
+      IF (radiantPulseReceived(surfNum,CoolDesSelected) .NE. 0.0) THEN
+        diff = loadConvectedWithPulse(surfNum,TimeStep,CoolDesSelected) &
+                                  - loadConvectedNormal(surfNum,TimeStep,CoolDesSelected)
+        decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = -diff / radiantPulseReceived(surfNum,CoolDesSelected)
+      ELSE
+        decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+      END IF
     END DO
   END IF
-  DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
-    IF (radiantPulseReceived(surfNum,CoolDesSelected) .NE. 0.0) THEN
-      diff = loadConvectedWithPulse(surfNum,TimeStep,CoolDesSelected) &
-                                - loadConvectedNormal(surfNum,TimeStep,CoolDesSelected)
-      decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = -diff / radiantPulseReceived(surfNum,CoolDesSelected)
-    ELSE
-      decayCurveCool(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+  HeatDesSelected = CalcFinalZoneSizing(ZoneNum)%HeatDDNum
+  IF (HeatDesSelected .NE. 0) THEN
+    TimeOfPulse = radiantPulseTimestep(ZoneNum,HeatDesSelected)
+    ! scan back to the day that the heating pulse occurs, if necessary
+    IF (TimeOfPulse .EQ. 0) THEN
+      DO i = HeatDesSelected, 1, -1
+        TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
+        IF (TimeOfPulse .NE. 0) EXIT
+      END DO
     END IF
-  END DO
-  TimeOfPulse = radiantPulseTimestep(ZoneNum,HeatDesSelected)
-  ! scan back to the day that the heating pulse occurs, if necessary
-  IF (TimeOfPulse .EQ. 0) THEN
-    DO i = HeatDesSelected, 1, -1
-      TimeOfPulse = radiantPulseTimestep(ZoneNum,i)
-      IF (TimeOfPulse .NE. 0) EXIT
+    IF (TimeOfPulse == 0) TimeOfPulse=1
+    DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
+      IF (radiantPulseReceived(surfNum,HeatDesSelected) .NE. 0.0) THEN
+        diff = loadConvectedWithPulse(surfNum,TimeStep,HeatDesSelected) &
+                                  - loadConvectedNormal(surfNum,TimeStep,HeatDesSelected)
+        decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = -diff  / radiantPulseReceived(surfNum,HeatDesSelected)
+      ELSE
+        decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
+      END IF
     END DO
   END IF
-  DO TimeStep = TimeOfPulse, NumOfTimeStepInHour* 24
-    IF (radiantPulseReceived(surfNum,HeatDesSelected) .NE. 0.0) THEN
-      diff = loadConvectedWithPulse(surfNum,TimeStep,HeatDesSelected) &
-                                - loadConvectedNormal(surfNum,TimeStep,HeatDesSelected)
-      decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = -diff  / radiantPulseReceived(surfNum,HeatDesSelected)
-    ELSE
-      decayCurveHeat(surfNum, TimeStep - TimeOfPulse + 1) = 0.0
-    END IF
-  END DO
 END DO
 END SUBROUTINE ComputeLoadComponentDecayCurve
 
@@ -11514,6 +11539,7 @@ ALLOCATE(equipRadIntoSurf(NumOfTimeStepInHour*24))
 ALLOCATE(hvacLossRadIntoSurf(NumOfTimeStepInHour*24))
 ALLOCATE(powerGenRadIntoSurf(NumOfTimeStepInHour*24))
 ALLOCATE(lightLWRadIntoSurf(NumOfTimeStepInHour*24))
+! deallocate after writing?  LKL
 IF (ALLOCATED(CalcFinalZoneSizing)) THEN
   DO lDesHtCl = 1,2 !iterates between heating and cooling design day
     isCooling = lDesHtCl .EQ. 2  !flag for when cooling design day otherwise heating design day
@@ -14061,7 +14087,7 @@ ELSE
     ALLOCATE(TOCEntries(TOCEntriesSize + 20))
     TOCEntries(1:TOCEntriesSize) = CopyOfTOCEntries
     DEALLOCATE(CopyOfTOCEntries)
-    TOCEntriesSize = TOCEntriesSize * 2
+    TOCEntriesSize = TOCEntriesSize + 20
   END IF
 END IF
 TOCEntries(TOCEntriesCount)%reportName = nameReport

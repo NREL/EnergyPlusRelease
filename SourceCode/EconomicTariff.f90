@@ -540,23 +540,25 @@ USE OutputReportTabular, ONLY: AddTOCEntry
 IMPLICIT NONE
 
 LOGICAL, SAVE     :: GetInput = .TRUE.
+LOGICAL           :: ErrorsFound = .false.
 
 IF (GetInput) THEN
-  CALL GetInputEconomicsTariff
+  CALL GetInputEconomicsTariff(ErrorsFound)
   ! do rest of GetInput only if at least one tariff is defined.
-  CALL GetInputEconomicsCurrencyType
+  CALL GetInputEconomicsCurrencyType(ErrorsFound)
   IF (numTariff .GE. 1) THEN
-    CALL AddTOCEntry('Economics Results Summary Report','Entire Facility')
+    IF (.not. ErrorsFound) CALL AddTOCEntry('Economics Results Summary Report','Entire Facility')
     CALL CreateCategoryNativeVariables
-    CALL GetInputEconomicsQualify
-    CALL GetInputEconomicsChargeSimple
-    CALL GetInputEconomicsChargeBlock
-    CALL GetInputEconomicsRatchet
-    CALL GetInputEconomicsVariable
-    CALL GetInputEconomicsComputation
+    CALL GetInputEconomicsQualify(ErrorsFound)
+    CALL GetInputEconomicsChargeSimple(ErrorsFound)
+    CALL GetInputEconomicsChargeBlock(ErrorsFound)
+    CALL GetInputEconomicsRatchet(ErrorsFound)
+    CALL GetInputEconomicsVariable(ErrorsFound)
+    CALL GetInputEconomicsComputation(ErrorsFound)
     CALL CreateDefaultComputation
   END IF
   GetInput = .FALSE.
+  IF (ErrorsFound) CALL ShowFatalError('UpdateUtilityBills: Preceding errors cause termination.')
 END IF
 IF (DoOutputReporting .and. (KindOfSim == ksRunPeriodWeather)) THEN
   CALL GatherForEconomics
@@ -573,7 +575,7 @@ END SUBROUTINE UpdateUtilityBills
 !======================================================================================================================
 !======================================================================================================================
 
-SUBROUTINE GetInputEconomicsTariff
+SUBROUTINE GetInputEconomicsTariff(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -589,21 +591,22 @@ SUBROUTINE GetInputEconomicsTariff
           ! na
 
           ! USE STATEMENTS:
-USE InputProcessor, ONLY: ProcessNumber
 USE DataGlobals, ONLY: NumOfTimeStepInHour
 USE OutputReportTabular, ONLY: AddTOCEntry
 USE DataInterfaces, ONLY:GetVariableKeyCountandType, GetVariableKeys
 USE OutputProcessor, ONLY: EnergyMeters, NumEnergyMeters
 USE DataGlobalConstants, ONLY: AssignResourceTypeNum
+USE DataIPShortCuts
+USE General, ONLY: RoundSigDigits
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsTariff: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -617,8 +620,8 @@ INTEGER                     :: iInObj     ! loop index variable for reading in o
 INTEGER                     :: jObj       ! loop index for objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
+!REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 INTEGER                     :: found
 LOGICAL                     :: isNotNumeric
@@ -637,17 +640,20 @@ CurrentModuleObject = 'UtilityCost:Tariff'
 NumTariff = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(tariff(NumTariff))
 DO iInObj = 1 , NumTariff
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+      !  args are always turned to upper case but this is okay...
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !name of the tariff
-  tariff(iInObj)%tariffName =  AlphaArray(1)
+  tariff(iInObj)%tariffName =  cAlphaArgs(1)
   !check if tariff name is unique
   found = 0
   DO jObj = 1, iInObj - 1
@@ -657,28 +663,28 @@ DO iInObj = 1 , NumTariff
     END IF
   END DO
   IF (found .GT. 0) THEN
-    CALL ShowWarningError(TRIM(CurrentModuleObject)//': Each tariff name needs to be unique:' //   &
-                    TRIM(tariff(iInObj)%tariffName))
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError('...Duplicate name. Name has already been used.')
+    ErrorsFound=.true.
   END IF
   !name of the report meter
-  tariff(iInObj)%reportMeter =  AlphaArray(2)
+  tariff(iInObj)%reportMeter =  cAlphaArgs(2)
   ! call the key count function but only need count during this pass
   CALL GetVariableKeyCountandType(tariff(iInObj)%reportMeter,KeyCount,TypeVar,AvgSumVar,StepTypeVar,UnitsVar)
   ! if no meters found for that name
   IF (KeyCount .EQ. 0) THEN
-     CALL ShowWarningError(TRIM(CurrentModuleObject)//': ' // &
-       'Meter referenced is not present due to a lack of equipment that uses that energy source:'//tariff(iInObj)%reportMeter)
-      CALL ShowContinueError('  In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)))
-     tariff(iInObj)%reportMeterIndx = 0
-
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" missing meter')
+    CALL ShowContinueError('Meter referenced is not present due to a lack of equipment that uses that energy source/meter:"'//  &
+       tariff(iInObj)%reportMeter//'".')
+    tariff(iInObj)%reportMeterIndx = 0
   ELSE
     ALLOCATE(NamesOfKeys(KeyCount))
     ALLOCATE(IndexesForKeyVar(KeyCount))
     CALL GetVariableKeys(tariff(iInObj)%reportMeter,TypeVar,NamesOfKeys,IndexesForKeyVar)
     !although this retrieves all keys for a variable, we only need one so the first one is chosen
     IF (KeyCount .GT. 1) THEN
-      CALL ShowWarningError(TRIM(CurrentModuleObject)//': Multiple keys for variable select. First key will be used.')
-      CALL ShowContinueError('  In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)))
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" multiple keys')
+      CALL ShowContinueError('... Multiple keys for variable select. First key will be used.')
     END IF
     !assign the index
     tariff(iInObj)%reportMeterIndx = IndexesForKeyVar(1)
@@ -687,35 +693,35 @@ DO iInObj = 1 , NumTariff
     DEALLOCATE(IndexesForKeyVar)
   END IF
   !conversion factor
-  IF (SameString(AlphaArray(3),'USERDEFINED')) THEN
+  IF (SameString(cAlphaArgs(3),'USERDEFINED')) THEN
     tariff(iInObj)%convChoice = conversionUSERDEF
-    tariff(iInObj)%energyConv = NumArray(1)      !energy conversion factor
-    tariff(iInObj)%demandConv = NumArray(2)      !demand conversion factor
-  ELSE IF (SameString(AlphaArray(3),'KWH')) THEN
+    tariff(iInObj)%energyConv = rNumericArgs(1)      !energy conversion factor
+    tariff(iInObj)%demandConv = rNumericArgs(2)      !demand conversion factor
+  ELSE IF (SameString(cAlphaArgs(3),'KWH')) THEN
     tariff(iInObj)%convChoice = conversionKWH
     tariff(iInObj)%energyConv = 0.0000002778d0
     tariff(iInObj)%demandConv = 0.001d0
-  ELSE IF (SameString(AlphaArray(3),'THERM')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'THERM')) THEN
     tariff(iInObj)%convChoice = conversionTHERM
     tariff(iInObj)%energyConv = 9.4781712d-9
     tariff(iInObj)%demandConv = 0.00003412d0
-  ELSE IF (SameString(AlphaArray(3),'MMBTU')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'MMBTU')) THEN
     tariff(iInObj)%convChoice = conversionMMBTU
     tariff(iInObj)%energyConv = 9.4781712d-10
     tariff(iInObj)%demandConv = 0.000003412d0
-  ELSE IF (SameString(AlphaArray(3),'MJ')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'MJ')) THEN
     tariff(iInObj)%convChoice = conversionMJ
     tariff(iInObj)%energyConv = 0.000001d0
     tariff(iInObj)%demandConv = 0.0036d0
-  ELSE IF (SameString(AlphaArray(3),'KBTU')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'KBTU')) THEN
     tariff(iInObj)%convChoice = conversionKBTU
     tariff(iInObj)%energyConv = 9.4781712d-7
     tariff(iInObj)%demandConv = 0.003412d0
-  ELSE IF (SameString(AlphaArray(3),'MCF')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'MCF')) THEN
     tariff(iInObj)%convChoice = conversionMCF
     tariff(iInObj)%energyConv = 9.4781712d-10
     tariff(iInObj)%demandConv = 0.000003412d0
-  ELSE IF (SameString(AlphaArray(3),'CCF')) THEN
+  ELSE IF (SameString(cAlphaArgs(3),'CCF')) THEN
     tariff(iInObj)%convChoice = conversionCCF
     tariff(iInObj)%energyConv = 9.4781712d-9
     tariff(iInObj)%demandConv = 0.00003412d0
@@ -723,79 +729,88 @@ DO iInObj = 1 , NumTariff
     tariff(iInObj)%convChoice = conversionKWH
     tariff(iInObj)%energyConv = 0.0000002778d0
     tariff(iInObj)%demandConv = 0.001d0
-    CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' = '//TRIM(tariff(iInObj)%tariffName))
-    CALL ShowContinueError('Invalid conversion.  Defaulting to KWH.')
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError(trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'", Defaulting to KWH.')
   END IF
   !schedules
   ! period schedule
-  IF (LEN_TRIM(AlphaArray(4)) .GT. 0) THEN
-    tariff(iInObj)%periodSchedule = AlphaArray(4)  !name of the period schedule (time of day)
-    tariff(iInObj)%periodSchIndex = GetScheduleIndex(AlphaArray(4)) !index to the period schedule
+  IF (LEN_TRIM(cAlphaArgs(4)) .GT. 0) THEN
+    tariff(iInObj)%periodSchedule = cAlphaArgs(4)  !name of the period schedule (time of day)
+    tariff(iInObj)%periodSchIndex = GetScheduleIndex(cAlphaArgs(4)) !index to the period schedule
     IF (tariff(iInObj)%periodSchIndex .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' Period schedule not found: ' // TRIM(AlphaArray(4)) // &
-                            ' in ' // TRIM(tariff(iInObj)%tariffName))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+      CALL ShowContinueError(' not found '//trim(cAlphaFieldNames(4))//'="'//TRIM(cAlphaArgs(4)) //'".')
+      ErrorsFound=.true.
     END IF
   ELSE
     tariff(iInObj)%periodSchIndex = 0 !flag value for no schedule used
   END IF
   ! season schedule
-  IF (LEN_TRIM(AlphaArray(5)) .GT. 0) THEN
-    tariff(iInObj)%seasonSchedule = AlphaArray(5)  !name of the season schedule (winter/summer)
-    tariff(iInObj)%seasonSchIndex = GetScheduleIndex(AlphaArray(5))   !index to the season schedule
+  IF (LEN_TRIM(cAlphaArgs(5)) .GT. 0) THEN
+    tariff(iInObj)%seasonSchedule = cAlphaArgs(5)  !name of the season schedule (winter/summer)
+    tariff(iInObj)%seasonSchIndex = GetScheduleIndex(cAlphaArgs(5))   !index to the season schedule
     IF (tariff(iInObj)%seasonSchIndex .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' Season schedule not found: ' // TRIM(AlphaArray(5)) // &
-                            ' in ' // TRIM(tariff(iInObj)%tariffName))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+      CALL ShowContinueError(' not found '//trim(cAlphaFieldNames(5))//'="'//TRIM(cAlphaArgs(5)) //'".')
+      ErrorsFound=.true.
     END IF
   ELSE
     tariff(iInObj)%seasonSchIndex = 0 !flag value for no schedule used
   END IF
   ! month schedule
-  IF (LEN_TRIM(AlphaArray(6)) .GT. 0) THEN
-    tariff(iInObj)%monthSchedule = AlphaArray(6)   !name of month schedule (when months end)
-    tariff(iInObj)%monthSchIndex = GetScheduleIndex(AlphaArray(6))    !index to the month schedule
+  IF (LEN_TRIM(cAlphaArgs(6)) .GT. 0) THEN
+    tariff(iInObj)%monthSchedule = cAlphaArgs(6)   !name of month schedule (when months end)
+    tariff(iInObj)%monthSchIndex = GetScheduleIndex(cAlphaArgs(6))    !index to the month schedule
     IF (tariff(iInObj)%monthSchIndex .EQ. 0) THEN
-      CALL ShowSevereError(TRIM(CurrentModuleObject)//' Month schedule not found: ' // TRIM(AlphaArray(6)) // &
-                            ' in ' // TRIM(tariff(iInObj)%tariffName))
+      CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+      CALL ShowContinueError(' not found '//trim(cAlphaFieldNames(6))//'="'//TRIM(cAlphaArgs(6)) //'".')
+      ErrorsFound=.true.
     END IF
   ELSE
     tariff(iInObj)%monthSchIndex = 0 !flag value for no schedule used
   END IF
   !type of demand window
-  IF (SameString(AlphaArray(7),'QuarterHour')) THEN
+  IF (SameString(cAlphaArgs(7),'QuarterHour')) THEN
     ! check to make sure that the demand window and the TIMESTEP IN HOUR are consistant.
     SELECT CASE (NumOfTimeStepInHour)
       CASE (1,3,5,15)
         tariff(iInObj)%demandWindow = demandWindowHour
         tariff(iInObj)%demWinTime = 1.00d0
-        CALL ShowWarningError('Demand window of QuarterHour is not consistent with number of timesteps per hour')
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError('Demand window of QuarterHour is not consistent with number of timesteps per hour ['//  &
+           trim(RoundSigDigits(NumOfTimeStepInHour))//'].')
         CALL ShowContinueError('Demand window will be set to FullHour, and the simulation continues.')
       CASE (2,6,10,30)
         tariff(iInObj)%demandWindow = demandWindowHalf
         tariff(iInObj)%demWinTime = 0.50d0
-        CALL ShowWarningError('Demand window of QuarterHour is not consistent with number of timesteps per hour')
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError('Demand window of QuarterHour is not consistent with number of timesteps per hour ['//  &
+           trim(RoundSigDigits(NumOfTimeStepInHour))//'].')
         CALL ShowContinueError('Demand window will be set to HalfHour, and the simulation continues.')
       CASE (4,12,20,60)
         tariff(iInObj)%demandWindow = demandWindowQuarter
         tariff(iInObj)%demWinTime = 0.25d0
     END SELECT
-  ELSE IF (SameString(AlphaArray(7),'HalfHour')) THEN
+  ELSE IF (SameString(cAlphaArgs(7),'HalfHour')) THEN
     SELECT CASE (NumOfTimeStepInHour)
       CASE (1,3,5,15)
         tariff(iInObj)%demandWindow = demandWindowHour
         tariff(iInObj)%demWinTime = 1.00d0
-        CALL ShowWarningError('Demand window of HalfHour is not consistent with number of timesteps per hour')
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError('Demand window of HalfHour is not consistent with number of timesteps per hour ['//  &
+           trim(RoundSigDigits(NumOfTimeStepInHour))//'].')
         CALL ShowContinueError('Demand window will be set to FullHour, and the simulation continues.')
       CASE (2,4,6,10,12,20,30,60)
         tariff(iInObj)%demandWindow = demandWindowHalf
         tariff(iInObj)%demWinTime = 0.50d0
     END SELECT
-  ELSE IF (SameString(AlphaArray(7),'FullHour')) THEN
+  ELSE IF (SameString(cAlphaArgs(7),'FullHour')) THEN
     tariff(iInObj)%demandWindow = demandWindowHour
     tariff(iInObj)%demWinTime = 1.00d0
-  ELSE IF (SameString(AlphaArray(7),'Day')) THEN
+  ELSE IF (SameString(cAlphaArgs(7),'Day')) THEN
     tariff(iInObj)%demandWindow = demandWindowDay
     tariff(iInObj)%demWinTime = 24.00d0
-  ELSE IF (SameString(AlphaArray(7),'Week')) THEN
+  ELSE IF (SameString(cAlphaArgs(7),'Week')) THEN
     tariff(iInObj)%demandWindow = demandWindowWeek
     tariff(iInObj)%demWinTime = 24.d0 * 7.d0
   ELSE
@@ -813,28 +828,28 @@ DO iInObj = 1 , NumTariff
     END SELECT
   END IF
   !monthly charge
-  tariff(iInObj)%monthChgVal = ProcessNumber(AlphaArray(8),isNotNumeric)
-  tariff(iInObj)%monthChgPt = AssignVariablePt(AlphaArray(8),isNotNumeric,varIsArgument,varNotYetDefined,kindUnknown,0,iInObj)
+  tariff(iInObj)%monthChgVal = ProcessNumber(cAlphaArgs(8),isNotNumeric)
+  tariff(iInObj)%monthChgPt = AssignVariablePt(cAlphaArgs(8),isNotNumeric,varIsArgument,varNotYetDefined,kindUnknown,0,iInObj)
   !minimum monthly charge
-  IF (LEN_TRIM(AlphaArray(9)) .GT. 0) THEN
-  tariff(iInObj)%minMonthChgVal = ProcessNumber(AlphaArray(9),isNotNumeric)
+  IF (LEN_TRIM(cAlphaArgs(9)) .GT. 0) THEN
+    tariff(iInObj)%minMonthChgVal = ProcessNumber(cAlphaArgs(9),isNotNumeric)
   ELSE
     tariff(iInObj)%minMonthChgVal = -HUGE(-1.0d0) !set to a very negative value
   END IF
-  tariff(iInObj)%minMonthChgPt = AssignVariablePt(AlphaArray(9),isNotNumeric,varIsArgument,varNotYetDefined,kindUnknown,0,iInObj)
+  tariff(iInObj)%minMonthChgPt = AssignVariablePt(cAlphaArgs(9),isNotNumeric,varIsArgument,varNotYetDefined,kindUnknown,0,iInObj)
   !real time pricing
-  tariff(iInObj)%chargeSchedule = AlphaArray(10)
-  tariff(iInObj)%chargeSchIndex = GetScheduleIndex(AlphaArray(10))
-  tariff(iInObj)%baseUseSchedule = AlphaArray(11)
-  tariff(iInObj)%baseUseSchIndex = GetScheduleIndex(AlphaArray(11))
+  tariff(iInObj)%chargeSchedule = cAlphaArgs(10)
+  tariff(iInObj)%chargeSchIndex = GetScheduleIndex(cAlphaArgs(10))
+  tariff(iInObj)%baseUseSchedule = cAlphaArgs(11)
+  tariff(iInObj)%baseUseSchIndex = GetScheduleIndex(cAlphaArgs(11))
   !group name for separate distribution and transmission rates
-  tariff(iInObj)%groupName = AlphaArray(12)
+  tariff(iInObj)%groupName = cAlphaArgs(12)
   !buy or sell option
-  IF (SameString(AlphaArray(13),'BuyFromUtility')) THEN
+  IF (SameString(cAlphaArgs(13),'BuyFromUtility')) THEN
     tariff(iInObj)%buyOrSell = buyFromUtility
-  ELSE IF (SameString(AlphaArray(13),'SellToUtility')) THEN
+  ELSE IF (SameString(cAlphaArgs(13),'SellToUtility')) THEN
     tariff(iInObj)%buyOrSell = sellToUtility
-  ELSE IF (SameString(AlphaArray(13),'NetMetering')) THEN
+  ELSE IF (SameString(cAlphaArgs(13),'NetMetering')) THEN
     tariff(iInObj)%buyOrSell = netMetering
   ELSE
     tariff(iInObj)%buyOrSell = buyFromUtility
@@ -842,28 +857,28 @@ DO iInObj = 1 , NumTariff
   ! check if meter is consistent with buy or sell option
   IF ((tariff(iInObj)%buyOrSell .EQ. sellToUtility) .AND.   &
         (.NOT. SameString(tariff(iInObj)%reportMeter,'ELECTRICITYSURPLUSSOLD:FACILITY'))) THEN
-    CALL ShowWarningError('UtilityCost:Tariff: The meter chosen ' // TRIM(tariff(iInObj)%reportMeter) //  &
-       ' is not typically used with the sellToUtility option. Usually')
-    CALL ShowContinueError('  the ElectricitySurplusSold:Facility meter is selected when the sellToUtility option is used.')
-    CALL ShowContinueError('  In UtilityCost:Tariff named ' // TRIM(AlphaArray(1)))
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" atypical meter')
+    CALL ShowContinueError('The meter chosen "' // TRIM(tariff(iInObj)%reportMeter) //  &
+       '" is not typically used with the sellToUtility option.')
+    CALL ShowContinueError('Usually the ElectricitySurplusSold:Facility meter is selected when the sellToUtility option is used.')
   END IF
   IF ((tariff(iInObj)%buyOrSell .EQ. netMetering) .AND.   &
        (.NOT. SameString(tariff(iInObj)%reportMeter,'ELECTRICITYNET:FACILITY'))) THEN
-    CALL ShowWarningError('UtilityCost:Tariff: The meter chosen ' // TRIM(tariff(iInObj)%reportMeter) //  &
-       ' is not typically used with the netMetering option. Usually')
-    CALL ShowContinueError('  the ElectricityNet:Facility meter is selected when the netMetering option is used.')
-    CALL ShowContinueError('  In UtilityCost:Tariff named ' // TRIM(AlphaArray(1)))
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" atypical meter')
+    CALL ShowContinueError('The meter chosen "' // TRIM(tariff(iInObj)%reportMeter) //  &
+       ' is not typically used with the netMetering option.')
+    CALL ShowContinueError('Usually the ElectricityNet:Facility meter is selected when the netMetering option is used.')
   END IF
   !also test the buy option for electricity
   IF (tariff(iInObj)%buyOrSell .EQ. buyFromUtility) THEN
     IF (INDEX(MakeUPPERCase(tariff(iInObj)%reportMeter),'ELEC') .GT. 0) THEN !test if electric meter
       IF (.NOT. (SameString(tariff(iInObj)%reportMeter,'Electricity:Facility') .OR.   &
                  SameString(tariff(iInObj)%reportMeter,'ElectricityPurchased:Facility'))) THEN
-        CALL ShowWarningError('UtilityCost:Tariff: The meter chosen ' // TRIM(tariff(iInObj)%reportMeter) //  &
-           ' is not typically used with the buyFromUtility option. Usually')
-        CALL ShowContinueError('  the Electricity:Facility meter or the '//  &
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" atypical meter')
+        CALL ShowContinueError('The meter chosen "' // TRIM(tariff(iInObj)%reportMeter) //  &
+           ' is not typically used with the buyFromUtility option.')
+        CALL ShowContinueError('Usually the Electricity:Facility meter or the '//  &
            'ElectricityPurchased:Facility is selected when the buyFromUtility option is used.')
-        CALL ShowContinueError('  In UtilityCost:Tariff named ' // TRIM(AlphaArray(1)))
       ENDIF
     END IF
   END IF
@@ -886,7 +901,7 @@ DO iInObj = 1 , NumTariff
 END DO
 END SUBROUTINE GetInputEconomicsTariff
 
-SUBROUTINE GetInputEconomicsQualify
+SUBROUTINE GetInputEconomicsQualify(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -902,14 +917,15 @@ SUBROUTINE GetInputEconomicsQualify
           ! na
 
           ! USE STATEMENTS:
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsQualify: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -921,8 +937,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 LOGICAL                     :: isNotNumeric
 INTEGER          :: jFld
@@ -932,51 +948,57 @@ CurrentModuleObject = 'UtilityCost:Qualify'
 NumQualify = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(qualify(NumQualify))
 DO iInObj = 1 , NumQualify
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
-  qualify(iInObj)%tariffIndx  = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  CALL warnIfNativeVarname(AlphaArray(1),qualify(iInObj)%tariffIndx)
-  qualify(iInObj)%namePt = AssignVariablePt(AlphaArray(1),.TRUE.,varIsAssigned,&
+  qualify(iInObj)%tariffIndx  = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  CALL warnIfNativeVarname(cAlphaArgs(1),qualify(iInObj)%tariffIndx,ErrorsFound,CurrentModuleObject)
+  qualify(iInObj)%namePt = AssignVariablePt(cAlphaArgs(1),.TRUE.,varIsAssigned,&
                                 varNotYetDefined,kindQualify,iInObj,qualify(iInObj)%tariffIndx)
   !index of the variable in the variable array
-  qualify(iInObj)%sourcePt = AssignVariablePt(AlphaArray(3), .TRUE. ,varIsArgument,varNotYetDefined, &
+  qualify(iInObj)%sourcePt = AssignVariablePt(cAlphaArgs(3), .TRUE. ,varIsArgument,varNotYetDefined, &
                                 kindUnknown,0,qualify(iInObj)%tariffIndx)
   !indicator if maximum test otherwise minimum
-  IF (SameString(AlphaArray(4),'Minimum')) THEN
+  IF (SameString(cAlphaArgs(4),'Minimum')) THEN
     qualify(iInObj)%isMaximum = .FALSE.
-  ELSE IF (SameString(AlphaArray(4),'Maximum')) THEN
+  ELSE IF (SameString(cAlphaArgs(4),'Maximum')) THEN
     qualify(iInObj)%isMaximum = .TRUE.
   ELSE
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError(trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'" -- setting to "Maximum".')
     qualify(iInObj)%isMaximum = .TRUE.
   END IF
   !value of the threshold
-  qualify(iInObj)%thresholdVal = ProcessNumber(AlphaArray(5),isNotNumeric)
-  qualify(iInObj)%thresholdPt = AssignVariablePt(AlphaArray(5),isNotNumeric,varIsArgument,&
+  qualify(iInObj)%thresholdVal = ProcessNumber(cAlphaArgs(5),isNotNumeric)
+  qualify(iInObj)%thresholdPt = AssignVariablePt(cAlphaArgs(5),isNotNumeric,varIsArgument,&
                                 varNotYetDefined,kindUnknown,0,qualify(iInObj)%tariffIndx)
   !enumerated list of the kind of season
-  qualify(iInObj)%season = LookUpSeason(AlphaArray(6),AlphaArray(1))
+  qualify(iInObj)%season = LookUpSeason(cAlphaArgs(6),cAlphaArgs(1))
   !indicator if consecutive months otherwise count
-  IF (SameString(AlphaArray(7),'Count')) THEN
+  IF (SameString(cAlphaArgs(7),'Count')) THEN
     qualify(iInObj)%isConsecutive  = .FALSE.
-  ELSE IF (SameString(AlphaArray(7),'Consecutive')) THEN
+  ELSE IF (SameString(cAlphaArgs(7),'Consecutive')) THEN
     qualify(iInObj)%isConsecutive  = .TRUE.
   ELSE
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError(trim(cAlphaFieldNames(5))//'="'//trim(cAlphaArgs(5))//'" -- setting to "Consecutive".')
     qualify(iInObj)%isConsecutive  = .TRUE.
   END IF
   !number of months the test must be good for
-  qualify(iInObj)%numberOfMonths = NumArray(1)
+  qualify(iInObj)%numberOfMonths = rNumericArgs(1)
 END DO
 END SUBROUTINE GetInputEconomicsQualify
 
-SUBROUTINE GetInputEconomicsChargeSimple
+SUBROUTINE GetInputEconomicsChargeSimple(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -992,14 +1014,15 @@ SUBROUTINE GetInputEconomicsChargeSimple
           ! na
 
           ! USE STATEMENTS:
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsChargeSimple: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1012,8 +1035,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 LOGICAL                     :: isNotNumeric
 INTEGER          :: jFld
@@ -1023,45 +1046,49 @@ CurrentModuleObject = 'UtilityCost:Charge:Simple'
 numChargeSimple = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(chargeSimple(numChargeSimple))
 DO iInObj = 1 , numChargeSimple
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
-  chargeSimple(iInObj)%tariffIndx = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  CALL warnIfNativeVarname(AlphaArray(1),chargeSimple(iInObj)%tariffIndx)
-  chargeSimple(iInObj)%namePt = AssignVariablePt(AlphaArray(1),.TRUE.,varIsAssigned,&
+  chargeSimple(iInObj)%tariffIndx = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  CALL warnIfNativeVarname(cAlphaArgs(1),chargeSimple(iInObj)%tariffIndx,ErrorsFound,CurrentModuleObject)
+  chargeSimple(iInObj)%namePt = AssignVariablePt(cAlphaArgs(1),.TRUE.,varIsAssigned,&
                                 varNotYetDefined,kindChargeSimple,iInObj,chargeSimple(iInObj)%tariffIndx)
   !index of the variable in the variable array
-  chargeSimple(iInObj)%sourcePt = AssignVariablePt(AlphaArray(3),.TRUE.,varIsArgument,&
+  chargeSimple(iInObj)%sourcePt = AssignVariablePt(cAlphaArgs(3),.TRUE.,varIsArgument,&
                                   varNotYetDefined,kindUnknown,0,chargeSimple(iInObj)%tariffIndx)
   !enumerated list of the kind of season
-  chargeSimple(iInObj)%season = LookUpSeason(AlphaArray(4),AlphaArray(1))
+  chargeSimple(iInObj)%season = LookUpSeason(cAlphaArgs(4),cAlphaArgs(1))
   !check to make sure a seasonal schedule is specified if the season is not annual
   IF (chargeSimple(iInObj)%season .NE. seasonAnnual) THEN
     IF (chargeSimple(iInObj)%tariffIndx .NE. 0) THEN
       IF (tariff(chargeSimple(iInObj)%tariffIndx)%seasonSchIndex .EQ. 0) THEN
-        CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a Season other than Annual is used but no Season Schedule Name is specified in the UtilityCost:Tariff.')
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError(trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'".')
+        CALL ShowContinueError(' a Season other than Annual is used but no Season Schedule Name is specified'//  &
+           ' in the UtilityCost:Tariff.')
       END IF
     END IF
   END IF
   !index of the category in the variable array
-  chargeSimple(iInObj)%categoryPt = AssignVariablePt(AlphaArray(5),.TRUE.,varIsAssigned,&
+  chargeSimple(iInObj)%categoryPt = AssignVariablePt(cAlphaArgs(5),.TRUE.,varIsAssigned,&
                                   varNotYetDefined,kindCategory,iInObj,chargeSimple(iInObj)%tariffIndx)
   !cost per unit value or variable
-  chargeSimple(iInObj)%costPerVal = ProcessNumber(AlphaArray(6),isNotNumeric)
-  chargeSimple(iInObj)%costPerPt = AssignVariablePt(AlphaArray(6),isNotNumeric,varIsArgument,&
+  chargeSimple(iInObj)%costPerVal = ProcessNumber(cAlphaArgs(6),isNotNumeric)
+  chargeSimple(iInObj)%costPerPt = AssignVariablePt(cAlphaArgs(6),isNotNumeric,varIsArgument,&
                                 varNotYetDefined,kindUnknown,0,chargeSimple(iInObj)%tariffIndx)
 END DO
 END SUBROUTINE GetInputEconomicsChargeSimple
 
-SUBROUTINE GetInputEconomicsChargeBlock
+SUBROUTINE GetInputEconomicsChargeBlock(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -1077,15 +1104,15 @@ SUBROUTINE GetInputEconomicsChargeBlock
           ! na
 
           ! USE STATEMENTS:
-USE InputProcessor, ONLY: MakeUpperCase
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsChargeBlock: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1098,8 +1125,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 LOGICAL                     :: isNotNumeric
 INTEGER                     :: jBlk       ! loop index for blocks
@@ -1113,47 +1140,51 @@ hugeNumber = HUGE(hugeNumber)
 numChargeBlock = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(chargeBlock(numChargeBlock))
 DO iInObj = 1 , numChargeBlock
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
-  chargeBlock(iInObj)%tariffIndx = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  CALL warnIfNativeVarname(AlphaArray(1),chargeBlock(iInObj)%tariffIndx)
-  chargeBlock(iInObj)%namePt = AssignVariablePt(AlphaArray(1),.TRUE.,varIsAssigned,&
+  chargeBlock(iInObj)%tariffIndx = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  CALL warnIfNativeVarname(cAlphaArgs(1),chargeBlock(iInObj)%tariffIndx,ErrorsFound,CurrentModuleObject)
+  chargeBlock(iInObj)%namePt = AssignVariablePt(cAlphaArgs(1),.TRUE.,varIsAssigned,&
                                 varNotYetDefined,kindChargeBlock,iInObj,chargeBlock(iInObj)%tariffIndx)
   !index of the variable in the variable array
-  chargeBlock(iInObj)%sourcePt = AssignVariablePt(AlphaArray(3),.TRUE.,varIsArgument,&
+  chargeBlock(iInObj)%sourcePt = AssignVariablePt(cAlphaArgs(3),.TRUE.,varIsArgument,&
                                   varNotYetDefined,kindUnknown,0,chargeBlock(iInObj)%tariffIndx)
   !enumerated list of the kind of season
-  chargeBlock(iInObj)%season = LookUpSeason(AlphaArray(4),AlphaArray(1))
+  chargeBlock(iInObj)%season = LookUpSeason(cAlphaArgs(4),cAlphaArgs(1))
   !check to make sure a seasonal schedule is specified if the season is not annual
   IF (chargeBlock(iInObj)%season .NE. seasonAnnual) THEN
     IF (chargeBlock(iInObj)%tariffIndx .NE. 0) THEN
       IF (tariff(chargeBlock(iInObj)%tariffIndx)%seasonSchIndex .EQ. 0) THEN
-        CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a Season other than Annual is used but no Season Schedule Name is specified in the UtilityCost:Tariff.')
+        CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+        CALL ShowContinueError(trim(cAlphaFieldNames(4))//'="'//trim(cAlphaArgs(4))//'".')
+        CALL ShowContinueError(' a Season other than Annual is used but no Season Schedule Name is specified'//  &
+           ' in the UtilityCost:Tariff.')
       END IF
     END IF
   END IF
   !index of the category in the variable array
-  chargeBlock(iInObj)%categoryPt = AssignVariablePt(AlphaArray(5),.TRUE.,varIsAssigned,&
+  chargeBlock(iInObj)%categoryPt = AssignVariablePt(cAlphaArgs(5),.TRUE.,varIsAssigned,&
                                   varNotYetDefined,kindCategory,iInObj,chargeBlock(iInObj)%tariffIndx)
   !index of the remaining into variable in the variable array
-  chargeBlock(iInObj)%remainingPt = AssignVariablePt(AlphaArray(6),.TRUE.,varIsAssigned,&
+  chargeBlock(iInObj)%remainingPt = AssignVariablePt(cAlphaArgs(6),.TRUE.,varIsAssigned,&
                                   varNotYetDefined,kindCategory,iInObj,chargeBlock(iInObj)%tariffIndx)
   !block size multiplier
-  IF (LEN_TRIM(AlphaArray(7)) .EQ. 0) THEN  !if blank
+  IF (LEN_TRIM(cAlphaArgs(7)) .EQ. 0) THEN  !if blank
     chargeBlock(iInObj)%blkSzMultVal = 1  !default is 1 if left blank
     chargeBlock(iInObj)%blkSzMultPt = 0
   ELSE
-    chargeBlock(iInObj)%blkSzMultVal = ProcessNumber(AlphaArray(7),isNotNumeric)
-    chargeBlock(iInObj)%blkSzMultPt = AssignVariablePt(AlphaArray(7),isNotNumeric,varIsArgument, &
+    chargeBlock(iInObj)%blkSzMultVal = ProcessNumber(cAlphaArgs(7),isNotNumeric)
+    chargeBlock(iInObj)%blkSzMultPt = AssignVariablePt(cAlphaArgs(7),isNotNumeric,varIsArgument, &
                                       varNotYetDefined,kindUnknown,0,chargeBlock(iInObj)%tariffIndx)
   END IF
   !number of blocks used
@@ -1161,25 +1192,25 @@ DO iInObj = 1 , numChargeBlock
   DO jBlk = 1, chargeBlock(iInObj)%numBlk
     alphaOffset = 7 +  (jBlk - 1) * 2
     !catch the "remaining" code word for the block size
-    IF (sameString(AlphaArray(alphaOffset + 1),"REMAINING")) THEN
+    IF (sameString(cAlphaArgs(alphaOffset + 1),"REMAINING")) THEN
       chargeBlock(iInObj)%blkSzVal(jBlk) = hugeNumber / 1000000 !using small portion of largest possible value to prevent overflow
       chargeBlock(iInObj)%blkSzPt(jBlk) = 0
     ELSE
       !array of block size
-      chargeBlock(iInObj)%blkSzVal(jBlk) = ProcessNumber(AlphaArray(alphaOffset + 1),isNotNumeric)
+      chargeBlock(iInObj)%blkSzVal(jBlk) = ProcessNumber(cAlphaArgs(alphaOffset + 1),isNotNumeric)
 
-      chargeBlock(iInObj)%blkSzPt(jBlk) = AssignVariablePt(AlphaArray(alphaOffset + 1),isNotNumeric,&
+      chargeBlock(iInObj)%blkSzPt(jBlk) = AssignVariablePt(cAlphaArgs(alphaOffset + 1),isNotNumeric,&
                         varIsArgument,varNotYetDefined,kindUnknown,0,chargeBlock(iInObj)%tariffIndx)
     END IF
     !array of block cost
-    chargeBlock(iInObj)%blkCostVal(jBlk) = ProcessNumber(AlphaArray(alphaOffset + 2),isNotNumeric)
-    chargeBlock(iInObj)%blkCostPt(jBlk) = AssignVariablePt(AlphaArray(alphaOffset + 2),isNotNumeric,&
+    chargeBlock(iInObj)%blkCostVal(jBlk) = ProcessNumber(cAlphaArgs(alphaOffset + 2),isNotNumeric)
+    chargeBlock(iInObj)%blkCostPt(jBlk) = AssignVariablePt(cAlphaArgs(alphaOffset + 2),isNotNumeric,&
                         varIsArgument,varNotYetDefined,kindUnknown,0,chargeBlock(iInObj)%tariffIndx)
   END DO
 END DO
 END SUBROUTINE GetInputEconomicsChargeBlock
 
-SUBROUTINE GetInputEconomicsRatchet
+SUBROUTINE GetInputEconomicsRatchet(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -1195,14 +1226,15 @@ SUBROUTINE GetInputEconomicsRatchet
           ! na
 
           ! USE STATEMENTS:
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsRatchet: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1215,8 +1247,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 LOGICAL                     :: isNotNumeric
 INTEGER                     :: jFld
@@ -1226,41 +1258,43 @@ CurrentModuleObject = 'UtilityCost:Ratchet'
 numRatchet = GetNumObjectsFound(CurrentModuleObject)
 ALLOCATE(ratchet(numRatchet))
 DO iInObj = 1 , numRatchet
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
   !index of the tariff name in the tariff array
-  ratchet(iInObj)%tariffIndx = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  CALL warnIfNativeVarname(AlphaArray(1),ratchet(iInObj)%tariffIndx)
-  ratchet(iInObj)%namePt = AssignVariablePt(AlphaArray(1),.TRUE.,varIsAssigned,&
+  ratchet(iInObj)%tariffIndx = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  CALL warnIfNativeVarname(cAlphaArgs(1),ratchet(iInObj)%tariffIndx,ErrorsFound,CurrentModuleObject)
+  ratchet(iInObj)%namePt = AssignVariablePt(cAlphaArgs(1),.TRUE.,varIsAssigned,&
                                 varNotYetDefined,kindRatchet,iInObj,ratchet(iInObj)%tariffIndx)
   !index of the variable in the variable array
-  ratchet(iInObj)%baselinePt = AssignVariablePt(AlphaArray(3),.TRUE.,varIsArgument,&
+  ratchet(iInObj)%baselinePt = AssignVariablePt(cAlphaArgs(3),.TRUE.,varIsArgument,&
                                 varNotYetDefined,kindRatchet,iInObj,ratchet(iInObj)%tariffIndx)
   !index of the variable in the variable array
-  ratchet(iInObj)%adjustmentPt = AssignVariablePt(AlphaArray(4),.TRUE.,varIsArgument,&
+  ratchet(iInObj)%adjustmentPt = AssignVariablePt(cAlphaArgs(4),.TRUE.,varIsArgument,&
                                 varNotYetDefined,kindRatchet,iInObj,ratchet(iInObj)%tariffIndx)
   ! seasons to and from
-  ratchet(iInObj)%seasonFrom = LookUpSeason(AlphaArray(5),AlphaArray(1))
-  ratchet(iInObj)%seasonTo  = LookUpSeason(AlphaArray(6),AlphaArray(1))
+  ratchet(iInObj)%seasonFrom = LookUpSeason(cAlphaArgs(5),cAlphaArgs(1))
+  ratchet(iInObj)%seasonTo  = LookUpSeason(cAlphaArgs(6),cAlphaArgs(1))
   !ratchet multiplier
-  ratchet(iInObj)%multiplierVal = ProcessNumber(AlphaArray(7),isNotNumeric)
-  ratchet(iInObj)%multiplierPt = AssignVariablePt(AlphaArray(7),isNotNumeric,varIsArgument,varNotYetDefined,&
+  ratchet(iInObj)%multiplierVal = ProcessNumber(cAlphaArgs(7),isNotNumeric)
+  ratchet(iInObj)%multiplierPt = AssignVariablePt(cAlphaArgs(7),isNotNumeric,varIsArgument,varNotYetDefined,&
                                  kindUnknown,0,ratchet(iInObj)%tariffIndx)
   !ratchet offset
-  ratchet(iInObj)%offsetVal = ProcessNumber(AlphaArray(8),isNotNumeric)
-  ratchet(iInObj)%offsetPt = AssignVariablePt(AlphaArray(8),isNotNumeric,varIsArgument,varNotYetDefined, &
+  ratchet(iInObj)%offsetVal = ProcessNumber(cAlphaArgs(8),isNotNumeric)
+  ratchet(iInObj)%offsetPt = AssignVariablePt(cAlphaArgs(8),isNotNumeric,varIsArgument,varNotYetDefined, &
                                 kindUnknown,0,ratchet(iInObj)%tariffIndx)
 END DO
 END SUBROUTINE GetInputEconomicsRatchet
 
-SUBROUTINE GetInputEconomicsVariable
+SUBROUTINE GetInputEconomicsVariable(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -1276,14 +1310,15 @@ SUBROUTINE GetInputEconomicsVariable
           ! na
 
           ! USE STATEMENTS:
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsVariable: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1298,8 +1333,8 @@ INTEGER                     :: tariffPt
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 INTEGER                     :: jVal
 INTEGER                     :: variablePt
@@ -1309,47 +1344,49 @@ CHARACTER(len=MaxNameLength) :: CurrentModuleObject  ! for ease in renaming.
 CurrentModuleObject = 'UtilityCost:Variable'
 numEconVarObj = GetNumObjectsFound(CurrentModuleObject)
 DO iInObj = 1 , numEconVarObj
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-          ' a field was found containing UtilityCost: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
-  tariffPt = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  variablePt = AssignVariablePt(AlphaArray(1),.TRUE.,varIsArgument,&
+  tariffPt = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  variablePt = AssignVariablePt(cAlphaArgs(1),.TRUE.,varIsArgument,&
                                 varUserDefined,kindVariable,iInObj,tariffPt)
-  CALL warnIfNativeVarname(AlphaArray(1),tariffPt)
+  CALL warnIfNativeVarname(cAlphaArgs(1),tariffPt,ErrorsFound,CurrentModuleObject)
   !validate the kind of variable - not used internally except for validation
-  IF (SameString(AlphaArray(3),'ENERGY')) THEN
+  IF (SameString(cAlphaArgs(3),'ENERGY')) THEN
     econVar(variablePt)%varUnitType = varUnitTypeEnergy
-  ELSEIF (SameString(AlphaArray(3),'DEMAND')) THEN
+  ELSEIF (SameString(cAlphaArgs(3),'DEMAND')) THEN
     econVar(variablePt)%varUnitType = varUnitTypeDemand
-  ELSEIF (SameString(AlphaArray(3),'DIMENSIONLESS')) THEN
+  ELSEIF (SameString(cAlphaArgs(3),'DIMENSIONLESS')) THEN
     econVar(variablePt)%varUnitType = varUnitTypeDimensionless
-  ELSEIF (SameString(AlphaArray(3),'CURRENCY')) THEN
+  ELSEIF (SameString(cAlphaArgs(3),'CURRENCY')) THEN
     econVar(variablePt)%varUnitType = varUnitTypeCurrency
   ELSE
     econVar(variablePt)%varUnitType = varUnitTypeDimensionless
-    CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-    ' the Variable Type was not energy, demand, dimensionless, or currency. Dimensionless assumed.')
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data')
+    CALL ShowContinueError('invalid '//trim(cAlphaFieldNames(3))//'="'//trim(cAlphaArgs(3))//'". Dimensionless assumed.')
   END IF
   !move number inputs into econVar
   DO jVal = 1, NumNums
-    econVar(variablePt)%values(jVal) = NumArray(jVal)
+    econVar(variablePt)%values(jVal) = rNumericArgs(jVal)
   END DO
   ! fill the rest of the array with the last value entered
   IF (NumNums .LT. MaxNumMonths) THEN
     DO jVal = NumNums + 1, MaxNumMonths
-      econVar(variablePt)%values(jVal) = NumArray(numNums)
+      econVar(variablePt)%values(jVal) = rNumericArgs(numNums)
     END DO
   END IF
 END DO
 END SUBROUTINE GetInputEconomicsVariable
 
-SUBROUTINE GetInputEconomicsComputation
+SUBROUTINE GetInputEconomicsComputation(ErrorsFound)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -1366,14 +1403,15 @@ SUBROUTINE GetInputEconomicsComputation
           ! na
 
           ! USE STATEMENTS:
+USE DataIPShortCuts
 
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
-          ! na
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsComputation: '
 
           ! INTERFACE BLOCK SPECIFICATIONS
           ! na
@@ -1387,8 +1425,8 @@ INTEGER                     :: tariffPt
 INTEGER                     :: iInObj     ! loop index variable for reading in objects
 INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
 INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(100)  :: AlphaArray !character string data
-REAL(r64),                        DIMENSION(100)  :: NumArray  !numeric data
+!CHARACTER(len=MaxNameLength),DIMENSION(100)  :: cAlphaArgs !character string data
+!REAL(r64),                        DIMENSION(100)  :: rNumericArgs  !numeric data
 INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
 INTEGER                     :: jLine
 INTEGER                     :: jFld
@@ -1403,24 +1441,26 @@ computation%firstStep = 0
 computation%lastStep = -1
 computation%isUserDef = .FALSE.
 DO iInObj = 1 , numComputation
-  CALL GetObjectItem(CurrentModuleObject,iInObj,AlphaArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
+  CALL GetObjectItem(CurrentModuleObject,iInObj,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
   !check to make sure none of the values are another economic object
   DO jFld = 1, NumAlphas
-    IF (INDEX(MakeUpperCase(AlphaArray(jFld)),'UTILITYCOST:') .GT. 0) THEN
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//' named ' // TRIM(AlphaArray(1)) //   &
-                ' a field was found containing UTILITYCOST: which may indicate a missing comma.')
+    IF (INDEX(MakeUpperCase(cAlphaArgs(jFld)),'UTILITYCOST:') .GT. 0) THEN
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)// '="' // TRIM(cAlphaArgs(1)) //'".')
+      CALL ShowContinueError('... a field was found containing UtilityCost: which may indicate a missing comma.')
     END IF
   END Do
-  tariffPt = FindTariffIndex(AlphaArray(2),AlphaArray(1))
-  CALL warnIfNativeVarname(AlphaArray(1),tariffPt)
+  tariffPt = FindTariffIndex(cAlphaArgs(2),cAlphaArgs(1),ErrorsFound,CurrentModuleObject)
+  CALL warnIfNativeVarname(cAlphaArgs(1),tariffPt,ErrorsFound,CurrentModuleObject)
   !tariff and computation share the same index, the tariff index
   !so all references are to the tariffPt
   IF (isWithinRange(tariffPt,1,numTariff)) THEN
-    computation(tariffPt)%computeName = AlphaArray(1)
+    computation(tariffPt)%computeName = cAlphaArgs(1)
     computation(tariffPt)%firstStep = numSteps + 1
     DO jLine = 3, NumAlphas
-      CALL parseComputeLine(AlphaArray(jLine),tariffPt)
+      CALL parseComputeLine(cAlphaArgs(jLine),tariffPt)
     END DO
     computation(tariffPt)%lastStep = numSteps
     ! check to make sure that some steps were defined
@@ -1428,17 +1468,92 @@ DO iInObj = 1 , numComputation
       computation(tariffPt)%firstStep = 0
       computation(tariffPt)%lastStep = -1
       computation(tariffPt)%isUserDef = .FALSE.
-      CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//': No lines in the computation can be interpretted '// &
-                             TRIM(AlphaArray(1)))
+      CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
+      CALL ShowContinueError('... No lines in the computation can be interpreted ')
     ELSE
       computation(tariffPt)%isUserDef = .TRUE.
     END IF
   ELSE
-    CALL ShowWarningError('In '//TRIM(CurrentModuleObject)//': did not find referenced tariff name ' // TRIM(AlphaArray(2)) &
-                           // ' for ' // TRIM(AlphaArray(1)))
+    CALL ShowWarningError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
+    CALL ShowContinueError('... not found '//trim(cAlphaFieldNames(2))//'="'// TRIM(cAlphaArgs(2))//'".')
   END IF
 END DO
 END SUBROUTINE GetInputEconomicsComputation
+
+SUBROUTINE GetInputEconomicsCurrencyType(ErrorsFound)
+          ! SUBROUTINE INFORMATION:
+          !       AUTHOR         Jason Glazer
+          !       DATE WRITTEN   August 2008
+          !       MODIFIED       na
+          !       RE-ENGINEERED  na
+
+          ! PURPOSE OF THIS SUBROUTINE:
+          !   Sets the type of currency (U.S. Dollar, Euro, Yen, etc.. )
+          !   This is a "unique" object.
+
+          ! METHODOLOGY EMPLOYED:
+          !   Uses get input structure similar to other objects
+
+          ! REFERENCES:
+          ! na
+
+          ! USE STATEMENTS:
+USE DataInterfaces, ONLY :  ShowWarningError
+USE DataCostEstimate
+USE DataIPShortCuts
+
+IMPLICIT NONE
+
+          ! SUBROUTINE ARGUMENT DEFINITIONS:
+LOGICAL, INTENT(INOUT) :: ErrorsFound  ! true if errors found during getting input objects.
+
+          ! SUBROUTINE PARAMETER DEFINITIONS:
+CHARACTER(len=*), PARAMETER :: CurrentModuleObject='CurrencyType'
+CHARACTER(len=*), PARAMETER :: RoutineName='GetInputEconomicsCurrencyType: '
+
+          ! INTERFACE BLOCK SPECIFICATIONS:
+          ! na
+
+          ! DERIVED TYPE DEFINITIONS:
+          ! na
+
+          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
+INTEGER                     :: NumCurrencyType
+INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
+INTEGER                     :: NumNums    ! Number of elements in the numeric array
+!CHARACTER(len=MaxNameLength),DIMENSION(5) :: cAlphaArgs !character string data - should be 1
+!REAL(r64),                   DIMENSION(5) :: rNumericArgs  !numeric data          - should be 0
+INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
+INTEGER                     :: i
+
+CALL initializeMonetaryUnit
+NumCurrencyType = GetNumObjectsFound(CurrentModuleObject)
+selectedMonetaryUnit = 0 ! invalid
+IF (NumCurrencyType .EQ. 0) THEN
+  selectedMonetaryUnit = 1 !USD - U.S. Dollar
+ELSEIF (NumCurrencyType .EQ. 1) THEN
+  CALL GetObjectItem(CurrentModuleObject,1,cAlphaArgs,NumAlphas, &
+                    rNumericArgs,NumNums,IOSTAT,  &
+                   AlphaBlank=lAlphaFieldBlanks,NumBlank=lNumericFieldBlanks,  &
+                   AlphaFieldnames=cAlphaFieldNames,NumericFieldNames=cNumericFieldNames)
+  ! Monetary Unit
+  DO i = 1, numMonetaryUnit
+    IF (SameString(cAlphaArgs(1),monetaryUnit(i)%code)) THEN
+      selectedMonetaryUnit = i
+      EXIT
+    END IF
+  END DO
+  IF (selectedMonetaryUnit == 0) THEN
+    CALL ShowSevereError(RoutineName//TRIM(CurrentModuleObject)//'="'//trim(cAlphaArgs(1))//'" invalid data.')
+    CALL ShowContinueError('... invalid '//trim(cAlphaFieldNames(1))//'.')
+    ErrorsFound=.true.
+  ENDIF
+ELSEIF (NumCurrencyType .GT. 1) THEN
+  CALL ShowWarningError(RoutineName//CurrentModuleObject//  &
+     ' Only one instance of this object is allowed. USD will be used.')
+  selectedMonetaryUnit = 1 !USD - U.S. Dollar
+ENDIF
+END SUBROUTINE GetInputEconomicsCurrencyType
 
 SUBROUTINE parseComputeLine(lineOfCompute,fromTariff)
           ! SUBROUTINE INFORMATION:
@@ -1607,71 +1722,6 @@ ELSE
   aWord = ''
 END IF
 END SUBROUTINE GetLastWord
-
-SUBROUTINE GetInputEconomicsCurrencyType
-          ! SUBROUTINE INFORMATION:
-          !       AUTHOR         Jason Glazer
-          !       DATE WRITTEN   August 2008
-          !       MODIFIED       na
-          !       RE-ENGINEERED  na
-
-          ! PURPOSE OF THIS SUBROUTINE:
-          !   Sets the type of currency (U.S. Dollar, Euro, Yen, etc.. )
-          !   This is a "unique" object.
-
-          ! METHODOLOGY EMPLOYED:
-          !   Uses get input structure similar to other objects
-
-          ! REFERENCES:
-          ! na
-
-          ! USE STATEMENTS:
-USE DataInterfaces, ONLY :  ShowWarningError
-USE InputProcessor, ONLY : GetNumObjectsFound, GetObjectItem, VerifyName, SameString
-USE DataCostEstimate
-
-IMPLICIT NONE
-
-          ! SUBROUTINE ARGUMENT DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE PARAMETER DEFINITIONS:
-CHARACTER(len=*), PARAMETER :: CurrentModuleObject='CurrencyType'
-
-          ! INTERFACE BLOCK SPECIFICATIONS:
-          ! na
-
-          ! DERIVED TYPE DEFINITIONS:
-          ! na
-
-          ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-INTEGER                     :: NumCurrencyType
-INTEGER                     :: NumAlphas  ! Number of elements in the alpha array
-INTEGER                     :: NumNums    ! Number of elements in the numeric array
-CHARACTER(len=MaxNameLength),DIMENSION(5) :: AlphArray !character string data - should be 1
-REAL(r64),                   DIMENSION(5) :: NumArray  !numeric data          - should be 0
-INTEGER                     :: IOStat     ! IO Status when calling get input subroutine
-INTEGER                     :: i
-
-CALL initializeMonetaryUnit
-NumCurrencyType = GetNumObjectsFound(CurrentModuleObject)
-IF (NumCurrencyType .EQ. 0) THEN
-  selectedMonetaryUnit = 1 !USD - U.S. Dollar
-ELSEIF (NumCurrencyType .EQ. 1) THEN
-  CALL GetObjectItem(CurrentModuleObject,1,AlphArray,NumAlphas, &
-                    NumArray,NumNums,IOSTAT)
-  ! Monetary Unit
-  DO i = 1, numMonetaryUnit
-    IF (SameString(AlphArray(1),monetaryUnit(i)%code)) THEN
-      selectedMonetaryUnit = i
-      EXIT
-    END IF
-  END DO
-ELSEIF (NumCurrencyType .GT. 1) THEN
-  CALL ShowWarningError(CurrentModuleObject//' Only one instance of this object is allowed. USD will be used.')
-  selectedMonetaryUnit = 1 !USD - U.S. Dollar
-ENDIF
-END SUBROUTINE GetInputEconomicsCurrencyType
 
 SUBROUTINE initializeMonetaryUnit
           ! SUBROUTINE INFORMATION:
@@ -2098,7 +2148,7 @@ ELSE
 END IF
 END FUNCTION LookUpSeason
 
-INTEGER FUNCTION FindTariffIndex(nameOfTariff,nameOfReferingObj)
+INTEGER FUNCTION FindTariffIndex(nameOfTariff,nameOfReferingObj,ErrorsFound,nameOfCurObj)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   May 2004
@@ -2121,6 +2171,8 @@ IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
           ! SUBROUTINE ARGUMENT DEFINITIONS:
 CHARACTER(len=*), INTENT(IN) :: nameOfTariff
 CHARACTER(len=*), INTENT(IN) :: nameOfReferingObj
+LOGICAL, INTENT(INOUT)       :: ErrorsFound
+CHARACTER(len=*), INTENT(IN) :: nameOfCurObj
 
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
@@ -2145,13 +2197,14 @@ END DO
 IF (found .GT. 0) THEN
   FindTariffIndex = found
 ELSE
-  CALL ShowWarningError('UtilityCost:Qualify: The tariff name ' // TRIM(nameOfTariff))
-  CALL ShowContinueError ('  not found in: ' // TRIM(nameOfReferingObj))
+  CALL ShowSevereError(trim(nameOfCurObj)//'="'//trim(nameOfReferingObj)//'" invalid tariff referenced')
+  CALL ShowContinueError ('not found UtilityCost:Tariff="'//trim(nameOfTariff)//'".')
+  ErrorsFound=.true.
   FindTariffIndex = 0
 END IF
 END FUNCTION FindTariffIndex
 
-SUBROUTINE warnIfNativeVarname(objName,curTariffIndex)
+SUBROUTINE warnIfNativeVarname(objName,curTariffIndex,ErrorsFound,curobjName)
           ! SUBROUTINE INFORMATION:
           !    AUTHOR         Jason Glazer of GARD Analytics, Inc.
           !    DATE WRITTEN   March 2007
@@ -2172,8 +2225,11 @@ SUBROUTINE warnIfNativeVarname(objName,curTariffIndex)
 IMPLICIT NONE    ! Enforce explicit typing of all variables in this routine
 
           ! SUBROUTINE ARGUMENT DEFINITIONS:
-CHARACTER(len=MaxNameLength), INTENT(IN)   :: objName
-INTEGER, INTENT(IN)                        :: curTariffIndex
+CHARACTER(len=*), INTENT(IN)  :: objName
+INTEGER, INTENT(IN)           :: curTariffIndex
+LOGICAL, INTENT(INOUT)        :: ErrorsFound
+CHARACTER(len=*), INTENT(IN)  :: curobjName
+
           ! SUBROUTINE PARAMETER DEFINITIONS:
           ! na
 
@@ -2184,59 +2240,64 @@ INTEGER, INTENT(IN)                        :: curTariffIndex
           ! na
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
-LOGICAL    :: throwWarning
+LOGICAL    :: throwError
 
-throwWarning = .FALSE.
-IF (SameString(objName,'TotalEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'TotalDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'ShoulderEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'ShoulderDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'OffPeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'OffPeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'MidPeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'MidPeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakExceedsOffPeak')) throwWarning = .TRUE.
-IF (SameString(objName,'OffPeakExceedsPeak')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakExceedsMidPeak')) throwWarning = .TRUE.
-IF (SameString(objName,'MidPeakExceedsPeak')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakExceedsShoulder')) throwWarning = .TRUE.
-IF (SameString(objName,'ShoulderExceedsPeak')) throwWarning = .TRUE.
-IF (SameString(objName,'IsWinter')) throwWarning = .TRUE.
-IF (SameString(objName,'IsNotWinter')) throwWarning = .TRUE.
-IF (SameString(objName,'IsSpring')) throwWarning = .TRUE.
-IF (SameString(objName,'IsNotSpring')) throwWarning = .TRUE.
-IF (SameString(objName,'IsSummer')) throwWarning = .TRUE.
-IF (SameString(objName,'IsNotSummer')) throwWarning = .TRUE.
-IF (SameString(objName,'IsAutumn')) throwWarning = .TRUE.
-IF (SameString(objName,'IsNotAutumn')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndShoulderEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndShoulderDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndMidPeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndMidPeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'ShoulderAndOffPeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'ShoulderAndOffPeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndOffPeakEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'PeakAndOffPeakDemand')) throwWarning = .TRUE.
-IF (SameString(objName,'RealTimePriceCosts')) throwWarning = .TRUE.
-IF (SameString(objName,'AboveCustomerBaseCosts')) throwWarning = .TRUE.
-IF (SameString(objName,'BelowCustomerBaseCosts')) throwWarning = .TRUE.
-IF (SameString(objName,'AboveCustomerBaseEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'BelowCustomerBaseEnergy')) throwWarning = .TRUE.
-IF (SameString(objName,'EnergyCharges')) throwWarning = .TRUE.
-IF (SameString(objName,'DemandCharges')) throwWarning = .TRUE.
-IF (SameString(objName,'ServiceCharges')) throwWarning = .TRUE.
-IF (SameString(objName,'Basis')) throwWarning = .TRUE.
-IF (SameString(objName,'Surcharges')) throwWarning = .TRUE.
-IF (SameString(objName,'Adjustments')) throwWarning = .TRUE.
-IF (SameString(objName,'Subtotal')) throwWarning = .TRUE.
-IF (SameString(objName,'Taxes')) throwWarning = .TRUE.
-IF (SameString(objName,'Total')) throwWarning = .TRUE.
-IF (throwWarning) THEN
-  CALL ShowWarningError('UtilityCost: You cannot name an object using the same name as a native variable: ' // TRIM(objName))
+throwError = .FALSE.
+IF (SameString(objName,'TotalEnergy')) throwError = .TRUE.
+IF (SameString(objName,'TotalDemand')) throwError = .TRUE.
+IF (SameString(objName,'PeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'PeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'ShoulderEnergy')) throwError = .TRUE.
+IF (SameString(objName,'ShoulderDemand')) throwError = .TRUE.
+IF (SameString(objName,'OffPeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'OffPeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'MidPeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'MidPeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'PeakExceedsOffPeak')) throwError = .TRUE.
+IF (SameString(objName,'OffPeakExceedsPeak')) throwError = .TRUE.
+IF (SameString(objName,'PeakExceedsMidPeak')) throwError = .TRUE.
+IF (SameString(objName,'MidPeakExceedsPeak')) throwError = .TRUE.
+IF (SameString(objName,'PeakExceedsShoulder')) throwError = .TRUE.
+IF (SameString(objName,'ShoulderExceedsPeak')) throwError = .TRUE.
+IF (SameString(objName,'IsWinter')) throwError = .TRUE.
+IF (SameString(objName,'IsNotWinter')) throwError = .TRUE.
+IF (SameString(objName,'IsSpring')) throwError = .TRUE.
+IF (SameString(objName,'IsNotSpring')) throwError = .TRUE.
+IF (SameString(objName,'IsSummer')) throwError = .TRUE.
+IF (SameString(objName,'IsNotSummer')) throwError = .TRUE.
+IF (SameString(objName,'IsAutumn')) throwError = .TRUE.
+IF (SameString(objName,'IsNotAutumn')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndShoulderEnergy')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndShoulderDemand')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndMidPeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndMidPeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'ShoulderAndOffPeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'ShoulderAndOffPeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndOffPeakEnergy')) throwError = .TRUE.
+IF (SameString(objName,'PeakAndOffPeakDemand')) throwError = .TRUE.
+IF (SameString(objName,'RealTimePriceCosts')) throwError = .TRUE.
+IF (SameString(objName,'AboveCustomerBaseCosts')) throwError = .TRUE.
+IF (SameString(objName,'BelowCustomerBaseCosts')) throwError = .TRUE.
+IF (SameString(objName,'AboveCustomerBaseEnergy')) throwError = .TRUE.
+IF (SameString(objName,'BelowCustomerBaseEnergy')) throwError = .TRUE.
+IF (SameString(objName,'EnergyCharges')) throwError = .TRUE.
+IF (SameString(objName,'DemandCharges')) throwError = .TRUE.
+IF (SameString(objName,'ServiceCharges')) throwError = .TRUE.
+IF (SameString(objName,'Basis')) throwError = .TRUE.
+IF (SameString(objName,'Surcharges')) throwError = .TRUE.
+IF (SameString(objName,'Adjustments')) throwError = .TRUE.
+IF (SameString(objName,'Subtotal')) throwError = .TRUE.
+IF (SameString(objName,'Taxes')) throwError = .TRUE.
+IF (SameString(objName,'Total')) throwError = .TRUE.
+IF (throwError) THEN
+  ErrorsFound=.true.
   IF (curTariffIndex .GE. 1 .AND. curTariffIndex .LE. numTariff) THEN
-    CALL ShowContinueError('   in Tariff: ' // TRIM(tariff(curTariffIndex)%tariffName))
+    CALL ShowSevereError('UtilityCost:Tariff="'//trim(tariff(curTariffIndex)%tariffName)//'" invalid referenced name')
+    CALL ShowContinueError(trim(curobjName)//'="'//trim(objName)//  &
+       '" You cannot name an object using the same name as a native variable.')
+  ELSE
+    CALL ShowSevereError(trim(curobjname)//'="'//trim(objname)//  &
+       '" You cannot name an object using the same name as a native variable.')
   END IF
 END IF
 END SUBROUTINE warnIfNativeVarname

@@ -1809,7 +1809,7 @@ SUBROUTINE DetailsForSurfaces(RptType)
               ! Interior:  horizontal, still air, heat flow downward, Rcin = 0.92 ft2-F-hr/BTU
               ! Exterior:  horizontal, semi-exterior (crawlspace), Rcout = 0.46 ft2-F-hr/BTU
               IF (NominalU(Surface(surf)%Construction) > 0.0) THEN
-                NominalUwithConvCoeffs = 1.0d0 / (0.1620212 + (1.0d0 / NominalU(Surface(surf)%Construction)) + 0.0810106d0)
+                NominalUwithConvCoeffs = 1.0d0 / (0.1620212d0 + (1.0d0 / NominalU(Surface(surf)%Construction)) + 0.0810106d0)
               ELSE
                 cNominalUwithConvCoeffs = '[invalid]'
               ENDIF

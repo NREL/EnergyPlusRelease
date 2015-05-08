@@ -1716,7 +1716,7 @@ Until:  DO
             ENDDO
           ENDIF
         ENDIF
-        IF (iDay == 59 .and. rowCnt < 8784) THEN   ! 28 Feb
+        IF (iDay == 59 .and. rowCnt < 8784*hrlimitcount) THEN   ! 28 Feb
           ! Dup 28 Feb to 29 Feb (60)
           iDay=iDay+1
           Schedule(SchNum)%WeekSchedulePointer(iDay)=Schedule(SchNum)%WeekSchedulePointer(iDay-1)

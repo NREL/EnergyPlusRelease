@@ -1851,8 +1851,8 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
 
                  !Calculate the hemispherical-hemispherical transmittance
 
-                 Sum1 = 0.
-                 Sum2 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
                  DO  J = 1 , Geom%Inc%NBasis     !Incident ray loop
                      Sum2 = Sum2 + Geom%Inc%Lamda (J)
                      DO  M = 1 , Geom%Trn%NBasis     !Outgoing ray loop
@@ -1869,8 +1869,8 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
 
                  !Calculate the hemispherical-hemispherical transmittance for visible spetrum
 
-                 Sum1 = 0.
-                 Sum2 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
                  DO  J = 1 , Geom%Inc%NBasis     !Incident ray loop
                      Sum2 = Sum2 + Geom%Inc%Lamda (J)
                      DO  M = 1 , Geom%Trn%NBasis     !Outgoing ray loop
@@ -1878,10 +1878,10 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
      &                        Construct(IConst)%BSDFInput%VisFrtTrans ( J , M )
                      END DO        !Outgoing ray loop
                  END DO        !Incident ray loop
-                 IF (Sum2 > 0 ) THEN
+                 IF (Sum2 > 0.0d0 ) THEN
                      State%WinDiffVisTrans = Sum1/Sum2
                  ELSE
-                     State%WinDiffVisTrans = 0.
+                     State%WinDiffVisTrans = 0.0d0
                      CALL ShowWarningError ('BSDF--Inc basis has zero projected solid angle')
                  ENDIF
 
@@ -1889,9 +1889,9 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  Construct(IConst)%TransDiff = SurfaceWindow(ISurf)%ComplexFen%State(IState)%WinDiffTrans
                  !Calculate Window Sky Transmittance (transmitted radiation assumed diffuse)
                  !and Sky Absorptance (by layer)
-                 Sum1 = 0.
-                 Sum2 = 0.
-                 Sum3 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
+                 Sum3 = 0.0d0
                  DO  JJ =  1 ,  Geom%NSky
                      DO M = 1 , Geom%Trn%NBasis
                          J = Geom%SkyIndex( JJ )
@@ -1903,7 +1903,12 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      J = Geom%SkyIndex( JJ )
                      Sum2 = Sum2 + Geom%SolSkyWt ( JJ ) * Geom%Inc%Lamda( J )
                  END DO
+                 
+                 IF (Sum2 /= 0.0d0) THEN
                  State%WinSkyTrans = Sum1/Sum2
+                 ELSE
+                   State%WinSkyTrans = 0.0d0
+                 END IF
 
                  ALLOCATE(State%WinSkyFtAbs(State%NLayers))
                  !Also allocate the beam quantities for this state
@@ -1914,7 +1919,12 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          Sum3 = Sum3 + Geom%SolSkyWt ( JJ ) * Geom%Inc%Lamda( J ) * &
      &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1 , J)
                      END DO
+                     
+                     IF (Sum2 /= 0.0d0) THEN
                      State%WinSkyFtAbs(L) = Sum3/Sum2
+                     ELSE
+                       State%WinSkyFtAbs(L) = 0.0d0
+                     END IF
 
                  END DO
                  !Calculate Window Sky/Ground Transmittance
@@ -1922,9 +1932,9 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  !This is the same calculation as the sky transmittance, except that the set of incident
                  !rays and the ray weights are different
                  !Also calculate Window Sky/Ground Absorptance (by layer)
-                 Sum1 = 0.
-                 Sum2 = 0.
-                 Sum3 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
+                 Sum3 = 0.0d0
 
                  DO   JJ = 1 ,  Geom%NGnd
                      DO M = 1 , Geom%Trn%NBasis
@@ -1938,8 +1948,14 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      J = Geom%GndIndex( JJ )
                      Sum2 = Sum2 + Geom%SolSkyGndWt ( JJ ) * Geom%Inc%Lamda( J )
                  END DO
+                 
+                 IF (Sum2 /= 0.0d0) THEN
                  State%WinSkyGndTrans = Sum1/Sum2
+                 ELSE
+                   State%WinSkyGndTrans = 0.0d0
+                 END IF
                  ALLOCATE(State%WinSkyGndAbs(State%NLayers))
+                 
                  DO L = 1 , State%NLayers
                      Sum3 = 0.0d0
                      DO  JJ =  1 ,  Geom%NGnd
@@ -1947,12 +1963,17 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          Sum3 = Sum3 + Geom%SolSkyGndWt ( JJ ) * Geom%Inc%Lamda( J ) * &
      &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs(1 , J)
                      END DO
+                     
+                     IF (Sum2 /= 0.0d0) THEN
                      State%WinSkyGndAbs(L) = Sum3/Sum2
+                     ELSE
+                       State%WinSkyGndAbs(L) = 0.0d0
+                     END IF
                  END DO
                  !Calculate Window Back Hemispherical Reflectance and Layer Back Hemispherical Absorptance
-                 Sum1 = 0.
-                 Sum2 = 0.
-                 Sum3 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
+                 Sum3 = 0.0d0
                  !Note this again assumes the equivalence Inc basis = transmission basis for back incidence and
                  ! Trn basis = incident basis for back incidence
                  DO   J = 1 , Geom%Trn%NBasis
@@ -1965,7 +1986,12 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                  DO  J = 1 , Geom%Trn%NBasis
                      Sum2 = Sum2 +  Geom%Trn%Lamda( J )
                  END DO
+                 
+                 IF (Sum2 /= 0.0d0) THEN
                  State%WinBkHemRefl = Sum1/Sum2
+                 ELSE
+                   State%WinBkHemRefl = 0.0d0
+                 END IF
 
                  Construct(IConst)%ReflectSolDiffBack = State%WinBkHemRefl
 
@@ -1975,14 +2001,19 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          Sum3 = Sum3 +  Geom%Trn%Lamda( J ) * &
      &                     Construct(IConst)%BSDFInput%Layer(L)%BkAbs( 1 , J)
                      END DO
+                     
+                     IF (Sum2 /= 0.0d0) THEN
                      State%WinBkHemAbs(L) = Sum3/Sum2
+                     ELSE
+                       State%WinBkHemAbs(L) = 0.0d0
+                     END IF
 
                      !Put this into the construction for use in non-detailed optical calculations
                      Construct(IConst)%AbsDiffBack(L) = State%WinBkHemAbs(L)
                  END DO
                  !Calculate Window Layer Front Hemispherical Absorptance
-                 Sum1 = 0.
-                 Sum2 = 0.
+                 Sum1 = 0.0d0
+                 Sum2 = 0.0d0
                  DO  J = 1 , Geom%Inc%NBasis
                      Sum2 = Sum2 +  Geom%Inc%Lamda( J )
                  END DO
@@ -1993,7 +2024,12 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                          Sum1 = Sum1 +  Geom%Inc%Lamda( J ) * &
      &                     Construct(IConst)%BSDFInput%Layer(L)%FrtAbs( 1 , J)
                      END DO
+                     
+                     IF (Sum2 /= 0.0d0) THEN
                      State%WinFtHemAbs(L) = Sum1/Sum2
+                     ELSE
+                       State%WinFtHemAbs(L) = 0.0d0
+                     END IF
 
                      !Put this into the construction for use in non-detailed optical calculations
                      Construct(IConst)%AbsDiff(L) = State%WinFtHemAbs(L)
@@ -2029,8 +2065,8 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
                      IF ( SurfaceWindow(JSurf)%WindowModelType /= WindowBSDFModel ) CYCLE
                      !
                      !  Directional-hemispherical back reflectance
-                     Sum1 = 0.
-                     Sum2 = 0.
+                     Sum1 = 0.0d0
+                     Sum2 = 0.0d0
                      DO  J = 1 , Geom%NSurfInt ( KBkSurf )   !Inc Ray loop
                          Sum2 = Sum2 + Geom%Trn%Lamda( Geom%SurfInt(KBkSurf , J ) )
                          DO   M = 1 , Geom%Inc%NBasis   !Outgoing Ray loop
@@ -2055,8 +2091,8 @@ SUBROUTINE CalcWindowStaticProperties( IWind,ISurf,IState,IConst,Window,Geom,Sta
 
                      !  Directional layer  back absorption
                      DO L = 1 , State%NLayers  !layer loop
-                         Sum1 = 0.
-                         Sum2 = 0.
+                         Sum1 = 0.0d0
+                         Sum2 = 0.0d0
                          DO  J = 1 , Geom%NSurfInt ( KBkSurf )  !Inc Ray loop
                              Sum2 = Sum2 + Geom%Trn%Lamda( Geom%SurfInt(KBkSurf , J ) )
                              Sum1 = Sum1 + Geom%Trn%Lamda( Geom%SurfInt(KBkSurf , J ) ) * &
@@ -3476,10 +3512,10 @@ SUBROUTINE CalcComplexWindowThermal(SurfNum,ConstrNum,HextConvCoeff,SurfInsideTe
       RhoGlIR2 = 1.d0-emis(2*ngllayer)
       ShGlReflFacIR = 1.d0-RhoGlIR2*RhoShIR1
       NetIRHeatGainShade = ShadeArea * &
-        EpsShIR2*(sigma*theta(nglfacep)**4.0d0 - rmir) + &
-        EpsShIR1*(sigma*theta(nglfacep-1)**4.0d0 - rmir)*RhoGlIR2*TauShIR/ShGlReflFacIR
+        EpsShIR2*(sigma*theta(nglfacep)**4 - rmir) + &
+        EpsShIR1*(sigma*theta(nglfacep-1)**4 - rmir)*RhoGlIR2*TauShIR/ShGlReflFacIR
       NetIRHeatGainGlass = ShadeArea * &
-         (emis(2*ngllayer)*TauShIR/ShGlReflFacIR) * (sigma*theta(2*ngllayer)**4.0d0 - rmir)
+         (emis(2*ngllayer)*TauShIR/ShGlReflFacIR) * (sigma*theta(2*ngllayer)**4 - rmir)
       ConvHeatGainFrZoneSideOfShade = ShadeArea * hcin*(theta(nglfacep) - tind)
       WinHeatGain(SurfNum) = WinTransSolar(SurfNum) + ConvHeatFlowNatural + ConvHeatGainFrZoneSideOfShade + &
                            NetIRHeatGainGlass + NetIRHeatGainShade

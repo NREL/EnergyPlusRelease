@@ -297,7 +297,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
           ! Do the Begin Simulation initializations
   IF (BeginSimFlag) THEN
     CALL AllocateSurfaceHeatBalArrays ! Allocate the Module Arrays before any inits take place
-    InterZoneWindow=ANY(Zone%IntZWindow)
+    InterZoneWindow=ANY(Zone%HasInterZoneWindow)
     ALLOCATE (IsZoneDV(NumOfZones))
     IsZoneDV=.false.
     ALLOCATE (IsZoneCV(NumOfZones))
@@ -518,7 +518,7 @@ SUBROUTINE InitSurfaceHeatBalance  ! Surface Heat Balance Initialization Manager
   IF(SunIsUp .AND. (BeamSolarRad+GndSolarRad+DifSolarRad > 0.0)) THEN
     DO NZ = 1,NumOfZones
       IF(ZoneDaylight(NZ)%TotalDaylRefPoints > 0) THEN
-        IF(Zone(NZ)%IntZWindow) THEN
+        IF(Zone(NZ)%HasInterZoneWindow) THEN
           CALL DayltgInterReflIllFrIntWins(NZ)
           CALL DayltgGlareWithIntWins(ZoneDaylight(NZ)%GlareIndexAtRefPt,NZ)
         END IF
@@ -2050,7 +2050,7 @@ SUBROUTINE InitSolarHeatGains
                    WeightPreviousHour * ReflFacBmToDiffSolObs(SurfNum,PreviousHour))
         BmToDiffReflFacGnd(SurfNum) = (WeightNow * ReflFacBmToDiffSolGnd(SurfNum,HourOfDay) + &
                    WeightPreviousHour * ReflFacBmToDiffSolGnd(SurfNum,PreviousHour))
-        
+
         ! TH2 CR 9056
         SurfaceWindow(SurfNum)%SkySolarInc = SurfaceWindow(SurfNum)%SkySolarInc + &
                     BeamSolarRad * (BmToBmReflFacObs(SurfNum) + BmToDiffReflFacObs(SurfNum))  +  &
@@ -2230,7 +2230,7 @@ SUBROUTINE InitSolarHeatGains
         ! Total incident solar. Beam and sky reflection from obstructions, if calculated, is included
         ! in SkySolarInc.
         ! QRadSWOutIncident(SurfNum) = QRadSWOutIncidentBeam(SurfNum) + SkySolarInc + GndSolarInc
-        
+
         ! TH2 CR 9056
         QRadSWOutIncident(SurfNum) = QRadSWOutIncidentBeam(SurfNum) +  QRadSWOutIncidentSkyDiffuse(SurfNum) + &
                                      QRadSWOutIncBmToDiffReflGnd(SurfNum) + QRadSWOutIncSkyDiffReflGnd(SurfNum)
@@ -3446,7 +3446,7 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
         D(NZ,NZ)=1.0
       ENDDO
 
-!      IF (.not. ANY(Zone%IntZWindow)) RETURN  ! this caused massive diffs
+!      IF (.not. ANY(Zone%HasInterZoneWindow)) RETURN  ! this caused massive diffs
       IF (KickOffSimulation .or. KickOffSizing) RETURN
 !            Compute fraction transmitted in one pass.
 
@@ -3457,7 +3457,7 @@ SUBROUTINE ComputeDifSolExcZonesWIZWindows(NumberOfZones)
         IF (Construct(Surface(SurfNum)%Construction)%TransDiff <= 0.0) CYCLE
 
         NZ=Surface(SurfNum)%Zone
-        if (.not. Zone(NZ)%IntZWindow) CYCLE
+        if (.not. Zone(NZ)%HasInterZoneWindow) CYCLE
         MZ=Surface(Surface(SurfNum)%ExtBoundCond)%Zone
         FractDifShortZtoZ(MZ,NZ)=FractDifShortZtoZ(MZ,NZ)+ &
                        Construct(Surface(SurfNum)%Construction)%TransDiff*VMULT(NZ)*Surface(SurfNum)%Area

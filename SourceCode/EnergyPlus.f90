@@ -574,16 +574,16 @@ USE DataSystemVariables
         IF (LEN_TRIM(LINE) == 0) CYCLE      ! Ignore Blank Lines
 
         CALL ConvertCasetoLower(LINE,LINEOut)    ! Turn line into lower case
-        LINE=LINEOut
+!        LINE=LINEOut
 
-        IHEAD=INDEX(LINE,Heading)
+        IHEAD=INDEX(LINEOut,Heading)
         IF (IHEAD .EQ. 0) CYCLE
 
 !                                  See if [ and ] are on line
-        ILB=INDEX(LINE,'[')
-        IRB=INDEX(LINE,']')
+        ILB=INDEX(LINEOut,'[')
+        IRB=INDEX(LINEOut,']')
         IF (ILB == 0 .AND. IRB == 0) CYCLE
-        IF (INDEX(LINE,'['//TRIM(Heading)//']') == 0) CYCLE    ! Must be really correct heading line
+        IF (INDEX(LINEOut,'['//TRIM(Heading)//']') == 0) CYCLE    ! Must be really correct heading line
         ILB=0
         IRB=0
 
@@ -599,20 +599,20 @@ USE DataSystemVariables
           IF (LEN_TRIM(LINE) == 0) CYCLE      ! Ignore Blank Lines
 
           CALL ConvertCasetoLower(LINE,LINEOut)    ! Turn line into lower case
-          LINE=LINEOut
+!         LINE=LINEOut
 
-          ILB=INDEX(LINE,'[')
-          IRB=INDEX(LINE,']')
+          ILB=INDEX(LINEOut,'[')
+          IRB=INDEX(LINEOut,']')
           NewHeading=(ILB /= 0 .and. IRB /= 0)
 
 !                                  Should be a parameter line
 !                                  KindofParameter = string
-          IEQ=INDEX(LINE,'=')
-          IPAR=INDEX(LINE,TRIM(Param))
+          IEQ=INDEX(LINEOut,'=')
+          IPAR=INDEX(LINEOut,TRIM(Param))
           IF (IEQ == 0) CYCLE
           IF (IPAR == 0) CYCLE
           IF (IPAR /= 1) CYCLE
-          IF (INDEX(LINE,TRIM(Param)//'=') == 0) CYCLE      ! needs to be param=
+          IF (INDEX(LINEOut,TRIM(Param)//'=') == 0) CYCLE      ! needs to be param=
 
 !                                  = found and parameter found.
           IF (IPAR > IEQ) CYCLE
@@ -620,7 +620,7 @@ USE DataSystemVariables
 !                                  parameter = found
 !                                  Set output string to start with non-blank character
 
-          DataOut=ADJUSTL(LINE(IEQ+1:))
+          DataOut=ADJUSTL(LINEOut(IEQ+1:))
           Found=.true.
           EXIT
 

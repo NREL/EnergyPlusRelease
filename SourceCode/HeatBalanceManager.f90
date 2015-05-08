@@ -6970,11 +6970,11 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
         !Glass layer counter
     iMatGlass = 0
     !Simon TODO: This is to be confirmed.  If this is just initial value, then we might want to make better guess
-    NominalU(ConstrNum) = 0.1
+    NominalU(ConstrNum) = 0.1d0
     !Simon TODO: If I do not put this, then it is considered that surface is NOT window
-    Construct(ConstrNum)%TransDiff = 0.1    !This is a place holder to flag
-                                            !the construction as a window until
-                                            !the correct value is entered in WindowComplexManager
+    Construct(ConstrNum)%TransDiff = 0.1d0    !This is a place holder to flag
+                                              !the construction as a window until
+                                              !the correct value is entered in WindowComplexManager
 
     !Now override the deraults as appropriate
     Construct(ConstrNum)%Name = locAlphaArgs(1)
@@ -6991,6 +6991,9 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     CASE DEFAULT
       ! throw error
       ErrorsFound=.true.
+      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
+      CALL ShowContinueError(trim(locAlphaFieldNames(2))//' entered value="'//TRIM(locAlphaArgs(2))//  &
+        '" should be LBNLWindow or UserDefined.')
     END SELECT
 
     SELECT CASE (locAlphaArgs(3)) ! Basis Symmetry Keyword
@@ -7001,12 +7004,18 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     CASE DEFAULT
       ! throw error
       ErrorsFound=.true.
+      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
+      CALL ShowContinueError(trim(locAlphaFieldNames(3))//' entered value="'//TRIM(locAlphaArgs(3))//  &
+        '" should be Axisymmetric or None.')
     END SELECT
     IF (ErrorsFound) CALL ShowFatalError('Construction:ComplexFenestrationState: Error in state or basis definition.')
 
     !Simon: Assign thermal model number
     ThermalModelNum = FindIteminList(locAlphaArgs(4), WindowThermalModel%Name, TotThermalModels)
     IF (ThermalModelNum == 0 ) THEN
+        CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
+        CALL ShowContinueError(trim(locAlphaFieldNames(4))//' entered value="'//TRIM(locAlphaArgs(4))//  &
+          '" no corresponding thermal model.')
         CALL ShowFatalError ( 'Construction:ComplexFenestrationState: No corresponding thermal model parameters found' )
     ELSE
       Construct(ConstrNum)%BSDFInput%ThermalModel = ThermalModelNum
@@ -7019,6 +7028,9 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
 
     IF (NumCols /= 2 .AND. NumCols /= 1) THEN
       ErrorsFound=.true.
+      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
+      CALL ShowContinueError(trim(locAlphaFieldNames(5))//' entered value="'//TRIM(locAlphaArgs(5))//  &
+          '" invalid matrix.')
       Call ShowFatalError('Construction:ComplexFenestrationState: Basis matrix must be NX2 or NX1(axisymm).')
     END IF
     ALLOCATE (Construct(ConstrNum)%BSDFInput%BasisMat( NumRows, NumCols) )
@@ -7039,6 +7051,7 @@ SUBROUTINE SetupComplexFenestrationStateInput(ConstrNum,ErrorsFound)
     IF (Mod((NumAlphas - 9), 3) /= 0) Then
       !throw warning if incomplete field set
       !Simon TODO: Check this error message with someone
+      CALL ShowSevereError(TRIM(locCurrentModuleObject)//'="'//trim(locAlphaArgs(1))//'", Illegal value.')
       CALL ShowFatalError(&
        'Construction:ComplexFenestrationState: Incomplete field set.')
     ENDIF

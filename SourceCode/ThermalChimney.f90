@@ -240,8 +240,12 @@ DO Loop=1, TotThermalChimney
           ! Second Alpha is Zone Name
     ThermalChimneySys(Loop)%RealZonePtr = FindIteminList(cAlphaArgs(2),Zone%Name,NumOfZones)
     IF (ThermalChimneySys(Loop)%RealZonePtr == 0) THEN
-      CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid '//   &
-         trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'" not found.')
+      CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid Zone')
+      CALL ShowContinueError('invalid - not found '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'".')
+      ErrorsFound = .TRUE.
+    ELSEIF (.not. Zone(ThermalChimneySys(Loop)%RealZonePtr)%HasWindow) THEN
+      CALL ShowSevereError(trim(cCurrentModuleObject)//'="'//trim(cAlphaArgs(1))//' invalid Zone')
+      CALL ShowContinueError('invalid - no window(s) '//trim(cAlphaFieldNames(2))//'="'//trim(cAlphaArgs(2))//'".')
       ErrorsFound = .TRUE.
     ENDIF
     ThermalChimneySys(Loop)%RealZoneName = cAlphaArgs(2)
@@ -560,14 +564,15 @@ DO Loop=1, TotThermalChimney
 
 
   ZoneNum = ThermalChimneySys(Loop)%RealZonePtr
-  minorW = 100000.0      ! An impossibly big width
-  majorW = 0.0
+  ! start off with first surface in zone widths
+  majorW = Surface(Zone(ZoneNum)%SurfaceFirst)%Width
+  minorW = majorW
   TempmajorW = 0.0
   TemporaryWallSurfTemp = -10000.0
 
 
   ! determine major width and minor width
-  DO SurfNum = Zone(ZoneNum)%SurfaceFirst,Zone(ZoneNum)%SurfaceLast
+  DO SurfNum = Zone(ZoneNum)%SurfaceFirst+1,Zone(ZoneNum)%SurfaceLast
     IF (Surface(SurfNum)%Class .NE. SurfaceClass_Wall) CYCLE
 
     IF (Surface(SurfNum)%Width > majorW) THEN
@@ -607,9 +612,9 @@ DO Loop=1, TotThermalChimney
   END DO
 
   AbsorberWallWidthTC = majorW
-     IF (ThermalChimneySys(Loop)%AbsorberWallWidth /= majorW) THEN
-        AbsorberWallWidthTC = ThermalChimneySys(Loop)%AbsorberWallWidth
-     END IF
+  IF (ThermalChimneySys(Loop)%AbsorberWallWidth /= majorW) THEN
+    AbsorberWallWidthTC = ThermalChimneySys(Loop)%AbsorberWallWidth
+  END IF
 
   AirDensityThermalChim          = PsyRhoAirFnPbTdbW(OutBaroPress,MAT(ZoneNum),ZoneAirHumRat(ZoneNum))
   AirSpecHeatThermalChim         = PsyCpAirFnWTdb(ZoneAirHumRat(ZoneNum),MAT(ZoneNum))
@@ -663,11 +668,11 @@ DO Loop=1, TotThermalChimney
 
    ! Calculation of Thermal Chimney Discharge Air Temperature
    Process1= AbsorberWallWidthTC*DeltaL*ConvTransCoeffGlassFluid + AbsorberWallWidthTC*DeltaL*ConvTransCoeffWallFluid -   &
-             2.*TempTCMassAirFlowRate(IterationLoop)*AirSpecHeatThermalChim
+             2.d0*TempTCMassAirFlowRate(IterationLoop)*AirSpecHeatThermalChim
    Process2= AbsorberWallWidthTC*DeltaL*ConvTransCoeffGlassFluid + AbsorberWallWidthTC*DeltaL*ConvTransCoeffWallFluid +   &
-             2.*TempTCMassAirFlowRate(IterationLoop)*AirSpecHeatThermalChim
-   Process3= 2.*AbsorberWallWidthTC*DeltaL*ConvTransCoeffGlassFluid*SurfTempGlassCover  &
-             + 2.*AbsorberWallWidthTC*DeltaL*ConvTransCoeffWallFluid*SurfTempAbsorberWall
+             2.d0*TempTCMassAirFlowRate(IterationLoop)*AirSpecHeatThermalChim
+   Process3= 2.d0*AbsorberWallWidthTC*DeltaL*ConvTransCoeffGlassFluid*SurfTempGlassCover  &
+             + 2.d0*AbsorberWallWidthTC*DeltaL*ConvTransCoeffWallFluid*SurfTempAbsorberWall
 
    DO ThermChimLoop1=1, NTC
     DO ThermChimLoop2=1, NTC
@@ -770,7 +775,7 @@ DO Loop=1, TotThermalChimney
      MCPTThermChim(ZoneNum) = 0.
      ThermalChimneyReport(Loop)%OverallTCVolumeFlow = 0.
      ThermalChimneyReport(Loop)%OverallTCMassFlow = 0.
-     ThermalChimneyReport(Loop)%OutletAirTempThermalChim = REAL(MAT(ZoneNum))
+     ThermalChimneyReport(Loop)%OutletAirTempThermalChim = MAT(ZoneNum)
   END IF
 
 END DO     ! DO Loop=1, TotThermalChimney

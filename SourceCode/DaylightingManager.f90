@@ -868,8 +868,14 @@ SUBROUTINE CalcDayltgCoeffsRefMapPoints(ZoneNum)
 
   !Calc for daylighting reference points
   CALL CalcDayltgCoeffsRefPoints(ZoneNum)
-  IF (.not. DoingSizing) THEN
+  IF (.not. DoingSizing .and. .not. KickOffSimulation) THEN
     !Calc for illuminance map
+!    IF (DeveloperFlag .and. WarmUpFlag) THEN
+    IF (WarmUpFlag) THEN
+      CALL DisplayString('Calculating Daylighting Coefficients (Map Points), Zone='//trim(Zone(ZoneNum)%Name))
+    ELSE
+      CALL DisplayString('Updating Daylighting Coefficients (Map Points), Zone='//trim(Zone(ZoneNum)%Name))
+    END IF
     CALL CalcDayltgCoeffsMapPoints(ZoneNum)
   ENDIF
 
@@ -1193,22 +1199,22 @@ SUBROUTINE CalcDayltgCoeffsMapPoints(ZoneNum)
 
           ! SUBROUTINE LOCAL VARIABLE DECLARATIONS:
 
-  REAL(r64), DIMENSION(3) :: W2                        ! Second vertex of window
-  REAL(r64), DIMENSION(3) :: W3                        ! Third vertex of window
-  REAL(r64), DIMENSION(3) :: U2                        ! Second vertex of window for TDD:DOME (if exists)
-  REAL(r64), DIMENSION(3) :: RREF                      ! Location of a reference point in absolute coordinate system
-  REAL(r64), DIMENSION(3) :: RREF2                     ! Location of virtual reference point in absolute coordinate system
-  REAL(r64), DIMENSION(3) :: RWIN                      ! Center of a window element in absolute coordinate system
-  REAL(r64), DIMENSION(3) :: RWIN2                     ! Center of a window element for TDD:DOME (if exists) in abs coord sys
-  REAL(r64), DIMENSION(3) :: RAY                       ! Unit vector along ray from reference point to window element
-  REAL(r64), DIMENSION(3) :: W21                       ! Vector from window vertex 2 to window vertex 1
-  REAL(r64), DIMENSION(3) :: W23                       ! Vector from window vertex 2 to window vertex 3
-  REAL(r64), DIMENSION(3) :: U21                       ! Vector from window vertex 2 to window vertex 1 for TDD:DOME (if exists)
-  REAL(r64), DIMENSION(3) :: U23                       ! Vector from window vertex 2 to window vertex 3 for TDD:DOME (if exists)
-  REAL(r64), DIMENSION(3) :: WNORM2                    ! Unit vector normal to TDD:DOME (if exists)
-  REAL(r64), DIMENSION(3) :: VIEWVC                    ! View vector in absolute coordinate system
-  REAL(r64), DIMENSION(3) :: VIEWVC2                   ! Virtual view vector in absolute coordinate system
-  REAL(r64), DIMENSION(2) :: ZF                        ! Fraction of zone controlled by each reference point
+  REAL(r64), DIMENSION(3) :: W2             ! Second vertex of window
+  REAL(r64), DIMENSION(3) :: W3             ! Third vertex of window
+  REAL(r64), DIMENSION(3) :: U2             ! Second vertex of window for TDD:DOME (if exists)
+  REAL(r64), DIMENSION(3) :: RREF           ! Location of a reference point in absolute coordinate system
+  REAL(r64), DIMENSION(3) :: RREF2          ! Location of virtual reference point in absolute coordinate system
+  REAL(r64), DIMENSION(3) :: RWIN           ! Center of a window element in absolute coordinate system
+  REAL(r64), DIMENSION(3) :: RWIN2          ! Center of a window element for TDD:DOME (if exists) in abs coord sys
+  REAL(r64), DIMENSION(3) :: RAY            ! Unit vector along ray from reference point to window element
+  REAL(r64), DIMENSION(3) :: W21            ! Vector from window vertex 2 to window vertex 1
+  REAL(r64), DIMENSION(3) :: W23            ! Vector from window vertex 2 to window vertex 3
+  REAL(r64), DIMENSION(3) :: U21            ! Vector from window vertex 2 to window vertex 1 for TDD:DOME (if exists)
+  REAL(r64), DIMENSION(3) :: U23            ! Vector from window vertex 2 to window vertex 3 for TDD:DOME (if exists)
+  REAL(r64), DIMENSION(3) :: WNORM2         ! Unit vector normal to TDD:DOME (if exists)
+  REAL(r64), DIMENSION(3) :: VIEWVC         ! View vector in absolute coordinate system
+  REAL(r64), DIMENSION(3) :: VIEWVC2        ! Virtual view vector in absolute coordinate system
+  REAL(r64), DIMENSION(2) :: ZF             ! Fraction of zone controlled by each reference point
                                             !  In the following four variables, I=1 for clear sky, 2 for overcast.
   INTEGER   :: IHR                          ! Hour of day counter
   INTEGER   :: NRF                          ! Number of daylighting reference points in a zone
@@ -1319,6 +1325,9 @@ SUBROUTINE CalcDayltgCoeffsMapPoints(ZoneNum)
     NRF = IllumMapCalc(MapNum)%TotalMapRefPoints
     ZF=0.d0
 
+    ALLOCATE(MapWindowSolidAngAtRefPt(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
+    ALLOCATE(MapWindowSolidAngAtRefPtWtd(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
+
     DO IL = 1,NRF
 
       RREF(1:3) = IllumMapCalc(MapNum)%MapRefPtAbsCoord(IL,1:3) ! (x, y, z)
@@ -1327,9 +1336,7 @@ SUBROUTINE CalcDayltgCoeffsMapPoints(ZoneNum)
       ! ---------- WINDOW LOOP ----------
       !           -------------
 
-      ALLOCATE(MapWindowSolidAngAtRefPt(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
       MapWindowSolidAngAtRefPt=0.d0
-      ALLOCATE(MapWindowSolidAngAtRefPtWtd(ZoneDaylight(ZoneNum)%NumOfDayltgExtWins,NRF))
       MapWindowSolidAngAtRefPtWtd=0.d0
 
       DO loopwin = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
@@ -1420,10 +1427,10 @@ SUBROUTINE CalcDayltgCoeffsMapPoints(ZoneNum)
 
       END DO ! End of window loop, loopwin - IWin
 
-      DEALLOCATE(MapWindowSolidAngAtRefPt)
-      DEALLOCATE(MapWindowSolidAngAtRefPtWtd)
-
     END DO ! End of reference point loop, IL
+
+    DEALLOCATE(MapWindowSolidAngAtRefPt)
+    DEALLOCATE(MapWindowSolidAngAtRefPtWtd)
 
   END DO  ! MapNum
 
@@ -4201,7 +4208,8 @@ SUBROUTINE GetDaylightingParametersDetaild(TotDaylightingDetailed,ErrorsFound)
 
   DO SurfLoop = 1,TotSurfaces
     IF(Surface(SurfLoop)%Class == SurfaceClass_Window .AND. Surface(SurfLoop)%ExtSolar) THEN
-      IF(ZoneDaylight(Surface(SurfLoop)%Zone)%TotalDaylRefPoints > 0 .AND. .NOT. Zone(Surface(SurfLoop)%Zone)%IntZWindow) THEN
+      IF(ZoneDaylight(Surface(SurfLoop)%Zone)%TotalDaylRefPoints > 0 .AND.  &
+         .NOT. Zone(Surface(SurfLoop)%Zone)%HasInterZoneWindow) THEN
         CALL SetupOutputVariable('Daylighting Window Reference Point 1 Illuminance [lux]', &
                                  SurfaceWindow(SurfLoop)%IllumFromWinAtRefPt1Rep, &
                                 'Zone', 'Average',Surface(SurfLoop)%Name)
@@ -6033,7 +6041,7 @@ SUBROUTINE DayltgInteriorIllum(ZoneNum)
   END DO
 
   ! The following report variables are valid only for daylit zones without interior windows
-  IF(.NOT.Zone(ZoneNum)%IntZWindow) THEN
+  IF(.NOT.Zone(ZoneNum)%HasInterZoneWindow) THEN
     DO loop = 1,ZoneDaylight(ZoneNum)%NumOfDayltgExtWins
       IWin = ZoneDaylight(ZoneNum)%DayltgExtWinSurfNums(loop)
       IS = 1
@@ -6278,6 +6286,7 @@ SUBROUTINE DayltgElecLightingControl(ZoneNum)
   ENDIF
   ZoneDaylight(ZoneNum)%ZonePowerReductionFactor = TotReduction
 
+!  IF(TotIllumMaps > 0 .and. .not. DoingSizing .and. .not. WarmupFlag .and. .not. KickoffSimulation) THEN
   IF(TotIllumMaps > 0 .and. .not. DoingSizing .and. .not. WarmupFlag) THEN
     ! If an illuminance map is associated with this zone, generate the map
     IF (TimeStep == 1) mapResultsToReport=.false.
@@ -7829,7 +7838,10 @@ INTEGER :: ILM
 !              Initialize reference point illuminance and window background luminance
 
   DO ILM=1,ZoneDaylight(ZoneNum)%MapCount
+
     MapNum=ZoneDaylight(ZoneNum)%ZoneToMap(ILM)
+!    IllumMapCalc(MapNum)%DaylIllumAtMapPt  = 0.0
+!    IllumMapCalc(MapNum)%GlareIndexAtMapPt = 0.0
     NREFPT = IllumMapCalc(MapNum)%TotalMapRefPoints
 
     DaylIllum = 0.
@@ -8156,7 +8168,7 @@ INTEGER :: ILM
 
 !              Variables for reporting
     DO IL = 1,NREFPT
-      IllumMapCalc(MapNum)%DaylIllumAtMapPt(IL)  = DaylIllum(IL)
+      IllumMapCalc(MapNum)%DaylIllumAtMapPt(IL)  = MAX(DaylIllum(IL),0.0d0)
       IllumMapCalc(MapNum)%GlareIndexAtMapPt(IL) = GLRNDX(IL)
     ENDDO
   ENDDO

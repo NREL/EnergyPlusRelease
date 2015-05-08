@@ -277,7 +277,8 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
   END DO
 
   Zone%ExtWindowArea=0.0
-  Zone%IntZWindow=.false.
+  Zone%HasInterZoneWindow=.false.
+  Zone%HasWindow=.false.
   Zone%ExtGrossWallArea=0.0
   Zone%ExtNetWallArea=0.0
   Zone%TotalSurfArea=0.0
@@ -293,8 +294,10 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
     IF (.NOT.Surface(SurfNum)%HeatTransSurf) CYCLE    ! Skip shadowing (sub)surfaces
     ZoneNum=Surface(SurfNum)%Zone
     Zone(ZoneNum)%TotalSurfArea = Zone(ZoneNum)%TotalSurfArea + Surface(SurfNum)%Area
-    IF(Construct(Surface(SurfNum)%Construction)%TypeIsWindow) Zone(ZoneNum)%TotalSurfArea =  &
-      Zone(ZoneNum)%TotalSurfArea + SurfaceWindow(SurfNum)%FrameArea
+    IF(Construct(Surface(SurfNum)%Construction)%TypeIsWindow) THEN
+      Zone(ZoneNum)%TotalSurfArea = Zone(ZoneNum)%TotalSurfArea + SurfaceWindow(SurfNum)%FrameArea
+      Zone(ZoneNum)%HasWindow = .true.
+    ENDIF
     IF (Surface(SurfNum)%Class == SurfaceClass_Roof) ZoneCeilingArea(ZoneNum)=ZoneCeilingArea(ZoneNum)+Surface(SurfNum)%Area
     IF (.NOT. Construct(Surface(SurfNum)%Construction)%TypeIsWindow) THEN
       IF (Surface(SurfNum)%ExtBoundCond == ExternalEnvironment  .or. &
@@ -334,7 +337,7 @@ SUBROUTINE SetupZoneGeometry(ErrorsFound)
 
       IF ((Surface(SurfNum)%ExtBoundCond > 0) .AND. (Surface(SurfNum)%BaseSurf /= SurfNum)) THEN ! Interzone window present
         IF (.not. IgnoreInteriorWindowTransmission) THEN
-          Zone(Surface(SurfNum)%Zone)%IntZWindow=.TRUE.
+          Zone(Surface(SurfNum)%Zone)%HasInterZoneWindow=.TRUE.
         ENDIF
       ELSE
         IF (( (Surface(SurfNum)%ExtBoundCond == ExternalEnvironment) .OR.   &

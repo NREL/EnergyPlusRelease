@@ -1059,7 +1059,7 @@ SUBROUTINE GetSimpleAirModelInputs(ErrorsFound)
                                         VentilationObjects(Item)%Name,     &
                                         Ventilation%Name,           &
                                         Loop-1,                       &
-                                        Infiltration(Loop)%Name,            &
+                                        Ventilation(Loop)%Name,            &
                                         ErrFlag)
           Ventilation(Loop)%ZonePtr = ZoneList(VentilationObjects(Item)%ZoneOrZoneListPtr)%Zone(Item1)
           IF (ErrFlag) ErrorsFound=.true.
